@@ -141,7 +141,7 @@ function applySettings() {
   if (S.engine) S.engine.humans = rule('humans');
   G.audio.setVolumes({ sfx: settings.sfx, music: settings.music });
   applyGamma(settings.gamma); // r_fullscreen_gamma (ui/gamma.js)
-  G.renderer.setQuality({ renderScale: settings.renderScale, msaa: settings.msaa, pixelCap: settings.pixelCap, bloom: settings.bloom });
+  G.renderer.setQuality({ renderScale: settings.renderScale, msaa: settings.msaa, pixelCap: settings.pixelCap, bloom: settings.bloom, reflections: settings.reflections });
   G.renderer.lighting.setOptions({ fog: settings.fog, reflections: settings.reflections, particleLights: settings.particleLights });
   G.stream?.setMode(streamMode());
 }
@@ -273,7 +273,7 @@ async function loadStage() {
     if (fxBvh) data.collisionFx.bvh = fxBvh;
     G.stream?.dispose();
     G.stream = null;
-    G.renderer.setWorld(data.world);
+    G.renderer.setWorld(data.world, data.water);
     // a chunked world streams in around you (world/stream.js); the loop asks for what the camera needs.
     // load goes through S.map.loadChunk at each call (tests slow it down there to stand in for a phone's network)
     if (data.chunks.length) {

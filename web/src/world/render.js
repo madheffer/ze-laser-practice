@@ -11,6 +11,7 @@ import { sceneCopyWanted } from '../fx/particles/render/spritecard.js';
 import { SceneCopy } from './scenecopy.js';
 import { Bloom, BLOOM_POST_GLSL } from './bloom.js';
 import { PropAnimator, cloneModel } from './anim.js';
+import { Water } from './water.js';
 
 // an entity's world transform as a particle control point: position and its forward / left / up axes
 function cpFrom(ent) {
@@ -41,6 +42,7 @@ export class Renderer {
     // post-processing (tone curve, exposure, colour lookup), applied by the HDR blit in render()
     this.lighting = new MapLighting(this.scene, this.renderer);
     this.post = new PostProcess();
+    this.water = new Water(this.lighting); // CS2 water surfaces (world/water.js)
 
     this.worldRoot = new THREE.Group();
     this.worldRoot.matrixAutoUpdate = false;
@@ -68,8 +70,10 @@ export class Renderer {
   // performance settings: render resolution (x the screen's pixel ratio) and MSAA on the HDR target
   // pixelCap: the most of the screen's pixel ratio to draw at (phones are 3x; app/graphics.js Low draws at 1x)
   // bloom: CS2's bloom pass (bloom.js; off on Low)
-  setQuality({ renderScale = 1, msaa = true, pixelCap = 2, bloom = true } = {}) {
+  // water: its quality follows the preset's knobs (low = reflections off, medium = no MSAA, high = both on: world/water.js)
+  setQuality({ renderScale = 1, msaa = true, pixelCap = 2, bloom = true, reflections = true } = {}) {
     this.bloomOn = bloom !== false;
+    this.water.setQuality(!reflections ? 'low' : !msaa ? 'medium' : 'high');
     const ratio = Math.min(window.devicePixelRatio, Math.max(0.5, pixelCap)) * Math.min(1, Math.max(0.25, renderScale));
     if (Math.abs(this.renderer.getPixelRatio() - ratio) > 1e-3) { this.renderer.setPixelRatio(ratio); this.resize(); }
     if (this.msaa !== msaa) { this.msaa = msaa; if (this.hdr) { this.hdr.dispose(); this.hdr = null; this.blitScene = null; } }
@@ -90,8 +94,10 @@ export class Renderer {
   }
 
   // the whole world glb, or null for a streamed map (its chunks come through addWorldChunk)
-  setWorld(scene) {
+  // water: the map's baked water textures (loadMap's map.water; null for an older bake)
+  setWorld(scene, water = null) {
     this.worldRoot.clear();
+    this.water.setMap(water);
     this.worldMaterials = new Map(); // a streamed world's materials by name: one per vmat across every chunk
     if (scene) this.addWorldChunk(scene);
   }
@@ -116,6 +122,9 @@ export class Renderer {
     scene.traverse((o) => {
       if (o.isMesh) {
         o.material = Array.isArray(o.material) ? o.material.map((m) => this.sharedMaterial(m)) : this.sharedMaterial(o.material);
+        // CS2 water (csgo_water_fancy) gets its own shader in place of the flat glTF material
+        const w = !Array.isArray(o.material) && this.water.material(o.material);
+        if (w) { o.material = w; this.water.track(o); }
         // VRF names tool-texture meshes after their material; hide the editor-only ones
         const mats = Array.isArray(o.material) ? o.material : [o.material];
         if (mats.some((m) => /tools?(trigger|clip|nodraw|skip|invisible|playerclip|blocklight|areaportal|sky)/i.test(m?.name || ''))) o.visible = false;
@@ -515,7 +524,8 @@ void main() {
     }
     if (this.hdr.width !== size.x || this.hdr.height !== size.y) this.hdr.setSize(size.x, size.y);
     // depth feathering / refraction read the frame after the opaques (scenecopy.js)
-    (this.sceneCopy ||= new SceneCopy(this.scene, sceneCopyWanted)).frame(r, this.hdr, this.camera);
+    this.water.frame(this.camera, performance.now() / 1000);
+    (this.sceneCopy ||= new SceneCopy(this.scene, () => this.water.wantsCopy || sceneCopyWanted())).frame(r, this.hdr, this.camera);
     r.setRenderTarget(this.hdr);
     r.render(this.scene, this.camera);
     // CS2's bloom from the post volume on screen (bloom.js; this.bloomOn: the graphics setting)

@@ -99,6 +99,12 @@ public static class Program
             var ai = Array.IndexOf(args, "--cs2");
             return AlphaBake.Run(Path.GetFullPath(args[1]), Path.GetFullPath(args[2]), ai > 0 && ai + 1 < args.Length ? args[ai + 1] : FindCs2());
         }
+        if (args.Length >= 3 && args[0] == "--water")
+        {
+            // lasers-bake --water <workshop.vpk> <web/public/maps/<name>> [--cs2 <game/csgo>]: the water shader's textures (WaterBake.cs)
+            var wi = Array.IndexOf(args, "--cs2");
+            return WaterBake.Run(Path.GetFullPath(args[1]), Path.GetFullPath(args[2]), wi > 0 && wi + 1 < args.Length ? args[wi + 1] : FindCs2());
+        }
         if (args.Length >= 3 && args[0] == "--tiers")
         {
             // lasers-bake --tiers <workshop.vpk> <web/public/maps/<name>>: medium / low quality copies (TierBake.cs)
@@ -392,6 +398,8 @@ sealed class Baker(string input, string outRoot, string? cs2, bool textures)
         // the cut-out alpha VRF's exporter drops (alpha-tested leaves, fences): AlphaBake.cs
         AlphaBake.Write(loader, outDir, Log);
 
+        // the water shader's own textures (waves, foam, debris), which the glTF exporter drops: WaterBake.cs
+        WaterBake.Write(loader, outDir, Log);
         // 5. sounds: soundevents.json (every event the map's .vsndevts_c files define, + the stock ones its entities
         //    name: SoundRefs.cs) + the sounds they play (SoundBake.cs).
         var soundEvents = SoundBake.Map(loader, [map, outer], outDir, cs2 != null ? Program.StockPaks(cs2) : []);

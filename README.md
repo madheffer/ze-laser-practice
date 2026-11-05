@@ -207,6 +207,7 @@ All coordinates are Source units (inches, Z up), except the glbs, which are VRF'
   "spawn": { "origin": [2560, -3072, -2944], "yaw": 180 },
   "start": [{ "target": "[PR#]relay_atk_laser", "input": "Trigger" }],
   "winAfter": 26 }
+| `water/water.json` + `water/*.png` | *(ours)* the CS2 water shader's textures (waves normal + height, foam, debris, debris normal) the glTF exporter drops: `{ textures: { <vtex path>: <file>.png } }`, raw channels. Only maps with `csgo_water_fancy` water. Only this: `lasers-bake --water <workshop.vpk> <map folder>` |
 ```
 
 `start` inputs fire 1 s after spawn. You win either after `winAfter` seconds, or when `win: {target, input}`
@@ -516,6 +517,11 @@ web/src/
   main.js            boot + wiring only (G.play = start a stage: lock + fullscreen first, inside the click)
   lib/               shared helpers, import these instead of re-writing them:
                      dom ($, esc, replayClass), names ([PR#] names, matching), paths (map names, safe relative
+- **Water** (`world/water.js`, `world/water-glsl.js`, `WaterBake.cs`): `csgo_water_fancy` surfaces run CS2's own water
+  shader (VRF's translation of the decompiled one): waves, refraction with depth fog and decay colour, caustics, foam
+  and debris, cubemap + screen-space reflections, the sun's glint, every number from the vmat. Not ported: the
+  player / bullet ripple buffer (`g_tWaterEffectsMap`). Quality follows the preset: High as authored, Medium halves
+  SSR and drops the blurred refraction, Low has no SSR or caustics and 2 wave octaves.
                      paths, asset keys, versioned URLs), format, math (clamp, approach, bounds), storage, fetch
   app/               state, settings (sanitised, CS2 cvars), session (one attempt), loop (frames + 64-tick step),
                      input (keys, raw mouse, touch, fullscreen, keyboard lock), camera (first / third person),

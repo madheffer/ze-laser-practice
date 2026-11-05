@@ -122,6 +122,8 @@ export async function loadMap(name, onProgress = () => {}, opts = {}) {
     // optional: GFL's StripperCS2 edits to this map (tools/stripper.mjs), applied below as GFL's servers do
     fetchJson(url('stripper.json')).catch(() => null),
   ]);
+  // optional: the water shader's textures (lasers-bake --water), only for a map with CS2 water in it
+  const water = waterTextures(await fetchJson(url('water/water.json')).catch(() => null), url);
   // the same edits the co-op server applies to its copy (server/map-store.js): both must hold the same entities
   applyStripper(entities, stripper, name);
   const [fxBuf, fxLayerBuf] = await fxFiles;
@@ -161,7 +163,18 @@ export async function loadMap(name, onProgress = () => {}, opts = {}) {
   // particles that draw a model (C_OP_RenderModels) take it from the map's own models
   if (effects) { effects.getModel = getModel; effects.modelToSource = GLTF_TO_SOURCE; }
   const radar = radarInfo(overview, (rel) => url(rel));
-  return { name, version, manifest, entities, collision, collisionFx, hulls, bounds, animations, world, chunks, loadChunk, getModel, particles: fx, items, radar, effects };
+  return { name, version, manifest, entities, collision, collisionFx, hulls, bounds, animations, world, chunks, loadChunk, getModel, particles: fx, items, radar, effects, water };
+}
+
+// water.json -> { textures: { <vtex path>: url } } (null without one). File names only as the bake writes them.
+function waterTextures(j, url) {
+  const t = j?.textures;
+  if (!t || typeof t !== 'object') return null;
+  const textures = Object.create(null);
+  for (const [vtex, file] of Object.entries(t)) {
+    if (typeof file === 'string' && /^[a-z0-9_]{1,110}\.png$/.test(file)) textures[vtex] = url(`water/${file}`);
+  }
+  return { textures };
 }
 
 // (the loader adds ?v=)

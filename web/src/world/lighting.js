@@ -871,3 +871,6 @@ vec3 cs2EnvSpecular( vec3 posWS, vec3 normalVS, vec3 viewVS, float roughness, fl
   return env * min( diffuseLuma / max( envLuma, 1e-4 ), 1.0 );
 }
 `;
+
+// for the water shader (world/water.js): the lightmap decode, the cubemap reflections
+export { PARS as LIGHTMAP_PARS, CUBE_PARS };
