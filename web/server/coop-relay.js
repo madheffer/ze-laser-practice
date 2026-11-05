@@ -1,27 +1,28 @@
-// Co-op relay: rooms of up to MAX_MEMBERS players over one WebSocket each (path /coop). The relay knows nothing
-// about the game: it hands out room codes, keeps the member list (and who hosts: the oldest member), and forwards
-// each member's messages to the others with a server-set `from`, so nobody can speak as someone else.
+// The co-op server: rooms of up to 8 players over one WebSocket each (path /coop). Rooms and rounds live HERE:
+// the room owner (whoever made it; the next oldest member if they leave) can change the room's settings, pick
+// the stage and kick, and the server checks every one of those; a round (coop-round.js) is run by the server,
+// not by a player. Public rooms show up in a list anyone can browse; private ones only by code / invite link.
 //
-// Every client runs the map itself with the host's seed (the lasers line up without syncing entities); what goes
-// through here is small: player states at 20 Hz, deaths, boss damage, start / end of a round (app/coop.js).
-//
-// Everything a client sends is untrusted: frames are size- and rate-limited, names are cleaned, codes validated,
-// and relayed payloads are passed on untouched for the receiving client to validate (net/protocol.js).
+// Players only ever talk to the server, never to each other, so no one sees another player's address, and the
+// server never sends or logs one. Everything a client sends is untrusted: frames are size- and rate-limited,
+// names and settings are cleaned (lib/room-rules.js), and connections per address are capped.
 import { WebSocketServer } from 'ws';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { cleanName, cleanSettings, cheatsOn, ROOM_MAX } from '../src/lib/room-rules.js';
+import { isMapName } from '../src/lib/paths.js';
+import { Round } from './coop-round.js';
+import { scenarioStore } from './scenarios.js';
 
 export const PATH = '/coop';
-const MAX_MEMBERS = 8;
-const MAX_ROOMS = 200;
+const MAX_ROOMS = 300;
 const MAX_FRAME = 8 * 1024; // bytes
-const RATE = 80; // messages per second per connection (20 Hz state + events), averaged over a second
+const RATE = 80; // messages per second per connection (20 Hz state + events)
+const PER_ADDRESS = 6; // open sockets per remote address
+const LIST_MS = 1000; // a client may ask for the public list once a second
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ'; // no I / O (they read as 1 / 0)
 const CODE = /^[A-Z]{4}$/;
-
-export function cleanName(n) {
-  // eslint-disable-next-line no-control-regex
-  const s = String(n ?? '').replace(/[\u0000-\u001f\u007f<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, 20);
-  return s || 'Player';
-}
+const HERE = path.dirname(fileURLToPath(import.meta.url));
 
 function newCode(rooms) {
   for (let k = 0; k < 50; k++) {
@@ -32,33 +33,72 @@ function newCode(rooms) {
   return null;
 }
 
-// A browser page on another site must not be able to open a socket here: when an Origin is sent it has to be
-// this host (dev, `npm run play` and a LAN address all send their own host).
+// A page on another site must not open a socket here: when an Origin is sent it has to be this host.
 function sameOrigin(req) {
   const origin = req.headers.origin;
   if (!origin) return true; // not a browser
   try { return new URL(origin).host === req.headers.host; } catch { return false; }
 }
 
-export function attachCoopRelay(httpServer, { log = () => {} } = {}) {
+// a name nobody else in the room has: "Bob", "Bob (2)"
+function uniqueName(room, name, self) {
+  const taken = new Set(room.members.filter((m) => m !== self).map((m) => m.name));
+  if (!taken.has(name)) return name;
+  for (let i = 2; i < 20; i++) { const n = `${name.slice(0, 16)} (${i})`; if (!taken.has(n)) return n; }
+  return name;
+}
+
+export function attachCoopRelay(httpServer, { log = () => {}, scenariosDir = path.resolve(HERE, '../public/scenarios') } = {}) {
   const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_FRAME, perMessageDeflate: false });
-  const rooms = new Map(); // code -> { code, members: [client] }
+  const rooms = new Map(); // code -> room
+  const perAddress = new Map();
+  const findStage = scenarioStore(scenariosDir);
   let nextId = 1;
 
   const send = (c, msg) => { if (c.ws.readyState === 1) c.ws.send(JSON.stringify(msg)); };
-  const roster = (room) => ({
-    t: 'room', code: room.code, host: room.members[0]?.id ?? 0,
-    members: room.members.map((m) => ({ id: m.id, name: m.name })),
-  });
-  const announce = (room) => { const r = roster(room); for (const m of room.members) send(m, { ...r, you: m.id }); };
+  const io = { send };
 
-  function leave(c) {
+  const roomView = (room) => ({
+    code: room.code, owner: room.owner, settings: room.settings, map: room.map,
+    members: room.members.map((m) => ({ id: m.id, name: m.name })),
+    round: room.round && !room.round.ended ? { r: room.round.r, stage: room.round.stage.name, ids: [...room.round.players.keys()] } : null,
+  });
+  const announce = (room) => { const v = roomView(room); for (const m of room.members) send(m, { t: 'room', you: m.id, ...v }); };
+
+  function leave(c, why = 'left') {
     const room = c.room;
     if (!room) return;
     c.room = null;
     room.members = room.members.filter((m) => m !== c);
-    if (!room.members.length) rooms.delete(room.code);
-    else announce(room); // the next oldest member hosts
+    room.round?.onLeave(c);
+    if (!room.members.length) { rooms.delete(room.code); return; }
+    if (room.owner === c.id) room.owner = room.members[0].id; // the next oldest runs the room
+    room.round?.updateLeader();
+    announce(room);
+    if (why === 'kicked') send(c, { t: 'kicked' });
+  }
+
+  function publicList() {
+    return [...rooms.values()].filter((r) => r.settings.public).map((r) => ({
+      code: r.code, name: r.settings.name || `${r.members.find((m) => m.id === r.owner)?.name || 'Someone'}'s room`,
+      kind: r.settings.kind, players: r.members.length, max: r.settings.max, map: r.map || '',
+      playing: !!(r.round && !r.round.ended), stage: r.round && !r.round.ended ? r.round.stage.name : '',
+      cheats: cheatsOn(r.settings.rules),
+    })).sort((a, b) => (a.playing - b.playing) || (b.players - a.players)).slice(0, 100);
+  }
+
+  async function startRound(c, m) {
+    const room = c.room;
+    if (!room || room.owner !== c.id) return send(c, { t: 'error', msg: 'Only the room owner picks the stage' });
+    if (!isMapName(m.map)) return;
+    const stage = await findStage(m.map, m.stage == null ? null : String(m.stage).slice(0, 80));
+    if (c.room !== room) return; // left while the file was read
+    if (!stage) return send(c, { t: 'error', msg: 'That stage is not on this server' });
+    const mode = m.mode === 'endless' && stage.endless ? 'endless' : 'normal';
+    room.round = new Round(room, { map: m.map, stage, mode, kind: room.settings.kind, rules: room.settings.rules }, io);
+    room.map = m.map;
+    room.round.broadcast(room.round.startMessage());
+    announce(room);
   }
 
   function onMessage(c, raw) {
@@ -68,52 +108,87 @@ export function attachCoopRelay(httpServer, { log = () => {} } = {}) {
     let m;
     try { m = JSON.parse(String(raw)); } catch { return; }
     if (!m || typeof m !== 'object' || typeof m.t !== 'string') return;
+    const room = c.room, round = room?.round;
+    const owner = !!room && room.owner === c.id;
     switch (m.t) {
-      case 'hello': c.name = cleanName(m.name); if (c.room) announce(c.room); break;
+      case 'hello':
+        c.name = cleanName(m.name);
+        if (room) { c.name = uniqueName(room, c.name, c); announce(room); }
+        break;
+      case 'list':
+        if (now - c.listAt < LIST_MS) return;
+        c.listAt = now;
+        send(c, { t: 'list', rooms: publicList() });
+        break;
       case 'create': {
         leave(c);
         if (rooms.size >= MAX_ROOMS) return send(c, { t: 'error', msg: 'The server is full, try again later' });
         const code = newCode(rooms);
         if (!code) return send(c, { t: 'error', msg: 'Could not make a room code' });
-        const room = { code, members: [c] };
-        rooms.set(code, room);
-        c.room = room;
-        announce(room);
-        log(`coop: room ${code} created`);
+        const r = { code, members: [c], owner: c.id, settings: cleanSettings(m.settings), map: isMapName(m.map) ? m.map : '', round: null, banned: new Set() };
+        rooms.set(code, r);
+        c.room = r;
+        announce(r);
+        log(`coop: room ${code} (${r.settings.public ? 'public' : 'private'})`);
         break;
       }
       case 'join': {
         const code = String(m.code ?? '').toUpperCase();
-        const room = CODE.test(code) ? rooms.get(code) : null;
-        if (!room) return send(c, { t: 'error', msg: `No room ${CODE.test(code) ? code : ''}`.trim() });
-        if (room === c.room) return announce(room);
-        if (room.members.length >= MAX_MEMBERS) return send(c, { t: 'error', msg: `Room ${code} is full` });
+        const r = CODE.test(code) ? rooms.get(code) : null;
+        if (!r) return send(c, { t: 'error', msg: `No room ${CODE.test(code) ? code : ''}`.trim() });
+        if (r === room) return announce(r);
+        if (r.banned.has(c.id)) return send(c, { t: 'error', msg: 'You were removed from that room' });
+        if (r.members.length >= r.settings.max) return send(c, { t: 'error', msg: `Room ${code} is full` });
         leave(c);
-        room.members.push(c);
-        c.room = room;
-        announce(room);
+        c.name = uniqueName(r, c.name, c);
+        r.members.push(c);
+        c.room = r;
+        announce(r);
         break;
       }
       case 'leave': leave(c); send(c, { t: 'left' }); break;
-      case 'msg': {
-        if (!c.room || !m.d || typeof m.d !== 'object') return;
-        const out = JSON.stringify({ t: 'msg', from: c.id, d: m.d });
-        const to = Number.isInteger(m.to) ? m.to : null;
-        for (const o of c.room.members) if (o !== c && (to == null || o.id === to) && o.ws.readyState === 1) o.ws.send(out);
+      case 'settings':
+        if (!owner) return;
+        room.settings = cleanSettings(m.settings, room.members.length);
+        announce(room); // a round in progress keeps the rules it started with
+        break;
+      case 'map': if (owner && isMapName(m.map)) { room.map = m.map; announce(room); } break;
+      case 'kick': {
+        if (!owner || m.id === c.id) return;
+        const target = room.members.find((x) => x.id === m.id);
+        if (target) { room.banned.add(target.id); leave(target, 'kicked'); }
         break;
       }
+      case 'start': if (round && !round.ended && !owner) return; startRound(c, m); break;
+      case 'abort': if (owner && round && !round.ended) round.end('lose'); break;
+      // a round's traffic, for the round the client is in
+      case 's': if (round && m.r === round.r) round.onState(c, m); break;
+      case 'dead': if (round && m.r === round.r) round.onDead(c, m); break;
+      case 'outcome': if (round && m.r === round.r) round.onOutcome(c, m); break;
+      case 'hit': if (round && m.r === round.r) round.onHit(c, m); break;
     }
   }
 
-  wss.on('connection', (ws) => {
-    const c = { id: nextId++, name: 'Player', ws, room: null, windowAt: Date.now(), count: 0 };
-    send(c, { t: 'welcome', you: c.id });
+  wss.on('connection', (ws, req) => {
+    const addr = req.socket.remoteAddress || '';
+    const c = { id: nextId++, name: 'Player', ws, room: null, windowAt: Date.now(), count: 0, listAt: 0, addr };
+    ws.isAlive = true;
+    ws.on('pong', () => { ws.isAlive = true; });
+    send(c, { t: 'welcome', you: c.id, max: ROOM_MAX });
     ws.on('message', (raw) => onMessage(c, raw));
-    ws.on('close', () => leave(c));
-    ws.on('error', () => leave(c));
+    const gone = () => {
+      leave(c);
+      const n = (perAddress.get(addr) || 1) - 1;
+      if (n > 0) perAddress.set(addr, n); else perAddress.delete(addr);
+    };
+    ws.once('close', gone);
   });
 
-  // keep idle sockets from being dropped by proxies, and drop dead ones
+  // rounds: boss damage, clock, vote timeouts; and dead sockets
+  const tick = setInterval(() => {
+    const now = Date.now();
+    for (const r of rooms.values()) r.round?.tick(now);
+  }, 100);
   const ping = setInterval(() => {
     for (const ws of wss.clients) {
       if (ws.isAlive === false) { ws.terminate(); continue; }
@@ -121,18 +196,21 @@ export function attachCoopRelay(httpServer, { log = () => {} } = {}) {
       ws.ping();
     }
   }, 20000);
-  wss.on('connection', (ws) => { ws.isAlive = true; ws.on('pong', () => { ws.isAlive = true; }); });
-  wss.on('close', () => clearInterval(ping));
+  wss.on('close', () => { clearInterval(tick); clearInterval(ping); });
 
   httpServer.on('upgrade', (req, socket, head) => {
     if ((req.url || '').split('?')[0] !== PATH) return; // Vite's own HMR socket and anything else
-    if (!sameOrigin(req)) { socket.write('HTTP/1.1 403 Forbidden\r\n\r\n'); socket.destroy(); return; }
+    const addr = req.socket.remoteAddress || '';
+    if (!sameOrigin(req) || (perAddress.get(addr) || 0) >= PER_ADDRESS) {
+      socket.write('HTTP/1.1 403 Forbidden\r\n\r\n'); socket.destroy(); return;
+    }
+    perAddress.set(addr, (perAddress.get(addr) || 0) + 1);
     wss.handleUpgrade(req, socket, head, (ws) => wss.emit('connection', ws, req));
   });
   return wss;
 }
 
-// Vite plugin: the relay on the dev server (npm run dev) and the preview server (npm run play).
+// Vite plugin: the co-op server on the dev server (npm run dev) and the preview server (npm run play / host).
 export function coopRelayPlugin() {
   const attach = (server) => {
     if (server.httpServer) attachCoopRelay(server.httpServer, { log: (m) => server.config.logger.info(m) });

@@ -1,37 +1,24 @@
-// The rules a run plays by. Solo, they are your settings. In a co-op / versus round they are the host's, sent with
-// the round start (app/coop.js), so every client runs the same simulation: same seed, same humans and boss HP,
-// same team fire. They are held for the round only and never saved into your settings.
+// The rules a run plays by. Solo, they are your own settings. In a co-op / versus round they are the ROOM's
+// (lib/room-rules.js), sent by the server with the round start: every client runs the same simulation (same
+// humans, boss HP, team fire), and cheats (god mode, hitboxes, auto bunnyhop) are off unless the room owner
+// turned them on. Your own toggles do nothing in a round, and the room's rules are never saved into your settings.
 import { S } from './state.js';
-import { settings, sanitizeSettings } from './settings.js';
-import { own } from '../lib/storage.js';
-
-// what a round shares; everything else (sensitivity, ping, volume, camera) stays each player's own
-export const SHARED = ['humans', 'bossHp', 'autoFire', 'perfectTeam', 'fallDamage'];
+import { settings } from './settings.js';
+import { RULE_DEFAULTS } from '../lib/room-rules.js';
 
 export function rule(key) {
-  const r = S.mp?.rules;
-  const v = r ? own(r, key) : undefined;
-  return v !== undefined ? v : settings[key];
+  if (S.mp && Object.hasOwn(RULE_DEFAULTS, key)) return S.mp.rules[key];
+  return settings[key];
 }
 
-// God mode and slow motion would break a shared clock or a fair versus: a round runs at 1x, and versus never
-// has god mode.
+// a round runs on the server's clock: no slow motion
 export const timescale = () => (S.mp ? 1 : settings.timescale);
-export const godMode = () => (S.mp?.kind === 'versus' ? false : settings.god);
+export const godMode = () => rule('god');
 
-// The host's rules for a new round.
-export function hostRules() {
-  const out = { seed: settings.seed || ((Date.now() & 0xffff) || 1) };
-  for (const k of SHARED) out[k] = settings[k];
-  return out;
-}
-
-// Rules that came over the network: only the shared keys, typed and in range like saved settings are.
-export function cleanRules(r) {
-  if (!r || typeof r !== 'object') return { seed: 1 };
-  const picked = {};
-  for (const k of SHARED) if (Object.hasOwn(r, k)) picked[k] = r[k];
-  const out = sanitizeSettings(picked);
-  out.seed = Number.isInteger(r.seed) && r.seed > 0 && r.seed < 2 ** 31 ? r.seed : 1;
-  return out;
+// what movement reads (player.tick's settings): the room's auto bunnyhop in a round
+let moveCache = null;
+export function moveSettings() {
+  if (!S.mp) return settings;
+  if (moveCache?.src !== settings || moveCache.bhop !== S.mp.rules.autoBhop) moveCache = { src: settings, bhop: S.mp.rules.autoBhop, value: { ...settings, autoBhop: S.mp.rules.autoBhop } };
+  return moveCache.value;
 }

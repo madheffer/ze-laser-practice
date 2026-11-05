@@ -42,7 +42,7 @@ export function bossTargets(list = S.scenario?.bosses) {
 
 // Can the team see it? A world ray from your eye to the middle of its hull (8192 u max).
 function bossVisible(e) {
-  if (S.run?.spectating) return true; // the host is dead: the rest of the team still fights
+  if (S.run?.spectating) return true; // the leader is dead: the rest of the team still fights
   const hs = e.hulls();
   if (!hs?.length) return false;
   const h = hs[0];
@@ -57,26 +57,27 @@ function bossVisible(e) {
 // back up
 export const bossHittable = (e) => e.alive && (e.cls === 'func_breakable' || e.state.health >= e.state.max * 0.01);
 
-function hitBoss(e, damage) {
+// how: 'me' (your shot), 'team' (the simulated team), 'replay' (a fast-forward, the same on every client)
+function hitBoss(e, damage, how = 'me') {
   if (!bossHittable(e)) return false;
-  // in a round, boss damage is the host's: a guest's hit goes to the host, who applies it for everyone
-  if (S.mp && !S.mp.isHost) { S.mp.bossHit(e, damage); return true; }
+  // in a round, boss damage goes through the server, which sends everyone's (capped) hits back to all clients
+  if (S.mp && how !== 'replay') { S.mp.bossHit(e, damage, how === 'team'); return true; }
   applyBossDamage(e, damage);
   return true;
 }
 
-// Damage that lands (yours solo; the host's, or a hit the host relayed, in a round).
+// Damage that lands (yours solo; in a round, the hits the server sends back).
 export function applyBossDamage(e, damage) {
   S.engine.damage(e, damage, S.engine.playerEnt);
-  S.mp?.bossDamaged(e, damage);
 }
 
 // silent: during a fast-forward replay (shoots the scenario's fastForwardBosses, no line of sight needed)
 export function bossFire(dt, silent = false) {
   const { run, scenario } = S;
   if (!silent && (!rule('autoFire') || run.endless && scenario.endless?.noBossDamage)) return;
-  // the simulated team fires on the host only (a replay is the same on every client, so that runs everywhere)
-  if (!silent && S.mp && !S.mp.isHost) return;
+  // in a round the simulated team fires from one client, the round's leader (a replay runs everywhere)
+  if (!silent && S.mp && !S.mp.isLeader) return;
+  const how = silent ? 'replay' : 'team';
   const targets = silent ? bossTargets(scenario.fastForwardBosses) : bossTargets().filter(({ e }) => bossVisible(e));
   if (!targets.length) return;
   // you are one of the humans: the team is the other (humans - 1); your own shots come from your gun
@@ -87,7 +88,7 @@ export function bossFire(dt, silent = false) {
     run.fireAcc += team * PERFECT_HITS_PER_HUMAN * scale * dt;
     while (run.fireAcc >= 1 && guard++ < 400) {
       run.fireAcc -= 1;
-      for (const { e } of targets) hitBoss(e, DAMAGE_PER_HIT);
+      for (const { e } of targets) hitBoss(e, DAMAGE_PER_HIT, how);
     }
   } else {
     // slow wave (period ~9 s and ~4 s mixed) so the squad's fire ebbs and surges
@@ -100,7 +101,7 @@ export function bossFire(dt, silent = false) {
       run[k] = (run[k] || 0) + team * w.share * w.rate * ACCURACY * duty * scale * dt;
       while (run[k] >= 1 && guard++ < 400) {
         run[k] -= 1;
-        for (const { e } of targets) hitBoss(e, w.damage);
+        for (const { e } of targets) hitBoss(e, w.damage, how);
       }
     }
   }

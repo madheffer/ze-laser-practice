@@ -132,6 +132,53 @@ the stance files are vpkstuff's clip decode (lab `tools/previewer/extract-tp-cli
 (rotates the DMX's Y-up root bones into Z-up; `--check` it against `Z:\weaponviewer\tp\clips\pose_idle_knife.json`);
 `ctm_sas/ctm_sas.constraints.json` is copied from `Z:\weaponviewer\fp\agents\`.
 
+## Co-op and versus
+
+Play any stage (normal or endless) with other people, on rooms our server hosts. The **Multiplayer** card on the
+Play tab has three ways in:
+
+- **Create room**: a name, **Private** (code / invite link only) or **Public** (listed under Browse rooms), the mode,
+  max players (2–8) and the rules: humans alive, boss HP %, team fire, perfect team, fall damage, and the
+  **cheats** (god mode, laser hitboxes, auto bunnyhop). Cheats start **off**. Only the room owner can turn them on,
+  and the room view and the public list flag them for everyone. Your own Settings toggles (G / H / T too) do nothing
+  in a round: the round plays by the room's rules (`app/rules.js`), which are never saved into your settings.
+- **Browse rooms**: the public rooms (name, mode, map, players, in the lobby or playing what, cheats on), refreshed
+  every 4 s, with a Join button. With no rooms open, it offers to create a public one.
+- **Join by code** (or an invite link, `?room=CODE`).
+
+In a room: the code and **Copy invite link**, the badges, the players (★ owner; the owner can remove someone),
+the rules as chips, **Room settings** (owner; applies from the next round) and **Leave**. The owner picks the map
+and the stage, and the round starts for everyone (a 3 s countdown so the others can click in). Guests' stage cards
+are dimmed. If the owner leaves, the next oldest member owns the room.
+
+- **Co-op**: survive together. When someone dies, the kill feed (top right, CS2-style) says what got them, and you
+  can still clear the stage alone as the last one alive. Everyone dead = team wiped (endless: whoever lasted
+  longest). Dead players spectate a teammate (Mouse 1 = next).
+- **Versus**: the same stage side by side, last one alive wins. If both clear it, fewer hits wins.
+
+**The server runs the rooms and the rounds** (`web/server/`), not a player:
+- `coop-relay.js`: sockets, rooms, owner rights (settings, start, kick: all checked by the server), the public list.
+  `coop-round.js`: one round. The server picks the seed and hands out the room's rules, keeps the round clock,
+  stamps deaths itself (a claimed time has to be plausible), and decides the end and the winners. Stage clears and
+  fails come from the map's logic on the clients: the server takes one when every connected player's map says so, or
+  most of them within 3 s. `scenarios.js` reads the stage files so only real stages start.
+- **Boss damage** goes through the server. Each player's hits are capped at a gun's rate (12/s × the boss-HP
+  scale), and the simulated team's fire comes from one client, the round's leader, capped per human. The server
+  sums them and sends them to everyone, so every client applies the same hits.
+- **Nobody sees anyone's IP**: players only ever talk to the server, never to each other. The server sends names
+  only and never logs addresses.
+- **How it stays 1:1**: no entity is synced. Every client runs the map's own logic with the server's seed on the
+  wall clock, pulled onto the server's round clock. Two tabs spawn the same entities with the same ids on the same
+  ticks. Players send their position at 20 Hz.
+- **Limits**: 8 KB frames, 80 messages per second, 6 sockets per address, 300 rooms, and sockets from another site's
+  Origin are refused. Names and settings are cleaned on both sides by the same code (`lib/room-rules.js`).
+- **Running it**: it's built into `npm run dev` / `npm run play` at `/coop`. `npm --prefix web run host` serves on
+  your LAN (:5805). For hosting, `npm --prefix web run coop-server` (`server/main.js`, :5810, `/healthz`) runs it
+  alone behind the static site, with `/coop` proxied on the same origin.
+- **Not yet**: the server trusts each client about its own player (a modified client could skip its own death).
+  Leaderboards need the server to re-check runs (see ROADMAP). Triggers only a teammate touches don't fire on your
+  client. Someone who joins mid-round waits for the next one. Records are only kept solo.
+
 ## Endless, records, ping
 
 - **Endless** (∞ in the picker, or from the Stage cleared card): a scenario's `endless` block keeps the map's own

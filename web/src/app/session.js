@@ -89,7 +89,7 @@ export function startScenario(i, mode = 'normal') {
   // cs2f_free_armor 2); scenario.player can override health/armor/gravity for a stage that starts mid-map.
   const hp0 = scenario?.player?.health ?? 100;
   S.run = {
-    // a round counts down 3 s, so a guest has time to click in (their run starts without a click: the host's did)
+    // a round counts down 3 s, so a guest has time to click in (their run starts without a click)
     t: 0, ticks: 0, startAt: scenario ? (S.mp ? 3.0 : 1.0) : Infinity, started: false, hp: hp0, maxHp: hp0,
     armor: scenario?.player?.armor ?? 100, helmet: true,
     hits: 0, done: false, result: '', mode: endless ? 'endless' : 'normal', endless,
@@ -206,9 +206,10 @@ export function hazardName(source) {
 export function finish(result) {
   const run = S.run;
   if (!run || run.done) return;
-  // in a round your death makes you a spectator, and the host decides how the round ends (app/coop.js)
+  // in a round your death makes you a spectator, and the server decides how the round ends (app/coop.js)
   if (S.mp) {
-    if (result !== 'dead') { S.mp.outcome(result); return; }
+    // the stage's clear / fail goes to the server once (winAfter would say it every tick); the round runs on
+    if (result !== 'dead') { if (!run.reported) { run.reported = result; S.mp.outcome(result); } return; }
     if (run.spectating) return;
     run.spectating = true;
     run.deadAt = stageTime();

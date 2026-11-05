@@ -27,7 +27,7 @@ import { Menu } from './ui/menu.js';
 import { Killfeed } from './ui/killfeed.js';
 import { Lobby } from './ui/lobby.js';
 import { Peers } from './world/peers.js';
-import { net, lobby, installCoop, hostStart, setKind, abortRound } from './app/coop.js';
+import { net, lobby, installCoop, hostStart, abortRound } from './app/coop.js';
 
 const canvas = $('#view');
 G.renderer = new Renderer(canvas);
@@ -130,6 +130,7 @@ async function selectMap(name) {
   G.audio.loadMap(name, S.map.version).catch((e) => log(`audio: ${e.message || e}`));
   S.scenarios = (await loadScenarios(name)).scenarios || [];
   G.menu.build();
+  net.setMap(name); // a room owner's map shows in the public room list
   $('#status').textContent = `${name}: ${S.map.collision.length / 9} collision triangles, ${Object.keys(S.map.entities.lumps).length} entity lumps`;
   // a still view of the map behind the menu; nothing runs until a stage is picked
   const ct = S.map.entities.lumps.default_ents?.find((d) => d.kv.classname === 'info_player_counterterrorist');
@@ -167,7 +168,10 @@ G.selectMap = async (name) => {
   sel.value = name;
   await selectMap(name);
 };
-G.lobby = new Lobby($('#lobby'), { net, state: lobby, onKind: setKind });
+G.lobby = new Lobby($('#lobby'), {
+  net, state: lobby, getMap: () => S.map?.name || '',
+  mapTitle: (name) => S.mapIndex?.find((m) => m.name === name)?.title || name,
+});
 installCoop();
 
 // console handle for debugging and automated checks

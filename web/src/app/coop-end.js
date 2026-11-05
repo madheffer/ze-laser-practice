@@ -1,5 +1,5 @@
-// The end card of a co-op / versus round: who won, how, and a line per player (survived / died at). The host's
-// card has "Play again" (it starts the next round for everyone); a guest waits for the host.
+// The end card of a co-op / versus round (the server's verdict): who won, how, and a line per player (survived /
+// died at). The room owner's card has "Play again" (the server starts the next round for everyone); the others wait for it.
 import { S, G } from './state.js';
 import { formatTime, plural } from '../lib/format.js';
 
@@ -36,10 +36,10 @@ export function showRoundEnd(round, d) {
 
   const stats = d.stats.map((s) => [
     s.id === me ? `${round.name(s.id)} (you)` : round.name(s.id),
-    `${s.alive ? 'alive' : `died ${formatTime(s.t)}`} · ${plural(s.hits, 'hit')}`,
+    `${s.alive ? 'alive' : `died ${formatTime(s.at)}`} · ${plural(s.hits, 'hit')}`,
     d.winners.includes(s.id),
   ]);
-  stats.push(['Round time', formatTime(d.t)]);
+  stats.push(['Round time', formatTime(d.at)]);
 
   const menu = { label: 'Menu', key: 'Escape', onClick: () => { G.overlay.hide(); G.menu.update(); } };
   const buttons = round.isHost
@@ -48,7 +48,7 @@ export function showRoundEnd(round, d) {
   G.overlay.show({
     kind,
     kicker: `${scenario?.name || 'Free roam'} · ${versus ? 'versus' : 'co-op'}${round.mode === 'endless' ? ' · endless' : ''}`,
-    title, subtitle, record: round.isHost ? '' : 'Waiting for the host to start the next round', stats, buttons,
+    title, subtitle, record: round.isHost ? '' : 'Waiting for the room owner to start the next round', stats, buttons,
   });
   G.menu.update();
 }

@@ -2,7 +2,7 @@
 import { CS } from '../world/movement.js';
 import { S, G } from './state.js';
 import { settings } from './settings.js';
-import { timescale, godMode } from './rules.js';
+import { rule, timescale, godMode, moveSettings } from './rules.js';
 import { clamp } from '../lib/math.js';
 import { readInput, takeLookDelta } from './input.js';
 import { bossFire, bossStatus, trackSegments } from './bosses.js';
@@ -21,7 +21,7 @@ export function resetClock() { last = lastSim = performance.now(); }
 // Advance the simulation to `now`. Solo: real time x timescale, and nothing moves while paused. In a round
 // (S.mp) the map runs on the wall clock from the round start whatever you do (a server doesn't pause for your
 // menu), catching up after a hidden tab, so every client's lasers stay in step; app/coop.js nudges wall0 to
-// the host's clock.
+// the server's round clock.
 export function simulate(now) {
   const { player, engine, run } = S;
   if (!player || !engine || !run) return;
@@ -75,6 +75,7 @@ export function frame(now) {
   G.renderer.setView(cameraPosition(S.world, eye, view.yaw, view.pitch, tp, settings.tpDist), view.yaw, view.pitch);
   G.body?.update({ visible: tp, origin: o, yaw: player.yaw, ducked: player.ducked, duckAmount: player.duckAmount, onGround: player.onGround });
   G.peers?.update(S.run && S.mp ? S.run.t - S.mp.interpDelay : null, G.renderer.camera, spec?.id);
+  G.renderer.showHitboxes = rule('hitboxes'); // a round's are the room's
   G.renderer.updateEntities(engine ? engine.time + (live ? acc : 0) : 0);
   G.renderer.render();
   const look = takeLookDelta();
@@ -119,7 +120,7 @@ export function step() {
   const inp = window.__lasersInput?.(run.t) || (S.locked ? readInput() : { forward: 0, side: 0, jump: false, duck: false, walk: false });
   player.maxSpeed = G.vm.weapon === 'knife' ? 250 : 215; // CS2: knife 250, AK-47 215
   const before = player.origin;
-  player.tick(inp, settings);
+  player.tick(inp, moveSettings());
   footsteps(inp, before);
 
   for (const ev of engine.updateTriggers(player)) {

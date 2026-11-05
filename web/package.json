@@ -8,7 +8,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "play": "vite build && vite preview",
-    "host": "vite build && vite preview --host"
+    "host": "vite build && vite preview --host",
+    "coop-server": "node server/main.js"
   },
   "dependencies": {
     "three": "0.170.0",

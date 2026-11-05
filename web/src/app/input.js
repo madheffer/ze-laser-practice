@@ -182,9 +182,10 @@ export function installInput(canvas, actions) {
       case 'KeyR': actions.reload(); break;
       case 'KeyF': G.vm.inspect(); break;
       case 'Backspace': actions.restart(); break;
-      case 'KeyH': setToggle('hitboxes', '#hitboxes', !settings.hitboxes); actions.applySettings(); break;
-      case 'KeyG': setToggle('god', '#god', !settings.god); break;
-      case 'KeyT': settings.timescale = settings.timescale === 1 ? 0.25 : 1; break;
+      // a co-op / versus round plays by the room's rules (app/rules.js): these are solo-only
+      case 'KeyH': if (!S.mp) { setToggle('hitboxes', '#hitboxes', !settings.hitboxes); actions.applySettings(); } break;
+      case 'KeyG': if (!S.mp) setToggle('god', '#god', !settings.god); break;
+      case 'KeyT': if (!S.mp) settings.timescale = settings.timescale === 1 ? 0.25 : 1; break;
     }
   });
   document.addEventListener('keyup', (ev) => keys.delete(ev.code));
