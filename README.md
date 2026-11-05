@@ -453,6 +453,9 @@ Invite link and who is alive (with each player's ping). Change stage and Setting
     probe's baked visibility; outside every volume, the sky's ambient (`light_environment` skycolor x skyintensity)
   - the sun (`light_environment`, `directlight` 2 / 3): colour (sRGB -> linear) x brightness x N.L, masked by its
     `bakedshadowindex` channel; CS2's diffuse has no 1/pi, so three's numbers are scaled by pi to match
+  - the map's `light_omni2` with `directlight 3` (`world/maplights.js`): their bounce is baked, their direct light is
+    added per pixel (colour x 2^brightness x 100^2, 1/d^2, skirt fade), masked by each one's shadow channel on the
+    world, unshadowed on probe-lit meshes (the probe bake keeps the sun's channel only); up to 16 in view
   - the frame: CS2's tone curve (x 2.8, white point clamp, Hable-style curve from the `.vpost` or CS2's defaults), the map's
     exposure range, sRGB, the colour lookup, then gamma
   - fog, from the map's entities (`entities/classes/fog.js`, any map): `env_fog_controller` (start / end / max density /

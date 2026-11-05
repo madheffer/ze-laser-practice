@@ -105,7 +105,9 @@ export class PostProcess {
     const q = cleanParams(p);
     this.uniforms.cs2ToneA.value.set(q.m_flShoulderStrength, q.m_flLinearStrength, q.m_flLinearAngle, q.m_flToeStrength);
     const white = curve(2 ** q.m_flWhitePoint, q);
-    this.uniforms.cs2ToneB.value.set(q.m_flToeNum, q.m_flToeDenom, white > 1e-6 ? 1 / white : 1, 2 ** q.m_flWhitePoint);
+    // signed: some maps' curves are negative for every x > 0 (dreamin.vpost: f(white) = -0.211), and dividing by the
+    // negative f(white) flips them back to a near-linear curve; clamping that to 1 left every pixel negative (black)
+    this.uniforms.cs2ToneB.value.set(q.m_flToeNum, q.m_flToeDenom, Math.abs(white) > 1e-6 ? 1 / white : 1, 2 ** q.m_flWhitePoint);
     this.bias = 2 ** q.m_flExposureBias;
   }
 

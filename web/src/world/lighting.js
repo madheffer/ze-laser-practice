@@ -6,6 +6,7 @@
 //     sky light on top. Lights with directlight 1 ("fully baked") are inside it, the sun included.
 //   - the sun (light_environment with directlight 2 / 3): added per pixel, colour (sRGB -> linear) x brightness x
 //     N.L, masked by its channel of the baked shadow mask (bakedshadowindex: 0 R .. 3 A; 1 = fully shadowed).
+//   - the map's light_omni2 with directlight 3: the same, per pixel on the world, each by its own channel (maplights.js)
 //   - CS2's diffuse has no 1/pi (DiffuseColor x (direct + indirect)); three's Lambert divides by pi, so the
 //     lightmap irradiance and the sun's intensity are multiplied by pi here to land on CS2's numbers.
 //   - what has no lightmap (props, moving models): the light probe volumes (lighting_lpv.slang): an ambient cube per
@@ -30,6 +31,7 @@ import { ShaderChunk } from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { parseVec, angleForward } from './entities/index.js';
 import { chainBeforeCompile } from '../lib/shader.js';
+import { MapLights, MAP_LIGHTS_PARS, MAP_LIGHTS_GATHER } from './maplights.js';
 
 // the fallback (no baked lighting, or a GPU without the formats): what the renderer always had
 const FALLBACK = { hemiSky: 0xdde8ff, hemiGround: 0x3a3328, hemi: 1.1, sun: 0xfff1d6, sunIntensity: 1.6, sunDir: [0.4, 0.3, 1] };
@@ -58,6 +60,7 @@ export class MapLighting {
       cs2DirIrr: { value: null }, cs2Shadows: { value: null }, cs2IrrRange: { value: 0 },
       cs2SunMask: { value: new THREE.Vector4(1, 0, 0, 0) },
     };
+    this.mapLights = new MapLights(); // the map's directlight 3 omnis on the lightmapped world
     this.patched = new WeakMap(); // material -> its lightmapped clone
     this.probePatched = new Map(); // `${material.uuid}:${volume}` -> its probe-lit clone
     this.volumes = [];
@@ -147,6 +150,7 @@ export class MapLighting {
   update(engine, camera) {
     if (this.defaultFar == null) this.defaultFar = camera.far;
     this.cullCubes(camera);
+    this.mapLights.update(camera);
     const fog = this.options.fog && engine?.fogState ? engine.fogState() : { controller: null, gradient: null };
     const u = this.fogUniforms;
     const g = fog.gradient, c = fog.controller?.on ? fog.controller : null;
@@ -195,6 +199,7 @@ export class MapLighting {
     this.lightmaps = lightmaps;
     const ents = Object.values(entities?.lumps || {}).flat();
     const env = ents.find((e) => e?.kv?.classname === 'light_environment' && String(e.kv.enabled ?? 'true') !== 'false')?.kv;
+    this.mapLights.set([]);
     if (!lightmaps || !env) { this.fallback(); return; }
     // the sun: forward = the entity's angles; the light shines along it (three: from position toward target)
     const fwd = angleForward(parseVec(env.angles));
@@ -216,6 +221,8 @@ export class MapLighting {
     this.uniforms.cs2DirIrr.value = lightmaps.textures.directional_irradiance || null;
     this.uniforms.cs2Shadows.value = lightmaps.textures.direct_light_shadows || null;
     this.uniforms.cs2IrrRange.value = lightmaps.irradianceRange || 0; // a quality tier's RGBM PNG
+    // a BC4 shadow mask has one channel (R); a quality tier's PNG keeps the high bake's channels
+    this.mapLights.set(ents, lightmaps.textures.direct_light_shadows?.format === THREE.RED_RGTC1_Format ? 1 : 4);
     const irr = lightmaps.textures.irradiance;
     irr.channel = 1; // the world glb's TEXCOORD_1 is the lightmap UV (unscaled: x lighting.json uvScale)
     irr.repeat.set(lightmaps.uvScale[0], lightmaps.uvScale[1]);
@@ -473,16 +480,17 @@ export class MapLighting {
     const m = src.clone();
     const uniforms = { cs2Probe: { value: vol.texture }, cs2ProbeWorldToLocal: { value: vol.worldToLocal }, cs2ProbeDims: { value: vol.dims } };
     chainBeforeCompile(m, (shader) => {
-      Object.assign(shader.uniforms, uniforms, this.fogUniforms, this.cubeUniforms);
+      Object.assign(shader.uniforms, uniforms, this.fogUniforms, this.cubeUniforms, this.mapLights.uniforms);
       shader.vertexShader = worldPosVertex(shader.vertexShader);
       shader.fragmentShader = shader.fragmentShader
-        .replace('#include <lightmap_pars_fragment>', `#include <lightmap_pars_fragment>\n${PROBE_PARS}\n${FOG_PARS}\n${CUBE_PARS(this.cubeUniforms.cs2CubeCount.value > 0)}`)
-        .replace('#include <lights_fragment_begin>', PROBE_SUN + LIGHTS_BEGIN_PATCHED + BARN_GATHER)
+        .replace('#include <lightmap_pars_fragment>', `#include <lightmap_pars_fragment>\n${PROBE_PARS}\n${MAP_LIGHTS_PARS}\n${FOG_PARS}\n${CUBE_PARS(this.cubeUniforms.cs2CubeCount.value > 0)}`)
+        // the map's lights unshadowed here: the bake keeps only the sun's probe visibility (ProbeBake.cs face alpha)
+        .replace('#include <lights_fragment_begin>', PROBE_SUN + LIGHTS_BEGIN_PATCHED + BARN_GATHER + MAP_LIGHTS_GATHER)
         .replace('#include <lights_fragment_maps>', LIGHTS_MAPS_PROBES)
         .replace('#include <fog_fragment>', FOG_APPLY);
       shader.fragmentShader = shader.fragmentShader.replace('#include <common>', `#include <common>\n${BARN_PARS}`);
       Object.assign(shader.uniforms, this.barnUniforms);
-    }, `cs2probefb${this.cubeUniforms.cs2CubeCount.value > 0 ? 'c' : ''}`);
+    }, `cs2probemfb${this.cubeUniforms.cs2CubeCount.value > 0 ? 'c' : ''}`);
     return m;
   }
 
@@ -492,17 +500,17 @@ export class MapLighting {
     m.lightMapIntensity = 1;
     const hasDir = !!this.uniforms.cs2DirIrr.value, hasShadow = !!this.uniforms.cs2Shadows.value;
     chainBeforeCompile(m, (shader) => {
-      Object.assign(shader.uniforms, this.uniforms);
+      Object.assign(shader.uniforms, this.uniforms, this.mapLights.uniforms);
       Object.assign(shader.uniforms, this.fogUniforms, this.cubeUniforms);
       shader.vertexShader = worldPosVertex(shader.vertexShader);
       shader.fragmentShader = shader.fragmentShader
-        .replace('#include <lightmap_pars_fragment>', `#include <lightmap_pars_fragment>\n${PARS(hasDir, hasShadow)}\nvarying vec3 vCs2World;\n${FOG_PARS}\n${CUBE_PARS(this.cubeUniforms.cs2CubeCount.value > 0)}`)
-        .replace('#include <lights_fragment_begin>', SUN_VISIBILITY + LIGHTS_BEGIN_PATCHED + BARN_GATHER)
+        .replace('#include <lightmap_pars_fragment>', `#include <lightmap_pars_fragment>\n${PARS(hasDir, hasShadow)}\n${MAP_LIGHTS_PARS}\nvarying vec3 vCs2World;\n${FOG_PARS}\n${CUBE_PARS(this.cubeUniforms.cs2CubeCount.value > 0)}`)
+        .replace('#include <lights_fragment_begin>', SUN_VISIBILITY + LIGHTS_BEGIN_PATCHED + BARN_GATHER + MAP_LIGHTS_GATHER)
         .replace('#include <lights_fragment_maps>', LIGHTS_MAPS_CS2)
         .replace('#include <fog_fragment>', FOG_APPLY);
       shader.fragmentShader = shader.fragmentShader.replace('#include <common>', `#include <common>\n${BARN_PARS}`);
       Object.assign(shader.uniforms, this.barnUniforms);
-    }, `cs2lm${hasDir ? 'd' : ''}${hasShadow ? 's' : ''}fb${this.cubeUniforms.cs2CubeCount.value > 0 ? 'c' : ''}`);
+    }, `cs2lmm${hasDir ? 'd' : ''}${hasShadow ? 's' : ''}fb${this.cubeUniforms.cs2CubeCount.value > 0 ? 'c' : ''}`);
     return m;
   }
 }
