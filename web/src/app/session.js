@@ -90,7 +90,7 @@ export function startScenario(i, mode = 'normal') {
     traceBox: (s, e, h) => S.world.traceBox(s, e, h, undefined, true),
     fits: (o, solids) => standsFree(S.world, o, solids), // never spawn inside the floor or a moving brush
     countdown: S.replay ? (S.replay.meta.countdown ?? legacyCountdown(scenario)) : COUNTDOWN,
-    scenario, mode, seed: run.seed,
+    scenario, mapUpdated: S.mapUpdated, mode, seed: run.seed,
     humans: rule('humans'), bossHp: rule('bossHp'), items: heldItems(), run,
     // kept on the run: a replay's seek mutes the map the same way (app/replay.js)
     hooks: run.hooks = {

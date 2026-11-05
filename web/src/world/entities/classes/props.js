@@ -16,6 +16,7 @@
 import { register } from '../registry.js';
 import { num, bool } from '../math.js';
 import { breakable } from './brushes.js';
+import { startsNoDraw } from '../render-mode.js';
 
 const THINK = 0.1; // DAT_181790f84: every anim think schedules the next one 0.1 s on
 const END = 0.999; // DAT_18193edac: a forward sequence has "reached its end" at cycle >= 0.999
@@ -159,6 +160,7 @@ export const dynamicProp = {
   // default NOT_LOOPING) plays first if set, else the idle animation.
   spawn(e) {
     const kv = e.kv;
+    if (startsNoDraw(e.cls, kv)) e.visible = false; // Spawn: StartDisabled -> EF_NODRAW (entities/render-mode.js)
     const idle = kv.idleanim || kv.defaultanim || '';
     const mode = loopMode(kv.idleanimationloopmode, loopMode(kv.animationloopmode, bool(kv.holdanimation) ? USE_SEQUENCE : LOOPING));
     e.state.anim = {
@@ -170,6 +172,10 @@ export const dynamicProp = {
     else if (e.state.anim.idle) propSetAnim(e, e.state.anim.idle, mode);
   },
   input(e, inp, p) {
+    // EF_NODRAW off / on: what a StartDisabled prop waits for (westersand Enables its 11, alien shooter TurnOns its
+    // antlion at the laser fight). Inputs are hashed in server.dll, so this follows the maps' own use of them.
+    if (inp === 'enable' || inp === 'turnon') { e.enabled = true; e.visible = true; return true; }
+    if (inp === 'disable' || inp === 'turnoff') { e.enabled = false; e.visible = false; return true; }
     if (!e.state.anim) return false;
     switch (inp) {
       case 'setanimation': propSetAnim(e, p, USE_SEQUENCE); return true;

@@ -314,6 +314,9 @@ and parts come from the scenario file's top-level `title`, `description`, `works
 map's screenshots for the home page; `stageShots` the stage thumbnails, BAKING.md "Stage thumbnails"). The bake writes those screenshots (`maps/<name>/shots/N.jpg`, the map's own
 `panorama/images/map_icons/screenshots/1080p/*`); for an already-baked map, write only them with
 `lasers-bake --shots <workshop.vpk> web/public/maps/<name>`.
+`workshopUpdated` (YYYY-MM-DD) is the workshop item's last update (`timeupdated` in Steam's
+`steamapps/workshop/appworkshop_730.acf`): before 2026-01-21, CS2Fixes' map migrations remap the map's numbered
+rendermodes (10 hides, a numbered 2 draws), so the renderer does too (`world/entities/render-mode.js`).
 
 **ze_mist_p stages** (all from the map's own logic):
 

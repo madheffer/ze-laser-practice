@@ -18,6 +18,7 @@
 import { EntityEngine, parseVec } from './entities/index.js';
 import { mapCvars } from './entities/classes/server.js';
 import { configureScripts } from './entities/classes/scripts.js';
+import { migrates20260121 } from './entities/render-mode.js';
 import { giveItems } from './items.js';
 import { installEndless } from '../app/endless.js';
 import { inputMatcher, nameKey, nameMatches, stripPrefix } from '../lib/names.js';
@@ -35,12 +36,15 @@ export const legacyCountdown = (scenario) => (scenario?.fastForward ? 0 : 1);
 const DAMAGE_PER_HIT = 30;
 const PERFECT_HITS_PER_HUMAN = 5;
 
-export function createRunEngine({ entities, hulls, bounds, animations, soundDurations = null, traceBox, fits = null, countdown = COUNTDOWN, scenario, mode = 'normal', seed, humans = 20, bossHp = 100, items = [], hooks = {}, run: into = {} }) {
+export function createRunEngine({ entities, hulls, bounds, animations, soundDurations = null, traceBox, fits = null, countdown = COUNTDOWN, scenario, mapUpdated = null, mode = 'normal', seed, humans = 20, bossHp = 100, items = [], hooks = {}, run: into = {} }) {
   const endless = mode === 'endless' && !!scenario?.endless;
   // soundDurations: event name -> seconds (lib/sound-durations.js), for point_soundevent's OnSoundFinished
   const engine = new EntityEngine(entities, { hulls, bounds, animations, soundDurations }, { seed });
   // physboxes (world/entities/classes/physics.js) slide along the static world only
   if (traceBox) engine.traceBox = traceBox;
+  // CS2Fixes' 2026-01-21 map migrations remap numbered rendermodes on maps updated before then (entities/render-mode.js);
+  // mapUpdated: the scenario file's workshopUpdated
+  engine.renderMigrated = migrates20260121(mapUpdated);
   engine.humans = humans;
   // the scenario's word on a zombie cage the map's data can't decide (world/entities/cages.js)
   if (scenario?.cages && typeof scenario.cages === 'object') engine.cageOverrides = scenario.cages;

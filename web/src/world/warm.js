@@ -15,7 +15,9 @@
 import * as THREE from 'three';
 import { GLTF_TO_SOURCE } from './assets.js';
 import { cloneModel } from './anim.js';
+import { applySelfIllum } from './selfillum.js';
 import { parseVec, isParticleSystem } from './entities/index.js';
+import { spawnsHidden } from './entities/render-mode.js';
 
 const MAX_MODELS = 80;
 const IDLE_TIMEOUT_MS = 250;
@@ -45,7 +47,7 @@ export function templateAssets(engine) {
       if (cls === 'trigger_hurt') kind = 'hull';
       else if (cls.startsWith('trigger_') || isParticleSystem(cls)) continue;
       // render.js addEntity draws nothing for these
-      else if (kv.rendermode === 'kRenderNone' || kv.rendermode === '10' || kv.renderamt === '0') continue;
+      else if (spawnsHidden(kv, engine.renderMigrated)) continue;
       else kind = 'model';
       const name = String(kv.model);
       if (seen.has(kind + name)) continue;
@@ -94,7 +96,7 @@ export async function warmTemplates({ renderer, map, engine, origin, isCurrent }
       holder.add(cloneModel(src));
       group.add(holder);
       group.updateMatrixWorld(true);
-      group.traverse((o) => { if (o.isMesh) renderer.lighting?.applyProbes(o); });
+      group.traverse((o) => { if (o.isMesh) { applySelfIllum(o, renderer.selfIllum); renderer.lighting?.applyProbes(o); } });
       // shaders off the main thread where the browser can (KHR_parallel_shader_compile), then textures one per idle
       await gl.compileAsync(group, camera, scene).catch(() => {});
       const tex = new Set();

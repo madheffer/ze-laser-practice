@@ -18,6 +18,7 @@ import { fileURLToPath } from 'node:url';
 import { readMapEntities } from './map-entities.mjs';
 import { normaliseHulls } from '../web/src/world/hulls.js';
 import { CollisionWorld } from '../web/src/world/collision.js';
+import { spawnsHidden } from '../web/src/world/entities/render-mode.js';
 import { createRunEngine, startIfDue, mapRuns, winDue, TICK } from '../web/src/world/run-engine.js';
 import { isParticleSystem } from '../web/src/world/entities/index.js';
 import { nameKey } from '../web/src/lib/names.js';
@@ -44,7 +45,8 @@ if (fs.existsSync(colFile)) {
   world = new CollisionWorld(new Float32Array(b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength)));
 }
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../web/public/scenarios');
-const stages = JSON.parse(fs.readFileSync(path.join(root, `${map}.json`), 'utf8')).scenarios.filter((s) => !opt('--stage') || s.id === opt('--stage'));
+const scenarioFile = JSON.parse(fs.readFileSync(path.join(root, `${map}.json`), 'utf8'));
+const stages = scenarioFile.scenarios.filter((s) => !opt('--stage') || s.id === opt('--stage'));
 
 // every name in the map, and the lump it lives in
 const lumpOf = new Map();
@@ -87,11 +89,10 @@ function effectProblems(name, seen = new Set()) {
 }
 
 // what render.js draws for an entity (addEntity) and whether its pieces are baked
-const INVISIBLE_RENDER = new Set(['kRenderNone', '10']);
 function drawProblems(e) {
   const kv = e.kv;
   if (isParticleSystem(e.cls)) return effectProblems(kv.effect_name);
-  if (!kv.model || e.cls.startsWith('trigger_') || INVISIBLE_RENDER.has(String(kv.rendermode)) || kv.renderamt === '0') return [];
+  if (!kv.model || e.cls.startsWith('trigger_') || spawnsHidden(kv, e.engine?.renderMigrated)) return [];
   const m = assetKey(kv.model);
   if (baked.has(m)) return [];
   // a prop always has a mesh; a brush entity without one is invisible in CS2 too (the bake leaves it out)
@@ -110,7 +111,7 @@ for (const sc of stages) {
   run = createRunEngine({
     entities, hulls, bounds, animations: null,
     traceBox: world ? (s, e, h) => world.traceBox(s, e, h, undefined, true) : null,
-    scenario: sc, mode: 'normal', seed: 1, humans: 1, bossHp: 100,
+    scenario: sc, mapUpdated: scenarioFile.workshopUpdated, mode: 'normal', seed: 1, humans: 1, bossHp: 100,
     hooks: {
       attach(engine) {
         engine.player = { setHealth() {}, setMaxHealth() {}, setGravity() {}, setSpeed() {}, setVelocity() {}, setDamageFilter() {} };

@@ -15,6 +15,7 @@ import { Bloom, BLOOM_POST_GLSL } from './bloom.js';
 import { PropAnimator, cloneModel } from './anim.js';
 import { Water } from './water.js';
 import { applyUnlit } from './unlit.js';
+import { spawnsHidden } from './entities/render-mode.js';
 import { applySelfIllum, tintSelfIllum } from './selfillum.js';
 
 // an entity's world transform as a particle control point: position and its forward / left / up axes
@@ -258,8 +259,7 @@ export class Renderer {
         any = true;
       }
     } else if (!e.cls.startsWith('trigger_') && e.model) {
-      const hidden = kv.rendermode === 'kRenderNone' || kv.rendermode === '10' || kv.renderamt === '0';
-      if (!hidden) {
+      if (!spawnsHidden(kv, e.engine?.renderMigrated)) { // kRenderNone as GFL runs the map (entities/render-mode.js)
         const p = map.getModel(e.model);
         if (p) {
           any = true;
@@ -302,6 +302,9 @@ export class Renderer {
     }
     if (!any) return;
     group.userData.born = e.engine.time;
+    // CBaseModelEntity m_fadeMaxDist x m_flFadeScale: past it the model has faded out (fadedOut)
+    const fadeMax = Number(kv.fademaxdist) * (kv.fadescale == null ? 1 : Number(kv.fadescale));
+    if (fadeMax > 0) group.userData.fadeMax = fadeMax;
     this.visuals.set(e, group);
     this.entRoot.add(group);
   }
@@ -495,7 +498,7 @@ export class Renderer {
         g.visible = !!s && s.vis;
         if (!s) continue;
         g.matrix.copy(s.m);
-        if (g.visible) g.visible = this.entityInView(g);
+        if (g.visible) g.visible = !this.fadedOut(g) && this.entityInView(g);
         g.matrixWorldNeedsUpdate = true;
         for (const c of g.children) {
           const k = c.userData.kind;
@@ -508,7 +511,7 @@ export class Renderer {
       g.matrix.copy(e.getWorld());
       g.matrixWorldNeedsUpdate = true;
       const on = e.alive && e.visible;
-      g.visible = on && this.entityInView(g);
+      g.visible = on && !this.fadedOut(g) && this.entityInView(g);
       for (const c of g.children) {
         const k = c.userData.kind;
         if (k === 'fx') c.visible = !!e.state.active;
@@ -518,6 +521,15 @@ export class Renderer {
         else if (k === 'hitbox') c.visible = e.enabled && this.showHitboxes;
       }
     }
+  }
+
+  // an entity model past its fade distance (fademaxdist; ze_neochrome / ze_offliner hide their playerstart.vmdl
+  // angle helpers with fademaxdist 1). Fully faded only: the partial fade between fademindist and it is not drawn.
+  fadedOut(g) {
+    const max = g.userData.fadeMax;
+    if (!max) return false;
+    const m = g.matrix.elements, c = this.camera.position;
+    return Math.hypot(m[12] - c.x, m[13] - c.y, m[14] - c.z) > max;
   }
 
   // a heal zone's material: the colour of a particle parented to it (mist's aura: pink), else a soft green
