@@ -4,7 +4,7 @@ import { S, G } from './state.js';
 import { settings } from './settings.js';
 import { rule, timescale, godMode, moveSettings } from './rules.js';
 import { clamp } from '../lib/math.js';
-import { readInput, takeLookDelta, syncLeaveGuard } from './input.js';
+import { readInput, takeLookDelta, takeTickLook, syncLeaveGuard } from './input.js';
 import { bossFire, bossStatus, bossShown, trackSegments, shootAs } from './bosses.js';
 import { applyPose, eventsAfter, eventsDuring } from './replay-play.js';
 import { replayView } from './replay-view.js';
@@ -34,11 +34,15 @@ export function simulate(now) {
   if (S.mp && !run.go) return;
   if (S.mp && !run.done) {
     const target = Math.floor((now - run.wall0) / 1000 / CS.tick);
+    const n = Math.min(MAX_CATCHUP, Math.max(0, target - run.ticks));
+    const turn = spreadTurn(player, n);
     let steps = 0;
     while (run.ticks < target && steps++ < MAX_CATCHUP && S.run === run && !run.done) {
       prevOrigin = [...player.origin];
+      turn();
       step();
     }
+    turn.rest();
     acc = clamp((now - run.wall0) / 1000 - run.ticks * CS.tick, 0, CS.tick);
     return;
   }
@@ -48,13 +52,34 @@ export function simulate(now) {
   const realDt = Math.min(0.1, (now - lastSim) / 1000);
   lastSim = now;
   acc += realDt * timescale();
+  const turn = spreadTurn(player, Math.min(8, Math.floor(acc / CS.tick)));
   let steps = 0;
   while (acc >= CS.tick && steps < 8 && S.run === run) {
     acc -= CS.tick;
     steps++;
     prevOrigin = [...player.origin];
+    turn();
     step();
   }
+  turn.rest();
+}
+
+// The mouse turn since the last tick (app/input.js takeTickLook), handed out evenly over the n ticks about to run:
+// a 30 fps frame runs two ticks, and with the whole turn on the first the second strafes straight, so an air strafe
+// gained a third less at 32 fps and half at 21. Each tick sees the angle you had at its time, as CS2's per-tick
+// usercmds do. No tick this frame: the turn waits for the next one (the camera already shows it).
+function spreadTurn(player, n) {
+  const none = () => {};
+  none.rest = none;
+  if (n < 1) return none;
+  const { yaw, pitch } = takeTickLook();
+  if (!yaw && !pitch) return none;
+  player.yaw -= yaw; player.pitch -= pitch;
+  let left = n;
+  const turn = () => { if (left > 0) { left--; player.yaw += yaw / n; player.pitch += pitch / n; } };
+  // a burst cut short (the run restarted or ended): the rest of the turn still lands
+  turn.rest = () => { while (left > 0) turn(); };
+  return turn;
 }
 const MAX_CATCHUP = 320; // ticks per call (5 s): a long hidden tab catches up over a few calls
 let lastSim = performance.now();

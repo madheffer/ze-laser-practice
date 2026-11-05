@@ -12,7 +12,8 @@ import { freeLook } from './replay-view.js';
 import { chatKey, chatOpen } from './chat.js';
 
 const keys = new Set();
-let wheelJump = 0;
+let wheelJump = 0; // ticks a wheel notch's jump still counts for
+let spaceDown = false; // Space went down since the last tick
 let yawDelta = 0, pitchDelta = 0;
 let act = null; // the actions installInput was given
 let touch = null; // TouchControls, built on the first sign of a touch device
@@ -36,10 +37,14 @@ export function readInput() {
     forward: clamp((k('KeyW') || k('ArrowUp') ? 1 : 0) - (k('KeyS') || k('ArrowDown') ? 1 : 0) + (t?.forward || 0), -1, 1),
     side: clamp((k('KeyD') || k('ArrowRight') ? 1 : 0) - (k('KeyA') || k('ArrowLeft') ? 1 : 0) + (t?.side || 0), -1, 1),
     jump: k('Space') || wheelJump > 0 || !!t?.jump,
+    // a fresh press: every wheel notch is its own +jump / -jump in CS2, so a steady scroll is a stream of presses,
+    // not one long hold (held, a jump only counts the tick it goes down: world/movement.js)
+    jumpPress: spaceDown || wheelJump > 0,
     duck: k('ControlLeft') || k('ControlRight') || k('KeyC') || !!t?.duck,
     walk: k('ShiftLeft') || k('ShiftRight'),
   };
   if (wheelJump > 0) wheelJump--;
+  spaceDown = false;
   return inp;
 }
 
@@ -48,9 +53,21 @@ function look(dy, dp) {
   if (S.replay) { if (S.replay.cam === 'free' && S.locked) freeLook(dy, dp); return; } // the recorded view is the replay's
   const p = S.player;
   if (!S.locked || !p || S.paused) return;
+  const pitch = clamp(p.pitch + dp, -89, 89);
+  tickYaw -= dy; tickPitch += pitch - p.pitch;
   p.yaw -= dy;
-  p.pitch = clamp(p.pitch + dp, -89, 89);
+  p.pitch = pitch;
   yawDelta += dy; pitchDelta += dp;
+}
+
+// The turn since the last simulation step, already applied to the player (so the camera turns at once): loop.js
+// takes it back and spreads it over the ticks it runs this frame, so below 64 fps every tick still gets its share
+// of the turn (all on the first one loses most of an air strafe).
+let tickYaw = 0, tickPitch = 0;
+export function takeTickLook() {
+  const d = { yaw: tickYaw, pitch: tickPitch };
+  tickYaw = tickPitch = 0;
+  return d;
 }
 
 // Raw pointer lock: unadjustedMovement = mouse counts without OS pointer speed/acceleration, so CS2's
@@ -232,6 +249,7 @@ export function installInput(canvas, actions) {
     if (ev.ctrlKey || ev.code === 'Space' || ev.code === 'Tab' || ev.code.startsWith('Control') || ev.code === 'F1') ev.preventDefault();
     if (ev.repeat) return;
     keys.add(ev.code);
+    if (ev.code === 'Space') spaceDown = true;
     switch (ev.code) {
       case 'Digit1': actions.weapon('gun'); break;
       case 'Digit3': actions.weapon('knife'); break;

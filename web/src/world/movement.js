@@ -9,10 +9,10 @@ export const CS = {
   gravity: 800,
   // sv_jump_impulse's default (cs2_server registration: 0x4396ff27), "sqrt(2*gravity*height)"
   jumpImpulse: 301.993378,
-  // sv_legacy_jump, "Whether or not to use the pre-2026 jump code": default 0, so CS2 runs the modern jump
-  // (CCSPlayerModernJump: a landing penalty on the next jump, no stamina). GFL's whitelist keeps it a server
-  // setting and its value isn't public, so this is CS2's default. true = the legacy jump (stamina scales jumps)
-  legacyJump: false,
+  // sv_legacy_jump, "Whether or not to use the pre-2026 jump code": CS2's default is 0 (CCSPlayerModernJump: a
+  // landing penalty on the next jump, no stamina), but GFL's ZE servers run 1: their console prints
+  // "sv_legacy_jump = true" in game (2026-11-06). So the legacy jump: stamina scales jumps and slows you on landing
+  legacyJump: true,
   maxSpeed: 250, // knife out
   accelerate: 5.5,
   airAccelerate: 12,
@@ -39,7 +39,7 @@ export const CS = {
   // stamina (sv_staminamax / sv_staminajumpcost / sv_staminalandcost / sv_staminarecoveryrate): jumping
   // and landing build stamina, and while it's above 0 your ground speed is scaled down each tick by
   // ((max - stamina) / max) ^ (frametime / (1/70)) — the bhop/landing speed loss. CS2: "sv_legacy_jump only"
-  // (both costs' help text), so with the modern jump stamina never builds (legacyJump above).
+  // (both costs' help text): GFL runs the legacy jump (legacyJump above), so it builds.
   staminaMax: 80,
   staminaJumpCost: 0.08,
   staminaLandCost: 0.05,
@@ -124,7 +124,7 @@ export class Player {
     return this.world.traceBox(this.centre(a), this.centre(b), h, tr);
   }
 
-  // input: { forward, side (-1..1), jump, duck, walk }, settings: { autoBhop }
+  // input: { forward, side (-1..1), jump, jumpPress (went down this tick), duck, walk }, settings: { autoBhop }
   tick(input, settings) {
     const dt = CS.tick * this.speedScale;
     const gravity = (this.cvars.gravity ?? CS.gravity) * this.gravityScale;
@@ -150,7 +150,7 @@ export class Player {
     const wish = [wx, wy, 0];
 
     // jump
-    const wantJump = input.jump && (settings.autoBhop || !this.jumpHeld);
+    const wantJump = input.jump && (settings.autoBhop || !this.jumpHeld || !!input.jumpPress);
     this.jumpHeld = input.jump;
 
     // gravity (half)

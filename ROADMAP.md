@@ -101,8 +101,12 @@ exact map-folder format so he can lift our maps straight into his site. See [REA
       no stamina (legacy only); AirMove's pre-move half gravity on the jump tick; a mid-air crouch / unduck shifts the
       origin 9 (FinishDuck: the hull changes about its middle), not 18. Apexes: 55.83 standing, 64.83 crouch-jump,
       57.0 from a crouch; an instant re-jump after a jump ~41-43. coop-check.js's fly check now takes the 9 u
-      mid-air duck shift out of the fall speed (it struck honest crouch-jumps). GFL's sv_legacy_jump and
-      cs2f_allow_duck_spam values aren't public: CS2's defaults (modern jump) and duck spam on are assumed
+      mid-air duck shift out of the fall speed (it struck honest crouch-jumps). cs2f_allow_duck_spam's GFL value
+      isn't public (duck spam on is assumed)
+    - [x] engine: GFL runs sv_legacy_jump 1 (its console in game: "sv_legacy_jump = true"), so the legacy jump is on:
+      stamina from jumps and landings scales the next jump and slows you on the ground (world/movement.js CS.legacyJump)
+    - [x] engine: low fps no longer costs air strafe speed (the mouse turn is spread over a frame's ticks, app/loop.js)
+      and every wheel notch is its own jump press (scroll bhop; app/input.js)
     - [ ] engine: the modern jump's bhop window (sv_bhop_time_window 1/128 s, landed horizontal speed restored on a
       bhop) and subtick jump timing aren't modelled; sv_timebetweenducks (0.4 s) isn't either
     - [x] GFL's StripperCS2 edits (BAKING.md "GFL's entity edits"): `tools/stripper.mjs` (bake-map step `stripper`) ->
