@@ -98,7 +98,8 @@ export function frame(now) {
   G.radar?.draw();
   const look = takeLookDelta();
   G.vm.visible = !tp && !S.run?.spectating;
-  if (rv && S.replay.gun !== (G.vm.weapon === 'gun')) { G.vm.setWeapon(S.replay.gun ? 'gun' : 'knife'); G.hud.showWeapons(G.vm.weapon); }
+  if (rv && S.replay.gunName && S.replay.gunName !== G.vm.gunName) { G.vm.setGun(S.replay.gunName); G.hud.showWeapons(G.vm.weapon, G.vm.gunName); } // a buy
+  if (rv && S.replay.gun !== (G.vm.weapon === 'gun')) { G.vm.setWeapon(S.replay.gun ? 'gun' : 'knife'); G.hud.showWeapons(G.vm.weapon, G.vm.gunName); }
   if (S.run) {
     // the viewmodel keeps animating behind the menu (triggers are released on pause, shots are ignored)
     G.vm.update(Math.max(1e-3, realDt) * timescale(), {
@@ -146,7 +147,7 @@ export function step() {
   if (!S.replay) {
     // window.__lasersInput drives the player in tests: solo only (no bots in a round)
     inp = (!S.mp && window.__lasersInput?.(run.t)) || (S.locked ? readInput() : IDLE);
-    player.maxSpeed = G.vm.weapon === 'knife' ? 250 : 215; // CS2: knife 250, AK-47 215
+    player.maxSpeed = G.vm.weapon === 'knife' ? 250 : G.vm.gun.maxSpeed; // CS2's m_flMaxSpeed: knife 250, PP-Bizon 240, AK-47 215
     player.tick(inp, moveSettings());
   }
   const ground = player.groundEntity && player.groundEntity.alive ? player.groundEntity : null;
@@ -254,7 +255,7 @@ export function updateHud() {
     sub: sub.join(' · '),
     hp: run.spectating ? (S.mp?.spectateView()?.hp ?? 0) : run.hp, god: godMode(), armor: run.armor, money: run.money,
     spectate: run.spectating ? S.mp?.spectateLabel() : '',
-    weapon: G.vm.weapon, clip: G.vm.clip, reserve: G.vm.reserve, reloading: G.vm.reloading,
+    weapon: G.vm.weapon, gun: G.vm.gunName, clip: G.vm.clip, reserve: G.vm.reserve, reloading: G.vm.reloading,
     bossHtml: bossHudHtml(bosses),
   });
 }

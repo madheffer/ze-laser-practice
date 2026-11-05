@@ -25,6 +25,8 @@ import { startScenario, endRun } from './app/session.js';
 import { frame, step, simulate, resetClock, updateHud } from './app/loop.js';
 import { installInput, enterGame, clearKeys } from './app/input.js';
 import { onShot } from './app/bosses.js';
+import { buyWeapon } from './app/buy.js'; // registers the !<gun> chat commands too
+import { playGunDraw, playKnifeDraw, playGunReload } from './app/weapon-sounds.js';
 import { Hud } from './ui/hud.js';
 import { Overlay } from './ui/overlay.js';
 import { Menu } from './ui/menu.js';
@@ -140,18 +142,18 @@ function applySettings() {
   G.stream?.setMode(streamMode());
 }
 
-// ---- weapons (CS2: 1 primary, 3 knife, Q last weapon, R reload)
+// ---- weapons (CS2: 1 primary, 3 knife, Q last weapon, R reload; !<gun> in chat buys one: app/buy.js)
+const drawSounds = () => (G.vm.weapon === 'gun' ? playGunDraw() : playKnifeDraw());
 function weapon(w) {
   if (G.vm.weapon === w) return;
   G.vm.setWeapon(w);
-  G.hud.showWeapons(w);
-  G.audio.play(w === 'gun' ? 'gun.deploy' : 'knife.deploy');
+  G.hud.showWeapons(w, G.vm.gunName);
+  drawSounds();
 }
 G.vm.onShot = onShot;
 G.vm.onReload = () => {
   S.mp?.reloaded(); // a round's server checks your rounds against the reload
-  // the AK reload's own sounds, on its clip timing
-  for (const [t, s] of [[0.35, 'gun.clipout'], [1.45, 'gun.clipin'], [2.05, 'gun.boltpull']]) setTimeout(() => { if (G.vm.reloading) G.audio.play(s); }, t * 1000);
+  playGunReload(); // the gun's own reload sounds, on its clip's timing
 };
 
 // Restart: solo, the same stage again; in a room, the owner restarts the round for everyone
@@ -174,7 +176,7 @@ function showMaps() { G.maps.build(S.mapIndex, S.map?.name); G.menu.show('maps')
 installInput(canvas, {
   pause: G.pause, unpause: G.unpause, resume: G.resume, applySettings,
   weapon,
-  lastWeapon: () => { const before = G.vm.weapon; G.vm.swapLast(); if (G.vm.weapon !== before) { G.hud.showWeapons(G.vm.weapon); G.audio.play(G.vm.weapon === 'gun' ? 'gun.deploy' : 'knife.deploy'); } },
+  lastWeapon: () => { const before = G.vm.weapon; G.vm.swapLast(); if (G.vm.weapon !== before) { G.hud.showWeapons(G.vm.weapon, G.vm.gunName); drawSounds(); } },
   reload: () => G.vm.reload(),
   replayKey, // a replay's keys (app/replay.js)
   restart: () => restartRun(),
@@ -386,6 +388,7 @@ window.__lasers = {
   // solo only: a co-op / versus round runs on the server's clock
   // tests: pause so the map stays silent and only advance() moves time (assigning .paused does nothing)
   pause: () => G.pause(),
+  buyWeapon, // app/buy.js: buyWeapon('bizon' | 'weapon_ak47' | '!m4a1' ...)
   advance(seconds) { if (S.mp) return 'solo only'; for (let i = 0; i < Math.round(seconds / CS.tick); i++) { if (!S.run || S.run.done) break; step(); } updateHud(); },
 };
 

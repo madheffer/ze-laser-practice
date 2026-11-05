@@ -3,6 +3,7 @@
 // The rest of the team shoots the boss while it's in sight. Boss HP % is applied as extra hits, so a map that
 // counts bullets (OnHealthChanged -> Subtract 1) scales exactly like one that counts health.
 import { S, G } from './state.js';
+import { fireSound } from './weapon-sounds.js';
 import { rule } from './rules.js';
 import { rayHullEntry } from '../world/collision.js';
 import { angleForward } from '../world/entities/index.js';
@@ -143,7 +144,7 @@ export function onShot(shot) {
 export function shootAs(shot, yaw, pitch) {
   const { run, engine, player, scenario } = S;
   if (!run || run.done || !engine) return;
-  G.audio.play(shot.kind === 'bullet' ? 'gun.fire' : shot.kind === 'stab' ? 'knife.stab' : 'knife.slash', { pos: player.origin });
+  G.audio.play(shot.kind === 'bullet' ? fireSound(shot.gun) : shot.kind === 'stab' ? 'knife.stab' : 'knife.slash', { pos: player.origin });
   const noDamage = run.endless && scenario?.endless?.noBossDamage;
   const dir = angleForward([pitch, yaw, 0]);
   const eye = eyePos();

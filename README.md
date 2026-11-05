@@ -300,17 +300,20 @@ picking one loads it and shows its stages, one section per part with a jump bar 
 can't close the tab; outside fullscreen a "Leave site?" prompt catches it. Mouse look uses raw input
 (`requestPointerLock({ unadjustedMovement })`) and CS2's formula, degrees per count = `sensitivity × m_yaw`,
 so your CS2 sensitivity carries over 1:1. Movement adds CS2 stamina (`sv_stamina*` defaults) and weapon
-speed (knife 250, AK-47 215). Boss HP shows in CS2Fixes BossHUD's layout (GFL's bosshud config):
+speed (knife 250, a gun its own m_flMaxSpeed: PP-Bizon 240, AK-47 215). Boss HP shows in CS2Fixes BossHUD's layout (GFL's bosshud config):
 name, coloured HP and %, a 14-block bar; a segmented boss counts `(segments - 1) × segment HP + current`.
 
-Weapons: `weapons/viewmodel.js` + `weapons/fp/` is vpkstuff's previewer engine (CS2's own AnimGraph2) with the AK-47 and
-CT knife; assets in `web/public/weapons/fp/` are copied from the weaponviewer bake (`Z:\weaponviewer\fp`,
-gitignored). Sound: `lasers-bake` writes `maps/<map>/soundevents.json` + `sounds/` (the map's events plus the stock
+Weapons: `weapons/viewmodel.js` + `weapons/fp/` is vpkstuff's previewer engine (CS2's own AnimGraph2) with the CT knife
+and 20 buyable guns (the PP-Bizon at spawn; `!bizon`, `!ak`, `!m4a1` ... in chat: `app/buy.js`, CS2Fixes' aliases);
+assets in `web/public/weapons/fp/` are copied from the weaponviewer bake (`Z:\weaponviewer\fp`: `classes/<chassis>/`
+manifest + weapon_stock.glb + clips, `graph/gun_*` + `inspects_*`; gitignored). The guns' numbers are
+`lasers-bake --weapons web/src/lib/weapons-cs2.js` (committed, generated from scripts/weapons.vdata and the viewmodel
+clips' sound events; `bake/WeaponBake.cs` lists the guns), read through `lib/weapons.js`. Sound: `lasers-bake` writes `maps/<map>/soundevents.json` + `sounds/` (the map's events plus the stock
 CS2 ones its entities name: breakables, env_explosion, doors, trains, particles; `bake/SoundRefs.cs`; plus `surfaces.json`,
 CS2's surface properties for bullet impacts and prop breaks, `bake/SurfaceBake.cs`, with `collision_fx_surfaces.bin` per
 world triangle from `--collision`;
 `lasers-bake --sounds <vpk> <map folder>` redoes only that), and
-`lasers-bake --stock-sounds web/public/sounds` writes the stock knife/AK/player set (gitignored);
+`lasers-bake --stock-sounds web/public/sounds` writes the stock knife / buyable guns / player set (gitignored);
 the entity engine only emits sound requests (`world/entities/sound.js`: breakable break / hit by material, env_explosion,
 train move / ping / start / stop, door and movelinear sounds, from server.dll / Source) and
 `audio/audio.js` plays them (CS2 distance curves, csgo_mega voice limits in `audio/limits.js`, music through the music volume). Test pages:

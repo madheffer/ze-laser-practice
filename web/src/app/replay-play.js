@@ -7,7 +7,7 @@
 import { S } from './state.js';
 import { POS_SCALE, ANG_SCALE, SHOT_KINDS } from '../lib/replay-codec.js';
 import { CS } from '../world/movement.js';
-import { WEAPONS } from '../lib/weapons.js';
+import { GUNS, GUN_IDS, KNIFE } from '../lib/weapons.js';
 
 export const replaying = () => !!S.replay;
 
@@ -48,15 +48,18 @@ export function eventsDuring(k, { hurt }) {
   for (const ev of S.replay.byTick.get(k) || []) if (ev.type === 'fall') hurt(Math.min(ev.damage, 10000) / 10, 'fall');
 }
 
-// what the player did after tick k, before tick k + 1 (a frame between ticks): shots, E
+// what the player did after tick k, before tick k + 1 (a frame between ticks): shots, E, a bought gun
+// (S.replay.gunName: the primary at this point of the run; session.js starts it at the replay's meta.gun)
 export function eventsAfter(k, { shoot, use }) {
   for (const ev of S.replay.byTick.get(k) || []) {
     if (ev.type === 'use') use();
+    else if (ev.type === 'buy') S.replay.gunName = GUN_IDS[ev.gun] || S.replay.gunName;
     // a replay is someone else's data: a shot is held to CS2's own numbers (lib/weapons.js), whatever it claims
     else if (ev.type === 'shot') {
-      const w = ev.kind === 0 ? WEAPONS.gun : ev.kind === 2 ? WEAPONS.knife.stab : WEAPONS.knife.slash;
-      const damage = Math.min(ev.damage, ev.kind === 0 ? WEAPONS.gun.damage : ev.kind === 2 ? WEAPONS.knife.stab.damage : WEAPONS.knife.slash.first);
-      shoot({ kind: SHOT_KINDS[ev.kind], damage, range: Math.min(ev.range, w.range) }, ev.yaw / ANG_SCALE, Math.max(-89, Math.min(89, ev.pitch / ANG_SCALE)));
+      const gun = GUNS[S.replay.gunName];
+      const w = ev.kind === 0 ? gun : ev.kind === 2 ? KNIFE.stab : KNIFE.slash;
+      const damage = Math.min(ev.damage, ev.kind === 0 ? gun.damage : ev.kind === 2 ? KNIFE.stab.damage : KNIFE.slash.first);
+      shoot({ kind: SHOT_KINDS[ev.kind], damage, range: Math.min(ev.range, w.range), gun: ev.kind === 0 ? gun.name : undefined }, ev.yaw / ANG_SCALE, Math.max(-89, Math.min(89, ev.pitch / ANG_SCALE)));
     }
   }
 }

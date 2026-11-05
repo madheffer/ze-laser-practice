@@ -228,6 +228,8 @@ export class Round {
   }
 
   onReload(c) { const p = this.players.get(c.id); if (p?.alive && !this.ended && this.started) p.check.reload(); }
+  // a bought gun (app/buy.js): any of lib/weapons.js GUNS, held to its numbers (PlayerCheck.setGun drops the rest)
+  onWeapon(c, gun) { const p = this.players.get(c.id); if (p?.alive && !this.ended) p.check.setGun?.(gun); }
 
   // team = the simulated team's fire: its bullets carry the team (engine.teamEnt) as activator, not a player
   addDamage(id, dmg, n, team = false) { const k = `${id}:${dmg}:${team ? 1 : 0}`; this.dmg.set(k, (this.dmg.get(k) || 0) + n); }

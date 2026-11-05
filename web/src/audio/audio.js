@@ -32,6 +32,7 @@ import { spatialMix } from './spatial.js';
 import { VoiceLimits } from './limits.js';
 import { SurfaceSounds } from './surfaces.js';
 import { ALIASES, readTable, fileUrl } from './tables.js';
+import { DEFAULT_GUN, gunSounds } from '../lib/weapons.js';
 
 
 const MAX_VOICES = 64;
@@ -246,10 +247,18 @@ export class GameAudio {
   }
 
   _preloadStock() {
-    for (const a of Object.values(ALIASES)) {
-      const def = this.tables.stock.events.get((typeof a === 'string' ? a : a.name).toLowerCase());
-      if (def) for (const f of def.files || []) this._buffer(this._fileUrl(this.tables.stock, f));
-    }
+    this.preload(Object.values(ALIASES).map((a) => (typeof a === 'string' ? a : a.name)));
+    this.preload(gunSounds(DEFAULT_GUN));
+  }
+
+  // stock events to have fetched and decoded before they play (the aliases at boot, a gun when it is bought)
+  preload(names) {
+    this.stockReady?.then(() => {
+      for (const n of names) {
+        const def = this.tables.stock.events.get(String(n).toLowerCase());
+        if (def) for (const f of def.files || []) this._buffer(this._fileUrl(this.tables.stock, f));
+      }
+    });
   }
 
   // name (alias, stock or map event) -> { def, base, pitch, volume }

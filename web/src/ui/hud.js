@@ -7,10 +7,11 @@ import './hud.css';
 import { esc, replayClass } from '../lib/dom.js';
 import { clamp, clamp01 } from '../lib/math.js';
 import { thousands } from '../lib/format.js';
+import { GUNS, DEFAULT_GUN } from '../lib/weapons.js';
 
 const P = 'panorama/';
 const ICONS = {
-  ak47: `${P}icons/equipment/ak47.svg`,
+  gun: (name) => `${P}icons/equipment/${GUNS[name].icon}.svg`, // a gun's (lasers-bake --panorama, one per buyable gun)
   knife: `${P}icons/equipment/knife.svg`,
   armor: `${P}hud/armor.svg`,
   helmet: `${P}hud/armor_helmet.svg`,
@@ -20,9 +21,9 @@ const ICONS = {
   t: `${P}icons/ui/t_logo_1c.svg`,
   cart: `${P}icons/ui/shoppingcart.svg`,
 };
-// CS2's inventory slots for what a ZE human carries
+// CS2's inventory slots for what a ZE human carries (the primary's row follows the gun held: showWeapons)
 const WEAPONS = [
-  { slot: 1, id: 'gun', name: 'AK-47', icon: ICONS.ak47 },
+  { slot: 1, id: 'gun', name: GUNS[DEFAULT_GUN].label, icon: ICONS.gun(DEFAULT_GUN) },
   { slot: 3, id: 'knife', name: 'Knife', icon: ICONS.knife },
 ];
 
@@ -75,14 +76,22 @@ export class Hud {
       title: q('.hud-title'), timer: q('.hud-timer'), sub: q('.hud-sub'), boss: q('.hud-boss'), spec: q('.hud-spec'), countdown: q('.hud-countdown'),
       money: q('.money-digits'), ha: q('.hud-ha'), hp: q('.hud-ha-big.hp'), hpBar: q('.hp-bar i'),
       armor: q('.hud-ha-armor'), armorLabel: q('.hud-ha-armor-label'), armorIcon: q('.armor-icon'),
-      wpn: q('.hud-wpn-main'), clip: q('.hud-ha-big.clip'), clipBar: q('.clip-bar i'), reserve: q('.hud-wpn-reserve'),
+      wpn: q('.hud-wpn-main'), modeIcon: q('.mode-icon'), clip: q('.hud-ha-big.clip'), clipBar: q('.clip-bar i'), reserve: q('.hud-wpn-reserve'),
       ws: q('.hud-ws'), rows: [...root.querySelectorAll('.ws-row')],
     };
     this.last = {};
   }
 
   // The held weapon: its row lights up in the team colour with its name (CS2 keeps the list on screen).
-  showWeapons(id) {
+  // gun: the primary's GUNS name (a bought one replaces the row's icon and name)
+  showWeapons(id, gun) {
+    if (gun && Object.hasOwn(GUNS, gun) && this.last.gunRow !== gun) {
+      this.last.gunRow = gun;
+      const row = this.el.rows.find((r) => r.dataset.id === 'gun');
+      row?.querySelector('.ws-icon')?.style.setProperty('--src', `url('${ICONS.gun(gun)}')`);
+      const label = row?.querySelector('.ws-name');
+      if (label) label.textContent = GUNS[gun].label;
+    }
     for (const r of this.el.rows) r.classList.toggle('selected', r.dataset.id === id);
     const w = this.el.wpn;
     replayClass(w, 'changed');
@@ -118,9 +127,12 @@ export class Hud {
     if (gun) {
       set('clip', e.clip, String(v.clip));
       set('reserve', e.reserve, String(v.reserve));
-      const cf = clamp01(v.clip / 30);
+      const g = GUNS[v.gun] || GUNS[DEFAULT_GUN];
+      const cf = clamp01(v.clip / g.clip);
+      // the fire-mode mark shows only on a gun that can switch modes (hudhealthammocenter.css can-change-fire-mode: the FAMAS)
+      e.modeIcon.style.visibility = g.burstMode ? '' : 'hidden';
       if (this.last.cf !== cf) { this.last.cf = cf; e.clipBar.style.width = `${cf * 100}%`; }
-      e.wpn.classList.toggle('low-clip', v.clip <= 6);
+      e.wpn.classList.toggle('low-clip', v.clip <= Math.ceil(g.clip / 5)); // low-ammo tint: a fifth of the magazine (was 6 of the AK's 30)
       e.wpn.classList.toggle('reloading', !!v.reloading);
     }
     if (e.boss.innerHTML !== (v.bossHtml || '')) e.boss.innerHTML = v.bossHtml || '';

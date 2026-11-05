@@ -123,7 +123,7 @@ static class SoundBake
         return 0;
     }
 
-    /// The shared stock set (knife, AK-47, footsteps, damage) -> <outDir>/soundevents.json + sounds.
+    /// The shared stock set (knife, the buyable guns, footsteps, damage) -><outDir>/soundevents.json + sounds.
     public static void Stock(string pak01, string outDir)
     {
         var pkg = new Package();
@@ -138,7 +138,9 @@ static class SoundBake
             ReadEvents(bytes, f, raw);
         }
         Directory.CreateDirectory(outDir);
-        var (events, files, failed) = Export(loader, raw, StockEvents, outDir);
+        // plus every buyable gun's shot, draw and reload sounds (WeaponBake.cs)
+        var wanted = StockEvents.Concat(WeaponBake.SoundNames(pkg)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        var (events, files, failed) = Export(loader, raw, wanted, outDir);
         File.WriteAllText(Path.Combine(outDir, "soundevents.json"), events.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
         Console.WriteLine($"stock sounds: {events.Count} events, {files} files -> {outDir}{(failed.Count > 0 ? "; failed: " + string.Join(", ", failed) : "")}");
     }

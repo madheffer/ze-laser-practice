@@ -7,8 +7,9 @@
 //     (speed hacks), rising or hovering in the air with no jump / push (fly), a start away from the spawn, a
 //     map teleport that didn't land where the map sends you;
 //   - the clock: ticks from the future are refused; a run that falls far behind the round is out (slow-motion);
-//   - shots: each boss hit must fit the weapon (AK-47: 30-round magazine at 10 rounds/s, 2.43 s reloads; knife:
-//     its swing rate and reach) and have a clear line from the player's eye to the boss.
+//   - shots: each boss hit must fit the gun held (lib/weapons.js: its damage, magazine, m_flCycleTime and reload;
+//     every stage starts with the PP-Bizon, 'weapon' messages switch it) or the knife (its swing rate and reach),
+//     and have a clear line from the player's eye to the boss.
 //   - the stage's own win / lose (the map's win input or winAfter), instead of trusting a client.
 // Violations are counted per kind; a few within two seconds and the player is out of the round.
 import { createRunEngine, hazardName, TICK, COUNTDOWN, startIfDue, mapRuns } from '../src/world/run-engine.js';
@@ -16,7 +17,7 @@ import { useItems } from '../src/world/items.js';
 import { CollisionWorld, makeTrace } from '../src/world/collision.js';
 import { bulletWorld, BULLET_MASK } from '../src/world/bullets.js';
 import { CS, standsFree } from '../src/world/movement.js';
-import { WEAPONS } from '../src/lib/weapons.js';
+import { GUNS, KNIFE, DEFAULT_GUN } from '../src/lib/weapons.js';
 
 const MAX_AXIS_SPEED = 3500 * 1.05; // CS2 clamps each velocity axis to sv_maxvelocity 3500
 const BOOST_TICKS = 32; // after a push / map velocity: half a second of extra speed allowance, no fly check
@@ -27,7 +28,8 @@ const AHEAD_LIMIT = 32; // ticks a run may lead it (jitter)
 const SPAWN_SLACK = 96; // units: the first tick has to be this close to the spawn
 const TELEPORT_SLACK = 96; // units: the tick after a map teleport, this close to its destination
 const KNIFE_REACH = 32; // units added to a knife's range (hull / latency)
-const BURST = 6; // AK rounds that may arrive at once (network jitter bunches a few 100 ms batches)
+const BURST = 6; // rounds that may arrive at once (network jitter bunches a few 100 ms batches)
+const SWAP_GRACE = 1500; // ms the gun held before a buy still counts (its last rounds' hits trail the message)
 const RELOAD_SLACK = 0.3; // s off a reported reload (the report travels; the last rounds' hits may trail it)
 // A player's simulated ping (their own setting, 0-500 ms, sent with 'load' / 'ready': server/coop-round.js) is theirs
 // alone: it never touches the round clock, the boss damage schedule (coop-round.js BD_DELAY_TICKS: the same tick on
@@ -63,7 +65,8 @@ export class PlayerCheck {
     this.uses = []; // ticks after which the player pressed their map item (E)
     this.bd = []; // [{ tick, hits }] boss damage to apply when this run reaches that tick
     this.ping = 0; this.lagTicks = 0; this.past = []; // past: [{ tick, hulls: Map boss id -> hulls }], lagTicks + 1 long
-    this.shots = { tokens: BURST, rounds: WEAPONS.gun.clip, reloadUntil: 0, knife: 2, at: Date.now() };
+    this.gun = GUNS[DEFAULT_GUN]; this.prevGun = null; this.prevUntil = 0;
+    this.shots = { tokens: BURST, rounds: this.gun.clip, reloadUntil: 0, knife: 2, at: Date.now() };
     const me = this;
     this.stub = { centre: () => [me.pos[0], me.pos[1], me.pos[2] + me.height / 2], half: () => [CS.halfWidth, CS.halfWidth, me.height / 2] };
     this.run = createRunEngine({
@@ -288,25 +291,30 @@ export class PlayerCheck {
     const now = Date.now(), s = this.shots;
     const dt = Math.min(2, (now - s.at) / 1000);
     s.at = now;
-    s.tokens = Math.min(BURST, s.tokens + dt / WEAPONS.gun.cycle);
-    s.knife = Math.min(BURST / 2, s.knife + dt / WEAPONS.knife.slash.cycle);
+    const g = this.gun;
+    s.tokens = Math.min(BURST, s.tokens + dt / g.cycle);
+    s.knife = Math.min(BURST / 2, s.knife + dt / KNIFE.slash.cycle);
+    const gunDamage = (d) => d === g.damage || (now < this.prevUntil && d === this.prevGun?.damage);
     const bosses = this.bosses();
     const then = this.lagTicks ? this.past[0] : null; // the oldest kept: what a client lagTicks behind saw
     const out = [];
     for (const [id, dmg, n] of hits) {
       const e = bosses.find((x) => x.id === id);
-      const kind = dmg === WEAPONS.gun.damage ? 'gun' : [WEAPONS.knife.slash.first, WEAPONS.knife.slash.follow, WEAPONS.knife.stab.damage].includes(dmg) ? 'knife' : null;
+      const kind = gunDamage(dmg) ? 'gun' : [KNIFE.slash.first, KNIFE.slash.follow, KNIFE.stab.damage].includes(dmg) ? 'knife' : null;
       if (!e || !kind) { this.strike('shot', `damage ${dmg} on ${id}`); continue; }
-      const range = kind === 'gun' ? WEAPONS.gun.range : (dmg === WEAPONS.knife.stab.damage ? WEAPONS.knife.stab.range : WEAPONS.knife.slash.range) + KNIFE_REACH;
+      const range = kind === 'gun' ? Math.max(g.range, now < this.prevUntil ? this.prevGun?.range || 0 : 0)
+        : (dmg === KNIFE.stab.damage ? KNIFE.stab.range : KNIFE.slash.range) + KNIFE_REACH;
       // out of sight / reach, now and where the player's ping showed it: dropped (real lag can do this honestly)
       const past = then?.hulls.get(e.id);
       if (!this.canHit(e.hulls(), range) && !(past && this.canHit(past, range))) continue;
       let shotsWanted = Math.ceil(n / mult), ok = 0;
       while (shotsWanted-- > 0) {
         if (kind === 'gun') {
-          if (now < s.reloadUntil || s.tokens < 1) break;
+          // the gun held before a buy: its last rounds were fired before the new gun's draw lock
+          const old = dmg !== g.damage;
+          if ((now < s.reloadUntil && !old) || s.tokens < 1) break;
           s.tokens--; s.rounds--;
-          if (s.rounds <= 0) { s.rounds = WEAPONS.gun.clip; s.reloadUntil = now + WEAPONS.gun.reload * 1000; }
+          if (s.rounds <= 0) { s.rounds = g.clip; s.reloadUntil = now + g.reload * 1000; }
         } else {
           if (s.knife < 1) break;
           s.knife--;
@@ -324,8 +332,19 @@ export class PlayerCheck {
   reload() {
     const now = Date.now(), s = this.shots;
     if (now < s.reloadUntil) return;
-    s.reloadUntil = now + (WEAPONS.gun.reload - RELOAD_SLACK) * 1000;
-    s.rounds = WEAPONS.gun.clip;
+    s.reloadUntil = now + (this.gun.reload - RELOAD_SLACK) * 1000;
+    s.rounds = this.gun.clip;
+  }
+
+  // the client bought a gun (app/buy.js): a full magazine of it, after its draw (m_flDeployDuration). Buying again and
+  // again only costs the buyer the draw each time, so it is no way round the fire rate.
+  setGun(name) {
+    if (typeof name !== 'string' || !Object.hasOwn(GUNS, name)) return;
+    const now = Date.now(), s = this.shots;
+    if (GUNS[name] !== this.gun) { this.prevGun = this.gun; this.prevUntil = now + SWAP_GRACE; }
+    this.gun = GUNS[name];
+    s.rounds = this.gun.clip;
+    s.reloadUntil = Math.max(s.reloadUntil, now + (this.gun.deploy - RELOAD_SLACK) * 1000);
   }
 
   // a clear line from the eye to the boss hull (its centre or a corner), within range

@@ -92,8 +92,11 @@ class Round {
   // you used your map item (E) after tick k: the server's copy presses it before tick k + 1, as yours does
   used(k) { if (!this.ended && !S.run?.spectating) { this.sendTicks(); net.game({ t: 'use', r: this.r, k }); } }
 
-  // your AK reload started: the server's shot check holds your next rounds until it's done
+  // your gun's reload started: the server's shot check holds your next rounds until it's done
   reloaded() { if (!this.ended && !S.run?.spectating) net.game({ t: 'reload', r: this.r }); }
+
+  // you bought a gun (app/buy.js): the server's shot check holds you to its numbers from now on
+  bought(gun) { if (!this.ended && !S.run?.spectating) net.game({ t: 'weapon', r: this.r, gun }); }
 
   // the stage's clear / fail: the server's own copy of the run decides it, so nothing is sent
   outcome() {}

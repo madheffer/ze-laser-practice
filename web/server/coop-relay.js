@@ -250,6 +250,7 @@ export function attachCoopRelay(httpServer, { log = () => {}, store = openStore(
       // the home page's live feed: watch it, or report your own solo run to it
       case 'feed': feed.watch(c, m.on !== false); break;
       case 'reload': if (round && m.r === round.r) round.onReload(c); break;
+      case 'weapon': if (round && m.r === round.r) round.onWeapon(c, m.gun); break;
       case 'ready': if (round && m.r === round.r) round.onReady(c, m); break;
       case 'load': if (round && m.r === round.r) round.onLoad(c, m); break;
       case 'use': if (round && m.r === round.r) round.onUse(c, m); break;

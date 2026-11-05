@@ -37,6 +37,15 @@ public static class Program
             SoundBake.Stock(Path.Combine(stockCs2, "pak01_dir.vpk"), Path.GetFullPath(args[1]));
             return 0;
         }
+        if (args.Length >= 2 && args[0] == "--weapons")
+        {
+            // lasers-bake --weapons <web/src/lib/weapons-cs2.js> [--cs2 <game/csgo>]: the buyable guns' CS2 numbers (WeaponBake.cs)
+            string? wCs2 = null;
+            for (var i = 2; i < args.Length; i++) if (args[i] == "--cs2" && i + 1 < args.Length) wCs2 = args[++i];
+            wCs2 ??= FindCs2();
+            if (wCs2 == null) { Console.Error.WriteLine("no CS2 install found (--cs2 <game/csgo>)"); return 1; }
+            return WeaponBake.Run(Path.Combine(wCs2, "pak01_dir.vpk"), Path.GetFullPath(args[1]));
+        }
         if (args.Length >= 3 && args[0] == "--sounds")
         {
             // lasers-bake --sounds <workshop.vpk> <web/public/maps/<name>> [--cs2 <game/csgo>]: only soundevents.json + sounds/

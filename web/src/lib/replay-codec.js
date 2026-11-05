@@ -1,5 +1,5 @@
 // A run's replay, as bytes: where the player stood and looked on every 64-tick step, plus the few things they did
-// that change the map (shots at a boss, the map item's E, fall damage). Nothing about the map itself is stored:
+// that change the map (shots at a boss, the map item's E, fall damage, a bought gun). Nothing about the map is stored:
 // playback rebuilds the stage from the same seed and rules (app/replay-play.js), and the map's own entity logic
 // replays everything else, exactly as the co-op anti-cheat does with a round's positions (server/coop-check.js).
 //
@@ -8,9 +8,10 @@
 //
 // Layout: varint(VERSION) varint(n) then n ticks, then varint(events) and the events.
 //   tick:  zigzag deltas of x, y, z (1/32 unit), yaw, pitch (1/10 degree; yaw wraps), then one flags byte:
-//          bits 0-3 duckAmount (0..15), bit 4 on the ground, bit 5 ducked, bit 6 the AK-47 is out
+//          bits 0-3 duckAmount (0..15), bit 4 on the ground, bit 5 ducked, bit 6 the primary is out
 //   event: varint(tick delta from the last event), varint(type), then its fields (EVENT_FIELDS)
 // The bytes are gzipped on the wire and in the database (CompressionStream / zlib).
+import { GUN_IDS, LEGACY_GUN } from './weapons.js';
 
 export const VERSION = 1;
 export const POS_SCALE = 32;
@@ -20,11 +21,12 @@ export const MAX_EVENTS = 40000;
 export const MAX_BYTES = 2 * 1024 * 1024; // decoded
 
 // type -> its fields (all integers; *zz = signed). 'shot' carries the view it was fired at (mouse look moves between ticks)
-export const EVENTS = ['shot', 'use', 'fall'];
+export const EVENTS = ['shot', 'use', 'fall', 'buy'];
 const EVENT_FIELDS = {
   shot: ['kind', 'damage', 'range', 'yaw*zz', 'pitch*zz'], // kind: SHOT_KINDS index; yaw/pitch x ANG_SCALE
   use: [],
   fall: ['damage'], // x 10
+  buy: ['gun'], // lib/weapons.js GUN_IDS index (app/buy.js)
 };
 export const SHOT_KINDS = ['bullet', 'slash', 'stab'];
 const FIELD_MAX = 1e6; // any event field (damage, range, angles x 10): far past a real value, and a safe integer
@@ -125,6 +127,7 @@ export function decodeReplay(bytes) {
       if (Math.abs(ev[name]) > FIELD_MAX) throw new Error('replay: bad event field');
     }
     if (type === 'shot' && !SHOT_KINDS[ev.kind]) throw new Error('replay: bad shot');
+    if (type === 'buy' && !GUN_IDS[ev.gun]) throw new Error('replay: bad gun');
     out.events.push(ev);
   }
   if (r.i !== bytes.length) throw new Error('replay: trailing bytes');
@@ -148,6 +151,8 @@ export function cleanMeta(m) {
     stage: m.stage,
     mode: m.mode === 'endless' ? 'endless' : 'normal',
     weapon: m.weapon === 'gun' ? 'gun' : 'knife',
+    // the primary the run started with (lib/weapons.js GUNS); replays from before buying are the AK-47's
+    gun: GUN_IDS.includes(m.gun) ? m.gun : LEGACY_GUN,
     // s from the spawn to the stage's start (world/run-engine.js COUNTDOWN); absent in older replays (legacyCountdown)
     ...(Number.isFinite(m.countdown) ? { countdown: num(m.countdown, 0, 10, 3) } : {}),
     rules: {

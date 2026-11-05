@@ -3,13 +3,9 @@
 import { safeRelPath, versioned } from '../lib/paths.js';
 import { FRESH } from '../lib/fetch.js';
 
-// main.js's short names -> stock CS2 events (an entry can override pitch/volume)
+// main.js's short names -> stock CS2 events (an entry can override pitch/volume). A gun's sounds are its own events by
+// name (lib/weapons.js fireSound / drawSounds / reloadSounds, played by app/weapon-sounds.js).
 export const ALIASES = {
-  'gun.fire': 'Weapon_AK47.Single',
-  'gun.deploy': 'Weapon_AK47.Draw',
-  'gun.clipout': 'Weapon_AK47.Clipout',
-  'gun.clipin': 'Weapon_AK47.Clipin',
-  'gun.boltpull': 'Weapon_AK47.BoltPull',
   'knife.deploy': 'Weapon_Knife.Deploy',
   'knife.slash': 'Weapon_Knife.Slash',
   'knife.stab': { name: 'Weapon_Knife.Slash', pitch: 0.85, volume: 1.3 }, // the heavy swing; Weapon_Knife.Stab is its *hit*

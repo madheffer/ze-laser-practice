@@ -13,7 +13,7 @@ namespace Lasers.Bake;
 
 static class PanoramaBake
 {
-    static readonly string[] Files =
+    static readonly string[] BaseFiles =
     [
         // HUD icons
         "panorama/images/icons/ui/health.vsvg_c",
@@ -77,6 +77,8 @@ static class PanoramaBake
         "panorama/images/hud/deathnotice/icon_headshot.vsvg_c",
         "panorama/images/hud/deathnotice/penetrate.vsvg_c",
     ];
+    // every buyable gun's equipment icon (weapon select + ammo panel): icons/equipment/<vdata name without weapon_>
+    static readonly string[] Files = [.. BaseFiles, .. WeaponBake.Guns.Select(g => $"panorama/images/icons/equipment/{g.Vdata["weapon_".Length..]}.vsvg_c")];
 
     public static void Run(string cs2, string outDir)
     {
