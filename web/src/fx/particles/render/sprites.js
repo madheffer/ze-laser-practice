@@ -19,24 +19,29 @@ const LAYOUT = {
 export class SpriteRenderer {
   constructor(shared, assets) {
     this.assets = assets;
-    this.geometry = new THREE.InstancedBufferGeometry();
-    this.geometry.setAttribute('corner', new THREE.BufferAttribute(CORNERS, 2));
-    this.geometry.setIndex(INDEX);
     this.capacity = 0;
     this.material = createSpritecardMaterial('sprite', shared, whiteTexture());
-    this.mesh = new THREE.Mesh(this.geometry, this.material);
+    this.mesh = new THREE.Mesh(undefined, this.material);
     this.mesh.frustumCulled = false;
     this._grow(16);
     this._order = [];
   }
 
+  // A bigger set of instance buffers goes on a new geometry: three.js sizes an instanced geometry once, at its first
+  // draw (_maxInstanceCount, from the attribute counts then), and caps every later draw there. Swapping bigger buffers
+  // into the old one drew only its first capacity's worth: a 500-particle laser strip started at 16 drew 16.
   _grow(n) {
     this.capacity = Math.max(n, this.capacity * 2);
+    const geo = new THREE.InstancedBufferGeometry();
+    geo.setAttribute('corner', new THREE.BufferAttribute(CORNERS, 2));
+    geo.setIndex(INDEX);
     for (const [name, size] of Object.entries(LAYOUT)) {
       const a = new THREE.InstancedBufferAttribute(new Float32Array(this.capacity * size), size);
       a.setUsage(THREE.DynamicDrawUsage);
-      this.geometry.setAttribute(name, a);
+      geo.setAttribute(name, a);
     }
+    this.geometry?.dispose();
+    this.geometry = this.mesh.geometry = geo;
   }
 
   /** ctx: { time, camPos (Source), report(msg) }. Returns the controls it applied. */

@@ -10,6 +10,7 @@
       "name": "Throne finale – falling balls",
       "summary": "Dodge the falling balls on the throne",
       "description": "Starts on the throne at the bottom of its descent, 5 s before the balls. Normal gravity: the escape's 0.1 ends at the trigger every human crosses into the throne room (KeyValue gravity 1). 300-damage balls rain from the spinning makers above for 23 s (150 per half-second touch on 180 HP: one graze survives, two kill). Survive until the nuke.",
+      "setup": [{ "target": "!player", "input": "SetFogController", "param": "[PR#]fc_hell" }],
       "spawn": {
         "on": "[PR#]ml_throne",
         "offset": [
@@ -119,6 +120,7 @@
       "name": "Dragon → escape → throne (full run)",
       "summary": "The whole ending: dragon, chase, throne",
       "description": "The whole ending as it plays on a server: the bone dragon fight with every attack, its death, the escape-dragon chase and the falling-ball finale in the throne room.",
+      "setup": [{ "target": "!player", "input": "SetFogController", "param": "[PR#]fc_hell" }],
       "spawn": {
         "origin": [
           2560,
@@ -213,6 +215,7 @@
       "name": "Dragon – full fight",
       "summary": "The bone dragon fight, every attack",
       "description": "The fight from the moment the dragon lands: a random attack every 30 s until its 16 health segments (900 HP per human each, as the map adds it) are gone. Ends when it dies.",
+      "setup": [{ "target": "!player", "input": "SetFogController", "param": "[PR#]fc_hell" }],
       "spawn": {
         "origin": [
           2560,
@@ -300,6 +303,7 @@
       "name": "Ball spit",
       "summary": "The dragon hunts you and spits electro balls",
       "description": "The dragon flies between its four perches and turns to hunt one human (a spinning trigger tags them with the dragontarget context); when its sight line (tr_dragon_foundtarget) finds them it spits a pattern of electro balls along it, 768 u/s for 2048 u, every ~0.9 s while it keeps sight. 10 damage a second per ball.",
+      "setup": [{ "target": "!player", "input": "SetFogController", "param": "[PR#]fc_hell" }],
       "spawn": {
         "origin": [
           2560,
@@ -384,6 +388,7 @@
       "name": "Pentagram",
       "summary": "Blood balls from five circling stars",
       "description": "Five pentagram stars (one a second) ride their track (func_tracktrain) around the arena from 5 s to 25 s, each turning ring of makers shooting blood balls every timer_pent tick. 10 damage a second per star or ball.",
+      "setup": [{ "target": "!player", "input": "SetFogController", "param": "[PR#]fc_hell" }],
       "spawn": {
         "origin": [
           2560,
@@ -468,6 +473,7 @@
       "name": "Charge",
       "summary": "Dragon copies charge across the arena",
       "description": "The dragon rises out of the way (move_dragon_charge_atk) and the outer fire burns at the rim; every 3 s from 4 s a copy of it charges across the arena from one of 12 angles at 768 u/s, pushing you along (500) and firing a laser ahead of it. Seven charges.",
+      "setup": [{ "target": "!player", "input": "SetFogController", "param": "[PR#]fc_hell" }],
       "spawn": {
         "origin": [
           2560,
@@ -552,6 +558,7 @@
       "name": "Wind",
       "summary": "A pull to the centre and sweeping gusts",
       "description": "The dragon pulls everyone to the centre (push_gravity, 255) from 2 to 12 s and 16 to 26 s, while every 3 s a gust (temp_wind: turning push walls) sweeps across the arena.",
+      "setup": [{ "target": "!player", "input": "SetFogController", "param": "[PR#]fc_hell" }],
       "spawn": {
         "origin": [
           2560,
@@ -636,6 +643,7 @@
       "name": "Laser waves",
       "summary": "Laser waves: jump low, crouch high",
       "description": "7 random waves fan out from the centre over ~21 s. Low ones to jump, high ones to crouch.",
+      "setup": [{ "target": "!player", "input": "SetFogController", "param": "[PR#]fc_hell" }],
       "spawn": {
         "origin": [
           2560,
@@ -715,6 +723,7 @@
       "name": "Triangle",
       "summary": "Triangle lasers from a turning ring",
       "description": "Triangle-shaped lasers from the ring of makers while the whole ring turns, reversing direction as it goes.",
+      "setup": [{ "target": "!player", "input": "SetFogController", "param": "[PR#]fc_hell" }],
       "spawn": {
         "origin": [
           2560,
@@ -794,6 +803,7 @@
       "name": "Curveball",
       "summary": "Curving lasers from a turning ring",
       "description": "Curving lasers out of a turning ring.",
+      "setup": [{ "target": "!player", "input": "SetFogController", "param": "[PR#]fc_hell" }],
       "spawn": {
         "origin": [
           2560,
@@ -873,6 +883,7 @@
       "name": "Firestorm",
       "summary": "Fire lasers from every side",
       "description": "Fire lasers from all sides while the ring spins backwards.",
+      "setup": [{ "target": "!player", "input": "SetFogController", "param": "[PR#]fc_hell" }],
       "spawn": {
         "origin": [
           2560,
@@ -952,6 +963,7 @@
       "name": "Spin",
       "summary": "The dragon's spin attack",
       "description": "The dragon's spin attack.",
+      "setup": [{ "target": "!player", "input": "SetFogController", "param": "[PR#]fc_hell" }],
       "spawn": {
         "origin": [
           2560,
@@ -1036,6 +1048,7 @@
       "name": "Beam",
       "summary": "Dodge the sweeping beams",
       "description": "Sweeping beams.",
+      "setup": [{ "target": "!player", "input": "SetFogController", "param": "[PR#]fc_hell" }],
       "spawn": {
         "origin": [
           2560,
@@ -1121,6 +1134,7 @@
       "name": "Escape-dragon chase",
       "summary": "Low-gravity chase: float over the lasers",
       "description": "After the dragon dies: landing at the escape start (tr_addeschp) sets your gravity to 0.1 and adds the boss HP per human; it lasts until the gravity-1 trigger at the throne-room entrance. Float-jump the escape dragon's lasers (300), bullets (30) and fireballs (60) with the firewall behind you, and kill it before it reaches the end.",
+      "setup": [{ "target": "!player", "input": "SetFogController", "param": "[PR#]fc_hell" }],
       "spawn": {
         "at": "[PR#]td_throneroom",
         "yaw": 0
