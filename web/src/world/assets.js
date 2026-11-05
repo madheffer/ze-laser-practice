@@ -13,6 +13,7 @@ import { normaliseHulls } from './hulls.js';
 import { mapItems } from './items.js';
 import { MapEffects } from '../fx/effects.js';
 import { chunkList } from './stream.js';
+import { soundDurations } from '../lib/sound-durations.js';
 
 // VRF exports glTF in metres, Y up: gltf = (src.y, src.z, src.x) * 0.0254. This puts it back in Source units.
 export const GLTF_TO_SOURCE = new THREE.Matrix4().set(
@@ -122,6 +123,8 @@ export async function loadMap(name, onProgress = () => {}, opts = {}) {
     // optional: GFL's StripperCS2 edits to this map (tools/stripper.mjs), applied below as GFL's servers do
     fetchJson(url('stripper.json')).catch(() => null),
   ]);
+  // the map's sound events' lengths, for point_soundevent's OnSoundFinished (entities/classes/soundents.js)
+  const sounds = soundDurations(await fetchJson(url('soundevents.json')).catch(() => null));
   // optional: the water shader's textures (lasers-bake --water), only for a map with CS2 water in it
   const water = waterTextures(await fetchJson(url('water/water.json')).catch(() => null), url);
   // the same edits the co-op server applies to its copy (server/map-store.js): both must hold the same entities
@@ -163,7 +166,7 @@ export async function loadMap(name, onProgress = () => {}, opts = {}) {
   // particles that draw a model (C_OP_RenderModels) take it from the map's own models
   if (effects) { effects.getModel = getModel; effects.modelToSource = GLTF_TO_SOURCE; }
   const radar = radarInfo(overview, (rel) => url(rel));
-  return { name, version, manifest, entities, collision, collisionFx, hulls, bounds, animations, world, chunks, loadChunk, getModel, particles: fx, items, radar, effects, water };
+  return { name, version, manifest, entities, collision, collisionFx, hulls, bounds, animations, soundDurations: sounds, world, chunks, loadChunk, getModel, particles: fx, items, radar, effects, water };
 }
 
 // water.json -> { textures: { <vtex path>: url }, frames: { <vtex path>: slices } } (null without one). File names only

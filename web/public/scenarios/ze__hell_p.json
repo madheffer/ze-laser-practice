@@ -10,13 +10,28 @@
       "featured": true,
       "name": "Spike room (boss)",
       "summary": "Dodge the floor spikes for a minute",
-      "description": "The map's own sequence: math_boss_counter hits 15 on Room 14 (the 15th room spawned, math_total_counter starts at -1), so room_maker_relay_boss spawns roomBossTemplate at room_reset_maker_point and Room 14's door teleport drops you at human_teleport 1 s later. boss_start (the line 250 u ahead) triggers boss_start_relay: the map music stops, at +7 boss_sides_hurt closes the entrance strip behind you (999, humans) and Rod.lab plays, at +11 the face lights up with Rod.bell, boss music at +15. boss_attack_timer (enabled +13, every 4 s, 3 s from +20, 2 s from +40) snaps (Rod.snap +0.5 s) and boss_attack_case picks one of 3 patterns: rows 1 + 3, the X, or the outer ring. Each spike rises 1.15 s after the pick (Rod.crystal), its attack_hurt (999) is live once fully up and gone 1.1 s later. Win when boss_end_relay fires (+60).",
+      "description": "The map's own sequence, from its logic_auto (the soundscape trigger on at +3 s, Rod.Music from +5 s, both playing when you arrive): math_boss_counter hits 15 on Room 14 (the 15th room spawned, math_total_counter starts at -1), so room_maker_relay_boss spawns roomBossTemplate at room_reset_maker_point and Room 14's door teleport drops you at human_teleport 1 s later. boss_start (the line 250 u ahead) triggers boss_start_relay: the map music stops, at +7 boss_sides_hurt closes the entrance strip behind you (999, humans) and Rod.lab plays, at +11 the face lights up with Rod.bell, boss music at +15. boss_attack_timer (enabled +13, every 4 s, 3 s from +20, 2 s from +40) snaps (Rod.snap +0.5 s) and boss_attack_case picks one of 3 patterns: rows 1 + 3, the X, or the outer ring. Each spike rises 1.15 s after the pick (Rod.crystal), its attack_hurt (999) is live once fully up and gone 1.1 s later. Win when boss_end_relay fires (+60).",
       "spawn": {
         "at": "[PR#]human_teleport",
         "yaw": 90
       },
       "fastForward": 8,
       "start": [
+        {
+          "target": "[PR#]soundscape_trigger",
+          "input": "Enable",
+          "delay": 3
+        },
+        {
+          "target": "[PR#]spawn_music",
+          "input": "ForceSpawn",
+          "delay": 4.98
+        },
+        {
+          "target": "[PR#]music",
+          "input": "FireUser1",
+          "delay": 5
+        },
         {
           "target": "[PR#]math_room_counter",
           "input": "SetValue",

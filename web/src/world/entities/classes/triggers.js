@@ -7,6 +7,7 @@ import { DEG, num, bool, parseVec, angleForward } from '../math.js';
 import { nameMatches } from '../../../lib/names.js';
 import { explosionSound } from '../sound.js';
 import { strandsHuman } from '../cages.js';
+import { soundscapeTouch, soundscapeThink } from './soundents.js';
 
 const triggerBase = {
   input(e, inp, p, act) {
@@ -20,11 +21,11 @@ const triggerBase = {
     }
   },
 };
-for (const k of ['trigger_multiple', 'trigger_once', 'trigger_hurt', 'trigger_push', 'trigger_teleport', 'trigger_gravity', 'trigger_look']) {
+for (const k of ['trigger_multiple', 'trigger_once', 'trigger_hurt', 'trigger_push', 'trigger_teleport', 'trigger_gravity', 'trigger_look', 'trigger_soundscape']) {
   register(k, { trigger: true, input: triggerBase.input });
 }
 
-const TOUCH_CLASSES = ['trigger_hurt', 'trigger_multiple', 'trigger_once', 'trigger_push', 'trigger_teleport', 'trigger_gravity'];
+const TOUCH_CLASSES = ['trigger_hurt', 'trigger_multiple', 'trigger_once', 'trigger_push', 'trigger_teleport', 'trigger_gravity', 'trigger_soundscape'];
 const EPS = 1e-6;
 
 // ------------------------------------------------------------------ trigger_hurt
@@ -254,6 +255,7 @@ export function updateTriggers(engine, player) {
           else e.state.nextTrigger = engine.time + multipleWait(e);
         }
         if (cls === 'trigger_hurt') e.state.hurtOnce = false; // a new touch counts as a new hit
+        if (cls === 'trigger_soundscape') soundscapeTouch(engine, e); // its soundscape becomes yours (soundents.js)
         if (cls === 'trigger_teleport') {
           const dest = engine.findOne(e.kv.target);
           // CS2 takes the first destination with that name (porter research 07 §2.2); `cage`: a zombie cage with no
@@ -286,5 +288,7 @@ export function updateTriggers(engine, player) {
       }
     }
   }
+  // env_soundscape radii (soundents.js): the one you stand in takes over
+  soundscapeThink(engine, [c[0], c[1], c[2] - h[2]]);
   return events;
 }

@@ -31,7 +31,10 @@ import { mapName } from '../lib/paths.js';
 import { spatialMix } from './spatial.js';
 import { VoiceLimits } from './limits.js';
 import { createMixGlue } from './mixglue.js';
-import { mixVolume, eventVolume } from './mix.js';
+import { groupLevels, eventGroup, eventVolume } from './mix.js';
+import { MixLayers, DEATH_FADE } from './layers.js';
+import { RoomDsp } from './dsp.js';
+import { followCurve, fadeOut, randomAround } from './shape.js';
 import { SurfaceSounds } from './surfaces.js';
 import { ALIASES, readTable, fileUrl } from './tables.js';
 import { DEFAULT_GUN, gunSounds } from '../lib/weapons.js';
@@ -72,6 +75,13 @@ export class GameAudio {
     this.music.connect(this.glue.input);
     this.glue.output.connect(this.master);
     this.master.connect(this.ctx.destination);
+    // CS2's mix layers (temporary volume changes, layers.js) and room reverb (RoomDSP, dsp.js: core_null until a
+    // soundscape-style event switches it); the reverb returns through the sfx volume
+    this.layers = new MixLayers();
+    this.layerVersion = 0;
+    this.dsp = new RoomDsp(this.ctx);
+    this.dsp.output.connect(this.sfx);
+    this.chains = new Map(); // ent.id (or null) -> Set of retrigger chains (csgo_mega enable_retrigger)
     this.stockReady = this._loadTable('stock', 'sounds/soundevents.json').then(() => this._preloadStock());
     this.setVolumes(this.volumes);
 
@@ -123,12 +133,27 @@ export class GameAudio {
         this._start(name, {
           pos: ev.pos, ent: ev.ent, local: !!ev.local, entId: id, offset: ev.offset || 0, slot: ev.slot ?? null,
           volume, pitch: Number.isFinite(ev.pitch) && ev.pitch > 0 ? ev.pitch : 1, follow: typeof ev.follow === 'function' ? ev.follow : null,
-          repeat: !!ev.repeat,
+          repeat: !!ev.repeat, guid: Number.isFinite(ev.guid) ? ev.guid : 0,
         });
         return;
       }
       case 'stop': {
         for (const v of this._voicesOf(id, ev.slot)) this._stopVoice(v);
+        this._stopChains(id, ev.slot);
+        return;
+      }
+      // snd_event_param: a parameter on the sound with that handle (point_soundevent's SoundEventGuid). "volume" is the
+      // event's public volume (it replaces the event's own), "pitch" its pitch
+      case 'param': {
+        const val = Number(ev.value);
+        if (!ev.guid || !Number.isFinite(val)) return;
+        const key = String(ev.name || '').toLowerCase();
+        for (const v of this.voices) {
+          if (v.guid !== ev.guid) continue;
+          if (key === 'volume') { v.paramVolume = Math.abs(val); this._update(v); }
+          else if (key === 'pitch' && val > 0) { v.userPitch = val / (v.def.pitch || 1); for (const s of v.sources) s.playbackRate.setValueAtTime(v.rate * v.userPitch, this.ctx.currentTime); }
+          else this._warn(`audio: sound parameter "${ev.name}" isn't modelled`);
+        }
         return;
       }
       case 'volume': {
@@ -168,7 +193,26 @@ export class GameAudio {
     if (pos) { this.listener.pos[0] = pos[0]; this.listener.pos[1] = pos[1]; this.listener.pos[2] = pos[2]; }
     this.listener.yaw = yaw || 0;
     this.listener.pitch = pitch || 0;
-    for (const v of this.voices) if (v.spatial) this._update(v);
+    // mix-layer triggers (a layer follows its trigger group's sounds), then re-level every voice if a layer moved
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+    this.layers.tick(now, (group) => {
+      let m = 0;
+      for (const v of this.voices) if (!v.stopped && v.group && v.group.toLowerCase() === group) m = Math.max(m, v.lastGain || 0);
+      return m;
+    });
+    const relevel = this.layers.version !== this.layerVersion;
+    this.layerVersion = this.layers.version;
+    for (const v of this.voices) if (v.spatial || relevel) this._update(v);
+  }
+
+  // CS2's death cam mix (layers.js DEATH_FADE): 'death' when you die and watch on, 'clear' once you're back / restart
+  deathFade(phase) {
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+    if (phase === 'death') this.layers.set('DeathFadeLayer', DEATH_FADE.phase1[0], DEATH_FADE.phase1[1], now);
+    else if (phase === 'fade') this.layers.set('DeathFadeLayer', DEATH_FADE.phase2[0], DEATH_FADE.phase2[1], now);
+    else this.layers.set('DeathFadeLayer', 0, 0, now);
   }
 
   setVolumes({ sfx, music } = {}) {
@@ -210,9 +254,13 @@ export class GameAudio {
   }
 
   stopAll() {
-    for (const v of [...this.voices]) this._stopVoice(v);
+    for (const v of [...this.voices]) this._stopVoice(v, true);
+    for (const set of this.chains.values()) for (const c of set) { c.stopped = true; clearTimeout(c.timer); }
+    this.chains.clear();
     this.byEnt.clear();
     this.limits.clear();
+    this.layers.clear();
+    this.dsp.setPreset('core_null'); // a new run starts in the mix graph's default room
     if (this.held) this.held = []; // a restart drops what the old run asked for while the table loaded
   }
 
@@ -315,18 +363,28 @@ export class GameAudio {
     if (!this.limits.allow(def, o, this.ctx.currentTime)) return;
     for (const old of this.limits.overLimit(def, o.entId, this.voices)) this._stopVoice(old);
     const isMusic = /music/i.test(def.type || '');
+    // csgo_music stop_music: every other "Music." event stops (soundevent_limiter, max 0, name substring)
+    if (def.stopMusic) for (const v of [...this.voices]) if (v.def !== def && /music\./i.test(v.name || '')) this._stopVoice(v);
+    // a soundscape-style event switches the listener's room reverb (RoomDSP, dsp.js)
+    if (def.dspPreset) this.dsp.setPreset(def.dspPreset);
     const files = Array.isArray(def.files) ? def.files : [];
     if (files.length) {
       const file = files[(Math.random() * files.length) | 0];
       const pr = def.pitchRandom;
       const rate = Math.max(0.05, ((def.pitch ?? 1) * hit.pitch + (pr ? pr[0] + Math.random() * (pr[1] - pr[0]) : 0)) * (o.pitch ?? 1));
+      const local = !o.pos || o.local || def.local;
+      // randomize_position: a fixed point that far from where it plays (the listener, for a sound played to you)
+      const randomPos = def.randomPos ? randomAround(local ? this.listener.pos : o.pos, def.randomPos) : null;
       const v = {
-        def, name: def.name, sources: [], gain: null, pan: null, ent: o.ent, entId: o.entId, pos: o.pos ? [...o.pos] : null,
-        slot: o.slot ?? null, follow: o.follow || null, repeat: !!o.repeat,
+        def, name: def.name, sources: [], gain: null, pan: null, env: null, send: null, ent: o.ent, entId: o.entId,
+        pos: randomPos || (o.pos ? [...o.pos] : null), fixedPos: !!randomPos,
+        slot: o.slot ?? null, follow: o.follow || null, repeat: !!o.repeat, guid: o.guid || 0,
         offset: o.offset || 0, // seconds already played (a stage that starts mid-ending joins its music mid-track)
-        spatial: !!o.pos && !o.local && !def.local && !isMusic, music: isMusic, rate,
-        // the event's volume (+ its random variance) x CS2's mix group level (mix.js) x the request's
-        baseVolume: eventVolume(def) * mixVolume(def) * hit.volume * (o.volume ?? 1), userVolume: 1, userPitch: 1, stopped: false,
+        spatial: !isMusic && (!!randomPos || (!!o.pos && !o.local && !def.local)), music: isMusic, rate,
+        // the event's volume (+ its random variance; a snd_event_param "volume" replaces it) x the request's; the mix
+        // group's level (layers included) is applied in _update
+        eventVolume: eventVolume(def), paramVolume: null, requestVolume: hit.volume * (o.volume ?? 1), group: eventGroup(def),
+        userVolume: 1, userPitch: 1, stopped: false,
       };
       this._track(v);
       this._buffer(this._fileUrl(table, file)).then((buf) => {
@@ -334,8 +392,38 @@ export class GameAudio {
         this._begin(v, buf);
       });
     }
+    // enable_retrigger: the event plays again every [min, max] s until its entity's sound is stopped
+    if (def.retrigger) this._retrigger(name, o, depth);
     // child events (e.g. Weapon_AK47.Single -> SingleDistant) play alongside, owned by the same entity
-    if (depth < 3 && Array.isArray(def.children)) for (const c of def.children.slice(0, MAX_CHILD_EVENTS)) this._start(c, o, depth + 1);
+    if (depth < 3 && Array.isArray(def.children)) for (const c of def.children.slice(0, MAX_CHILD_EVENTS)) this._start(c, { ...o, chain: null }, depth + 1);
+  }
+
+  _retrigger(name, o, depth = 0) {
+    const def = this._lookup(name)?.def;
+    if (!def?.retrigger) return;
+    let chain = o.chain;
+    if (!chain) {
+      chain = { stopped: false, timer: 0, slot: o.slot ?? null };
+      const key = o.entId ?? null;
+      if (!this.chains.has(key)) this.chains.set(key, new Set());
+      this.chains.get(key).add(chain);
+    }
+    const [lo, hi] = def.retrigger;
+    const wait = Math.max(0.05, lo + Math.random() * Math.max(0, hi - lo));
+    const fire = () => {
+      if (chain.stopped) return;
+      if (this.paused) { chain.timer = setTimeout(fire, 250); return; } // the game's clock isn't running
+      this._start(name, { ...o, chain, offset: 0 }, 3); // depth 3: the event again, not its children (they have their own)
+    };
+    chain.timer = setTimeout(fire, wait * 1000);
+    void depth;
+  }
+
+  _stopChains(id, slot) {
+    const set = this.chains.get(id ?? null);
+    if (!set) return;
+    for (const c of [...set]) if (slot == null || c.slot === slot) { c.stopped = true; clearTimeout(c.timer); set.delete(c); }
+    if (!set.size) this.chains.delete(id ?? null);
   }
 
   _track(v) {
@@ -374,9 +462,14 @@ export class GameAudio {
       src.connect(v.pan);
       node = v.pan;
     }
-    node.connect(v.gain);
+    // the envelope: time_volume_mapping_curve from the start, the stop fade curve after a stop (shape.js)
+    v.env = ctx.createGain();
+    node.connect(v.env).connect(v.gain);
     v.gain.connect(v.music ? this.music : this.sfx);
+    // the reverb send, by the mix group's dsp level (music: 0 in Default_Mix)
+    if (!v.music) { v.send = ctx.createGain(); v.send.gain.value = 0; v.gain.connect(v.send).connect(this.dsp.input); }
     v.sources.push(src);
+    if (v.def.timeCurve) followCurve(v.env.gain, v.def.timeCurve, ctx.currentTime - Math.max(0, v.offset));
     this._update(v, true);
     src.onended = () => { if (!src.loop || v.stopped) this._finish(v); };
     // joining late: skip what has already played (wrap inside the loop for looping sounds)
@@ -392,40 +485,52 @@ export class GameAudio {
 
   _update(v, immediate = false) {
     if (!v.gain) return;
-    let g = v.baseVolume * v.userVolume, p = 0;
+    const t = this.ctx.currentTime;
+    // the mix group's level and dsp send with the mix layers' factors (mix.js, layers.js)
+    const lv = groupLevels(v.group, (grp) => this.layers.factor(grp, t));
+    let g = (v.paramVolume ?? v.eventVolume) * v.requestVolume * lv.vol * v.userVolume, p = 0;
     if (v.spatial) {
-      const pos = (v.ent && v.ent.alive !== false && (v.follow ? safeCall(v.follow) : typeof v.ent.worldOrigin === 'function' && safeOrigin(v.ent))) || v.pos;
+      const pos = (!v.fixedPos && v.ent && v.ent.alive !== false && (v.follow ? safeCall(v.follow) : typeof v.ent.worldOrigin === 'function' && safeOrigin(v.ent))) || v.pos;
       ({ gain: g, pan: p } = spatialMix(pos, this.listener, v.def.curve, g, v.def.distanceMultiplier ?? 1));
     }
-    const t = this.ctx.currentTime;
+    // nothing moved: no new automation event (setListener runs every frame; at uncapped frame rates a new
+    // setTargetAtTime per frame per voice piles up hundreds of events a second on each param)
+    if (!immediate && Math.abs(g - (v.lastGain ?? -1)) < 1e-4 && Math.abs(p - (v.lastPan ?? 9)) < 1e-3 && Math.abs(lv.dsp - (v.lastDsp ?? -1)) < 1e-4) return;
+    v.lastGain = g; v.lastPan = p; v.lastDsp = lv.dsp;
     if (immediate) {
       v.gain.gain.setValueAtTime(g, t);
       if (v.pan) v.pan.pan.setValueAtTime(p, t);
+      if (v.send) v.send.gain.setValueAtTime(lv.dsp, t);
     } else {
       v.gain.gain.setTargetAtTime(g, t, 0.03);
       if (v.pan) v.pan.pan.setTargetAtTime(p, t, 0.03);
+      if (v.send) v.send.gain.setTargetAtTime(lv.dsp, t, 0.03);
     }
   }
 
-  _stopVoice(v) {
+  // now: skip the event's stop fade (a restart / stopAll)
+  _stopVoice(v, now = false) {
     if (v.stopped) return;
     v.stopped = true;
     const t = this.ctx.currentTime;
-    if (v.gain) {
+    // fadetime_volume_mapping_curve: it keeps playing along the curve until its end (shape.js)
+    const tail = !now && v.env ? fadeOut(v.env.gain, v.def.fadeCurve, t) : 0;
+    if (!tail && v.gain) {
       // a short fade so StopSound doesn't click
       v.gain.gain.cancelScheduledValues(t);
       v.gain.gain.setValueAtTime(v.gain.gain.value, t);
       v.gain.gain.linearRampToValueAtTime(0, t + 0.05);
     }
-    for (const s of v.sources) { try { s.stop(t + 0.06); } catch { /* not started */ } }
+    const end = tail || 0.06;
+    for (const s of v.sources) { try { s.stop(t + end); } catch { /* not started */ } }
     if (!v.sources.length) this._untrack(v);
-    else setTimeout(() => this._finish(v), 100);
+    else setTimeout(() => this._finish(v), end * 1000 + 50);
   }
 
   _finish(v) {
     if (!this.voices.has(v)) return;
     v.stopped = true;
-    try { v.gain?.disconnect(); v.pan?.disconnect(); } catch { /* already gone */ }
+    try { v.gain?.disconnect(); v.pan?.disconnect(); v.env?.disconnect(); v.send?.disconnect(); } catch { /* already gone */ }
     this._untrack(v);
   }
 }

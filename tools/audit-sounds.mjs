@@ -5,6 +5,7 @@
 //   - stacks: the most voices of one event started on one tick after CS2's block / instance-limit rules
 //     (audio/limits.js). ze__hell_p's spikes start 8-12 Rod.crystal at once; audio/mixglue.js (CS2's final-mix
 //     compressor) keeps such stacks from clipping, so a stack is only a note unless it is very large
+//   - the music it plays (csgo_music events) and when, from the stage's start
 //   - peak live voices (a voice lives its event's duration, a loop until stopped), and each event's mixer level
 //
 //   node tools/audit-sounds.mjs web/public/maps/ze_mist_p [--stage id] [--for 240]
@@ -45,7 +46,7 @@ const noFiles = [...mapTable.values()].filter((d) => !(d.files || []).length && 
 console.log(`${map}: ${mapTable.size} map events${noFiles.length ? `, ${noFiles.length} with no playable file: ${noFiles.join(', ')}` : ''}`);
 
 for (const sc of stages) {
-  const unknown = new Map(), stacks = new Map(), used = new Map();
+  const unknown = new Map(), stacks = new Map(), used = new Map(), music = [];
   const limits = new VoiceLimits();
   const live = []; // { def, ent, slot, until }
   let peak = 0, peakAt = 0, tickStarts = new Map(), tickAt = -1, spawn = null, won = null, run = null;
@@ -71,6 +72,7 @@ for (const sc of stages) {
           const lim = def.instanceLimit | 0;
           if (lim > 0) for (const v of same.slice(0, Math.max(0, same.length - lim + 1))) v.until = now;
           used.set(def.name, def);
+          if (/music/.test(def.type || '') && music.length < 12) music.push(`${def.name} +${(now - (run?.startTime ?? 0)).toFixed(1)}`);
           live.push({ def, ent: ev.ent, slot: ev.slot ?? null, until: def.loop || ev.repeat ? Infinity : now + (def.duration || 1) });
           if (tickAt !== now) { tickAt = now; tickStarts = new Map(); }
           const n = (tickStarts.get(def.name) || 0) + 1;
@@ -101,6 +103,7 @@ for (const sc of stages) {
   }
   const big = [...stacks].filter(([, s]) => s.n >= 4).sort((a, b) => b[1].n - a[1].n);
   console.log(`\n== ${sc.id}: ${used.size} events played, peak ${peak} live voices (+${peakAt.toFixed(1)} s)`);
+  console.log(`   music      ${music.length ? music.join(', ') : 'none'}`);
   for (const [n, s] of big) console.log(`   STACK      ${n} x${s.n} on one tick (+${s.t.toFixed(1)} s), mixer ${mixVolume(used.get(n)).toFixed(2)}`);
   for (const [n, c] of unknown) console.log(`   UNKNOWN    ${n} (requested ${c}x): no table defines it, silent`);
 }

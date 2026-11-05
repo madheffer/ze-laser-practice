@@ -49,7 +49,13 @@
         "laserbeam_hurt": "a laser beam",
         "nut_boss_timeup_hurt": "the time limit",
         "nut_boss_fallhurt": "the fall"
-      }
+      },
+      "music": [
+        {
+          "target": "[PR#]nut_boss_music",
+          "input": "StartSound"
+        }
+      ]
     },
     {
       "id": "ba_rotate",
@@ -97,7 +103,13 @@
         "laserbeam_hurt": "a laser beam",
         "nut_boss_timeup_hurt": "the time limit",
         "nut_boss_fallhurt": "the fall"
-      }
+      },
+      "music": [
+        {
+          "target": "[PR#]nut_boss_music",
+          "input": "StartSound"
+        }
+      ]
     },
     {
       "id": "ba_push",
@@ -145,7 +157,13 @@
         "laserbeam_hurt": "a laser beam",
         "nut_boss_timeup_hurt": "the time limit",
         "nut_boss_fallhurt": "the fall"
-      }
+      },
+      "music": [
+        {
+          "target": "[PR#]nut_boss_music",
+          "input": "StartSound"
+        }
+      ]
     },
     {
       "id": "ba_pull",
@@ -193,7 +211,13 @@
         "laserbeam_hurt": "a laser beam",
         "nut_boss_timeup_hurt": "the time limit",
         "nut_boss_fallhurt": "the fall"
-      }
+      },
+      "music": [
+        {
+          "target": "[PR#]nut_boss_music",
+          "input": "StartSound"
+        }
+      ]
     },
     {
       "id": "ba_spheres",
@@ -241,7 +265,13 @@
         "laserbeam_hurt": "a laser beam",
         "nut_boss_timeup_hurt": "the time limit",
         "nut_boss_fallhurt": "the fall"
-      }
+      },
+      "music": [
+        {
+          "target": "[PR#]nut_boss_music",
+          "input": "StartSound"
+        }
+      ]
     },
     {
       "id": "ba_ballmove",
@@ -289,7 +319,13 @@
         "laserbeam_hurt": "a laser beam",
         "nut_boss_timeup_hurt": "the time limit",
         "nut_boss_fallhurt": "the fall"
-      }
+      },
+      "music": [
+        {
+          "target": "[PR#]nut_boss_music",
+          "input": "StartSound"
+        }
+      ]
     },
     {
       "id": "ba_crouch",
@@ -337,7 +373,13 @@
         "laserbeam_hurt": "a laser beam",
         "nut_boss_timeup_hurt": "the time limit",
         "nut_boss_fallhurt": "the fall"
-      }
+      },
+      "music": [
+        {
+          "target": "[PR#]nut_boss_music",
+          "input": "StartSound"
+        }
+      ]
     },
     {
       "id": "ba_cubes",
@@ -385,7 +427,13 @@
         "laserbeam_hurt": "a laser beam",
         "nut_boss_timeup_hurt": "the time limit",
         "nut_boss_fallhurt": "the fall"
-      }
+      },
+      "music": [
+        {
+          "target": "[PR#]nut_boss_music",
+          "input": "StartSound"
+        }
+      ]
     },
     {
       "id": "ba_lines",
@@ -433,7 +481,13 @@
         "laserbeam_hurt": "a laser beam",
         "nut_boss_timeup_hurt": "the time limit",
         "nut_boss_fallhurt": "the fall"
-      }
+      },
+      "music": [
+        {
+          "target": "[PR#]nut_boss_music",
+          "input": "StartSound"
+        }
+      ]
     },
     {
       "id": "ba_beams",
@@ -481,7 +535,13 @@
         "laserbeam_hurt": "a laser beam",
         "nut_boss_timeup_hurt": "the time limit",
         "nut_boss_fallhurt": "the fall"
-      }
+      },
+      "music": [
+        {
+          "target": "[PR#]nut_boss_music",
+          "input": "StartSound"
+        }
+      ]
     },
     {
       "id": "ending_full",
@@ -524,7 +584,13 @@
         "nut_dodge_doublelaser1_hurt": "a double laser",
         "nut_final_laser1_hurt": "a final laser",
         "nut_final_vertlaser_hurt": "a sweeping laser"
-      }
+      },
+      "music": [
+        {
+          "target": "[PR#]nut_p3_music",
+          "input": "StartSound"
+        }
+      ]
     },
     {
       "id": "purple_sphere",
@@ -566,7 +632,13 @@
         "nut_dodge_doublelaser1_hurt": "a double laser",
         "nut_final_laser1_hurt": "a final laser",
         "nut_final_vertlaser_hurt": "a sweeping laser"
-      }
+      },
+      "music": [
+        {
+          "target": "[PR#]nut_p3_music",
+          "input": "StartSound"
+        }
+      ]
     },
     {
       "id": "dodge_arena",

@@ -123,7 +123,18 @@
       "childrenTitle": "Drills",
       "endless": {
         "noBossDamage": true
-      }
+      },
+      "music": [
+        {
+          "target": "[PR#]Epic_Temp",
+          "input": "FireUser1"
+        },
+        {
+          "target": "[PR#]Music_12a",
+          "input": "FireUser1",
+          "delay": 0.1
+        }
+      ]
     },
     {
       "id": "chaos_lasers",
@@ -213,7 +224,18 @@
         "Firenova_Hurt": "a fire nova",
         "Electro_Hurt": "electro"
       },
-      "endless": {}
+      "endless": {},
+      "music": [
+        {
+          "target": "[PR#]Epic_Temp",
+          "input": "FireUser1"
+        },
+        {
+          "target": "[PR#]Music_12a",
+          "input": "FireUser1",
+          "delay": 0.1
+        }
+      ]
     },
     {
       "id": "desert_dragon",
@@ -320,7 +342,18 @@
       "childrenTitle": "Single attacks",
       "endless": {
         "noBossDamage": true
-      }
+      },
+      "music": [
+        {
+          "target": "[PR#]Easy_Temp",
+          "input": "FireUser1"
+        },
+        {
+          "target": "[PR#]Music_10a",
+          "input": "FireUser1",
+          "delay": 0.1
+        }
+      ]
     },
     {
       "id": "dragon_fire",
@@ -409,7 +442,18 @@
         "Lightning_Hurt": "lightning",
         "Firenova_Hurt": "a fire nova",
         "Electro_Hurt": "electro"
-      }
+      },
+      "music": [
+        {
+          "target": "[PR#]Easy_Temp",
+          "input": "FireUser1"
+        },
+        {
+          "target": "[PR#]Music_10a",
+          "input": "FireUser1",
+          "delay": 0.1
+        }
+      ]
     },
     {
       "id": "dragon_electro",
@@ -498,7 +542,18 @@
         "Lightning_Hurt": "lightning",
         "Firenova_Hurt": "a fire nova",
         "Electro_Hurt": "electro"
-      }
+      },
+      "music": [
+        {
+          "target": "[PR#]Easy_Temp",
+          "input": "FireUser1"
+        },
+        {
+          "target": "[PR#]Music_10a",
+          "input": "FireUser1",
+          "delay": 0.1
+        }
+      ]
     },
     {
       "id": "desert_ending",
@@ -603,7 +658,18 @@
         "Firenova_Hurt": "a fire nova",
         "Electro_Hurt": "electro"
       },
-      "childrenTitle": "Drills"
+      "childrenTitle": "Drills",
+      "music": [
+        {
+          "target": "[PR#]Easy_Temp",
+          "input": "FireUser1"
+        },
+        {
+          "target": "[PR#]Music_4a",
+          "input": "FireUser1",
+          "delay": 0.1
+        }
+      ]
     },
     {
       "id": "desert_guard_lasers",
@@ -693,7 +759,18 @@
         "Firenova_Hurt": "a fire nova",
         "Electro_Hurt": "electro"
       },
-      "endless": {}
+      "endless": {},
+      "music": [
+        {
+          "target": "[PR#]Easy_Temp",
+          "input": "FireUser1"
+        },
+        {
+          "target": "[PR#]Music_4a",
+          "input": "FireUser1",
+          "delay": 0.1
+        }
+      ]
     },
     {
       "id": "desert_guard_lasers_insane",
@@ -783,7 +860,18 @@
         "Firenova_Hurt": "a fire nova",
         "Electro_Hurt": "electro"
       },
-      "endless": {}
+      "endless": {},
+      "music": [
+        {
+          "target": "[PR#]Easy_Temp",
+          "input": "FireUser1"
+        },
+        {
+          "target": "[PR#]Music_4a",
+          "input": "FireUser1",
+          "delay": 0.1
+        }
+      ]
     },
     {
       "id": "belias",
@@ -882,7 +970,18 @@
       "childrenTitle": "Single attacks",
       "endless": {
         "noBossDamage": true
-      }
+      },
+      "music": [
+        {
+          "target": "[PR#]Tomb_Temp_Init",
+          "input": "FireUser1"
+        },
+        {
+          "target": "[PR#]Music_5b",
+          "input": "FireUser1",
+          "delay": 0.1
+        }
+      ]
     },
     {
       "id": "belias_sweep",
@@ -983,7 +1082,18 @@
         "Firenova_Hurt": "a fire nova",
         "Electro_Hurt": "electro"
       },
-      "endless": {}
+      "endless": {},
+      "music": [
+        {
+          "target": "[PR#]Tomb_Temp_Init",
+          "input": "FireUser1"
+        },
+        {
+          "target": "[PR#]Music_5b",
+          "input": "FireUser1",
+          "delay": 0.1
+        }
+      ]
     },
     {
       "id": "belias_sweep_back",
@@ -1126,7 +1236,18 @@
         "Firenova_Hurt": "a fire nova",
         "Electro_Hurt": "electro"
       },
-      "endless": {}
+      "endless": {},
+      "music": [
+        {
+          "target": "[PR#]Tomb_Temp_Init",
+          "input": "FireUser1"
+        },
+        {
+          "target": "[PR#]Music_5b",
+          "input": "FireUser1",
+          "delay": 0.1
+        }
+      ]
     },
     {
       "id": "belias_lure",
@@ -1227,7 +1348,18 @@
         "Firenova_Hurt": "a fire nova",
         "Electro_Hurt": "electro"
       },
-      "endless": {}
+      "endless": {},
+      "music": [
+        {
+          "target": "[PR#]Tomb_Temp_Init",
+          "input": "FireUser1"
+        },
+        {
+          "target": "[PR#]Music_5b",
+          "input": "FireUser1",
+          "delay": 0.1
+        }
+      ]
     },
     {
       "id": "belias_tiles",
@@ -1362,7 +1494,18 @@
         "Firenova_Hurt": "a fire nova",
         "Electro_Hurt": "electro"
       },
-      "endless": {}
+      "endless": {},
+      "music": [
+        {
+          "target": "[PR#]Tomb_Temp_Init",
+          "input": "FireUser1"
+        },
+        {
+          "target": "[PR#]Music_5b",
+          "input": "FireUser1",
+          "delay": 0.1
+        }
+      ]
     },
     {
       "id": "belias_xzone",
@@ -1467,7 +1610,18 @@
         "Firenova_Hurt": "a fire nova",
         "Electro_Hurt": "electro"
       },
-      "endless": {}
+      "endless": {},
+      "music": [
+        {
+          "target": "[PR#]Tomb_Temp_Init",
+          "input": "FireUser1"
+        },
+        {
+          "target": "[PR#]Music_5b",
+          "input": "FireUser1",
+          "delay": 0.1
+        }
+      ]
     },
     {
       "id": "gabranth_tomb",
@@ -1583,7 +1737,18 @@
         "Firenova_Hurt": "a fire nova",
         "Electro_Hurt": "electro"
       },
-      "childrenTitle": "Drills"
+      "childrenTitle": "Drills",
+      "music": [
+        {
+          "target": "[PR#]Tomb_Temp_Init",
+          "input": "FireUser1"
+        },
+        {
+          "target": "[PR#]Music_8a",
+          "input": "FireUser1",
+          "delay": 0.1
+        }
+      ]
     },
     {
       "id": "gabranth_last_laser",
@@ -1678,7 +1843,18 @@
         "Firenova_Hurt": "a fire nova",
         "Electro_Hurt": "electro"
       },
-      "endless": {}
+      "endless": {},
+      "music": [
+        {
+          "target": "[PR#]Tomb_Temp_Init",
+          "input": "FireUser1"
+        },
+        {
+          "target": "[PR#]Music_8a",
+          "input": "FireUser1",
+          "delay": 0.1
+        }
+      ]
     },
     {
       "id": "guard_gabranth",
@@ -1799,7 +1975,18 @@
         "Lightning_Hurt": "lightning",
         "Firenova_Hurt": "a fire nova",
         "Electro_Hurt": "electro"
-      }
+      },
+      "music": [
+        {
+          "target": "[PR#]Epic_Temp",
+          "input": "FireUser1"
+        },
+        {
+          "target": "[PR#]Music_7a",
+          "input": "FireUser1",
+          "delay": 0.1
+        }
+      ]
     },
     {
       "id": "airship_ending",

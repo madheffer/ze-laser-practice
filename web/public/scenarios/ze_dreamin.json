@@ -116,7 +116,13 @@
         "blade_rotate_hurt": "a rising blade",
         "boss_target_hurt": "the final crystal",
         "NUKE": "the nuke"
-      }
+      },
+      "music": [
+        {
+          "target": "[PR#]b_bossbgm",
+          "input": "PlaySound"
+        }
+      ]
     },
     {
       "id": "l1_cast_gravity",
@@ -175,7 +181,13 @@
         "blade_rotate_hurt": "a rising blade",
         "boss_target_hurt": "the final crystal",
         "NUKE": "the nuke"
-      }
+      },
+      "music": [
+        {
+          "target": "[PR#]b_bossbgm",
+          "input": "PlaySound"
+        }
+      ]
     },
     {
       "id": "l1_cast_thruster",
@@ -234,7 +246,13 @@
         "blade_rotate_hurt": "a rising blade",
         "boss_target_hurt": "the final crystal",
         "NUKE": "the nuke"
-      }
+      },
+      "music": [
+        {
+          "target": "[PR#]b_bossbgm",
+          "input": "PlaySound"
+        }
+      ]
     },
     {
       "id": "l1_cast_wind",
@@ -288,7 +306,13 @@
         "blade_rotate_hurt": "a rising blade",
         "boss_target_hurt": "the final crystal",
         "NUKE": "the nuke"
-      }
+      },
+      "music": [
+        {
+          "target": "[PR#]b_bossbgm",
+          "input": "PlaySound"
+        }
+      ]
     },
     {
       "id": "l1_cast_ice",
@@ -347,7 +371,13 @@
         "blade_rotate_hurt": "a rising blade",
         "boss_target_hurt": "the final crystal",
         "NUKE": "the nuke"
-      }
+      },
+      "music": [
+        {
+          "target": "[PR#]b_bossbgm",
+          "input": "PlaySound"
+        }
+      ]
     },
     {
       "id": "l1_finale",
@@ -396,7 +426,18 @@
         "blade_rotate_hurt": "a rising blade",
         "boss_target_hurt": "the final crystal",
         "NUKE": "the nuke"
-      }
+      },
+      "music": [
+        {
+          "target": "[PR#]b_dread",
+          "input": "Volume"
+        },
+        {
+          "target": "[PR#]b_dread",
+          "input": "PlaySound",
+          "delay": 0.1
+        }
+      ]
     },
     {
       "id": "l2_full",
@@ -534,7 +575,13 @@
         "width_hurt": "a sweeping laser",
         "width_hurt_2": "a sweeping laser",
         "trigger_snow": "the snow"
-      }
+      },
+      "music": [
+        {
+          "target": "[PR#]bloomin",
+          "input": "PlaySound"
+        }
+      ]
     },
     {
       "id": "l2_spread",
@@ -595,7 +642,13 @@
         "width_hurt": "a sweeping laser",
         "width_hurt_2": "a sweeping laser",
         "trigger_snow": "the snow"
-      }
+      },
+      "music": [
+        {
+          "target": "[PR#]bloomin",
+          "input": "PlaySound"
+        }
+      ]
     },
     {
       "id": "l2_field",
@@ -644,7 +697,13 @@
         "width_hurt": "a sweeping laser",
         "width_hurt_2": "a sweeping laser",
         "trigger_snow": "the snow"
-      }
+      },
+      "music": [
+        {
+          "target": "[PR#]bloomin",
+          "input": "PlaySound"
+        }
+      ]
     },
     {
       "id": "l2_upper",
@@ -733,7 +792,13 @@
         "width_hurt": "a sweeping laser",
         "width_hurt_2": "a sweeping laser",
         "trigger_snow": "the snow"
-      }
+      },
+      "music": [
+        {
+          "target": "[PR#]bloomin",
+          "input": "PlaySound"
+        }
+      ]
     },
     {
       "id": "l2_laser",
@@ -782,7 +847,13 @@
         "width_hurt": "a sweeping laser",
         "width_hurt_2": "a sweeping laser",
         "trigger_snow": "the snow"
-      }
+      },
+      "music": [
+        {
+          "target": "[PR#]bloomin",
+          "input": "PlaySound"
+        }
+      ]
     },
     {
       "id": "l2_spikes",
@@ -831,7 +902,13 @@
         "width_hurt": "a sweeping laser",
         "width_hurt_2": "a sweeping laser",
         "trigger_snow": "the snow"
-      }
+      },
+      "music": [
+        {
+          "target": "[PR#]bloomin",
+          "input": "PlaySound"
+        }
+      ]
     },
     {
       "id": "l2_final_lasers",
@@ -1016,7 +1093,13 @@
         "final_fail_1": "the nuke (boss survived)",
         "st3_nuke": "the nuke",
         "heal_tt": "the heal totem"
-      }
+      },
+      "music": [
+        {
+          "target": "[PR#]glorious",
+          "input": "PlaySound"
+        }
+      ]
     },
     {
       "id": "l3_ice",
@@ -1071,7 +1154,13 @@
         "final_fail_1": "the nuke (boss survived)",
         "st3_nuke": "the nuke",
         "heal_tt": "the heal totem"
-      }
+      },
+      "music": [
+        {
+          "target": "[PR#]glorious",
+          "input": "PlaySound"
+        }
+      ]
     },
     {
       "id": "l3_crouch",
@@ -1126,7 +1215,13 @@
         "final_fail_1": "the nuke (boss survived)",
         "st3_nuke": "the nuke",
         "heal_tt": "the heal totem"
-      }
+      },
+      "music": [
+        {
+          "target": "[PR#]glorious",
+          "input": "PlaySound"
+        }
+      ]
     },
     {
       "id": "l3_wind",
@@ -1176,7 +1271,13 @@
         "final_fail_1": "the nuke (boss survived)",
         "st3_nuke": "the nuke",
         "heal_tt": "the heal totem"
-      }
+      },
+      "music": [
+        {
+          "target": "[PR#]glorious",
+          "input": "PlaySound"
+        }
+      ]
     },
     {
       "id": "l3_upline",
@@ -1231,7 +1332,13 @@
         "final_fail_1": "the nuke (boss survived)",
         "st3_nuke": "the nuke",
         "heal_tt": "the heal totem"
-      }
+      },
+      "music": [
+        {
+          "target": "[PR#]glorious",
+          "input": "PlaySound"
+        }
+      ]
     },
     {
       "id": "l3_explo",
@@ -1276,7 +1383,13 @@
         "final_fail_1": "the nuke (boss survived)",
         "st3_nuke": "the nuke",
         "heal_tt": "the heal totem"
-      }
+      },
+      "music": [
+        {
+          "target": "[PR#]glorious",
+          "input": "PlaySound"
+        }
+      ]
     },
     {
       "id": "l3_linelaser",
@@ -1321,7 +1434,13 @@
         "final_fail_1": "the nuke (boss survived)",
         "st3_nuke": "the nuke",
         "heal_tt": "the heal totem"
-      }
+      },
+      "music": [
+        {
+          "target": "[PR#]glorious",
+          "input": "PlaySound"
+        }
+      ]
     },
     {
       "id": "l3_final",
@@ -1498,7 +1617,13 @@
         "rtv_nuke_1": "the nuke (boss survived)",
         "rtv_surflaser_hurt": "a surf laser",
         "rtv_endnuke": "the nuke"
-      }
+      },
+      "music": [
+        {
+          "target": "[PR#]rtv_music",
+          "input": "PlaySound"
+        }
+      ]
     },
     {
       "id": "l4_lasers",
@@ -1548,7 +1673,13 @@
         "rtv_nuke_1": "the nuke (boss survived)",
         "rtv_surflaser_hurt": "a surf laser",
         "rtv_endnuke": "the nuke"
-      }
+      },
+      "music": [
+        {
+          "target": "[PR#]rtv_music",
+          "input": "PlaySound"
+        }
+      ]
     },
     {
       "id": "l4_thrusters",
@@ -1598,7 +1729,13 @@
         "rtv_nuke_1": "the nuke (boss survived)",
         "rtv_surflaser_hurt": "a surf laser",
         "rtv_endnuke": "the nuke"
-      }
+      },
+      "music": [
+        {
+          "target": "[PR#]rtv_music",
+          "input": "PlaySound"
+        }
+      ]
     },
     {
       "id": "l4_ice",
@@ -1643,7 +1780,13 @@
         "rtv_nuke_1": "the nuke (boss survived)",
         "rtv_surflaser_hurt": "a surf laser",
         "rtv_endnuke": "the nuke"
-      }
+      },
+      "music": [
+        {
+          "target": "[PR#]rtv_music",
+          "input": "PlaySound"
+        }
+      ]
     },
     {
       "id": "l4_fields",
@@ -1703,7 +1846,13 @@
         "rtv_nuke_1": "the nuke (boss survived)",
         "rtv_surflaser_hurt": "a surf laser",
         "rtv_endnuke": "the nuke"
-      }
+      },
+      "music": [
+        {
+          "target": "[PR#]rtv_music",
+          "input": "PlaySound"
+        }
+      ]
     },
     {
       "id": "l4_bombs",
@@ -1763,7 +1912,13 @@
         "rtv_nuke_1": "the nuke (boss survived)",
         "rtv_surflaser_hurt": "a surf laser",
         "rtv_endnuke": "the nuke"
-      }
+      },
+      "music": [
+        {
+          "target": "[PR#]rtv_music",
+          "input": "PlaySound"
+        }
+      ]
     },
     {
       "id": "l4_light",
@@ -1884,7 +2039,13 @@
         "rtv_nuke_1": "the nuke (boss survived)",
         "rtv_surflaser_hurt": "a surf laser",
         "rtv_endnuke": "the nuke"
-      }
+      },
+      "music": [
+        {
+          "target": "[PR#]rtv_music",
+          "input": "PlaySound"
+        }
+      ]
     }
   ]
 }

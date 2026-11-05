@@ -34,9 +34,10 @@ export const legacyCountdown = (scenario) => (scenario?.fastForward ? 0 : 1);
 const DAMAGE_PER_HIT = 30;
 const PERFECT_HITS_PER_HUMAN = 5;
 
-export function createRunEngine({ entities, hulls, bounds, animations, traceBox, fits = null, countdown = COUNTDOWN, scenario, mode = 'normal', seed, humans = 20, bossHp = 100, items = [], hooks = {}, run: into = {} }) {
+export function createRunEngine({ entities, hulls, bounds, animations, soundDurations = null, traceBox, fits = null, countdown = COUNTDOWN, scenario, mode = 'normal', seed, humans = 20, bossHp = 100, items = [], hooks = {}, run: into = {} }) {
   const endless = mode === 'endless' && !!scenario?.endless;
-  const engine = new EntityEngine(entities, { hulls, bounds, animations }, { seed });
+  // soundDurations: event name -> seconds (lib/sound-durations.js), for point_soundevent's OnSoundFinished
+  const engine = new EntityEngine(entities, { hulls, bounds, animations, soundDurations }, { seed });
   // physboxes (world/entities/classes/physics.js) slide along the static world only
   if (traceBox) engine.traceBox = traceBox;
   engine.humans = humans;
@@ -54,6 +55,12 @@ export function createRunEngine({ entities, hulls, bounds, animations, traceBox,
   run.cvars = mapCvars(engine);
   engine.on('cvar', (name, value) => { run.cvars[name] = value; });
   run.fireStart = () => {
+    // `music`: the map's own inputs that start the track a stage begins in the middle of (it runs from earlier in the
+    // round: a level template, a boss trigger on the way in), fired with the start inputs, once (endless re-fires start)
+    if (!run.musicFired) {
+      run.musicFired = true;
+      for (const s of scenario?.music || []) engine.fire(s.target, s.input, s.param || '', s.delay || 0, engine.playerEnt, null);
+    }
     for (const s of scenario?.start || []) engine.fire(s.target, s.input, s.param || '', s.delay || 0, engine.playerEnt, null);
   };
 

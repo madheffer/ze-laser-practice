@@ -1,14 +1,21 @@
-// lasers-bake --mixers <web/src/lib/sound-mix-cs2.js> [--cs2 <game/csgo>]: CS2's sound mixer levels.
-// Every csgo_mega / csgo_music voice's volume is multiplied by its mix group's level (soundstacks_csgo_mega.vsndstck:
-// soundmixer_get_mixgroup @public.mixgroup -> mult_mixer_volume). The groups and the levels the game runs with are
-// pak01's scripts/soundmixers.txt: MixGroups (name -> parent) and SoundMixers.Default_Mix (group -> vol). Written as a
-// committed JS table, read by audio/mix.js.
+// lasers-bake --mixers <web/src/lib/sound-mix-cs2.js> [--cs2 <game/csgo>]: CS2's sound mixer, read by audio/mix.js
+// and audio/dsp.js.
+//  - MIX_PARENTS / MIX_LEVELS / MIX_DSP: pak01 scripts/soundmixers.txt MixGroups (name -> parent) and
+//    SoundMixers.Default_Mix (group -> vol, dsp). Every csgo_mega / csgo_music voice's volume is multiplied by its
+//    group's level (soundstacks_csgo_mega.vsndstck soundmixer_get_mixgroup -> mult_mixer_volume), its reverb send by
+//    the group's dsp value (@mixer.output_dsp).
+//  - MIX_LAYERS: MixLayers (layer -> { mixers: group -> vol, triggers: [...] }): the temporary volume changes
+//    (DeathFadeLayer on the death cam, DuckingMusicLayer while a DuckingMusic sound plays, ...).
+//  - DSP_PRESETS: the room reverbs a soundscape can switch RoomDSP to (sounds/graphs/reverb_*.vmix_c): each graph's
+//    processors (delay, diffusor, boxverb, filters) with their parameters as the graph sets them.
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using System.Text.RegularExpressions;
 using SteamDatabase.ValvePak;
+using ValveKeyValue;
+using ValveResourceFormat;
+using ValveResourceFormat.ResourceTypes;
 
 namespace Lasers.Bake;
 
@@ -20,37 +27,194 @@ static class MixerBake
         pkg.Read(pak01);
         var entry = pkg.FindEntry("scripts/soundmixers.txt") ?? throw new InvalidOperationException("scripts/soundmixers.txt not in pak01");
         pkg.ReadEntry(entry, out var bytes);
-        var text = Encoding.UTF8.GetString(bytes);
+        var root = Kv3Text.Parse(Encoding.UTF8.GetString(bytes)) as JsonObject ?? throw new InvalidOperationException("soundmixers.txt: not KV3");
 
-        // MixGroups = [ { name = "World" parent = "All" ... }, ... ]
         var parents = new JsonObject();
-        foreach (Match m in Regex.Matches(text, @"\{\s*name\s*=\s*""([^""]+)""\s*parent\s*=\s*""([^""]*)"""))
-            parents[m.Groups[1].Value] = m.Groups[2].Value;
-        // SoundMixers = { Default_Mix = [ { mixgroup = "World" vol = 0.4 ... }, ... ] ... }
-        var at = text.IndexOf("Default_Mix", StringComparison.Ordinal);
-        if (at < 0) throw new InvalidOperationException("no Default_Mix in soundmixers.txt");
-        var end = text.IndexOf(']', at);
-        var vols = new JsonObject();
-        foreach (Match m in Regex.Matches(text[at..end], @"mixgroup\s*=\s*""([^""]+)""([^}]*)"))
+        foreach (var g in root["MixGroups"]?.AsArray() ?? [])
+            if (g?["name"]?.GetValue<string>() is { } n) parents[n] = g["parent"]?.GetValue<string>() ?? "";
+        var levels = new JsonObject();
+        var dsp = new JsonObject();
+        foreach (var m in root["SoundMixers"]?["Default_Mix"]?.AsArray() ?? [])
         {
-            var v = Regex.Match(m.Groups[2].Value, @"\bvol\s*=\s*([-\d.]+)");
-            var mute = Regex.Match(m.Groups[2].Value, @"\bmute\s*=\s*([-\d.]+)");
-            if (!v.Success) continue;
-            var vol = double.Parse(v.Groups[1].Value, CultureInfo.InvariantCulture);
-            if (mute.Success && double.Parse(mute.Groups[1].Value, CultureInfo.InvariantCulture) != 0) vol = 0;
-            vols[m.Groups[1].Value] = vol;
+            if (m?["mixgroup"]?.GetValue<string>() is not { } g) continue;
+            var muted = Num(m["mute"]) != 0;
+            levels[g] = muted ? 0 : Num(m["vol"], 1);
+            dsp[g] = Num(m["dsp"], 1);
         }
-        if (parents.Count == 0 || vols.Count == 0) throw new InvalidOperationException($"soundmixers.txt: {parents.Count} groups, {vols.Count} levels");
+        var layers = new JsonObject();
+        foreach (var (name, l) in root["MixLayers"]?.AsObject() ?? [])
+        {
+            var mixers = new JsonObject();
+            foreach (var m in l?["Mixers"]?.AsArray() ?? [])
+                if (m?["mixgroup"]?.GetValue<string>() is { } g) mixers[g] = Num(m["mute"]) != 0 ? 0 : Num(m["vol"], 1);
+            var triggers = new JsonArray();
+            foreach (var t in l?["Triggers"]?.AsArray() ?? [])
+            {
+                if (t?["trigger"]?.GetValue<string>() is not { } tg) continue;
+                triggers.Add(new JsonObject
+                {
+                    ["trigger"] = tg, ["threshold"] = Num(t["threshold"]), ["mixamount"] = Num(t["mixamount"], 1),
+                    ["attack"] = Num(t["attack"]), ["release"] = Num(t["release"]), ["max"] = Num(t["max_trigger_amounts"]) != 0,
+                });
+            }
+            layers[name] = new JsonObject { ["mixers"] = mixers, ["triggers"] = triggers };
+        }
+        if (parents.Count == 0 || levels.Count == 0) throw new InvalidOperationException($"soundmixers.txt: {parents.Count} groups, {levels.Count} levels");
+
+        var presets = new JsonObject();
+        foreach (var e in pkg.Entries.TryGetValue("vmix_c", out var list) ? list : [])
+        {
+            var path = e.GetFullPath();
+            var name = Path.GetFileNameWithoutExtension(path);
+            if (!path.StartsWith("sounds/graphs/", StringComparison.OrdinalIgnoreCase) || !name.StartsWith("reverb_", StringComparison.OrdinalIgnoreCase)) continue;
+            var procs = Processors(pkg, e);
+            if (procs != null) presets[name.ToLowerInvariant()] = procs;
+        }
 
         var opts = new JsonSerializerOptions { WriteIndented = true };
         var sb = new StringBuilder();
-        sb.Append("// GENERATED by `lasers-bake --mixers` (bake/MixerBake.cs) from CS2's scripts/soundmixers.txt. Don't edit: rebake.\n");
-        sb.Append("// MIX_PARENTS: each mix group's parent; MIX_LEVELS: Default_Mix's vol per group (a muted group is 0). Read by audio/mix.js.\n");
+        sb.Append("// GENERATED by `lasers-bake --mixers` (bake/MixerBake.cs) from CS2's scripts/soundmixers.txt and sounds/graphs/reverb_*.vmix.\n");
+        sb.Append("// Don't edit: rebake. MIX_PARENTS: each group's parent; MIX_LEVELS / MIX_DSP: Default_Mix vol / dsp per group (a muted\n");
+        sb.Append("// group is 0); MIX_LAYERS: layer -> { mixers: group -> vol, triggers }; DSP_PRESETS: reverb graph -> its processors.\n");
         sb.Append("export const MIX_PARENTS = ").Append(parents.ToJsonString(opts)).Append(";\n");
-        sb.Append("export const MIX_LEVELS = ").Append(vols.ToJsonString(opts)).Append(";\n");
+        sb.Append("export const MIX_LEVELS = ").Append(levels.ToJsonString(opts)).Append(";\n");
+        sb.Append("export const MIX_DSP = ").Append(dsp.ToJsonString(opts)).Append(";\n");
+        sb.Append("export const MIX_LAYERS = ").Append(layers.ToJsonString(opts)).Append(";\n");
+        sb.Append("export const DSP_PRESETS = ").Append(presets.ToJsonString(opts)).Append(";\n");
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(outFile))!);
         File.WriteAllText(outFile, sb.ToString().Replace("\r\n", "\n"));
-        Console.WriteLine($"mixers: {parents.Count} groups, {vols.Count} levels -> {outFile}");
+        Console.WriteLine($"mixers: {parents.Count} groups, {levels.Count} levels, {layers.Count} layers, {presets.Count} reverb presets -> {outFile}");
         return 0;
+    }
+
+    // a mix graph's processors: [{ class, name, desc }] with desc as the graph's numbers / strings / bools
+    static JsonArray? Processors(Package pkg, PackageEntry e)
+    {
+        pkg.ReadEntry(e, out var bytes);
+        using var res = new Resource { FileName = e.GetFullPath() };
+        res.Read(new MemoryStream(bytes));
+        if (res.DataBlock is not BinaryKV3 kv) return null;
+        var outp = new JsonArray();
+        void Walk(KVObject o, int depth)
+        {
+            if (depth > 12) return;
+            var cls = o.ContainsKey("_class") ? o["_class"]?.ToString(CultureInfo.InvariantCulture) : null;
+            if (cls != null && cls.EndsWith("ProcessorDesc", StringComparison.Ordinal) && o.ContainsKey("m_desc"))
+            {
+                outp.Add(new JsonObject
+                {
+                    ["class"] = cls.Replace("CVMix", "").Replace("ProcessorDesc", ""),
+                    ["name"] = o.ContainsKey("m_name") ? o["m_name"]?.ToString(CultureInfo.InvariantCulture) : "",
+                    ["desc"] = ToJson(o["m_desc"]!, 0),
+                });
+                return;
+            }
+            foreach (var (_, c) in o.Children) if (c != null && (c.ValueType == KVValueType.Collection || c.IsArray)) Walk(c, depth + 1);
+        }
+        Walk(kv.Data, 0);
+        return outp.Count > 0 ? outp : null;
+    }
+
+    static JsonNode? ToJson(KVObject v, int depth)
+    {
+        if (depth > 8) return null;
+        if (v.IsArray) { var a = new JsonArray(); foreach (var (_, c) in v.Children) a.Add(ToJson(c, depth + 1)); return a; }
+        if (v.ValueType == KVValueType.Collection) { var o = new JsonObject(); foreach (var (k, c) in v.Children) if (k != null) o[k] = ToJson(c, depth + 1); return o; }
+        return v.ValueType switch
+        {
+            KVValueType.Boolean => v.ToBoolean(CultureInfo.InvariantCulture),
+            KVValueType.String => v.ToString(CultureInfo.InvariantCulture),
+            KVValueType.Null => null,
+            _ => Math.Round(v.ToDouble(CultureInfo.InvariantCulture), 6),
+        };
+    }
+
+    static double Num(JsonNode? n, double d = 0)
+    {
+        if (n is not JsonValue v) return d;
+        if (v.TryGetValue<double>(out var x)) return x;
+        if (v.TryGetValue<bool>(out var b)) return b ? 1 : 0;
+        return v.TryGetValue<string>(out var s) && double.TryParse(s, NumberStyles.Float, CultureInfo.InvariantCulture, out var y) ? y : d;
+    }
+}
+
+// KV3 text (soundmixers.txt and friends) -> JSON: { k = v }, [ v, ... ], "strings", numbers, true / false / null.
+// Only what Valve's text files use; the <!-- kv3 ... --> header and // comments are skipped.
+static class Kv3Text
+{
+    public static JsonNode? Parse(string s)
+    {
+        var i = 0;
+        var head = s.IndexOf("-->", StringComparison.Ordinal);
+        if (s.TrimStart().StartsWith("<!--", StringComparison.Ordinal) && head > 0) i = head + 3;
+        var v = Value(s, ref i, 0);
+        return v;
+    }
+
+    static void Skip(string s, ref int i)
+    {
+        while (i < s.Length)
+        {
+            if (char.IsWhiteSpace(s[i]) || s[i] == ',') { i++; continue; }
+            if (s[i] == '/' && i + 1 < s.Length && s[i + 1] == '/') { while (i < s.Length && s[i] != '\n') i++; continue; }
+            break;
+        }
+    }
+
+    static JsonNode? Value(string s, ref int i, int depth)
+    {
+        if (depth > 64) throw new FormatException("KV3 nesting too deep");
+        Skip(s, ref i);
+        if (i >= s.Length) return null;
+        var c = s[i];
+        if (c == '{')
+        {
+            i++;
+            var o = new JsonObject();
+            while (true)
+            {
+                Skip(s, ref i);
+                if (i >= s.Length) throw new FormatException("KV3: unclosed {");
+                if (s[i] == '}') { i++; return o; }
+                var key = Token(s, ref i);
+                Skip(s, ref i);
+                if (i < s.Length && s[i] == '=') i++;
+                var v = Value(s, ref i, depth + 1);
+                o[key] = v; // a repeated key keeps the last, as Valve's reader does
+            }
+        }
+        if (c == '[')
+        {
+            i++;
+            var a = new JsonArray();
+            while (true)
+            {
+                Skip(s, ref i);
+                if (i >= s.Length) throw new FormatException("KV3: unclosed [");
+                if (s[i] == ']') { i++; return a; }
+                a.Add(Value(s, ref i, depth + 1));
+            }
+        }
+        var t = c == '"' ? null : Token(s, ref i);
+        if (t == null) return JsonValue.Create(Token(s, ref i));
+        if (t == "true") return JsonValue.Create(true);
+        if (t == "false") return JsonValue.Create(false);
+        if (t == "null") return null;
+        return double.TryParse(t, NumberStyles.Float, CultureInfo.InvariantCulture, out var d) ? JsonValue.Create(d) : JsonValue.Create(t);
+    }
+
+    static string Token(string s, ref int i)
+    {
+        if (s[i] == '"')
+        {
+            var sb = new StringBuilder();
+            i++;
+            while (i < s.Length && s[i] != '"') { if (s[i] == '\\' && i + 1 < s.Length) i++; sb.Append(s[i++]); }
+            i++;
+            return sb.ToString();
+        }
+        var st = i;
+        while (i < s.Length && !char.IsWhiteSpace(s[i]) && s[i] != '=' && s[i] != ',' && s[i] != ']' && s[i] != '}') i++;
+        return s[st..i];
     }
 }

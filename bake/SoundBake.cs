@@ -182,6 +182,18 @@ static class SoundBake
         _ => v.ToDouble(CultureInfo.InvariantCulture),
     };
 
+    static bool Flag(Dictionary<string, KVObject> f, string key, bool dflt) => f.TryGetValue(key, out var v) ? Num(v) != 0 : dflt;
+
+    // a curve field ([[x, y, ...], ...]) as [[x, y], ...]; null when absent or empty
+    static JsonArray? Curve(Dictionary<string, KVObject> f, string key)
+    {
+        if (!f.TryGetValue(key, out var curve) || !curve.IsArray) return null;
+        var pts = new JsonArray();
+        foreach (var (_, p) in curve.Children)
+            if (p.IsArray && p.Count >= 2) pts.Add(new JsonArray(Math.Round(Num(p[0]), 4), Math.Round(Num(p[1]), 4)));
+        return pts.Count > 0 ? pts : null;
+    }
+
     static IEnumerable<string> Strings(KVObject v)
     {
         if (v.ValueType == KVValueType.String) { var s = v.ToString(CultureInfo.InvariantCulture); if (s.Length > 0) yield return s; }
@@ -237,6 +249,23 @@ static class SoundBake
             var vrMin = f.TryGetValue("volume_random_min", out var vmn) ? Num(vmn) : 0;
             var vrMax = f.TryGetValue("volume_random_max", out var vmx) ? Num(vmx) : 0;
             if (vrMin != 0 || vrMax != 0) ev["volumeRandom"] = new JsonArray(Math.Round(vrMin, 4), Math.Round(vrMax, 4));
+            // the volume over playback (use_time_volume_mapping_curve, csgo_mega default off) and over the time since a
+            // stop (use_fadetime_volume_mapping_curve, default on; an empty curve = stop at once)
+            if (Flag(f, "use_time_volume_mapping_curve", false) && Curve(f, "time_volume_mapping_curve") is { } tc) ev["timeCurve"] = tc;
+            if (Flag(f, "use_fadetime_volume_mapping_curve", true) && Curve(f, "fadetime_volume_mapping_curve") is { } fc) ev["fadeCurve"] = fc;
+            // a room reverb this event switches the listener's RoomDSP to (a soundscape's), its own reverb send
+            if (Flag(f, "override_dsp_preset", false) && f.TryGetValue("dsp_preset", out var dp) && dp.ToString(CultureInfo.InvariantCulture).Length > 0)
+                ev["dspPreset"] = dp.ToString(CultureInfo.InvariantCulture).ToLowerInvariant();
+            if (f.TryGetValue("reverb_wet", out var rw) && Num(rw) != 0) ev["reverbWet"] = Math.Round(Num(rw), 4);
+            // csgo_mega's retrigger (plays again every [min, max] s until stopped) and random position (a point min..max
+            // units from where it plays, the upper half only with randomize_position_hemisphere): soundscape one-shots
+            if (Flag(f, "enable_retrigger", false))
+                ev["retrigger"] = new JsonArray(Math.Round(Num(f.GetValueOrDefault("retrigger_interval_min") ?? 1), 3), Math.Round(Num(f.GetValueOrDefault("retrigger_interval_max") ?? 1), 3));
+            var rpMax = f.TryGetValue("randomize_position_max_radius", out var rpx) ? Num(rpx) : 0;
+            if (rpMax > 0)
+                ev["randomPos"] = new JsonArray(Math.Round(f.TryGetValue("randomize_position_min_radius", out var rpn) ? Num(rpn) : 0, 2), Math.Round(rpMax, 2), Flag(f, "randomize_position_hemisphere", false));
+            // csgo_music: starting it stops every other "Music." event (soundevent_limiter max 0, substring match)
+            if (Flag(f, "stop_music", false)) ev["stopMusic"] = true;
             if (f.TryGetValue("vsnd_duration", out var dur)) ev["duration"] = Math.Round(Num(dur), 3);
             // voice management (audio/limits.js): only what the event sets; the stack's defaults live in the player
             if (f.TryGetValue("instance_limit", out var il) && Num(il) > 0) ev["instanceLimit"] = Math.Round(Num(il));

@@ -453,6 +453,12 @@
           "input": "KeyValue",
           "param": "origin 0 -960 9962"
         }
+      ],
+      "music": [
+        {
+          "target": "[PR#]music_core001",
+          "input": "StartSound"
+        }
       ]
     },
     {
@@ -541,6 +547,12 @@
           "input": "KeyValue",
           "param": "origin 0 -960 9962"
         }
+      ],
+      "music": [
+        {
+          "target": "[PR#]music_core001",
+          "input": "StartSound"
+        }
       ]
     },
     {
@@ -579,6 +591,12 @@
           "target": "[PR#]des2",
           "input": "KeyValue",
           "param": "origin 0 -960 9962"
+        }
+      ],
+      "music": [
+        {
+          "target": "[PR#]music_core001",
+          "input": "StartSound"
         }
       ]
     },
@@ -619,6 +637,12 @@
           "input": "KeyValue",
           "param": "origin 0 -960 9962"
         }
+      ],
+      "music": [
+        {
+          "target": "[PR#]music_core001",
+          "input": "StartSound"
+        }
       ]
     },
     {
@@ -657,6 +681,12 @@
           "target": "[PR#]des2",
           "input": "KeyValue",
           "param": "origin 0 -960 9962"
+        }
+      ],
+      "music": [
+        {
+          "target": "[PR#]music_core001",
+          "input": "StartSound"
         }
       ]
     },
@@ -697,6 +727,12 @@
           "input": "KeyValue",
           "param": "origin 0 -960 9962"
         }
+      ],
+      "music": [
+        {
+          "target": "[PR#]music_core001",
+          "input": "StartSound"
+        }
       ]
     },
     {
@@ -735,6 +771,12 @@
           "target": "[PR#]des2",
           "input": "KeyValue",
           "param": "origin 0 -960 9962"
+        }
+      ],
+      "music": [
+        {
+          "target": "[PR#]music_core001",
+          "input": "StartSound"
         }
       ]
     },
@@ -775,6 +817,12 @@
           "input": "KeyValue",
           "param": "origin 0 -960 9962"
         }
+      ],
+      "music": [
+        {
+          "target": "[PR#]music_core001",
+          "input": "StartSound"
+        }
       ]
     },
     {
@@ -813,6 +861,12 @@
           "target": "[PR#]des2",
           "input": "KeyValue",
           "param": "origin 0 -960 9962"
+        }
+      ],
+      "music": [
+        {
+          "target": "[PR#]music_core001",
+          "input": "StartSound"
         }
       ]
     },
@@ -853,6 +907,12 @@
           "input": "KeyValue",
           "param": "origin 0 -960 9962"
         }
+      ],
+      "music": [
+        {
+          "target": "[PR#]music_core001",
+          "input": "StartSound"
+        }
       ]
     },
     {
@@ -891,6 +951,12 @@
           "target": "[PR#]des2",
           "input": "KeyValue",
           "param": "origin 0 -960 9962"
+        }
+      ],
+      "music": [
+        {
+          "target": "[PR#]music_core001",
+          "input": "StartSound"
         }
       ]
     },
@@ -931,6 +997,12 @@
           "input": "KeyValue",
           "param": "origin 0 -960 9962"
         }
+      ],
+      "music": [
+        {
+          "target": "[PR#]music_core001",
+          "input": "StartSound"
+        }
       ]
     },
     {
@@ -969,6 +1041,12 @@
           "target": "[PR#]des2",
           "input": "KeyValue",
           "param": "origin 0 -960 9962"
+        }
+      ],
+      "music": [
+        {
+          "target": "[PR#]music_core001",
+          "input": "StartSound"
         }
       ]
     },
@@ -1009,6 +1087,12 @@
           "input": "KeyValue",
           "param": "origin 0 -960 9962"
         }
+      ],
+      "music": [
+        {
+          "target": "[PR#]music_core001",
+          "input": "StartSound"
+        }
       ]
     },
     {
@@ -1047,6 +1131,12 @@
           "target": "[PR#]des2",
           "input": "KeyValue",
           "param": "origin 0 -960 9962"
+        }
+      ],
+      "music": [
+        {
+          "target": "[PR#]music_core001",
+          "input": "StartSound"
         }
       ]
     },
@@ -1087,6 +1177,12 @@
           "input": "KeyValue",
           "param": "origin 0 -960 9962"
         }
+      ],
+      "music": [
+        {
+          "target": "[PR#]music_core001",
+          "input": "StartSound"
+        }
       ]
     },
     {
@@ -1125,6 +1221,12 @@
           "target": "[PR#]des2",
           "input": "KeyValue",
           "param": "origin 0 -960 9962"
+        }
+      ],
+      "music": [
+        {
+          "target": "[PR#]music_core001",
+          "input": "StartSound"
         }
       ]
     },
@@ -1165,6 +1267,12 @@
           "input": "KeyValue",
           "param": "origin 0 -960 9962"
         }
+      ],
+      "music": [
+        {
+          "target": "[PR#]music_core001",
+          "input": "StartSound"
+        }
       ]
     },
     {
@@ -1203,6 +1311,12 @@
           "target": "[PR#]des2",
           "input": "KeyValue",
           "param": "origin 0 -960 9962"
+        }
+      ],
+      "music": [
+        {
+          "target": "[PR#]music_core001",
+          "input": "StartSound"
         }
       ]
     },
@@ -1243,6 +1357,12 @@
           "input": "KeyValue",
           "param": "origin 0 -960 9962"
         }
+      ],
+      "music": [
+        {
+          "target": "[PR#]music_core001",
+          "input": "StartSound"
+        }
       ]
     },
     {
@@ -1282,6 +1402,12 @@
           "input": "KeyValue",
           "param": "origin 0 -960 9962"
         }
+      ],
+      "music": [
+        {
+          "target": "[PR#]music_core001",
+          "input": "StartSound"
+        }
       ]
     },
     {
@@ -1320,6 +1446,12 @@
           "target": "[PR#]des2",
           "input": "KeyValue",
           "param": "origin 0 -960 9962"
+        }
+      ],
+      "music": [
+        {
+          "target": "[PR#]music_core001",
+          "input": "StartSound"
         }
       ]
     },
@@ -1363,6 +1495,12 @@
           "target": "[PR#]des2",
           "input": "KeyValue",
           "param": "origin 0 -960 9962"
+        }
+      ],
+      "music": [
+        {
+          "target": "[PR#]music_core001",
+          "input": "StartSound"
         }
       ]
     },
@@ -1489,6 +1627,12 @@
           "input": "KeyValue",
           "param": "origin -605 -5997 106"
         }
+      ],
+      "music": [
+        {
+          "target": "[PR#]music_s1",
+          "input": "StartSound"
+        }
       ]
     },
     {
@@ -1537,6 +1681,12 @@
           "target": "[PR#]des2",
           "input": "KeyValue",
           "param": "origin 10761 -4741 -2131"
+        }
+      ],
+      "music": [
+        {
+          "target": "[PR#]music_s1",
+          "input": "StartSound"
         }
       ]
     },
@@ -1593,6 +1743,12 @@
           "input": "KeyValue",
           "param": "origin 10761 -4741 -2131"
         }
+      ],
+      "music": [
+        {
+          "target": "[PR#]music_d_ex_way",
+          "input": "StartSound"
+        }
       ]
     },
     {
@@ -1642,6 +1798,12 @@
           "input": "KeyValue",
           "param": "origin 11247 -9519 -172"
         }
+      ],
+      "music": [
+        {
+          "target": "[PR#]music_s1",
+          "input": "StartSound"
+        }
       ]
     },
     {
@@ -1683,6 +1845,12 @@
           "target": "[PR#]des2",
           "input": "KeyValue",
           "param": "origin -7393 -1270 3661"
+        }
+      ],
+      "music": [
+        {
+          "target": "[PR#]music_b_boss",
+          "input": "StartSound"
         }
       ]
     }

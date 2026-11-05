@@ -240,6 +240,7 @@ standing still. Fields we added (cybo's site ignores them):
 | `bosses` | `[{target, name, counter, counterMode}]` breakables/physboxes the team shoots, with a HUD bar |
 | `shooters` | how many of the simulated humans fire at the bosses (a trainer choice, not map data): ze_deadcore's cubes have a flat 1500–2400 HP that 20 humans would erase in a blink, so their drills use 2 |
 | `setup` | inputs fired the moment you are placed (after any fast-forward): puts the map where its own sequence would be for a stage that starts past the relays that do it. ze_deadcore's drills move `des2` (its catch-all fall destination) to where the map keeps it for that part, so a fall puts you back where a human would land |
+| `music` | the map's own inputs that start the track a stage begins in the middle of (a level template, a boss track), fired with `start`, once (endless re-fires start but not this). westersand's level music lives in its level templates (`Easy_Temp`, `Tomb_Temp_Init`, `Epic_Temp`) |
 | `player.name` | the targetname the map gives a human before this point (westersand's spawn room names everyone `None`); name filters test it |
 | `cages` | `{ "<destination>": true }` or `false`: overrides `world/entities/cages.js` for a destination its evidence gets wrong (`tools/cages.mjs`); none needed so far |
 
@@ -364,6 +365,24 @@ the stance files are vpkstuff's clip decode (lab `tools/previewer/extract-tp-cli
 `pose_extract.py` to JSON) then `node tools/tp-pose.mjs <decoded.json> web/public/player/clips/pose_<clip>.json`
 (rotates the DMX's Y-up root bones into Z-up; `--check` it against `Z:\weaponviewer\tp\clips\pose_idle_knife.json`);
 `ctm_sas/ctm_sas.constraints.json` is copied from `Z:\weaponviewer\fp\agents\`.
+
+### Sound as CS2 runs it
+
+- **Sound entities** (`world/entities/classes/soundents.js`, from server.dll): point_soundevent / snd_event_point start 1 s after
+  spawn with `startonspawn`; StartSound with `stoponnew` stops the old sound first; `SoundEventGuid` hands the playing sound's
+  handle on and `OnSoundFinished` fires after the event's duration (`lib/sound-durations.js`, the same on the co-op server);
+  snd_event_param sets a parameter (`volume`, `pitch`) on the sound with that handle (ze_gris_p's music fades).
+- **Soundscapes**: trigger_soundscape / env_soundscape(_triggerable, _proxy) make a soundscape yours; its sound event plays
+  to you (its children too: loops with their fade-in / stop-fade curves, one-shots that retrigger every [min, max] s at a random
+  point around you) until another takes over (ze__hell_p's dust indoor ambience).
+- **Mixer** (`audio/mix.js`, `audio/layers.js`): each voice x its mix group's level x its mix-layer factors x its parent's;
+  layers are CS2's temporary volume changes (soundmixers.txt MixLayers: the death cam's DeathFadeLayer, trigger-driven
+  ducking), folded as soundsystem.dll does.
+- **Room reverb** (`audio/dsp.js`): RoomDSP is `core_null` (dry) until a sound event with `override_dsp_preset` switches
+  it; presets are CS2's reverb graphs (delay / filter as stated, diffusor / boxverb approximated). None of the baked maps
+  switches it, so they play dry as in CS2.
+- **Music**: csgo_music `stop_music` stops other `Music.` events; a scenario's `music` list starts the track a stage begins
+  in the middle of (the map's own level template / relay inputs). `node tools/audit-sounds.mjs` lists each stage's music.
 
 ## Co-op and versus
 

@@ -18,6 +18,7 @@ import './classes/movers.js';
 import './classes/brushes.js';
 import './classes/props.js';
 import './classes/fx.js';
+import './classes/soundents.js';
 import './classes/physics.js';
 import './classes/server.js';
 import './classes/beams.js';

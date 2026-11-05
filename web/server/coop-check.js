@@ -70,7 +70,7 @@ export class PlayerCheck {
     const me = this;
     this.stub = { centre: () => [me.pos[0], me.pos[1], me.pos[2] + me.height / 2], half: () => [CS.halfWidth, CS.halfWidth, me.height / 2] };
     this.run = createRunEngine({
-      entities: assets.entities, hulls: assets.hulls, bounds: assets.bounds, animations: assets.animations,
+      entities: assets.entities, hulls: assets.hulls, bounds: assets.bounds, animations: assets.animations, soundDurations: assets.soundDurations,
       traceBox: (s, e, h) => this.world.traceBox(s, e, h, undefined, true),
       // the client's spawn test (app/session.js): the same spot, so the spawn check below agrees
       fits: (o, solids) => standsFree(this.world, o, solids), countdown,

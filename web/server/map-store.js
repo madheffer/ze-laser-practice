@@ -9,6 +9,7 @@ import { applyStripper } from '../src/lib/stripper.js';
 import { normaliseHulls } from '../src/world/hulls.js';
 import { TriangleBVH } from '../src/world/collision.js';
 import { mapItems, usableHeals } from '../src/world/items.js';
+import { soundDurations } from '../src/lib/sound-durations.js';
 
 const KEEP = 3;
 
@@ -23,7 +24,7 @@ export function mapStore(dir) {
     }
     const folder = path.join(dir, map); // [a-z0-9_-] only: never leaves dir
     const p = (async () => {
-      const [entities, hullsRaw, col, entwatch, animations, fxCol, fxLayers, stripper] = await Promise.all([
+      const [entities, hullsRaw, col, entwatch, animations, fxCol, fxLayers, stripper, soundevents] = await Promise.all([
         readFile(path.join(folder, 'entities.json'), 'utf8').then(JSON.parse),
         readFile(path.join(folder, 'hulls.json'), 'utf8').then(JSON.parse).catch(() => ({})),
         readFile(path.join(folder, 'collision.bin')),
@@ -35,6 +36,8 @@ export function mapStore(dir) {
         readFile(path.join(folder, 'collision_fx_layers.bin')).catch(() => null),
         // GFL's StripperCS2 edits to the map (tools/stripper.mjs; optional)
         readFile(path.join(folder, 'stripper.json'), 'utf8').then(JSON.parse).catch(() => null),
+        // the sound events' lengths: point_soundevent's OnSoundFinished times by them, as on the clients (optional)
+        readFile(path.join(folder, 'soundevents.json'), 'utf8').then(JSON.parse).catch(() => null),
       ]);
       // the same edits the client applies (world/assets.js): the anti-cheat's copy of the map must be the player's
       applyStripper(entities, stripper, map);
@@ -45,7 +48,7 @@ export function mapStore(dir) {
             layers: new Uint32Array(fxLayers.buffer.slice(fxLayers.byteOffset, fxLayers.byteOffset + fxLayers.byteLength)) }
         : null;
       // the map's EntWatch items, as the browser reads them (world/items.js): a round's heal holders get its heals
-      return { map, entities, hulls, bounds, animations, bvh: new TriangleBVH(tris), fx, heals: usableHeals(mapItems(entities, entwatch)) };
+      return { map, entities, hulls, bounds, animations, soundDurations: soundDurations(soundevents), bvh: new TriangleBVH(tris), fx, heals: usableHeals(mapItems(entities, entwatch)) };
     })();
     p.catch(() => cache.delete(map));
     cache.set(map, p);

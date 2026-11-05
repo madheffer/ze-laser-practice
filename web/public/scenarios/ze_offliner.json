@@ -37,7 +37,13 @@
       },
       "cages": {
         "[PR#]last_zm_dest": true
-      }
+      },
+      "music": [
+        {
+          "target": "[PR#]third_music",
+          "input": "StartSound"
+        }
+      ]
     },
     {
       "id": "green_sphere",
@@ -68,7 +74,13 @@
       "win": {
         "target": "[PR#]end_laser_breakable",
         "input": "Break"
-      }
+      },
+      "music": [
+        {
+          "target": "[PR#]third_music",
+          "input": "StartSound"
+        }
+      ]
     },
     {
       "id": "final_lasers",

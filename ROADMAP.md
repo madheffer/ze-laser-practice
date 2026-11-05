@@ -153,9 +153,22 @@ exact map-folder format so he can lift our maps straight into his site. See [REA
   boss end and lasers are 0: heard map-wide); `volume_random_*`; ze_offliner named sounds by their source file
   (`.wav` / `.mp3`) and the bake dropped them (the boss death, Shockwave, music, 4 ambients): they resolve to
   `.vsnd_c` as CS2 does. Stacks after that (13 breakables at once, deadcore) are held by the final-mix compressor
-  - [ ] soundscapes (env_soundscape*, the `amb.*` events: retrigger, random position, time / fade curves) aren't played
-  - [ ] reverb / DSP presets, mix layers and ducking (other mixers than Default_Mix), occlusion aren't modelled
-  - [ ] a stopped voice fades 50 ms; csgo_mega's default stops at once unless the event has a fade curve (16 amb.* do)
+  - [x] soundscapes, sound entities, mixer layers, room reverb, music (2026-11-06): point_soundevent / snd_event_point as
+    server.dll runs them (startonspawn +1 s, stoponnew, SoundEventGuid, OnSoundFinished on the event's duration), snd_event_param
+    (ze_gris_p's music / sfx faders: volume steps then StopSound); trigger_soundscape / env_soundscape* (ze__hell_p's dust
+    ambience: loops with time / stop-fade curves, retriggered one-shots at random points); mix layers (soundmixers.txt MixLayers,
+    soundsystem.dll FUN_1800324b0's fold; DeathFadeLayer on the death cam, client.dll cl_deathcam_audio_mix_* 0.15 / 2 s);
+    RoomDSP (core_null by default per __main__.vmix heap slot 3; reverb presets from reverb_*.vmix: delay / filter exact,
+    diffusor / boxverb approximated; no baked map switches it); csgo_music stop_music; a scenario's `music` starts the track a
+    stage begins in the middle of (westersand's level templates, deadcore's core / stage tracks, dreamin's and neochrome's boss
+    tracks, offliner's third track: 80 stages had none). ze__hell_p's stage replays its logic_auto (map music, soundscape)
+  - [ ] the engine never fires a map's logic_auto: music it starts at map spawn only plays where a stage's `music` / `start`
+    replays it (gris's bgm1, mist's music_aguirre, neochrome's intro / music case are in no stage yet)
+  - [ ] occlusion; Steam Audio (no map has baked data); the per-mode volume layers (CasualVol ...: our volume sliders); the
+    death cam's phase 2 (no freeze cam here: spectating ends the fade)
+  - [ ] Rod.crystal (ze__hell_p's spikes): CS2 stops it at the spike's arrival (DoorHitTop -> StopMovingSound, 0.05 s in);
+    whether the client lets a stopped voice with an empty fade curve ring out isn't settled from soundsystem.dll
+  - [ ] point_soundevent's Volume input: kept as ambient_generic's 0..10, not checked against CS2's input list
   - [ ] **ze_ffvii_mako_reactor_v5_p** (3513334092) — 85, 5 laser templates; Heal Materia + 7 materia
   - [ ] **ze_ffvii_mako_reactor_v6_p** (3378273414) — 80, 12 laser templates; Heal Materia + 11 materia (Mimic, Barrier, Ultima ...)
   - [ ] **ze_offliner** (3559892707) — 84, 7 laser templates; no heal (Shockwave only)

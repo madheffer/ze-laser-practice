@@ -80,7 +80,7 @@ export function startScenario(i, mode = 'normal') {
   // During a silent fast-forward, remember what is still sounding, so it can join at the right point after.
   const sounding = new Map(); // `${ent.id}:${slot}` -> { ev, at }
   createRunEngine({
-    entities: map.entities, hulls: map.hulls, bounds: map.bounds, animations: map.animations,
+    entities: map.entities, hulls: map.hulls, bounds: map.bounds, animations: map.animations, soundDurations: map.soundDurations,
     traceBox: (s, e, h) => S.world.traceBox(s, e, h, undefined, true),
     fits: (o, solids) => standsFree(S.world, o, solids), // never spawn inside the floor or a moving brush
     countdown: S.replay ? (S.replay.meta.countdown ?? legacyCountdown(scenario)) : COUNTDOWN,
@@ -225,6 +225,7 @@ export function finish(result) {
     if (run.spectating) return;
     run.spectating = true;
     run.deadAt = stageTime();
+    G.audio.deathFade?.('death'); // CS2's death-cam mix: DeathFadeLayer to 0.15 over 2 s (audio/layers.js)
     G.vm.trigger(false); G.vm.trigger2(false);
     S.mp.died(hazardName(run.killedBy));
     return;

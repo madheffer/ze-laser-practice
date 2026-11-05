@@ -139,6 +139,7 @@ class Round {
   spectateNext() {
     const ids = this.alive.filter((p) => p.id !== this.me).map((p) => p.id);
     if (ids.length) this.specId = ids[(ids.indexOf(this.specId) + 1) % ids.length];
+    G.audio?.deathFade?.('clear'); // spectating: CS2's death-cam mix is over (audio/layers.js)
   }
   spectateLabel() { const v = this.spectateView(); return v ? `Spectating ${this.name(v.id)}` : 'You died'; }
 
