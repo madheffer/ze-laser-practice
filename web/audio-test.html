@@ -1,0 +1,79 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>lasers: audio test</title>
+<style>
+  body { font: 13px system-ui, sans-serif; background: #111; color: #ddd; margin: 16px; }
+  button { margin: 2px; background: #233; color: #cff; border: 1px solid #466; padding: 4px 8px; cursor: pointer; }
+  button:hover { background: #355; }
+  h2 { font-size: 14px; margin: 14px 0 4px; color: #8cf; }
+  table { border-collapse: collapse; margin-top: 6px; }
+  td { padding: 1px 8px; border-bottom: 1px solid #222; }
+  .ok { color: #7f7; } .failed { color: #f77; } .pending { color: #fc6; }
+  label { margin-right: 12px; }
+</style>
+</head>
+<body>
+<div>
+  map <input id="map" value="ze_mist_p" size="14"> <button id="load">load</button>
+  <span id="state"></span>
+</div>
+<div>
+  <label>source at <select id="where">
+    <option value="here">listener (0 u)</option>
+    <option value="right">300 u right</option>
+    <option value="left">300 u left</option>
+    <option value="far">2000 u ahead</option>
+    <option value="2d">2D (no pos)</option>
+  </select></label>
+  <label>sfx <input id="master" type="range" min="0" max="1" step="0.05" value="0.8"></label>
+  <label>music <input id="music" type="range" min="0" max="1" step="0.05" value="0.5"></label>
+  <button id="stop">stopAll</button> <button id="pause">pause</button> <button id="resume">resume</button>
+</div>
+<h2>aliases (main.js)</h2><div id="aliases"></div>
+<h2>stock events</h2><div id="stock"></div>
+<h2>map events (start / stop as entity)</h2><div id="mapev"></div>
+<h2>files</h2><table id="files"></table>
+<script type="module">
+import { GameAudio } from './src/audio/audio.js';
+import { esc } from './src/lib/dom.js';
+const audio = new GameAudio();
+window.__audio = audio;
+const $ = (id) => document.getElementById(id);
+// listener at the origin looking down +X (yaw 0): +Y is left, -Y is right
+audio.setListener([0, 0, 0], 0, 0);
+const posFor = () => ({ here: [0, 0, 0], right: [0, -300, 0], left: [0, 300, 0], far: [2000, 0, 0], '2d': null })[$('where').value];
+const fakeEnt = (name) => ({ id: 'test:' + name });
+function btn(parent, label, fn) { const b = document.createElement('button'); b.textContent = label; b.onclick = fn; parent.appendChild(b); return b; }
+function render() {
+  const r = audio.report();
+  $('state').textContent = `context: ${r.state}, voices: ${r.voices}`;
+  $('files').innerHTML = Object.entries(r.files).map(([u, s]) => `<tr><td>${esc(u)}</td><td class="${esc(s)}">${esc(s)}</td></tr>`).join('');
+}
+async function load() {
+  await audio.loadMap($('map').value);
+  const r = audio.report();
+  $('aliases').innerHTML = ''; $('stock').innerHTML = ''; $('mapev').innerHTML = '';
+  for (const a of Object.keys(r.aliases)) btn($('aliases'), a, () => { const p = posFor(); audio.play(a, p ? { pos: p } : {}); });
+  for (const n of r.stockEvents) btn($('stock'), n, () => { const p = posFor(); audio.play(n, p ? { pos: p } : {}); });
+  for (const n of r.mapEvents) {
+    const span = document.createElement('span');
+    span.style.display = 'inline-block'; span.style.marginRight = '10px';
+    span.append(n + ' ');
+    btn(span, '▶', () => { const p = posFor(); audio.onSound({ type: 'start', ent: fakeEnt(n), name: n, pos: p || [0, 0, 0], local: !p }); });
+    btn(span, '■', () => audio.onSound({ type: 'stop', ent: fakeEnt(n), name: n }));
+    $('mapev').appendChild(span);
+  }
+}
+$('load').onclick = load;
+$('stop').onclick = () => audio.stopAll();
+$('pause').onclick = () => audio.pause();
+$('resume').onclick = () => audio.resume();
+const vols = () => { audio.setVolumes({ sfx: +$('master').value, music: +$('music').value }); audio.resume(); };
+$('master').oninput = vols; $('music').oninput = vols; vols();
+setInterval(render, 300);
+load();
+</script>
+</body>
+</html>

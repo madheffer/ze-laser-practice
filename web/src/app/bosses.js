@@ -1,0 +1,180 @@
+// Bosses: the simulated team's fire, your own shots, and the boss HUD numbers.
+//
+// The rest of the team shoots the boss while it's in sight. Boss HP % is applied as extra hits, so a map that
+// counts bullets (OnHealthChanged -> Subtract 1) scales exactly like one that counts health.
+import { S, G } from './state.js';
+import { settings } from './settings.js';
+import { rayHullEntry } from '../world/collision.js';
+import { angleForward } from '../world/entities/index.js';
+import { stripPrefix } from '../lib/names.js';
+import { clamp } from '../lib/math.js';
+
+// The other humans, as a squad. Each carries a rifle (AK-47: 10 rounds/s, 36 dmg), an SMG (P90: 14.3/s,
+// 26 dmg) or just a knife (no boss damage), lands about half its rounds, and is only firing part of the time:
+// ~80% when calm, ~55% while lasers / attacks are out (they're dodging), with a slow random swing on top so
+// damage comes in waves. ze_mist_p's dragon gets 900 HP per human per segment, so the fight length doesn't
+// depend on how many humans: this mix gives ~2.5 minutes. "Perfect team" = everyone always firing.
+const SQUAD = [
+  { share: 0.55, rate: 10, damage: 36 }, // rifles
+  { share: 0.35, rate: 14.3, damage: 26 }, // SMGs
+  { share: 0.10, rate: 0, damage: 0 }, // knife out
+];
+const ACCURACY = 0.5;
+const DUTY_CALM = 0.8, DUTY_ATTACK = 0.55;
+const DAMAGE_PER_HIT = 30; // your own shots' fallback, and the perfect team's
+const PERFECT_HITS_PER_HUMAN = 5;
+
+export function eyePos() {
+  const p = S.player;
+  return [p.origin[0], p.origin[1], p.origin[2] + p.eyeHeight()];
+}
+
+export function bossTargets(list = S.scenario?.bosses) {
+  const { engine, run } = S;
+  const out = [];
+  for (const b of list || []) {
+    // "after": seconds into the stage before this boss can be shot (fast-forward only)
+    if (b.after && engine.time - (run.ffStart ?? 0) < b.after) continue;
+    for (const e of engine.find(b.target)) if (e.alive && e.state.health != null) out.push({ e, b });
+  }
+  return out;
+}
+
+// Can the team see it? A world ray from your eye to the middle of its hull (8192 u max).
+function bossVisible(e) {
+  const hs = e.hulls();
+  if (!hs?.length) return false;
+  const h = hs[0];
+  const c = [(h.min[0] + h.max[0]) / 2, (h.min[1] + h.max[1]) / 2, (h.min[2] + h.max[2]) / 2];
+  const eye = eyePos();
+  const d = Math.hypot(c[0] - eye[0], c[1] - eye[1], c[2] - eye[2]);
+  if (d > 8192) return false;
+  return S.world.traceRay(eye, c, undefined, true).fraction >= 0.999;
+}
+
+function hitBoss(e, damage) {
+  // a physbox boss under 1% (strictly, as the map's compare is) is between segments: the map is about to
+  // top it back up
+  if (e.cls !== 'func_breakable' && e.state.health < e.state.max * 0.01) return false;
+  S.engine.damage(e, damage, S.engine.playerEnt);
+  return true;
+}
+
+// silent: during a fast-forward replay (shoots the scenario's fastForwardBosses, no line of sight needed)
+export function bossFire(dt, silent = false) {
+  const { run, scenario } = S;
+  if (!silent && (!settings.autoFire || run.endless && scenario.endless?.noBossDamage)) return;
+  const targets = silent ? bossTargets(scenario.fastForwardBosses) : bossTargets().filter(({ e }) => bossVisible(e));
+  if (!targets.length) return;
+  // you are one of the humans: the team is the other (humans - 1); your own shots come from your gun
+  const team = silent ? settings.humans : Math.max(0, settings.humans - 1);
+  const scale = 100 / Math.max(1, settings.bossHp);
+  let guard = 0;
+  if (silent || settings.perfectTeam) {
+    run.fireAcc += team * PERFECT_HITS_PER_HUMAN * scale * dt;
+    while (run.fireAcc >= 1 && guard++ < 400) {
+      run.fireAcc -= 1;
+      for (const { e } of targets) hitBoss(e, DAMAGE_PER_HIT);
+    }
+  } else {
+    // slow wave (period ~9 s and ~4 s mixed) so the squad's fire ebbs and surges
+    run.waveT = (run.waveT || 0) + dt;
+    const wave = 1 + 0.25 * Math.sin(run.waveT * 0.7) + 0.12 * Math.sin(run.waveT * 1.6 + 1.3);
+    const duty = (attackActive() ? DUTY_ATTACK : DUTY_CALM) * wave;
+    for (const w of SQUAD) {
+      if (!w.rate) continue;
+      const k = `fire${w.rate}`;
+      run[k] = (run[k] || 0) + team * w.share * w.rate * ACCURACY * duty * scale * dt;
+      while (run[k] >= 1 && guard++ < 400) {
+        run[k] -= 1;
+        for (const { e } of targets) hitBoss(e, w.damage);
+      }
+    }
+  }
+  if (run.fireAcc > 400) run.fireAcc = 0;
+}
+
+// Is an attack on? Any map-spawned hurt (lasers, balls, fire) alive and on, within 2000 u of you.
+function attackActive() {
+  const { engine, player, run } = S;
+  if (run.attackCheckT > engine.time) return run.attackOn;
+  run.attackCheckT = engine.time + 0.25;
+  const p = player.origin;
+  run.attackOn = false;
+  for (const h of engine.byClass.get('trigger_hurt') || []) {
+    if (!h.fromTemplate || !h.alive || !h.enabled) continue;
+    const o = h.worldOrigin();
+    if (Math.abs(o[0] - p[0]) < 2000 && Math.abs(o[1] - p[1]) < 2000 && Math.abs(o[2] - p[2]) < 1500) { run.attackOn = true; break; }
+  }
+  return run.attackOn;
+}
+
+// A shot from the viewmodel (bullet or knife): trace it against the world and the bosses.
+export function onShot(shot) {
+  const { run, engine, player, world, scenario } = S;
+  if (!run || S.paused || run.done || !engine) return;
+  G.audio.play(shot.kind === 'bullet' ? 'gun.fire' : shot.kind === 'stab' ? 'knife.stab' : 'knife.slash', { pos: player.origin });
+  const noDamage = run.endless && scenario?.endless?.noBossDamage;
+  const dir = angleForward([player.pitch, player.yaw, 0]);
+  const eye = eyePos();
+  const range = shot.range || 8192;
+  const wallTr = world.traceRay(eye, eye.map((v, i) => v + dir[i] * range), undefined, true);
+  const wallDist = wallTr.fraction * range;
+  for (const { e } of bossTargets()) {
+    for (const h of e.hulls() || []) {
+      const t = rayHullEntry(eye, dir, h);
+      if (t == null || t > Math.min(range, wallDist + 1)) continue;
+      if (!noDamage) {
+        const n = Math.max(1, Math.round(100 / Math.max(1, settings.bossHp)));
+        let landed = false;
+        for (let k = 0; k < n; k++) landed = hitBoss(e, shot.damage || DAMAGE_PER_HIT) || landed;
+        if (landed) { run.myHits++; run.myDamage += shot.damage || DAMAGE_PER_HIT; G.hitmark(); }
+      }
+      if (shot.kind !== 'bullet') G.audio.play('knife.hit', { pos: player.origin });
+      return;
+    }
+  }
+  if (shot.kind !== 'bullet' && wallTr.fraction < 1) G.audio.play('knife.hitwall', { pos: player.origin });
+}
+
+// Every tick: remember each segmented boss's segment size (the most its health + offset has held, ignoring
+// the spawn placeholder), so the bar reads right even between HUD redraws.
+export function trackSegments() {
+  const { engine, run } = S;
+  for (const b of S.scenario?.bosses || []) {
+    if (!b.counter || b.counterMode === 'hits') continue;
+    const e = engine.findOne(b.target);
+    // above half of spawn health = the spawn placeholder (the map has not set the first segment yet)
+    if (!e?.alive || e.state.health == null || e.state.health > e.state.max * 0.5) continue;
+    const cur = e.state.health + (b.offset || 0);
+    run.segMax ||= new Map();
+    if (cur > (run.segMax.get(b.target) || 0)) run.segMax.set(b.target, cur);
+  }
+}
+
+// Boss HP the way CS2Fixes BossHUD computes it. A segmented boss (counter of segments + a breakable that
+// refills each segment, ze_mist's "BreakableHPBar") shows (segments left - 1) x segment HP + this segment;
+// a hit-counted boss shows the counter; a plain breakable shows its health.
+export function bossStatus(b) {
+  const { engine, run } = S;
+  const e = engine.findOne(b.target);
+  const c = b.counter ? engine.findOne(b.counter) : null;
+  if (!e?.alive && !(c?.alive)) return null;
+  let hp, peak;
+  const off = b.offset || 0; // BossHUD's "offset": health below it isn't real boss HP (mist dragon: -10000)
+  if (b.counterMode === 'hits' && c?.state.v != null) hp = c.state.v;
+  else if (c?.state.v != null && e?.state.health != null) {
+    // BreakableHPBar: (segments left - 1) x segment HP + this segment's (health + offset). The segment's size
+    // is the most it has held (the map tops it up to the same amount every segment).
+    const cur = Math.max(0, e.state.health + off);
+    const seg = run.segMax?.get(b.target) || cur;
+    hp = Math.max(0, c.state.v - 1) * seg + Math.min(cur, seg);
+    peak = Math.max(c.state.max || c.state.v, c.state.v) * seg;
+  } else if (e?.state.health != null) hp = Math.max(0, e.state.health + off);
+  else return null;
+  if (peak == null) {
+    peak = Math.max(run.bossPeak.get(b.target) || 0, hp);
+    run.bossPeak.set(b.target, peak);
+  }
+  return { name: b.name || stripPrefix(b.target), hp: Math.round(hp), pct: Math.round(clamp((hp / Math.max(1, peak)) * 100, 0, 100)) };
+}

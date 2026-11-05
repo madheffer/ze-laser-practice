@@ -1,0 +1,209 @@
+/* The menu / pause screen: a top bar (title, Play | Settings tabs, map, Resume / Restart) over one scrolling tab
+   panel. Fluid from a phone in portrait to an ultrawide; tap targets grow to 44px on touch (--tap, style.css). */
+
+#menu {
+  position: fixed; inset: 0; z-index: 30; display: flex; align-items: center; justify-content: center;
+  background: radial-gradient(ellipse at 50% 30%, rgba(8, 12, 18, 0.55), rgba(3, 5, 8, 0.85));
+  padding: max(16px, var(--safe-t)) max(16px, var(--safe-r)) max(16px, var(--safe-b)) max(16px, var(--safe-l));
+}
+#menu.hidden { display: none; }
+
+#menu .panel {
+  width: min(1180px, 100%); height: min(780px, 100%); display: flex; flex-direction: column;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow: hidden;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.55);
+}
+
+/* ---- buttons + focus */
+#menu [hidden] { display: none !important; } /* beats the display rules below */
+#menu button, #menu select, #menu input { font: inherit; color: inherit; }
+#menu button { cursor: pointer; }
+#menu :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+#menu .primary, #menu .ghost {
+  min-height: var(--tap); border-radius: 8px; padding: 0 16px; font-weight: 700; font-size: 14px;
+  display: inline-flex; align-items: center; gap: 8px; white-space: nowrap;
+}
+#menu .primary { background: var(--accent); border: 1px solid #ff7a7a; color: #fff; }
+#menu .primary:hover { filter: brightness(1.1); }
+#menu .ghost { background: rgba(255, 255, 255, 0.03); border: 1px solid var(--line); }
+#menu .ghost:hover { border-color: #3b4c60; background: rgba(255, 255, 255, 0.06); }
+#menu kbd { font: 600 10px ui-monospace, Consolas, monospace; opacity: 0.75; border: 1px solid currentColor; border-radius: 3px; padding: 0 4px; }
+body.touch #menu .kb { display: none; }
+
+/* ---- top bar */
+.topbar {
+  display: grid; align-items: center; gap: 10px 16px; padding: 12px 16px;
+  grid-template-columns: auto auto 1fr auto; grid-template-areas: "brand tabs map actions";
+  border-bottom: 1px solid var(--line); background: rgba(10, 14, 19, 0.6);
+}
+.brand { grid-area: brand; display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.brand h1 { margin: 0; font: 700 20px/1 'Stratum2', 'Segoe UI', sans-serif; letter-spacing: 0.08em; white-space: nowrap; }
+.tag { font-size: 11px; color: var(--dim); border: 1px solid var(--line); border-radius: 4px; padding: 1px 6px; }
+.actions { grid-area: actions; display: flex; gap: 8px; justify-content: flex-end; }
+
+.tabs { grid-area: tabs; display: inline-flex; padding: 3px; gap: 2px; background: #0a0e13; border: 1px solid var(--line); border-radius: 10px; }
+.tabs [role=tab] {
+  min-height: calc(var(--tap) - 6px); min-width: 92px; padding: 0 16px; border: 0; border-radius: 7px; background: transparent;
+  color: var(--dim); font-weight: 600; font-size: 14px; letter-spacing: 0.04em;
+}
+.tabs [role=tab]:hover { color: var(--text); }
+.tabs [role=tab][aria-selected=true] { background: #1d2733; color: #fff; box-shadow: inset 0 -2px 0 var(--accent); }
+
+.map-pick { grid-area: map; display: flex; align-items: center; gap: 8px; min-width: 0; justify-self: end; font-size: 12px; color: var(--dim); }
+.map-pick select { min-height: var(--tap); min-width: 0; max-width: 320px; width: 100%; }
+#menu select, #menu input[type=number] {
+  background: #0b0f14; border: 1px solid var(--line); border-radius: 7px; padding: 6px 8px; font-size: 14px;
+}
+
+/* ---- tab panels: the only thing that scrolls */
+.tab-panels { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; padding: 16px; scrollbar-color: #2a3646 transparent; }
+.tab-panels [role=tabpanel][hidden] { display: none; }
+
+/* ---- stage picker */
+/* One stage per row (a mixed-width grid left holes beside full-width cards); a boss's attacks get a grid inside */
+#scenarios { display: flex; flex-direction: column; gap: 10px; }
+
+.stage { position: relative; display: flex; min-width: 0; background: #121922; border: 1px solid var(--line); border-radius: 10px; transition: border-color 0.12s, transform 0.12s; }
+.stage:hover, .stage:focus-within { border-color: #3b4c60; }
+.stage-main {
+  flex: 1; min-width: 0; text-align: left; background: none; border: 0; border-radius: 10px 0 0 10px; padding: 12px 14px;
+  display: flex; flex-direction: column; gap: 4px; min-height: 64px;
+}
+.stage:hover .stage-main b { color: #fff; }
+.stage-kicker { font-size: 10.5px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--dim); opacity: 0.85; }
+.stage-main b { font-size: 15px; font-weight: 700; display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+.stage-main .tags i {
+  font-style: normal; font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--gold);
+  border: 1px solid #5a4320; border-radius: 3px; padding: 0 5px;
+}
+.stage-desc {
+  font-size: 12.5px; line-height: 1.4; color: var(--dim);
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden;
+}
+.stage.open .stage-desc { -webkit-line-clamp: unset; line-clamp: none; }
+.stage-pb { font-size: 12px; color: var(--gold); font-variant-numeric: tabular-nums; }
+
+/* the right rail: endless (infinity) and "more" */
+.stage-rail { display: flex; flex-direction: column; border-left: 1px solid var(--line); }
+.stage-rail button {
+  flex: 1; width: max(44px, var(--tap)); min-height: var(--tap); border: 0; background: none; color: var(--dim); font-size: 13px;
+}
+.stage-rail button + button { border-top: 1px solid var(--line); }
+.stage-rail button:last-child { border-radius: 0 10px 10px 0; }
+.stage-rail button:first-child:not(:last-child) { border-radius: 0 10px 0 0; }
+.stage-rail button:hover { background: rgba(255, 255, 255, 0.05); color: var(--text); }
+.stage-rail .endless { color: #4cff9a; font-size: 22px; line-height: 1; background: rgba(17, 34, 26, 0.6); }
+.stage-rail .endless:hover { background: #11221a; color: #8affbe; }
+.stage-rail .more[aria-expanded=true] { color: var(--text); }
+
+.stage.featured { grid-column: 1 / -1; border-color: #7a2d2d; background: linear-gradient(100deg, #2e1515 0%, #1a1418 45%, #121922 100%); }
+.stage.featured .stage-main { padding: 18px 20px; min-height: 96px; }
+.stage.featured .stage-main b { font: 700 22px/1.1 'Stratum2', 'Segoe UI', sans-serif; letter-spacing: 0.02em; }
+.stage.featured .stage-desc { font-size: 13.5px; -webkit-line-clamp: 2; max-width: 80ch; }
+.stage.featured:hover { border-color: var(--accent); }
+.stage.full { border-color: #4a3a1a; background: #19150f; }
+.stage.full:hover { border-color: var(--gold); }
+
+/* a boss: its card, then its single attacks folded under it */
+.family { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.family:has(.attacks[open]) { grid-column: 1 / -1; }
+.attacks { border: 1px dashed var(--line); border-radius: 10px; }
+.attacks summary {
+  min-height: var(--tap); display: flex; align-items: center; gap: 8px; padding: 0 14px; cursor: pointer; list-style: none;
+  font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--dim); border-radius: 10px;
+}
+.attacks summary::-webkit-details-marker { display: none; }
+.attacks summary::before { content: ''; width: 7px; height: 7px; border: solid currentColor; border-width: 0 2px 2px 0; transform: rotate(-45deg); transition: transform 0.15s; }
+.attacks[open] summary::before { transform: rotate(45deg); }
+.attacks summary:hover { color: var(--text); }
+.attacks summary .count { margin-left: auto; font-variant-numeric: tabular-nums; opacity: 0.7; }
+.attack-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr)); gap: 8px; padding: 0 10px 10px; }
+.stage.child .stage-main { padding: 9px 12px; min-height: 52px; }
+.stage.child .stage-main b { font-size: 14px; }
+.stage.child .stage-desc { -webkit-line-clamp: 1; line-clamp: 1; }
+
+.stage.free { border-style: dashed; background: transparent; }
+
+/* ---- settings */
+.settings-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); gap: 12px; align-items: start; }
+.card { margin: 0; min-width: 0; background: #121922; border: 1px solid var(--line); border-radius: 10px; padding: 6px 14px 12px; display: flex; flex-direction: column; gap: 4px; }
+.card legend { float: left; width: 100%; padding: 8px 0 6px; font: 600 11px 'Segoe UI', sans-serif; letter-spacing: 0.14em; text-transform: uppercase; color: var(--dim); }
+.card .field { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 8px; row-gap: 4px; font-size: 14px; padding: 6px 0; }
+.card .field > input, .card .field > .pair { flex: 1 0 100%; }
+.card .field small, .card .chk small { color: var(--dim); font-size: 12px; }
+.card .field output { margin-left: auto; font: 600 14px ui-monospace, Consolas, monospace; color: var(--text); }
+.card .field input[type=number] { min-height: var(--tap); }
+.card input[type=range] { accent-color: var(--accent); min-height: var(--tap); margin: 0; }
+.card .pair { display: flex; align-items: center; gap: 10px; }
+.card .pair input[type=range] { flex: 1; min-width: 0; }
+.card .pair .num { display: flex; align-items: center; gap: 4px; color: var(--dim); font-size: 12px; }
+.card .pair input[type=number] { width: 76px; text-align: right; font: 600 14px ui-monospace, Consolas, monospace; }
+
+/* checkboxes as switches (still real checkboxes: app/settings.js reads .checked) */
+.card .chk { display: flex; align-items: center; gap: 12px; min-height: var(--tap); padding: 4px 0; font-size: 14px; cursor: pointer; }
+.card .chk > span { display: block; min-width: 0; line-height: 1.3; }
+.card .chk > span small { display: block; margin-top: 2px; }
+.card .chk input {
+  appearance: none; -webkit-appearance: none; flex: none; position: relative; width: 38px; height: 22px; margin: 0;
+  border-radius: 11px; background: #26303c; border: 1px solid #34414f; cursor: pointer; transition: background 0.15s;
+}
+.card .chk input::after {
+  content: ''; position: absolute; left: 2px; top: 2px; width: 16px; height: 16px; border-radius: 50%; background: #a8b4c0; transition: transform 0.15s, background 0.15s;
+}
+.card .chk input:checked { background: #7a2525; border-color: var(--accent); }
+.card .chk input:checked::after { transform: translateX(16px); background: #fff; }
+.card .chk kbd { margin-left: 4px; }
+
+/* third-person distance only while third person is on */
+.card:has(#thirdperson:not(:checked)) .tp-dist { display: none; }
+
+.touch-only { display: none !important; }
+body.touch .touch-only { display: flex !important; }
+body.touch .keys-card { display: none; }
+
+.keys { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; margin: 4px 0 0; font-size: 13px; }
+.keys dt { font: 600 12px ui-monospace, Consolas, monospace; color: var(--text); white-space: nowrap; }
+.keys dd { margin: 0; color: var(--dim); }
+
+/* ---- footer: status line + collapsed log */
+.menu-foot { display: flex; align-items: center; gap: 12px; padding: 6px 16px; border-top: 1px solid var(--line); font-size: 11px; color: var(--dim); min-height: 30px; }
+#status { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.menu-foot .log summary { cursor: pointer; }
+.menu-foot .log[open] { position: absolute; right: 16px; bottom: 36px; width: min(520px, calc(100% - 32px)); background: #0a0e13; border: 1px solid var(--line); border-radius: 8px; padding: 8px; z-index: 1; }
+#menu .panel { position: relative; }
+#log { margin: 6px 0 0; max-height: 200px; overflow: auto; font-size: 10px; color: #6f7d8b; white-space: pre-wrap; }
+
+/* ---- responsive */
+/* tablet / narrow desktop: title + actions on top, tabs + map below */
+@media (max-width: 900px) {
+  .topbar { grid-template-columns: auto 1fr; grid-template-areas: "brand actions" "tabs map"; }
+}
+/* phone portrait: the panel fills the screen */
+@media (max-width: 600px) {
+  #menu { padding: 0; }
+  #menu .panel { border-radius: 0; border: 0; height: 100%; }
+  .topbar { padding: max(10px, var(--safe-t)) max(12px, var(--safe-r)) 10px max(12px, var(--safe-l)); grid-template-columns: 1fr auto; grid-template-areas: "brand actions" "tabs tabs" "map map"; }
+  .brand h1 { font-size: 16px; }
+  .tabs { width: 100%; }
+  .tabs [role=tab] { flex: 1; }
+  .map-pick { justify-self: stretch; }
+  .map-pick select { max-width: none; }
+  .tab-panels { padding: 12px max(12px, var(--safe-r)) 12px max(12px, var(--safe-l)); }
+  .menu-foot { padding-bottom: max(6px, var(--safe-b)); }
+  .stage.featured .stage-main b { font-size: 19px; }
+}
+/* phone landscape (short): one compact bar, full-bleed panel */
+@media (max-height: 520px) and (orientation: landscape) {
+  #menu { padding: 0; }
+  #menu .panel { border-radius: 0; border: 0; height: 100%; width: 100%; }
+  .topbar { padding: 6px max(12px, var(--safe-r)) 6px max(12px, var(--safe-l)); grid-template-columns: auto auto 1fr auto; grid-template-areas: "brand tabs map actions"; }
+  .brand .tag, .brand h1 { display: none; }
+  .brand::before { content: 'ZE LASERS'; font: 700 14px 'Stratum2', 'Segoe UI', sans-serif; letter-spacing: 0.08em; white-space: nowrap; }
+  .tabs [role=tab] { min-width: 76px; }
+  .map-pick > span { display: none; }
+  .tab-panels { padding: 10px max(12px, var(--safe-r)) 10px max(12px, var(--safe-l)); }
+  .menu-foot { display: none; }
+  .stage.featured .stage-main { padding: 12px 16px; min-height: 0; }
+  .stage.featured .stage-main b { font-size: 18px; }
+}
+@media (prefers-reduced-motion: reduce) { .stage, .attacks summary::before, .card .chk input, .card .chk input::after { transition: none; } }

@@ -1,0 +1,32 @@
+.overlay { position: fixed; inset: 0; display: grid; place-items: center; z-index: 20; padding: 16px; animation: ov-in 0.25s ease-out; }
+.overlay.hidden { display: none; }
+.overlay.dead { background: radial-gradient(ellipse at center, rgba(90, 0, 0, 0.55), rgba(10, 0, 0, 0.85)); }
+.overlay.win, .overlay.endless { background: radial-gradient(ellipse at center, rgba(10, 40, 30, 0.5), rgba(4, 10, 8, 0.85)); }
+@keyframes ov-in { from { opacity: 0; } to { opacity: 1; } }
+.ov-card {
+  width: min(460px, 100%); text-align: center; color: #fff; font-family: 'Stratum2', 'Segoe UI', sans-serif;
+  background: rgba(14, 18, 24, 0.88); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 10px; padding: 22px 22px 18px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5); animation: ov-pop 0.3s cubic-bezier(.2, .9, .3, 1.2);
+}
+@keyframes ov-pop { from { transform: scale(0.92); opacity: 0; } to { transform: none; opacity: 1; } }
+.ov-kicker { font-size: 12px; letter-spacing: 0.18em; text-transform: uppercase; opacity: 0.6; }
+.ov-card h2 { margin: 4px 0 2px; font-size: 40px; font-weight: 700; letter-spacing: 0.04em; }
+.dead .ov-card h2 { color: #ff4a4a; text-shadow: 0 0 18px rgba(255, 0, 0, 0.45); }
+.win .ov-card h2, .endless .ov-card h2 { color: #4cff9a; text-shadow: 0 0 18px rgba(0, 255, 120, 0.3); }
+.ov-sub { font-size: 15px; opacity: 0.8; }
+.ov-record { margin-top: 10px; display: inline-block; font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #1a1205; background: #ffb35c; border-radius: 4px; padding: 3px 8px; }
+.ov-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; margin: 16px 0; }
+.ov-stats div { background: rgba(255, 255, 255, 0.05); border-radius: 6px; padding: 8px 6px; }
+.ov-stats div.hi { background: rgba(255, 179, 92, 0.14); box-shadow: inset 0 0 0 1px rgba(255, 179, 92, 0.4); }
+.ov-stats dt { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.6; }
+.ov-stats dd { margin: 2px 0 0; font: 700 20px 'Stratum2 TF', 'Stratum2', sans-serif; }
+.ov-buttons { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+.ov-buttons button { font: 700 14px 'Stratum2', 'Segoe UI', sans-serif; border-radius: 7px; padding: 9px 16px; cursor: pointer; }
+.ov-buttons button.primary { background: #ff4d4d; border: 1px solid #ff7a7a; color: #fff; }
+.win .ov-buttons button.primary, .endless .ov-buttons button.primary { background: #1f9d5a; border-color: #4cff9a; }
+.ov-buttons button.ghost { background: transparent; border: 1px solid rgba(255, 255, 255, 0.2); color: #fff; }
+.ov-buttons kbd { font: 600 11px ui-monospace, Consolas, monospace; opacity: 0.7; border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 3px; padding: 0 4px; margin-left: 4px; }
+
+/* touch: 44px tap targets on the card buttons */
+body.touch .ov-buttons button { min-height: 44px; padding: 0 20px; }
+@media (max-height: 480px) { .ov-card { padding: 14px 18px 12px; } .ov-card h2 { font-size: 30px; } .ov-stats { margin: 10px 0; } }

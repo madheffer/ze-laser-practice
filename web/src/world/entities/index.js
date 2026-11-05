@@ -1,0 +1,4 @@
+// The map's I/O engine. engine.js runs it; classes/*.js register the entity classes it knows.
+export { EntityEngine } from './engine.js';
+export { Entity, stripName } from './entity.js';
+export { angleQuat, angleForward, parseVec, DEG } from './math.js';

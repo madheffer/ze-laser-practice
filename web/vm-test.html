@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>viewmodel test</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #6d7074; overflow: hidden; font: 13px/1.4 system-ui, sans-serif; color: #fff; }
+  canvas { display: block; width: 100vw; height: 100vh; }
+  #hud { position: fixed; left: 10px; top: 10px; background: rgba(0,0,0,.55); padding: 8px 10px; border-radius: 4px; white-space: pre; pointer-events: none; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud">loading...</div>
+<script type="module">
+import * as THREE from 'three';
+import { Viewmodel } from '/src/weapons/viewmodel.js';
+
+// Same renderer setup as render.js (ACES + sRGB), a flat grey "world" pass, then the viewmodel overlay.
+const canvas = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;
+const world = new THREE.Scene();
+world.background = new THREE.Color(0x6d7074);
+const worldCam = new THREE.PerspectiveCamera(73.74, 1, 1, 100);
+
+const vm = new Viewmodel(renderer);
+const shots = { bullet: 0, slash: 0, stab: 0, dmg: 0, last: null };
+vm.onShot = (s) => { shots[s.kind]++; shots.dmg += s.damage; shots.last = s; };
+const hud = document.getElementById('hud');
+let status = 'loading...';
+vm.load().then(() => { status = 'ready'; }).catch((e) => { status = 'load failed: ' + (e.message || e); console.error(e); });
+vm.setWeapon('gun');
+
+let speed = 0, onGround = true, yawDelta = 0, pitchDelta = 0;
+const keys = new Set();
+addEventListener('keydown', (e) => {
+  keys.add(e.code);
+  if (e.code === 'Digit1') vm.setWeapon('gun');
+  if (e.code === 'Digit3') vm.setWeapon('knife');
+  if (e.code === 'KeyF') vm.inspect();
+  if (e.code === 'Space') { onGround = false; setTimeout(() => { onGround = true; }, 600); }
+});
+addEventListener('keyup', (e) => keys.delete(e.code));
+addEventListener('mousedown', (e) => { if (e.button === 0) vm.trigger(true); if (e.button === 2) vm.trigger2(true); });
+addEventListener('mouseup', (e) => { if (e.button === 0) vm.trigger(false); if (e.button === 2) vm.trigger2(false); });
+addEventListener('contextmenu', (e) => e.preventDefault());
+addEventListener('mousemove', (e) => { yawDelta += e.movementX * 0.05; pitchDelta += e.movementY * 0.05; });
+
+// debug handle for automated checks
+window.__vm = { vm, shots, set: (o) => { if ('speed' in o) speed = o.speed; if ('onGround' in o) onGround = o.onGround; } };
+
+let last = performance.now();
+function frame(now) {
+  requestAnimationFrame(frame);
+  const dt = Math.min((now - last) / 1000, 0.1); last = now;
+  const w = innerWidth, h = innerHeight;
+  if (canvas.width !== Math.floor(w * renderer.getPixelRatio())) renderer.setSize(w, h, false);
+  const walking = keys.has('KeyW') || keys.has('KeyA') || keys.has('KeyS') || keys.has('KeyD');
+  const sp = walking ? (vm.weapon === 'knife' ? 250 : 215) : speed;
+  vm.update(dt, { speed: sp, onGround, ducked: false, yawDelta, pitchDelta });
+  yawDelta = pitchDelta = 0;
+  worldCam.aspect = w / h;
+  renderer.render(world, worldCam);
+  vm.render(w / h);
+  const s = vm._sources[vm.weapon];
+  hud.textContent = `${status}   weapon: ${vm.weapon}   action: ${s?.wc.action ?? '-'}\n`
+    + `shots  bullet ${shots.bullet}  slash ${shots.slash}  stab ${shots.stab}  total dmg ${shots.dmg}\n`
+    + `last   ${shots.last ? JSON.stringify(shots.last) : '-'}\n`
+    + `1 gun  3 knife  M1 fire/slash  M2 stab  F inspect  WASD bob  Space jump`;
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

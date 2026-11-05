@@ -1,0 +1,44 @@
+:root {
+  --bg: #0d1116;
+  --panel: rgba(16, 21, 28, 0.95);
+  --line: #263240;
+  --text: #dfe7ef;
+  --dim: #8796a6;
+  --accent: #ff4d4d;
+  --good: #3ddc84;
+  --gold: #ffb35c;
+  --focus: #7cc4ff;
+  --tap: 36px; /* minimum control size; 44px on touch (below) */
+  --safe-t: env(safe-area-inset-top, 0px);
+  --safe-r: env(safe-area-inset-right, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-l: env(safe-area-inset-left, 0px);
+  font-family: "Segoe UI", system-ui, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+}
+@media (any-pointer: coarse) { :root { --tap: 44px; } }
+body.touch { --tap: 44px; }
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); color: var(--text); }
+#view { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+.hidden { display: none !important; }
+
+/* CS2 default crosshair: 4 green lines with a gap and a dark outline */
+#crosshair, #hitmarker { position: fixed; left: 50%; top: 50%; width: 0; height: 0; pointer-events: none; }
+#crosshair i { position: absolute; background: #4cff4c; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.8); }
+#crosshair i:nth-child(1) { left: -1px; top: -12px; width: 2px; height: 8px; }
+#crosshair i:nth-child(2) { left: -1px; top: 4px; width: 2px; height: 8px; }
+#crosshair i:nth-child(3) { left: -12px; top: -1px; width: 8px; height: 2px; }
+#crosshair i:nth-child(4) { left: 4px; top: -1px; width: 8px; height: 2px; }
+#hitmarker { opacity: 0; }
+#hitmarker.on { opacity: 1; }
+#hitmarker i { position: absolute; width: 10px; height: 2px; background: #fff; box-shadow: 0 0 2px #000; }
+#hitmarker i:nth-child(1) { left: 6px; top: 6px; transform: rotate(45deg); }
+#hitmarker i:nth-child(2) { left: -16px; top: 6px; transform: rotate(-45deg); }
+#hitmarker i:nth-child(3) { left: 6px; top: -8px; transform: rotate(-45deg); }
+#hitmarker i:nth-child(4) { left: -16px; top: -8px; transform: rotate(45deg); }
+
+#flash { position: fixed; inset: 0; pointer-events: none; background: radial-gradient(transparent 40%, rgba(255, 0, 0, 0.55)); opacity: 0; transition: opacity 0.25s; }
+#flash.on { opacity: 1; transition: none; }
+
+/* the menu: ui/menu.css; touch controls: ui/touch.css */

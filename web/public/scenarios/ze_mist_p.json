@@ -1,0 +1,734 @@
+{
+  "map": "ze_mist_p",
+  "scenarios": [
+    {
+      "id": "throne",
+      "group": "Most played",
+      "name": "Throne finale – falling balls",
+      "description": "Starts on the throne at the bottom of its descent, 5 s before the balls. Normal gravity: the escape's 0.1 ends at the trigger every human crosses into the throne room (KeyValue gravity 1). 300-damage balls rain from the spinning makers above for 23 s (150 per half-second touch on 180 HP: one graze survives, two kill). Survive until the nuke.",
+      "spawn": {
+        "on": "[PR#]ml_throne",
+        "offset": [
+          0,
+          0,
+          2
+        ],
+        "yaw": 0,
+        "pitch": -40
+      },
+      "start": [
+        {
+          "target": "[PR#]relay_escape",
+          "input": "Trigger"
+        }
+      ],
+      "fastForward": 106,
+      "bosses": [],
+      "win": {
+        "target": "[PR#]hurt_nuke",
+        "input": "Enable"
+      },
+      "lose": {
+        "target": "[PR#]relay_fail",
+        "input": "Trigger"
+      },
+      "player": {
+        "health": 180,
+        "gravity": 1
+      },
+      "fastForwardBosses": [
+        {
+          "target": "[PR#]br_escdragon",
+          "after": 30
+        }
+      ],
+      "featured": true,
+      "hold": 4,
+      "hazards": {
+        "hurt_finalbullet": "a falling ball",
+        "hurt_esclaser": "an escape laser",
+        "hurt_escbullet": "an escape bullet",
+        "hurt_escfireball": "a fireball",
+        "hurt_escfire": "the side fire",
+        "firewall_hurt": "the firewall",
+        "hurt_escdragon": "the escape dragon",
+        "hurt_humandelay": "falling behind",
+        "hurt_vlaser": "a laser",
+        "hurt_claser": "a high laser",
+        "hurt_slaser1": "a spinning laser",
+        "hurt_slaser2": "a spinning laser",
+        "hurt_dragon": "the dragon",
+        "hurt_outerfire": "the outer fire",
+        "hurt_firestorm1": "the firestorm",
+        "hurt_firestorm2": "the firestorm",
+        "hurt_firestorm3": "the firestorm",
+        "hurt_firestorm4": "the firestorm",
+        "hurt_firestorm5": "the firestorm",
+        "hurt_firestorm6": "the firestorm",
+        "hurt_firestorm7": "the firestorm",
+        "hurt_firestorm8": "the firestorm",
+        "hurt_spin_low": "the low spin",
+        "hurt_spin_mid": "the mid spin",
+        "hurt_spin_high": "the high spin",
+        "hurt_beam1": "a beam",
+        "hurt_beam2": "a beam",
+        "hurt_beam3": "a beam",
+        "hurt_beam4": "a beam",
+        "hurt_beam5": "a beam",
+        "hurt_nuke": "the nuke",
+        "hurt_nuke_fail": "the nuke",
+        "hurt_finalfall": "the fall"
+      },
+      "endless": {
+        "cancel": [
+          {
+            "target": "[PR#]timer_finalbullet",
+            "input": "Disable"
+          },
+          {
+            "target": "[PR#]hurt_nuke",
+            "input": "Enable"
+          },
+          {
+            "target": "[PR#]fade_dragonkill",
+            "input": "Fade"
+          }
+        ]
+      }
+    },
+    {
+      "id": "full",
+      "group": "Full sequence",
+      "full": true,
+      "name": "Dragon → escape → throne (full run)",
+      "description": "The whole ending as it plays on a server: the bone dragon fight with every attack, its death, the escape-dragon chase and the falling-ball finale in the throne room.",
+      "spawn": {
+        "origin": [
+          2560,
+          -3072,
+          -2944
+        ],
+        "yaw": 180
+      },
+      "start": [
+        {
+          "target": "[PR#]relay_dragon",
+          "input": "Trigger"
+        }
+      ],
+      "fastForward": 20,
+      "bosses": [
+        {
+          "target": "[PR#]pbox_dragon",
+          "name": "Dragon",
+          "counter": "[PR#]counter_dragon",
+          "offset": -10000
+        },
+        {
+          "target": "[PR#]br_escdragon",
+          "name": "Revived Dragon",
+          "counter": "[PR#]counter_eschp",
+          "counterMode": "hits"
+        }
+      ],
+      "win": {
+        "target": "[PR#]hurt_nuke",
+        "input": "Enable"
+      },
+      "lose": {
+        "target": "[PR#]relay_fail",
+        "input": "Trigger"
+      },
+      "player": {
+        "health": 180
+      },
+      "hazards": {
+        "hurt_finalbullet": "a falling ball",
+        "hurt_esclaser": "an escape laser",
+        "hurt_escbullet": "an escape bullet",
+        "hurt_escfireball": "a fireball",
+        "hurt_escfire": "the side fire",
+        "firewall_hurt": "the firewall",
+        "hurt_escdragon": "the escape dragon",
+        "hurt_humandelay": "falling behind",
+        "hurt_vlaser": "a laser",
+        "hurt_claser": "a high laser",
+        "hurt_slaser1": "a spinning laser",
+        "hurt_slaser2": "a spinning laser",
+        "hurt_dragon": "the dragon",
+        "hurt_outerfire": "the outer fire",
+        "hurt_firestorm1": "the firestorm",
+        "hurt_firestorm2": "the firestorm",
+        "hurt_firestorm3": "the firestorm",
+        "hurt_firestorm4": "the firestorm",
+        "hurt_firestorm5": "the firestorm",
+        "hurt_firestorm6": "the firestorm",
+        "hurt_firestorm7": "the firestorm",
+        "hurt_firestorm8": "the firestorm",
+        "hurt_spin_low": "the low spin",
+        "hurt_spin_mid": "the mid spin",
+        "hurt_spin_high": "the high spin",
+        "hurt_beam1": "a beam",
+        "hurt_beam2": "a beam",
+        "hurt_beam3": "a beam",
+        "hurt_beam4": "a beam",
+        "hurt_beam5": "a beam",
+        "hurt_nuke": "the nuke",
+        "hurt_nuke_fail": "the nuke",
+        "hurt_finalfall": "the fall"
+      }
+    },
+    {
+      "id": "dragon",
+      "group": "Bosses",
+      "name": "Dragon – full fight",
+      "description": "The fight from the moment the dragon lands: a random attack every 30 s until its 16 health segments (900 HP per human each, as the map adds it) are gone. Ends when it dies.",
+      "spawn": {
+        "origin": [
+          2560,
+          -3072,
+          -2944
+        ],
+        "yaw": 180
+      },
+      "start": [
+        {
+          "target": "[PR#]relay_dragon",
+          "input": "Trigger"
+        }
+      ],
+      "fastForward": 20,
+      "bosses": [
+        {
+          "target": "[PR#]pbox_dragon",
+          "name": "Dragon",
+          "counter": "[PR#]counter_dragon",
+          "offset": -10000
+        }
+      ],
+      "win": {
+        "target": "[PR#]relay_escape",
+        "input": "Trigger"
+      },
+      "player": {
+        "health": 180
+      },
+      "childrenTitle": "Single attacks",
+      "hazards": {
+        "hurt_finalbullet": "a falling ball",
+        "hurt_esclaser": "an escape laser",
+        "hurt_escbullet": "an escape bullet",
+        "hurt_escfireball": "a fireball",
+        "hurt_escfire": "the side fire",
+        "firewall_hurt": "the firewall",
+        "hurt_escdragon": "the escape dragon",
+        "hurt_humandelay": "falling behind",
+        "hurt_vlaser": "a laser",
+        "hurt_claser": "a high laser",
+        "hurt_slaser1": "a spinning laser",
+        "hurt_slaser2": "a spinning laser",
+        "hurt_dragon": "the dragon",
+        "hurt_outerfire": "the outer fire",
+        "hurt_firestorm1": "the firestorm",
+        "hurt_firestorm2": "the firestorm",
+        "hurt_firestorm3": "the firestorm",
+        "hurt_firestorm4": "the firestorm",
+        "hurt_firestorm5": "the firestorm",
+        "hurt_firestorm6": "the firestorm",
+        "hurt_firestorm7": "the firestorm",
+        "hurt_firestorm8": "the firestorm",
+        "hurt_spin_low": "the low spin",
+        "hurt_spin_mid": "the mid spin",
+        "hurt_spin_high": "the high spin",
+        "hurt_beam1": "a beam",
+        "hurt_beam2": "a beam",
+        "hurt_beam3": "a beam",
+        "hurt_beam4": "a beam",
+        "hurt_beam5": "a beam",
+        "hurt_nuke": "the nuke",
+        "hurt_nuke_fail": "the nuke",
+        "hurt_finalfall": "the fall"
+      },
+      "endless": {
+        "noBossDamage": true
+      }
+    },
+    {
+      "id": "dragon_lasers",
+      "name": "Laser waves",
+      "description": "7 random waves fan out from the centre over ~21 s. Low ones to jump, high ones to crouch.",
+      "spawn": {
+        "origin": [
+          2560,
+          -3072,
+          -2944
+        ],
+        "yaw": 180
+      },
+      "start": [
+        {
+          "target": "[PR#]relay_atk_laser",
+          "input": "Trigger"
+        },
+        {
+          "target": "[PR#]music_birthofawish",
+          "input": "StartSound"
+        }
+      ],
+      "winAfter": 26,
+      "player": {
+        "health": 180
+      },
+      "parent": "dragon",
+      "hazards": {
+        "hurt_finalbullet": "a falling ball",
+        "hurt_esclaser": "an escape laser",
+        "hurt_escbullet": "an escape bullet",
+        "hurt_escfireball": "a fireball",
+        "hurt_escfire": "the side fire",
+        "firewall_hurt": "the firewall",
+        "hurt_escdragon": "the escape dragon",
+        "hurt_humandelay": "falling behind",
+        "hurt_vlaser": "a laser",
+        "hurt_claser": "a high laser",
+        "hurt_slaser1": "a spinning laser",
+        "hurt_slaser2": "a spinning laser",
+        "hurt_dragon": "the dragon",
+        "hurt_outerfire": "the outer fire",
+        "hurt_firestorm1": "the firestorm",
+        "hurt_firestorm2": "the firestorm",
+        "hurt_firestorm3": "the firestorm",
+        "hurt_firestorm4": "the firestorm",
+        "hurt_firestorm5": "the firestorm",
+        "hurt_firestorm6": "the firestorm",
+        "hurt_firestorm7": "the firestorm",
+        "hurt_firestorm8": "the firestorm",
+        "hurt_spin_low": "the low spin",
+        "hurt_spin_mid": "the mid spin",
+        "hurt_spin_high": "the high spin",
+        "hurt_beam1": "a beam",
+        "hurt_beam2": "a beam",
+        "hurt_beam3": "a beam",
+        "hurt_beam4": "a beam",
+        "hurt_beam5": "a beam",
+        "hurt_nuke": "the nuke",
+        "hurt_nuke_fail": "the nuke",
+        "hurt_finalfall": "the fall"
+      },
+      "endless": {
+        "repeat": 30
+      }
+    },
+    {
+      "id": "dragon_triangle",
+      "name": "Triangle",
+      "description": "Triangle-shaped lasers from the ring of makers while the whole ring turns, reversing direction as it goes.",
+      "spawn": {
+        "origin": [
+          2560,
+          -3072,
+          -2944
+        ],
+        "yaw": 180
+      },
+      "start": [
+        {
+          "target": "[PR#]relay_atk_triangle",
+          "input": "Trigger"
+        },
+        {
+          "target": "[PR#]music_birthofawish",
+          "input": "StartSound"
+        }
+      ],
+      "winAfter": 27,
+      "player": {
+        "health": 180
+      },
+      "parent": "dragon",
+      "hazards": {
+        "hurt_finalbullet": "a falling ball",
+        "hurt_esclaser": "an escape laser",
+        "hurt_escbullet": "an escape bullet",
+        "hurt_escfireball": "a fireball",
+        "hurt_escfire": "the side fire",
+        "firewall_hurt": "the firewall",
+        "hurt_escdragon": "the escape dragon",
+        "hurt_humandelay": "falling behind",
+        "hurt_vlaser": "a laser",
+        "hurt_claser": "a high laser",
+        "hurt_slaser1": "a spinning laser",
+        "hurt_slaser2": "a spinning laser",
+        "hurt_dragon": "the dragon",
+        "hurt_outerfire": "the outer fire",
+        "hurt_firestorm1": "the firestorm",
+        "hurt_firestorm2": "the firestorm",
+        "hurt_firestorm3": "the firestorm",
+        "hurt_firestorm4": "the firestorm",
+        "hurt_firestorm5": "the firestorm",
+        "hurt_firestorm6": "the firestorm",
+        "hurt_firestorm7": "the firestorm",
+        "hurt_firestorm8": "the firestorm",
+        "hurt_spin_low": "the low spin",
+        "hurt_spin_mid": "the mid spin",
+        "hurt_spin_high": "the high spin",
+        "hurt_beam1": "a beam",
+        "hurt_beam2": "a beam",
+        "hurt_beam3": "a beam",
+        "hurt_beam4": "a beam",
+        "hurt_beam5": "a beam",
+        "hurt_nuke": "the nuke",
+        "hurt_nuke_fail": "the nuke",
+        "hurt_finalfall": "the fall"
+      },
+      "endless": {
+        "repeat": 30
+      }
+    },
+    {
+      "id": "dragon_curveball",
+      "name": "Curveball",
+      "description": "Curving lasers out of a turning ring.",
+      "spawn": {
+        "origin": [
+          2560,
+          -3072,
+          -2944
+        ],
+        "yaw": 180
+      },
+      "start": [
+        {
+          "target": "[PR#]relay_atk_curveball",
+          "input": "Trigger"
+        },
+        {
+          "target": "[PR#]music_birthofawish",
+          "input": "StartSound"
+        }
+      ],
+      "winAfter": 27,
+      "player": {
+        "health": 180
+      },
+      "parent": "dragon",
+      "hazards": {
+        "hurt_finalbullet": "a falling ball",
+        "hurt_esclaser": "an escape laser",
+        "hurt_escbullet": "an escape bullet",
+        "hurt_escfireball": "a fireball",
+        "hurt_escfire": "the side fire",
+        "firewall_hurt": "the firewall",
+        "hurt_escdragon": "the escape dragon",
+        "hurt_humandelay": "falling behind",
+        "hurt_vlaser": "a laser",
+        "hurt_claser": "a high laser",
+        "hurt_slaser1": "a spinning laser",
+        "hurt_slaser2": "a spinning laser",
+        "hurt_dragon": "the dragon",
+        "hurt_outerfire": "the outer fire",
+        "hurt_firestorm1": "the firestorm",
+        "hurt_firestorm2": "the firestorm",
+        "hurt_firestorm3": "the firestorm",
+        "hurt_firestorm4": "the firestorm",
+        "hurt_firestorm5": "the firestorm",
+        "hurt_firestorm6": "the firestorm",
+        "hurt_firestorm7": "the firestorm",
+        "hurt_firestorm8": "the firestorm",
+        "hurt_spin_low": "the low spin",
+        "hurt_spin_mid": "the mid spin",
+        "hurt_spin_high": "the high spin",
+        "hurt_beam1": "a beam",
+        "hurt_beam2": "a beam",
+        "hurt_beam3": "a beam",
+        "hurt_beam4": "a beam",
+        "hurt_beam5": "a beam",
+        "hurt_nuke": "the nuke",
+        "hurt_nuke_fail": "the nuke",
+        "hurt_finalfall": "the fall"
+      },
+      "endless": {
+        "repeat": 30
+      }
+    },
+    {
+      "id": "dragon_firestorm",
+      "name": "Firestorm",
+      "description": "Fire lasers from all sides while the ring spins backwards.",
+      "spawn": {
+        "origin": [
+          2560,
+          -3072,
+          -2944
+        ],
+        "yaw": 180
+      },
+      "start": [
+        {
+          "target": "[PR#]relay_atk_firestorm",
+          "input": "Trigger"
+        },
+        {
+          "target": "[PR#]music_birthofawish",
+          "input": "StartSound"
+        }
+      ],
+      "winAfter": 30,
+      "player": {
+        "health": 180
+      },
+      "parent": "dragon",
+      "hazards": {
+        "hurt_finalbullet": "a falling ball",
+        "hurt_esclaser": "an escape laser",
+        "hurt_escbullet": "an escape bullet",
+        "hurt_escfireball": "a fireball",
+        "hurt_escfire": "the side fire",
+        "firewall_hurt": "the firewall",
+        "hurt_escdragon": "the escape dragon",
+        "hurt_humandelay": "falling behind",
+        "hurt_vlaser": "a laser",
+        "hurt_claser": "a high laser",
+        "hurt_slaser1": "a spinning laser",
+        "hurt_slaser2": "a spinning laser",
+        "hurt_dragon": "the dragon",
+        "hurt_outerfire": "the outer fire",
+        "hurt_firestorm1": "the firestorm",
+        "hurt_firestorm2": "the firestorm",
+        "hurt_firestorm3": "the firestorm",
+        "hurt_firestorm4": "the firestorm",
+        "hurt_firestorm5": "the firestorm",
+        "hurt_firestorm6": "the firestorm",
+        "hurt_firestorm7": "the firestorm",
+        "hurt_firestorm8": "the firestorm",
+        "hurt_spin_low": "the low spin",
+        "hurt_spin_mid": "the mid spin",
+        "hurt_spin_high": "the high spin",
+        "hurt_beam1": "a beam",
+        "hurt_beam2": "a beam",
+        "hurt_beam3": "a beam",
+        "hurt_beam4": "a beam",
+        "hurt_beam5": "a beam",
+        "hurt_nuke": "the nuke",
+        "hurt_nuke_fail": "the nuke",
+        "hurt_finalfall": "the fall"
+      },
+      "endless": {
+        "repeat": 30
+      }
+    },
+    {
+      "id": "dragon_spin",
+      "name": "Spin",
+      "description": "The dragon's spin attack.",
+      "spawn": {
+        "origin": [
+          2560,
+          -3072,
+          -2944
+        ],
+        "yaw": 180
+      },
+      "start": [
+        {
+          "target": "[PR#]temp_dragon",
+          "input": "ForceSpawn"
+        },
+        {
+          "target": "[PR#]relay_atk_spin",
+          "input": "Trigger",
+          "delay": 1
+        },
+        {
+          "target": "[PR#]music_birthofawish",
+          "input": "StartSound"
+        }
+      ],
+      "winAfter": 30,
+      "player": {
+        "health": 180
+      },
+      "parent": "dragon",
+      "hazards": {
+        "hurt_finalbullet": "a falling ball",
+        "hurt_esclaser": "an escape laser",
+        "hurt_escbullet": "an escape bullet",
+        "hurt_escfireball": "a fireball",
+        "hurt_escfire": "the side fire",
+        "firewall_hurt": "the firewall",
+        "hurt_escdragon": "the escape dragon",
+        "hurt_humandelay": "falling behind",
+        "hurt_vlaser": "a laser",
+        "hurt_claser": "a high laser",
+        "hurt_slaser1": "a spinning laser",
+        "hurt_slaser2": "a spinning laser",
+        "hurt_dragon": "the dragon",
+        "hurt_outerfire": "the outer fire",
+        "hurt_firestorm1": "the firestorm",
+        "hurt_firestorm2": "the firestorm",
+        "hurt_firestorm3": "the firestorm",
+        "hurt_firestorm4": "the firestorm",
+        "hurt_firestorm5": "the firestorm",
+        "hurt_firestorm6": "the firestorm",
+        "hurt_firestorm7": "the firestorm",
+        "hurt_firestorm8": "the firestorm",
+        "hurt_spin_low": "the low spin",
+        "hurt_spin_mid": "the mid spin",
+        "hurt_spin_high": "the high spin",
+        "hurt_beam1": "a beam",
+        "hurt_beam2": "a beam",
+        "hurt_beam3": "a beam",
+        "hurt_beam4": "a beam",
+        "hurt_beam5": "a beam",
+        "hurt_nuke": "the nuke",
+        "hurt_nuke_fail": "the nuke",
+        "hurt_finalfall": "the fall"
+      },
+      "endless": {
+        "repeat": 30
+      }
+    },
+    {
+      "id": "dragon_beam",
+      "name": "Beam",
+      "description": "Sweeping beams.",
+      "spawn": {
+        "origin": [
+          2560,
+          -3072,
+          -2944
+        ],
+        "yaw": 180
+      },
+      "start": [
+        {
+          "target": "[PR#]temp_dragon",
+          "input": "ForceSpawn"
+        },
+        {
+          "target": "[PR#]relay_atk_beam",
+          "input": "Trigger",
+          "delay": 1
+        },
+        {
+          "target": "[PR#]music_birthofawish",
+          "input": "StartSound"
+        }
+      ],
+      "winAfter": 30,
+      "player": {
+        "health": 180
+      },
+      "parent": "dragon",
+      "hazards": {
+        "hurt_finalbullet": "a falling ball",
+        "hurt_esclaser": "an escape laser",
+        "hurt_escbullet": "an escape bullet",
+        "hurt_escfireball": "a fireball",
+        "hurt_escfire": "the side fire",
+        "firewall_hurt": "the firewall",
+        "hurt_escdragon": "the escape dragon",
+        "hurt_humandelay": "falling behind",
+        "hurt_vlaser": "a laser",
+        "hurt_claser": "a high laser",
+        "hurt_slaser1": "a spinning laser",
+        "hurt_slaser2": "a spinning laser",
+        "hurt_dragon": "the dragon",
+        "hurt_outerfire": "the outer fire",
+        "hurt_firestorm1": "the firestorm",
+        "hurt_firestorm2": "the firestorm",
+        "hurt_firestorm3": "the firestorm",
+        "hurt_firestorm4": "the firestorm",
+        "hurt_firestorm5": "the firestorm",
+        "hurt_firestorm6": "the firestorm",
+        "hurt_firestorm7": "the firestorm",
+        "hurt_firestorm8": "the firestorm",
+        "hurt_spin_low": "the low spin",
+        "hurt_spin_mid": "the mid spin",
+        "hurt_spin_high": "the high spin",
+        "hurt_beam1": "a beam",
+        "hurt_beam2": "a beam",
+        "hurt_beam3": "a beam",
+        "hurt_beam4": "a beam",
+        "hurt_beam5": "a beam",
+        "hurt_nuke": "the nuke",
+        "hurt_nuke_fail": "the nuke",
+        "hurt_finalfall": "the fall"
+      },
+      "endless": {
+        "repeat": 30
+      }
+    },
+    {
+      "id": "escape",
+      "group": "Bosses",
+      "name": "Escape-dragon chase",
+      "description": "After the dragon dies: landing at the escape start (tr_addeschp) sets your gravity to 0.1 and adds the boss HP per human; it lasts until the gravity-1 trigger at the throne-room entrance. Float-jump the escape dragon's lasers (300), bullets (30) and fireballs (60) with the firewall behind you, and kill it before it reaches the end.",
+      "spawn": {
+        "at": "[PR#]td_throneroom",
+        "yaw": 0
+      },
+      "start": [
+        {
+          "target": "[PR#]relay_escape",
+          "input": "Trigger"
+        }
+      ],
+      "bosses": [
+        {
+          "target": "[PR#]br_escdragon",
+          "name": "Revived Dragon",
+          "counter": "[PR#]counter_eschp",
+          "counterMode": "hits"
+        }
+      ],
+      "win": {
+        "target": "[PR#]temp_final",
+        "input": "ForceSpawn"
+      },
+      "lose": {
+        "target": "[PR#]relay_fail",
+        "input": "Trigger"
+      },
+      "player": {
+        "health": 180
+      },
+      "fastForward": 0.1,
+      "hazards": {
+        "hurt_finalbullet": "a falling ball",
+        "hurt_esclaser": "an escape laser",
+        "hurt_escbullet": "an escape bullet",
+        "hurt_escfireball": "a fireball",
+        "hurt_escfire": "the side fire",
+        "firewall_hurt": "the firewall",
+        "hurt_escdragon": "the escape dragon",
+        "hurt_humandelay": "falling behind",
+        "hurt_vlaser": "a laser",
+        "hurt_claser": "a high laser",
+        "hurt_slaser1": "a spinning laser",
+        "hurt_slaser2": "a spinning laser",
+        "hurt_dragon": "the dragon",
+        "hurt_outerfire": "the outer fire",
+        "hurt_firestorm1": "the firestorm",
+        "hurt_firestorm2": "the firestorm",
+        "hurt_firestorm3": "the firestorm",
+        "hurt_firestorm4": "the firestorm",
+        "hurt_firestorm5": "the firestorm",
+        "hurt_firestorm6": "the firestorm",
+        "hurt_firestorm7": "the firestorm",
+        "hurt_firestorm8": "the firestorm",
+        "hurt_spin_low": "the low spin",
+        "hurt_spin_mid": "the mid spin",
+        "hurt_spin_high": "the high spin",
+        "hurt_beam1": "a beam",
+        "hurt_beam2": "a beam",
+        "hurt_beam3": "a beam",
+        "hurt_beam4": "a beam",
+        "hurt_beam5": "a beam",
+        "hurt_nuke": "the nuke",
+        "hurt_nuke_fail": "the nuke",
+        "hurt_finalfall": "the fall"
+      }
+    }
+  ]
+}

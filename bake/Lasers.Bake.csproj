@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>lasers-bake</AssemblyName>
+    <RootNamespace>Lasers.Bake</RootNamespace>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Same VRF line cybo's exports come from (Source 2 Viewer 20.1), so the output matches his site's. -->
+    <PackageReference Include="ValveResourceFormat" Version="20.1.7467" />
+  </ItemGroup>
+
+</Project>
