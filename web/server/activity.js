@@ -3,10 +3,12 @@
 // run store (db/store.js: Postgres, or memory), which the leaderboards read and which refills the feed on start.
 //
 //   co-op / versus rounds   from the server's own round result (coop-round.js): checked, the server's call
-//   solo runs               reported by the player's page (POST /api/solo, runs-http.js): unchecked, so they are
-//                           rate-limited, the map + stage must exist on this server, and they are stored as
-//                           verified = false. Signed in through Steam: kept for your history even with sharing off
-//                           (listed = false: not on the feed), with your SteamID and Steam name
+//   solo runs               reported by the player's page (POST /api/solo, runs-http.js): rate-limited, the map +
+//                           stage must exist on this server, stored as verified = false, then checked from their
+//                           replay on the server's copy of the run (replay-verify.js: verified, or removed from the
+//                           rankings on evidence). A run without a replay that fits it is kept but never ranked.
+//                           Signed in through Steam: kept for your history even with sharing off (listed = false:
+//                           not on the feed), with your SteamID and Steam name
 //
 // Privacy: a private room's players are never named or stored (the row says "a private room"); a solo run keeps
 // the name the player typed (or their Steam name), and players can turn sharing off on the home page. Nothing
@@ -34,7 +36,8 @@ function feedItem(run) {
 
 // send(client, msg); findStage(map, id) -> scenarios.js's stage or null; stats() -> { online, rooms, rounds, playing };
 // store: db/store.js's (a promise for one is fine: the feed fills from it once it's open)
-export function activityFeed({ send, findStage, stats, store, log = () => {} }) {
+// verify: replay-verify.js's (a solo run's replay is checked once stored)
+export function activityFeed({ send, findStage, stats, store, verify = null, log = () => {} }) {
   const items = [];
   const watchers = new Set();
   let nextId = 1;
@@ -88,9 +91,11 @@ export function activityFeed({ send, findStage, stats, store, log = () => {} }) 
         mode, result: endless ? 'over' : won ? 'win' : 'lose', time: round1(time),
         players: 1, named: true, roomName: '', cheats: false, cause: cleanText(m.cause, 40), finishedAt: Date.now(), listed: share,
         people: [{ name: user ? cleanName(user.name) : cleanName(m.name), steamId: user?.steamId || null, won,
-          hits: Number.isInteger(m.hits) && m.hits >= 0 ? Math.min(m.hits, 9999) : null, survived: round1(time), removed: '' }],
-        replay: rp ? { ...rp, public: share, owner: user?.steamId || null } : undefined,
+          // no replay (or one that doesn't fit the run): nothing to check it by, so it is kept but never ranked
+          hits: Number.isInteger(m.hits) && m.hits >= 0 ? Math.min(m.hits, 9999) : null, survived: round1(time), removed: rp ? '' : 'no replay' }],
+        replay: rp ? { data: rp.data, meta: rp.meta, public: share, owner: user?.steamId || null } : undefined,
       });
+      if (rp && id != null) verify?.queue(id, { map: m.map, stageId: stage.id, mode, result: endless ? 'over' : won ? 'win' : 'lose', time: round1(time), hits: Number.isInteger(m.hits) ? m.hits : null, cause: cleanText(m.cause, 40) }, rp.meta, rp.decoded);
       return { id, replay: rp && id != null ? id : null };
     },
 

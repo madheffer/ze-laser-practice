@@ -148,7 +148,21 @@ Esc gives the mouse back, then leaves.
 its replay. Signed in through Steam, every run is also kept for **Your runs** (the feed's second tab), shared or not;
 from there Share makes a link anyone can watch and keeps that replay for good. Kept: a player's newest 200 replays
 plus everything they shared; a guest's shared replays 14 days. `replays.views` counts others watching (one per viewer
-per replay per 30 minutes; the owner's own don't count). Solo runs are still the page's word (`verified = false`).
+per replay per 30 minutes; the owner's own don't count).
+
+**Checking solo runs** (`server/replay-verify.js`). A solo run is the page's word, so the server re-runs its replay on
+the same anti-cheat copy that checks co-op rounds (`coop-check.js`), from the replay's seed and rules. On a stage
+without a boss the copy is the page's simulation tick for tick: the run is **verified** when the copy reaches the
+same end at the same time with the same hits, and **removed from the rankings** (and the feed) on evidence: a
+movement cheat (noclip, speed, fly, spawn, teleport), a death the copy saw well before the reported end, more hits
+than reported, or a forged seed. On a boss stage the boss's health depends on team fire the server doesn't simulate,
+so those runs stay unverified (flagged) and are never removed by the check. A solo run with no replay, or one that
+doesn't fit it (another stage, the wrong length), is kept for history but never ranked.
+
+Limits against abuse: 1 solo run per address per 4 s; bodies over 1.5 MB are refused; a replay is at most 1 MB
+gzipped / 2 MB decoded / 30 minutes, and every field is bounds-checked (`lib/replay-codec.js`), on the server and
+again in the page that plays it (shots held to CS2's own weapon numbers); a player can share at most 100 replays for
+good; guests' replays: the newest 2000, 14 days at most.
 
 **Steam sign-in** (`server/auth/`), the same OpenID 2.0 flow and checks as vpkstuff's `SteamService`: the assertion is
 bound to this server (Steam's `op_endpoint`, our `return_to`, a signature over the trusted fields, a single-use nonce)

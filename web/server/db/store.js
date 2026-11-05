@@ -11,6 +11,8 @@
 //   getReplay(id)                           a run's replay: { runId, owner, public, meta, data (gzip), run } or null
 //   shareReplay(id, owner, on) -> bool      the owner shares (keeps) or unshares one of their replays
 //   addView(id)                             someone other than its owner watched it (runs-http.js dedupes)
+//   setVerdict(id, { verified, removed })   the server's replay check (replay-verify.js): verified, or taken out of
+//                                           the rankings (removed: why, kept on the run's player row)
 //   close()
 //
 // run: { kind: 'solo'|'coop'|'versus', verified, map, stageId, stageName, mode: 'normal'|'endless',
@@ -20,10 +22,13 @@
 //        people is empty for a private room
 //
 // Replays (migrations/002_players_replays.sql): a signed-in player keeps their newest REPLAYS_KEPT plus every one
-// they shared from their history (pinned); a guest's (shared to the feed) last GUEST_DAYS days.
+// they shared from their history (pinned, at most PINNED_MAX); a guest's (shared to the feed) last GUEST_DAYS days, and
+// only the newest GUEST_KEPT of those.
 export const BOARD_MAX = 100;
 export const REPLAYS_KEPT = 200;
 export const GUEST_DAYS = 14;
+export const GUEST_KEPT = 2000; // guests' replays kept in all (newest), whatever their age: one address can't fill the disk
+export const PINNED_MAX = 100; // replays one player can share for good
 const MEMORY_KEEP = 5000; // runs kept by the memory store
 const MEMORY_REPLAYS = 300; // replays kept by the memory store
 
@@ -61,6 +66,8 @@ export function memoryStore() {
     } else {
       const cutoff = Date.now() - GUEST_DAYS * 86400000;
       for (const [id, r] of mine) if (r.at < cutoff) replays.delete(id);
+      const guests = mine.filter(([id]) => replays.has(id)).sort((a, b) => b[0] - a[0]);
+      for (const [id] of guests.slice(GUEST_KEPT)) replays.delete(id);
     }
     if (replays.size > MEMORY_REPLAYS) for (const id of [...replays.keys()].slice(0, replays.size - MEMORY_REPLAYS)) replays.delete(id);
   }
@@ -115,9 +122,16 @@ export function memoryStore() {
       return rp && run ? { runId: id, owner: rp.owner, public: rp.public, views: rp.views, meta: rp.meta, data: rp.data, run: runSummary(run) } : null;
     },
     async addView(id) { const rp = replays.get(id); if (rp) rp.views++; },
+    async setVerdict(id, { verified = false, removed = '' }) {
+      const run = byId(id);
+      if (!run) return;
+      if (verified) run.verified = true;
+      if (removed) { for (const p of run.people) p.removed = String(removed).slice(0, 60); run.listed = false; }
+    },
     async shareReplay(id, owner, on) {
       const rp = replays.get(id);
       if (!rp || !owner || rp.owner !== owner) return false;
+      if (on && !rp.pinned && [...replays.values()].filter((r) => r.owner === owner && r.pinned).length >= PINNED_MAX) return false;
       rp.public = rp.pinned = !!on;
       return true;
     },

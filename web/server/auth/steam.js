@@ -22,10 +22,13 @@ export const isSteamId = (v) => typeof v === 'string' && STEAM_ID.test(v);
 export function steamOpenId({ apiKey = '', log = () => {} } = {}) {
   const seen = new Map(); // response_nonce -> when
 
+  // expired ones first; past MAX_NONCES the oldest go anyway (insertion order), so a flood can't grow it without end.
+  // Steam's own check_authentication still refuses a reused assertion, so dropping an old nonce early is safe.
   function pruneNonces() {
     if (seen.size <= MAX_NONCES) return;
     const cutoff = Date.now() - NONCE_TTL;
     for (const [k, t] of seen) if (t < cutoff) seen.delete(k);
+    for (const k of seen.keys()) { if (seen.size <= MAX_NONCES) break; seen.delete(k); }
   }
 
   return {

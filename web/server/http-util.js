@@ -1,7 +1,8 @@
 // Small HTTP helpers shared by the server's handlers (api.js, auth/, runs-http.js) and the co-op socket.
 
 export function json(res, status, body, headers = {}) {
-  res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff', ...headers });
+  if (res.headersSent) return;
+  res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff', ...(status === 413 ? { connection: 'close' } : {}), ...headers });
   res.end(JSON.stringify(body));
 }
 
@@ -10,17 +11,19 @@ export function redirect(res, location, headers = {}) {
   res.end();
 }
 
-// the request body, at most `limit` bytes (rejects with .status 413 past it)
+// the request body, at most `limit` bytes (rejects with .status 413 past it: the rest is read and dropped, not kept,
+// so the 413 still reaches the client; json() then closes the connection)
 export function readBody(req, limit) {
   return new Promise((resolve, reject) => {
-    const parts = [];
+    let parts = [];
     let n = 0;
     req.on('data', (c) => {
+      if (!parts) return; // over the limit: dropped
       n += c.length;
-      if (n > limit) { const e = new Error('too large'); e.status = 413; reject(e); req.destroy(); return; }
+      if (n > limit) { parts = null; const e = new Error('too large'); e.status = 413; reject(e); return; }
       parts.push(c);
     });
-    req.on('end', () => resolve(Buffer.concat(parts)));
+    req.on('end', () => { if (parts) resolve(Buffer.concat(parts)); });
     req.on('error', reject);
   });
 }
@@ -62,14 +65,19 @@ export function parseCookies(req) {
 // https as the browser sees it: TLS here, or a proxy in front that says so
 export const isHttps = (req) => !!req.socket.encrypted || String(req.headers['x-forwarded-proto'] || '').split(',')[0].trim() === 'https';
 
-// one call per key per `ms` (a sliding gate, with the map pruned as it grows)
+// one call per key per `ms` (a sliding gate). The map is pruned as it grows and never holds more than `max` keys: past
+// that the oldest entries go (a flood of new keys can't use up memory; at worst an old key gets through early).
 export function rateGate(ms, max = 10000) {
-  const last = new Map();
+  const last = new Map(); // insertion order = oldest first (a key is re-inserted when it passes)
   return (key) => {
     const now = Date.now();
     if (now - (last.get(key) || 0) < ms) return false;
+    last.delete(key);
     last.set(key, now);
-    if (last.size > max) for (const [k, t] of last) if (now - t > ms) last.delete(k);
+    if (last.size > max) {
+      for (const [k, t] of last) { if (last.size <= max || now - t <= ms) break; last.delete(k); }
+      for (const k of last.keys()) { if (last.size <= max) break; last.delete(k); }
+    }
     return true;
   };
 }

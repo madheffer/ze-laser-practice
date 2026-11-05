@@ -8,7 +8,8 @@
 import { S, G, log } from './state.js';
 import { startScenario, endRun } from './session.js';
 import { step, updateHud } from './loop.js';
-import { decodeReplay } from '../lib/replay-codec.js';
+import { decodeReplay, cleanMeta } from '../lib/replay-codec.js';
+import { cleanText } from '../lib/room-rules.js';
 import { gunzip } from '../lib/bytes.js';
 import { fetchJson } from '../lib/fetch.js';
 import { indexEvents } from './replay-play.js';
@@ -30,7 +31,10 @@ export async function watchReplay(id) {
   const zipped = Uint8Array.from(atob(String(r.data || '')), (c) => c.charCodeAt(0));
   const bytes = await gunzip(zipped);
   const run = r.run && typeof r.run === 'object' ? r.run : {};
-  await playReplay({ meta: r.meta, bytes, info: { id: String(id), name: String(run.name || ''), time: run.time, result: run.result } });
+  // the server's copy is cleaned again here: a replay is untrusted data wherever it comes from
+  const meta = cleanMeta(r.meta);
+  if (!meta) throw new Error('replay: bad header');
+  await playReplay({ meta, bytes, info: { id: String(id), name: cleanText(run.name, 32), time: Number.isFinite(run.time) ? run.time : null, result: cleanText(run.result, 10) } });
 }
 
 export const watchLastRun = () => { const l = lastRun(); return l ? playReplay(l) : Promise.resolve(); };

@@ -4,7 +4,7 @@
 import pg from 'pg';
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
-import { REPLAYS_KEPT, GUEST_DAYS } from './store.js';
+import { REPLAYS_KEPT, GUEST_DAYS, GUEST_KEPT, PINNED_MAX } from './store.js';
 import { fileURLToPath } from 'node:url';
 
 const MIGRATIONS = path.join(path.dirname(fileURLToPath(import.meta.url)), 'migrations');
@@ -65,6 +65,9 @@ export async function postgresStore(url, log) {
            SELECT run_id FROM replays WHERE owner = $1 AND NOT pinned ORDER BY run_id DESC LIMIT $2)`, [owner, REPLAYS_KEPT]);
     } else {
       await client.query(`DELETE FROM replays WHERE owner IS NULL AND created_at < now() - make_interval(days => $1)`, [GUEST_DAYS]);
+      await client.query(
+        `DELETE FROM replays WHERE owner IS NULL AND run_id NOT IN (
+           SELECT run_id FROM replays WHERE owner IS NULL ORDER BY run_id DESC LIMIT $1)`, [GUEST_KEPT]);
     }
   }
 
@@ -169,9 +172,21 @@ export async function postgresStore(url, log) {
 
     async addView(id) { await pool.query('UPDATE replays SET views = views + 1 WHERE run_id = $1', [id]); },
 
+    // the server's replay check (replay-verify.js): a removed run's player rows leave the ranked_runs view
+    async setVerdict(id, { verified = false, removed = '' }) {
+      if (verified) await pool.query('UPDATE runs SET verified = true WHERE id = $1', [id]);
+      if (removed) {
+        await pool.query('UPDATE run_players SET removed = $2 WHERE run_id = $1', [id, String(removed).slice(0, 60)]);
+        await pool.query('UPDATE runs SET listed = false WHERE id = $1', [id]); // off the feed too
+      }
+    },
+
     async shareReplay(id, owner, on) {
       if (!owner) return false;
-      const { rowCount } = await pool.query('UPDATE replays SET public = $3, pinned = $3 WHERE run_id = $1 AND owner = $2', [id, owner, !!on]);
+      // at most PINNED_MAX shared for good per player (the count check and the update in one statement)
+      const { rowCount } = await pool.query(
+        `UPDATE replays SET public = $3, pinned = $3 WHERE run_id = $1 AND owner = $2
+           AND (NOT $3 OR pinned OR (SELECT count(*) FROM replays WHERE owner = $2 AND pinned) < $4)`, [id, owner, !!on, PINNED_MAX]);
       return rowCount > 0;
     },
 

@@ -7,6 +7,7 @@
 import { S } from './state.js';
 import { POS_SCALE, ANG_SCALE, SHOT_KINDS } from '../lib/replay-codec.js';
 import { CS } from '../world/movement.js';
+import { WEAPONS } from '../lib/weapons.js';
 
 export const replaying = () => !!S.replay;
 
@@ -44,13 +45,18 @@ export function applyPose(k, player) {
 
 // what the player did during tick k (between moving and the map's touches): fall damage
 export function eventsDuring(k, { hurt }) {
-  for (const ev of S.replay.byTick.get(k) || []) if (ev.type === 'fall') hurt(ev.damage / 10, 'fall');
+  for (const ev of S.replay.byTick.get(k) || []) if (ev.type === 'fall') hurt(Math.min(ev.damage, 10000) / 10, 'fall');
 }
 
 // what the player did after tick k, before tick k + 1 (a frame between ticks): shots, E
 export function eventsAfter(k, { shoot, use }) {
   for (const ev of S.replay.byTick.get(k) || []) {
     if (ev.type === 'use') use();
-    else if (ev.type === 'shot') shoot({ kind: SHOT_KINDS[ev.kind], damage: ev.damage, range: ev.range }, ev.yaw / ANG_SCALE, ev.pitch / ANG_SCALE);
+    // a replay is someone else's data: a shot is held to CS2's own numbers (lib/weapons.js), whatever it claims
+    else if (ev.type === 'shot') {
+      const w = ev.kind === 0 ? WEAPONS.gun : ev.kind === 2 ? WEAPONS.knife.stab : WEAPONS.knife.slash;
+      const damage = Math.min(ev.damage, ev.kind === 0 ? WEAPONS.gun.damage : ev.kind === 2 ? WEAPONS.knife.stab.damage : WEAPONS.knife.slash.first);
+      shoot({ kind: SHOT_KINDS[ev.kind], damage, range: Math.min(ev.range, w.range) }, ev.yaw / ANG_SCALE, Math.max(-89, Math.min(89, ev.pitch / ANG_SCALE)));
+    }
   }
 }

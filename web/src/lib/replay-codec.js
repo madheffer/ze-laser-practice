@@ -27,6 +27,7 @@ const EVENT_FIELDS = {
   fall: ['damage'], // x 10
 };
 export const SHOT_KINDS = ['bullet', 'slash', 'stab'];
+const FIELD_MAX = 1e6; // any event field (damage, range, angles x 10): far past a real value, and a safe integer
 
 const zig = (v) => (v >= 0 ? v * 2 : -v * 2 - 1);
 const unzig = (u) => (u % 2 ? -(u + 1) / 2 : u / 2);
@@ -96,6 +97,7 @@ export function decodeReplay(bytes) {
   if (r.uint() !== VERSION) throw new Error('replay: unknown version');
   const n = r.uint();
   if (n < 1 || n > MAX_TICKS) throw new Error('replay: bad length');
+  if (bytes.length - r.i < n * 6) throw new Error('replay: truncated'); // a tick is at least 6 bytes: refuse before allocating
   const out = {
     n, x: new Int32Array(n), y: new Int32Array(n), z: new Int32Array(n),
     yaw: new Int32Array(n), pitch: new Int32Array(n), flags: new Uint8Array(n), events: [],
@@ -120,6 +122,7 @@ export function decodeReplay(bytes) {
     for (const f of EVENT_FIELDS[type]) {
       const [name, signed] = f.split('*');
       ev[name] = signed ? r.int() : r.uint();
+      if (Math.abs(ev[name]) > FIELD_MAX) throw new Error('replay: bad event field');
     }
     if (type === 'shot' && !SHOT_KINDS[ev.kind]) throw new Error('replay: bad shot');
     out.events.push(ev);

@@ -22,6 +22,7 @@ import { apiHandler } from './api.js';
 import { openStore } from './db/store.js';
 import { sameOriginSocket, clientAddress } from './http-util.js';
 import { serverAuth } from './auth/index.js';
+import { replayVerifier } from './replay-verify.js';
 
 export const PATH = '/coop';
 const MAX_ROOMS = 300;
@@ -65,8 +66,10 @@ export function attachCoopRelay(httpServer, { log = () => {}, store = openStore(
   const send = (c, msg) => { if (c.ws.readyState === 1) c.ws.send(JSON.stringify(msg)); };
   const io = { send, log };
   // the home page's live feed (activity.js): finished rounds and solo runs, and how busy the server is
+  // solo runs' replays, checked on the server's copy of the run (replay-verify.js)
+  const verify = replayVerifier({ loadMap, findStage, store, log });
   const feed = activityFeed({
-    send, findStage, store, log,
+    send, findStage, store, log, verify,
     stats: () => {
       const live = [...rooms.values()].filter((r) => r.round && !r.round.ended);
       return {

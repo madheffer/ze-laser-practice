@@ -39,7 +39,7 @@ export function checkReplay(upload, { map, stageId, mode, time }) {
     // COUNTDOWN; older replays 1 s, none mid-map)
     if (d.n * TICK < time - 1 || d.n * TICK > time + 4) return null;
     meta.ticks = d.n;
-    return { data: gz, meta };
+    return { data: gz, meta, decoded: d }; // decoded: for the server's own check (replay-verify.js)
   } catch {
     return null;
   }
