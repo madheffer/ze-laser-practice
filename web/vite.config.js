@@ -1,4 +1,5 @@
 import { defineConfig } from 'vite';
+import { coopRelayPlugin } from './server/coop-relay.js';
 
 // Baked maps and sounds never change under a given URL: the loader adds ?v=<version> to every one of them
 // (lib/paths.js versioned()). So the browser may keep them for a year and a reload reads them from disk
@@ -55,9 +56,10 @@ function cspHeaderInPreview() {
 }
 
 export default defineConfig({
-  plugins: [longCacheForAssets(), cspInBuild(), cspHeaderInPreview()],
+  plugins: [longCacheForAssets(), cspInBuild(), cspHeaderInPreview(), coopRelayPlugin()],
   server: { port: 5804, strictPort: true },
   // a stable copy for playing while code is being edited: `npm run play` (build + preview, no hot reload)
+  // `npm run host` = the same on every network interface, so a friend on your LAN can join a co-op room
   preview: { port: 5805, strictPort: true },
   build: { target: 'es2022' },
 });

@@ -16,13 +16,18 @@ import { S, G, $, log } from './app/state.js';
 import { replayClass } from './lib/dom.js';
 import { isMapName } from './lib/paths.js';
 import { settings, bindSettings, FOV } from './app/settings.js';
+import { rule } from './app/rules.js';
 import { startScenario, endRun } from './app/session.js';
-import { frame, step, resetClock, updateHud } from './app/loop.js';
+import { frame, step, simulate, resetClock, updateHud } from './app/loop.js';
 import { installInput, enterGame, clearKeys } from './app/input.js';
 import { onShot } from './app/bosses.js';
 import { Hud } from './ui/hud.js';
 import { Overlay } from './ui/overlay.js';
 import { Menu } from './ui/menu.js';
+import { Killfeed } from './ui/killfeed.js';
+import { Lobby } from './ui/lobby.js';
+import { Peers } from './world/peers.js';
+import { net, lobby, installCoop, hostStart, setKind, abortRound } from './app/coop.js';
 
 const canvas = $('#view');
 G.renderer = new Renderer(canvas);
@@ -31,6 +36,9 @@ G.vm = new Viewmodel(G.renderer.renderer);
 G.body = new PlayerBody(G.renderer.scene, { log }); // third person (!tp): your own CT
 G.hud = new Hud($('#hud'));
 G.overlay = new Overlay($('#overlay'));
+G.killfeed = new Killfeed($('#killfeed'));
+G.peers = new Peers(G.renderer.scene, { log }); // the other players in a co-op / versus round
+G.simulate = simulate;
 
 // ---- pause / resume
 G.pause = () => {
@@ -50,7 +58,18 @@ G.unpause = () => {
 G.resume = () => { if (S.run && !S.run.done) enterGame(canvas); };
 // Start (or restart) a stage and drop straight into it: the lock + fullscreen requests go out first, inside the
 // click, then the stage is built (pointerlockchange unpauses once it lands).
-G.play = (i, mode = 'normal') => { enterGame(canvas); startScenario(i, mode); };
+// In a room the host's pick starts the round for everyone (app/coop.js); a guest waits for it.
+G.play = (i, mode = 'normal') => {
+  if (net.inRoom) {
+    if (!net.isHost) { G.lobby.note('The host picks the stage'); return; }
+    enterGame(canvas);
+    hostStart(i, mode);
+    return;
+  }
+  S.mp = null;
+  enterGame(canvas);
+  startScenario(i, mode);
+};
 
 // ---- small HUD effects
 // light an element's `on` class for `ms` (restarting its animation if it is already on)
@@ -69,7 +88,7 @@ G.renderer.setFov(FOV); // CS2's fixed 90
 function applySettings() {
   G.renderer.showHitboxes = settings.hitboxes;
   G.renderer.delay = settings.ping / 1000;
-  if (S.engine) S.engine.humans = settings.humans;
+  if (S.engine) S.engine.humans = rule('humans');
   G.audio.setVolumes({ sfx: settings.sfx, music: settings.music });
 }
 
@@ -97,11 +116,12 @@ installInput(canvas, {
   weapon,
   lastWeapon: () => { const before = G.vm.weapon; G.vm.swapLast(); if (G.vm.weapon !== before) { G.hud.showWeapons(G.vm.weapon); G.audio.play(G.vm.weapon === 'gun' ? 'gun.deploy' : 'knife.deploy'); } },
   reload: () => G.vm.reload(),
-  restart: () => { startScenario(S.scenarioIndex, S.run?.mode); },
+  restart: () => { if (net.inRoom) { if (net.isHost) hostStart(S.scenarioIndex, S.run?.mode); } else startScenario(S.scenarioIndex, S.run?.mode); },
 });
 
 async function selectMap(name) {
   $('#status').textContent = `loading ${name}...`;
+  abortRound(); // the host leaving a live round for another map ends it for everyone
   endRun();
   S.map = await loadMap(name, (s) => { $('#status').textContent = `loading ${name}: ${s}`; });
   G.renderer.setWorld(S.map.world);
@@ -139,11 +159,23 @@ async function init() {
   if (want) { sel.value = want; await selectMap(want); }
 }
 
+// a round's start can bring the host's map: load it the way picking it does
+G.selectMap = async (name) => {
+  if (!isMapName(name)) throw new Error('bad map name');
+  const sel = $('#map');
+  if (![...sel.options].some((o) => o.value === name)) throw new Error('not on this server');
+  sel.value = name;
+  await selectMap(name);
+};
+G.lobby = new Lobby($('#lobby'), { net, state: lobby, onKind: setKind });
+installCoop();
+
 // console handle for debugging and automated checks
 window.__lasers = {
   get engine() { return S.engine; }, get player() { return S.player; }, get run() { return S.run; }, get world() { return S.world; },
   get paused() { return S.paused; }, get vm() { return G.vm; }, get body() { return G.body; }, get audio() { return G.audio; }, get overlayOpen() { return G.overlay.open; },
   startScenario, settings, scenarios: () => S.scenarios,
+  coop: { net, lobby, get round() { return S.mp; }, peers: G.peers },
   // run the simulation n seconds synchronously (tests; a hidden tab gets no animation frames)
   advance(seconds) { for (let i = 0; i < Math.round(seconds / CS.tick); i++) { if (!S.run || S.run.done) break; step(); } updateHud(); },
 };

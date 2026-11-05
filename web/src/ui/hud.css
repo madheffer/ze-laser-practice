@@ -103,3 +103,8 @@
 
 /* touch play: the weapon list sits where the thumb buttons are (weapon swap is a button there) */
 body.touch-playing .hud-ws { display: none; }
+
+/* dead in a co-op / versus round: who you're watching (CS2's spectator bar, top-centre) */
+.hud-spec { position: absolute; left: 50%; top: calc(70 * var(--u)); transform: translateX(-50%); font: 700 calc(16 * var(--u)) 'Stratum2', sans-serif; letter-spacing: 0.06em; text-transform: uppercase; color: #fff; text-shadow: 0 1px 3px #000; }
+.hud-spec:empty { display: none; }
+.hud-spec { background: rgba(0, 0, 0, 0.45); padding: calc(6 * var(--u)) calc(16 * var(--u)); border-radius: calc(4 * var(--u)); }

@@ -3,7 +3,7 @@
 // The rest of the team shoots the boss while it's in sight. Boss HP % is applied as extra hits, so a map that
 // counts bullets (OnHealthChanged -> Subtract 1) scales exactly like one that counts health.
 import { S, G } from './state.js';
-import { settings } from './settings.js';
+import { rule } from './rules.js';
 import { rayHullEntry } from '../world/collision.js';
 import { angleForward } from '../world/entities/index.js';
 import { stripPrefix } from '../lib/names.js';
@@ -42,6 +42,7 @@ export function bossTargets(list = S.scenario?.bosses) {
 
 // Can the team see it? A world ray from your eye to the middle of its hull (8192 u max).
 function bossVisible(e) {
+  if (S.run?.spectating) return true; // the host is dead: the rest of the team still fights
   const hs = e.hulls();
   if (!hs?.length) return false;
   const h = hs[0];
@@ -52,25 +53,37 @@ function bossVisible(e) {
   return S.world.traceRay(eye, c, undefined, true).fraction >= 0.999;
 }
 
+// a physbox boss under 1% (strictly, as the map's compare is) is between segments: the map is about to top it
+// back up
+export const bossHittable = (e) => e.alive && (e.cls === 'func_breakable' || e.state.health >= e.state.max * 0.01);
+
 function hitBoss(e, damage) {
-  // a physbox boss under 1% (strictly, as the map's compare is) is between segments: the map is about to
-  // top it back up
-  if (e.cls !== 'func_breakable' && e.state.health < e.state.max * 0.01) return false;
-  S.engine.damage(e, damage, S.engine.playerEnt);
+  if (!bossHittable(e)) return false;
+  // in a round, boss damage is the host's: a guest's hit goes to the host, who applies it for everyone
+  if (S.mp && !S.mp.isHost) { S.mp.bossHit(e, damage); return true; }
+  applyBossDamage(e, damage);
   return true;
+}
+
+// Damage that lands (yours solo; the host's, or a hit the host relayed, in a round).
+export function applyBossDamage(e, damage) {
+  S.engine.damage(e, damage, S.engine.playerEnt);
+  S.mp?.bossDamaged(e, damage);
 }
 
 // silent: during a fast-forward replay (shoots the scenario's fastForwardBosses, no line of sight needed)
 export function bossFire(dt, silent = false) {
   const { run, scenario } = S;
-  if (!silent && (!settings.autoFire || run.endless && scenario.endless?.noBossDamage)) return;
+  if (!silent && (!rule('autoFire') || run.endless && scenario.endless?.noBossDamage)) return;
+  // the simulated team fires on the host only (a replay is the same on every client, so that runs everywhere)
+  if (!silent && S.mp && !S.mp.isHost) return;
   const targets = silent ? bossTargets(scenario.fastForwardBosses) : bossTargets().filter(({ e }) => bossVisible(e));
   if (!targets.length) return;
   // you are one of the humans: the team is the other (humans - 1); your own shots come from your gun
-  const team = silent ? settings.humans : Math.max(0, settings.humans - 1);
-  const scale = 100 / Math.max(1, settings.bossHp);
+  const team = silent ? rule('humans') : Math.max(0, rule('humans') - 1);
+  const scale = 100 / Math.max(1, rule('bossHp'));
   let guard = 0;
-  if (silent || settings.perfectTeam) {
+  if (silent || rule('perfectTeam')) {
     run.fireAcc += team * PERFECT_HITS_PER_HUMAN * scale * dt;
     while (run.fireAcc >= 1 && guard++ < 400) {
       run.fireAcc -= 1;
@@ -112,7 +125,7 @@ function attackActive() {
 // A shot from the viewmodel (bullet or knife): trace it against the world and the bosses.
 export function onShot(shot) {
   const { run, engine, player, world, scenario } = S;
-  if (!run || S.paused || run.done || !engine) return;
+  if (!run || S.paused || run.done || run.spectating || !engine) return;
   G.audio.play(shot.kind === 'bullet' ? 'gun.fire' : shot.kind === 'stab' ? 'knife.stab' : 'knife.slash', { pos: player.origin });
   const noDamage = run.endless && scenario?.endless?.noBossDamage;
   const dir = angleForward([player.pitch, player.yaw, 0]);
@@ -125,7 +138,7 @@ export function onShot(shot) {
       const t = rayHullEntry(eye, dir, h);
       if (t == null || t > Math.min(range, wallDist + 1)) continue;
       if (!noDamage) {
-        const n = Math.max(1, Math.round(100 / Math.max(1, settings.bossHp)));
+        const n = Math.max(1, Math.round(100 / Math.max(1, rule('bossHp'))));
         let landed = false;
         for (let k = 0; k < n; k++) landed = hitBoss(e, shot.damage || DAMAGE_PER_HIT) || landed;
         if (landed) { run.myHits++; run.myDamage += shot.damage || DAMAGE_PER_HIT; G.hitmark(); }

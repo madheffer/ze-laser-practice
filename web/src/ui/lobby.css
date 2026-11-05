@@ -1,0 +1,33 @@
+/* The co-op lobby: a card above the stage grid (menu.css styles its buttons and inputs). */
+.lobby {
+  border: 1px solid var(--line); border-radius: 10px; background: rgba(255, 255, 255, 0.02);
+  padding: 10px 12px; margin-bottom: 14px; display: flex; flex-direction: column; gap: 8px;
+}
+.lobby-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.lobby-head b { font: 700 14px 'Stratum2', 'Segoe UI', sans-serif; letter-spacing: 0.1em; text-transform: uppercase; }
+.lobby-sub { font-size: 12px; color: var(--dim); }
+.lobby-row { display: flex; align-items: center; gap: 8px 10px; flex-wrap: wrap; }
+.lobby-field { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: var(--dim); }
+#menu .lobby input[type=text] {
+  min-height: var(--tap); background: #0b0f14; border: 1px solid var(--line); border-radius: 7px; padding: 0 10px; font-size: 14px; width: 160px;
+}
+#menu .lobby input.code { width: 82px; text-transform: uppercase; letter-spacing: 0.2em; font-family: ui-monospace, Consolas, monospace; }
+.lobby .or { font-size: 12px; color: var(--dim); }
+.room-code { font-size: 13px; color: var(--dim); }
+.room-code b { color: var(--text); font: 700 18px ui-monospace, Consolas, monospace; letter-spacing: 0.2em; margin-left: 4px; }
+
+.seg { display: inline-flex; padding: 3px; gap: 2px; background: #0a0e13; border: 1px solid var(--line); border-radius: 9px; }
+#menu .seg button { min-height: calc(var(--tap) - 6px); padding: 0 14px; border: 0; border-radius: 6px; background: transparent; color: var(--dim); font-weight: 600; font-size: 13px; }
+#menu .seg button[aria-checked=true] { background: #1d2733; color: #fff; box-shadow: inset 0 -2px 0 var(--accent); }
+#menu .seg button:disabled { cursor: default; }
+
+.members { list-style: none; margin: 0; padding: 0; display: flex; gap: 6px; flex-wrap: wrap; flex: 1; min-width: 0; }
+.members li { font-size: 13px; padding: 4px 10px; border-radius: 999px; background: rgba(181, 212, 238, 0.08); color: #b5d4ee; border: 1px solid rgba(181, 212, 238, 0.2); }
+.members li.host::before { content: '★ '; color: var(--gold); }
+.lobby-hint { font-size: 12px; color: var(--dim); }
+.lobby-hint:empty, .lobby-note:empty { display: none; }
+.lobby-note { font-size: 12px; color: var(--gold); word-break: break-all; }
+
+/* a guest's stage cards: the host picks */
+body.mp-guest #scenarios .stage { opacity: 0.55; }
+body.mp-guest #scenarios .stage button { cursor: not-allowed; }

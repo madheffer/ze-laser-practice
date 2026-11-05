@@ -5,6 +5,7 @@ import { EntityEngine, parseVec, DEG } from '../world/entities/index.js';
 import { CS } from '../world/movement.js';
 import { S, G, log } from './state.js';
 import { settings } from './settings.js';
+import { rule, godMode } from './rules.js';
 import { bossFire } from './bosses.js';
 import { installEndless } from './endless.js';
 import { submitRun, getRecord } from './records.js';
@@ -34,7 +35,7 @@ export function startScenario(i, mode = 'normal') {
   S.scenarioIndex = i;
   const scenario = S.scenario = i >= 0 ? S.scenarios[i] : null;
   const endless = mode === 'endless' && !!scenario?.endless;
-  const engine = S.engine = new EntityEngine(map.entities, { hulls: map.hulls, bounds: map.bounds }, { seed: settings.seed || (Date.now() & 0xffff) });
+  const engine = S.engine = new EntityEngine(map.entities, { hulls: map.hulls, bounds: map.bounds }, { seed: S.mp?.rules.seed || settings.seed || (Date.now() & 0xffff) });
   engine.on('spawn', (e) => G.renderer.addEntity(e, map));
   engine.on('kill', (e) => G.renderer.removeEntity(e));
   engine.on('log', (m) => log(m));
@@ -51,11 +52,13 @@ export function startScenario(i, mode = 'normal') {
     else G.audio.onSound(ev);
   });
   engine.onTeleportPlayer = (o, yaw) => player.teleport(o, yaw ?? player.yaw);
+  // physboxes (world/entities/classes/physics.js) slide along the static world only
+  engine.traceBox = (s, e, h) => S.world.traceBox(s, e, h, undefined, true);
   engine.playerMatrix = () => new THREE.Matrix4().compose(
     new THREE.Vector3(...player.origin),
     new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), player.yaw * DEG),
     new THREE.Vector3(1, 1, 1));
-  engine.humans = settings.humans;
+  engine.humans = rule('humans');
   // what the map can do to you: !activator SetHealth / KeyValue gravity, speed, max_health, absvelocity
   engine.player = {
     setHealth: (v) => { S.run.hp = v; S.run.maxHp = Math.max(S.run.maxHp, v); },
@@ -76,7 +79,7 @@ export function startScenario(i, mode = 'normal') {
     G.audio.play('land', { pos: player.origin });
     // CS fall damage: safe below 580 u/s, fatal at 1024, linear between (sv_falldamage_scale 1)
     const run = S.run;
-    if (!run.started || run.done || run.noFall || !settings.fallDamage || v <= 580) return;
+    if (!run.started || run.done || run.noFall || !rule('fallDamage') || v <= 580) return;
     hurtPlayer((v - 580) * (100 / (1024 - 580)), 'fall');
   };
   player.onJump = () => G.audio.play('jump', { pos: player.origin });
@@ -86,7 +89,8 @@ export function startScenario(i, mode = 'normal') {
   // cs2f_free_armor 2); scenario.player can override health/armor/gravity for a stage that starts mid-map.
   const hp0 = scenario?.player?.health ?? 100;
   S.run = {
-    t: 0, startAt: scenario ? 1.0 : Infinity, started: false, hp: hp0, maxHp: hp0,
+    // a round counts down 3 s, so a guest has time to click in (their run starts without a click: the host's did)
+    t: 0, ticks: 0, startAt: scenario ? (S.mp ? 3.0 : 1.0) : Infinity, started: false, hp: hp0, maxHp: hp0,
     armor: scenario?.player?.armor ?? 100, helmet: true,
     hits: 0, done: false, result: '', mode: endless ? 'endless' : 'normal', endless,
     winAfter: endless ? null : scenario?.winAfter, fireAcc: 0, myHits: 0, myDamage: 0, noFall: false, bossPeak: new Map(),
@@ -117,6 +121,8 @@ export function startScenario(i, mode = 'normal') {
   }
 
   placePlayer(scenario);
+  // a round runs on the wall clock from here (loop.js simulate), so every client's map stays in step
+  run.wall0 = performance.now();
   G.vm.reset(scenario?.weapon || 'knife');
   G.hud.showWeapons(G.vm.weapon);
   G.menu.update();
@@ -168,9 +174,10 @@ export function stageTime() {
 
 export function hurtPlayer(dmg, source) {
   const run = S.run;
+  if (run.spectating) return;
   run.lastHurt = { dmg, source };
   G.hud.damaged();
-  if (settings.god) return;
+  if (godMode()) return;
   run.hp -= dmg;
   if (run.hp <= 0) {
     run.killedBy = source;
@@ -185,8 +192,9 @@ export function healPlayer(amount) {
 
 // What killed you, in words: the scenario's own name for it, or the entity name tidied up
 // (hurt_finalbullet&0042 -> "finalbullet").
-function hazardName(source) {
+export function hazardName(source) {
   if (source === 'fall') return 'Fall damage';
+  if (source === 'void') return 'the void';
   const raw = typeof source === 'string' ? source : (source?.name || '');
   const key = stripPrefix(raw).replace(/&\d+$/, '');
   const named = own(S.scenario?.hazards, key);
@@ -198,6 +206,16 @@ function hazardName(source) {
 export function finish(result) {
   const run = S.run;
   if (!run || run.done) return;
+  // in a round your death makes you a spectator, and the host decides how the round ends (app/coop.js)
+  if (S.mp) {
+    if (result !== 'dead') { S.mp.outcome(result); return; }
+    if (run.spectating) return;
+    run.spectating = true;
+    run.deadAt = stageTime();
+    G.vm.trigger(false); G.vm.trigger2(false);
+    S.mp.died(hazardName(run.killedBy));
+    return;
+  }
   run.done = true;
   run.result = result;
   const t = stageTime();

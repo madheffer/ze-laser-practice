@@ -17,6 +17,8 @@
   <!-- CS2 Panorama HUD (ui/hud.js builds it), the end-of-run card (ui/overlay.js); touch controls come from ui/touch.js -->
   <div id="hud" class="hidden"></div>
   <div id="overlay"></div>
+  <!-- co-op / versus: the kill feed (ui/killfeed.js) -->
+  <div id="killfeed"></div>
 
   <!-- The menu doubles as the pause screen (ui/menu.js). Settings controls are bound by id in app/settings.js. -->
   <div id="menu">
@@ -41,6 +43,8 @@
 
       <div class="tab-panels">
         <section id="panel-play" role="tabpanel" aria-labelledby="tab-play">
+          <!-- co-op rooms (ui/lobby.js) -->
+          <div id="lobby"></div>
           <div id="scenarios"></div>
         </section>
 
