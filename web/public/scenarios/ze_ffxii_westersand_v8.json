@@ -1807,7 +1807,7 @@
       "full": true,
       "name": "Chaos → plate escape (Epic ending)",
       "summary": "Chaos fight, then jump to the plate",
-      "description": "Chaos fight, then the run to the plate under it (Chaos_End_Epic): the plate rises 5 s after the first human reaches it and the airship is nuked 3.5 s later. The plate is across the void from the deck: jump the stepping stones. Win on the plate.",
+      "description": "Stage 3 (EPIC) of the map's level system (Level_Counter_Stage 3, read as its logic_auto does, so its own setup kills the god-mode ending and flyer). Chaos fight, then the run to the plate under it (Chaos_End_Epic): the plate rises 5 s after the first human reaches it and the airship is nuked 3.5 s later. The plate is across the void from the deck: jump the stepping stones. Win on the plate.",
       "spawn": {
         "origin": [
           5900,
@@ -1818,46 +1818,232 @@
       },
       "start": [
         {
+          "target": "[PR#]Level_Counter_Stage",
+          "input": "SetValue",
+          "param": "3"
+        },
+        {
+          "target": "[PR#]Level_Counter_Diff",
+          "input": "GetValue",
+          "delay": 0.02
+        },
+        {
+          "target": "[PR#]Level_Counter_Stage",
+          "input": "GetValue",
+          "delay": 0.02
+        },
+        {
           "target": "[PR#]Temp_Maker",
           "input": "Keyvalue",
-          "param": "targetname Map_Maker"
+          "param": "targetname Map_Maker",
+          "delay": 16
         },
         {
           "target": "[PR#]S_Boss_Temp",
-          "input": "FireUser1"
+          "input": "FireUser1",
+          "delay": 16
         },
         {
           "target": "[PR#]Boss_Health_Init",
-          "input": "FireUser1"
+          "input": "FireUser1",
+          "delay": 16
         },
         {
           "target": "[PR#]Ship_Temp",
-          "input": "ForceSpawn"
+          "input": "ForceSpawn",
+          "delay": 16
         },
         {
           "target": "[PR#]Guard_Temp_Boss",
-          "input": "Kill"
+          "input": "Kill",
+          "delay": 16
         },
         {
           "target": "[PR#]Side_Temp",
-          "input": "Kill"
+          "input": "Kill",
+          "delay": 16
         },
         {
           "target": "[PR#]Chaos_Temp",
-          "input": "ForceSpawn"
+          "input": "ForceSpawn",
+          "delay": 16
         },
         {
           "target": "[PR#]Chaos_Hp_To_Boss",
           "input": "Enable",
-          "delay": 0.1
+          "delay": 16.1
         },
         {
           "target": "[PR#]Last_Chaos_Summon_Move",
           "input": "Open",
-          "delay": 0.1
+          "delay": 16.1
         }
       ],
-      "fastForward": 0.3,
+      "fastForward": 16.3,
+      "bosses": [
+        {
+          "target": "[PR#]Chaos_Armor",
+          "name": "Chaos",
+          "counter": "[PR#]Boss_Health",
+          "counterMode": "hits"
+        }
+      ],
+      "win": {
+        "target": "[PR#]Level_Counter_Progress",
+        "input": "GetValue"
+      },
+      "lose": {
+        "target": "[PR#]Nuke_Trigger",
+        "input": "Enable"
+      },
+      "player": {
+        "health": 250,
+        "name": "None"
+      },
+      "hazards": {
+        "Chaos_Laser_Dam": "a Chaos laser",
+        "Chaos_Laser_DamUp": "a high Chaos laser",
+        "Chaos_Laser_Dam2": "a Chaos laser",
+        "Chaos_Hurt": "the fall",
+        "Nuke_Trigger": "the nuke",
+        "Ship_Hurt_Void": "the fall",
+        "Ehe_Laser_Up_Dam": "a high laser",
+        "Ehe_Laser_Down_Dam": "a low laser",
+        "Fireball_Hurt": "a fireball",
+        "Ehe_Dragon_Hurt": "the dragon",
+        "Drag_Hurt": "the dragon",
+        "Choc_Hurt": "the chocobos",
+        "Boss_Fire_Left": "the dragon's fire",
+        "Boss_Fire_Right": "the dragon's fire",
+        "Boss_Electro": "the electro floor",
+        "Boss_S_Firenova": "the fire nova",
+        "Boss_Meteor_Kill": "the meteor",
+        "Boss_Armor_Kill": "the dragon",
+        "Pillar_Hurt": "the lava",
+        "Nuke_Volcano": "Holy (time ran out)",
+        "Belias_Hurt_Fire": "the entrance fire",
+        "Belias_UHurt_Fire": "Belias's fire",
+        "Belias_Exp_Tri": "the explosion",
+        "Firewave_Hurt": "a firewave",
+        "Firewave_2_Hurt": "a firewave",
+        "Tile_Hurt": "a falling tile",
+        "Judge_Hurt": "Gabranth",
+        "Judge_Hurt_Niggers": "Gabranth's fire",
+        "Tomb_Laser_Up_Dam": "a high laser",
+        "Tomb_Laser_Down_Dam": "a low laser",
+        "Tomb_Void_Hurt": "the fall",
+        "Guard_Boss_Point_Hurt": "Gabranth",
+        "Side_Attack_Hurt1": "a summon",
+        "Side_Attack_Hurt3": "a summon",
+        "Side_Attack_Hurt4": "a summon",
+        "Ultimate_Summon_Hurt": "the ultimate summon",
+        "Chaos_Summon_Meteor_Hurt": "a meteor",
+        "Belias_Summon_Hurt": "a summon",
+        "SETH_Chaos_Metor_Damage": "a meteor",
+        "Lightning_Hurt": "lightning",
+        "Firenova_Hurt": "a fire nova",
+        "Electro_Hurt": "electro"
+      }
+    },
+    {
+      "id": "god_ending",
+      "group": "Airship (ending)",
+      "full": true,
+      "name": "God mode ending: Chaos → guard lasers → lift-off",
+      "summary": "Chaos, the guard's lasers, then fly off",
+      "description": "Stage 4 (GOD MODE) of the map's level system: Level_Counter_Stage set to 4, then both level counters read as the map's logic_auto does at +0.02 s, so its own stage setup runs (Chaos_Temp gets the god-mode timer, Chaos_End_God is armed at +15 s). The guard who fires the last lasers follows the team through the airship on its own train: spawned at the Gabranth fight (Summoner_Temp1), put on its path at Gabranth's death (Summoner_Temp2) and sent on as at Airship_End_Trigger3, so by the Chaos fight it waits behind the deck where the map parks it. The Chaos fight's laser stream until it dies, then cross the stepping stones to the god plate (God_End_Phys_Wall; the plates round it are debris and hold no one) and Chaos_End_God: 1 s later the guard appears and fires 4 lasers (Chaos_Random2, low or high, +2.5 to +4.9 s), at +5 s the flyer (Fly_Temp) rises out of the bay through the plate at 3072 u/s, takes the humans standing on it up over the ship (the ship is nuked as it passes Fly_Path_4). Win when it ends the round (Fly_End_Godmode, or God_End_Solo_Winner alone: Level_Counter_Progress.GetValue).",
+      "spawn": {
+        "origin": [
+          5900,
+          -6016,
+          7746
+        ],
+        "yaw": 180
+      },
+      "start": [
+        {
+          "target": "[PR#]Level_Counter_Stage",
+          "input": "SetValue",
+          "param": "4"
+        },
+        {
+          "target": "[PR#]Level_Counter_Diff",
+          "input": "GetValue",
+          "delay": 0.02
+        },
+        {
+          "target": "[PR#]Level_Counter_Stage",
+          "input": "GetValue",
+          "delay": 0.02
+        },
+        {
+          "target": "[PR#]Summoner_Temp1",
+          "input": "FireUser1",
+          "delay": 0.1
+        },
+        {
+          "target": "[PR#]Summoner_Temp2",
+          "input": "FireUser1",
+          "delay": 0.6
+        },
+        {
+          "target": "[PR#]Summoner_Guard_Train",
+          "input": "StartForward",
+          "delay": 1.7
+        },
+        {
+          "target": "[PR#]Summoner_Guard_Model",
+          "input": "Enable",
+          "delay": 1.7
+        },
+        {
+          "target": "[PR#]Temp_Maker",
+          "input": "Keyvalue",
+          "param": "targetname Map_Maker",
+          "delay": 16
+        },
+        {
+          "target": "[PR#]S_Boss_Temp",
+          "input": "FireUser1",
+          "delay": 16
+        },
+        {
+          "target": "[PR#]Boss_Health_Init",
+          "input": "FireUser1",
+          "delay": 16
+        },
+        {
+          "target": "[PR#]Ship_Temp",
+          "input": "ForceSpawn",
+          "delay": 16
+        },
+        {
+          "target": "[PR#]Guard_Temp_Boss",
+          "input": "Kill",
+          "delay": 16
+        },
+        {
+          "target": "[PR#]Side_Temp",
+          "input": "Kill",
+          "delay": 16
+        },
+        {
+          "target": "[PR#]Chaos_Temp",
+          "input": "ForceSpawn",
+          "delay": 16
+        },
+        {
+          "target": "[PR#]Chaos_Hp_To_Boss",
+          "input": "Enable",
+          "delay": 16.1
+        },
+        {
+          "target": "[PR#]Last_Chaos_Summon_Move",
+          "input": "Open",
+          "delay": 16.1
+        }
+      ],
+      "fastForward": 16.3,
       "bosses": [
         {
           "target": "[PR#]Chaos_Armor",
