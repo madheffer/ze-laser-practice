@@ -9,12 +9,14 @@
 // It answers the /coop WebSocket and the read-only /api/ (api.js), and with --static the game itself. Without
 // --static, serve web/dist from your web server and forward /coop + /api/ here on the same origin (the server
 // refuses sockets whose Origin isn't the Host they asked for). Runs are stored in Postgres: DATABASE_URL must be
-// set (web/.env or the environment) and reachable, or the server won't start.
+// set (web/.env or the environment) and reachable, or the server won't start. Steam sign-in: auth/index.js
+// (STEAM_API_KEY, STEAM_RETURN_HOST, SESSION_SECRET).
 import http from 'node:http';
 import { attachCoopRelay, PATH } from './coop-relay.js';
 import { apiHandler } from './api.js';
 import { staticFiles } from './static.js';
 import { openStore } from './db/store.js';
+import { serverAuth } from './auth/index.js';
 
 const argv = process.argv.slice(2);
 const arg = (name, fallback) => { const i = argv.indexOf(name); return i >= 0 ? argv[i + 1] : fallback; };
@@ -38,12 +40,14 @@ try {
 
 const notFound = (req, res) => { res.writeHead(404, { 'content-type': 'text/plain' }); res.end('not found'); };
 const files = staticDirs.length ? staticFiles(staticDirs) : (req, res, next) => next();
-const api = apiHandler(store);
+const auth = serverAuth({ log });
+let relay = null;
+const api = apiHandler(store, { auth, feed: () => relay?.feed, ipHeader: opts.ipHeader });
 const server = http.createServer((req, res) => {
   if (req.url === '/healthz') { res.writeHead(200, { 'content-type': 'text/plain' }); res.end('ok'); return; }
   api(req, res, () => files(req, res, () => notFound(req, res)));
 });
-attachCoopRelay(server, { log, store, ...opts });
+relay = attachCoopRelay(server, { log, store, sessions: auth.sessions, ...opts });
 server.listen(port, () => console.log(`server on :${port}: ${PATH} + /api/${staticDirs.length ? ` + files from ${staticDirs.join(', ')}` : ''}`));
 
 const stop = () => {

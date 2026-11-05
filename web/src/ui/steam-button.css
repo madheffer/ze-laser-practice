@@ -1,0 +1,30 @@
+/* ui/steam-button.js: Steam's own look (its client's #171a21 chrome, the store's blue), the mark + two-line label */
+.steam-btn {
+  --steam-blue: #66c0f4;
+  display: inline-flex; align-items: center; gap: 10px; text-decoration: none; color: #fff;
+  background: linear-gradient(180deg, #2a475e 0%, #1b2838 100%); border: 1px solid rgba(102, 192, 244, 0.35);
+  border-radius: 8px; box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06) inset, 0 4px 14px rgba(0, 0, 0, 0.35);
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s, filter 0.15s; cursor: pointer; white-space: nowrap;
+}
+.steam-btn:hover { border-color: var(--steam-blue); box-shadow: 0 0 0 1px rgba(102, 192, 244, 0.25), 0 6px 18px rgba(0, 0, 0, 0.4); transform: translateY(-1px); }
+.steam-btn:active { transform: none; filter: brightness(0.95); }
+.steam-btn:focus-visible { outline: 2px solid var(--steam-blue); outline-offset: 2px; }
+.steam-btn.going { opacity: 0.75; pointer-events: none; }
+.steam-btn-mark { display: grid; place-items: center; flex: none; border-radius: 50%; color: #fff; background: radial-gradient(circle at 30% 30%, #1999ff, #0b3f7a); }
+.steam-btn-mark svg { display: block; }
+.steam-btn-text { display: flex; flex-direction: column; line-height: 1; text-align: left; }
+.steam-btn-text small { font-size: 10px; font-weight: 600; letter-spacing: 0.04em; color: #c7d5e0; text-transform: uppercase; }
+.steam-btn-text b { font-size: 15px; font-weight: 800; letter-spacing: 0.14em; margin-top: 2px; }
+
+.steam-btn-small { padding: 5px 12px 5px 5px; min-height: 36px; }
+.steam-btn-small .steam-btn-mark { width: 26px; height: 26px; }
+.steam-btn-small .steam-btn-mark svg { width: 20px; height: 20px; }
+
+.steam-btn-large { padding: 8px 18px 8px 8px; min-height: 48px; }
+.steam-btn-large .steam-btn-mark { width: 34px; height: 34px; }
+.steam-btn-large .steam-btn-mark svg { width: 26px; height: 26px; }
+.steam-btn-large .steam-btn-text small { font-size: 11px; }
+.steam-btn-large .steam-btn-text b { font-size: 18px; }
+
+@media (max-width: 520px) { .steam-btn-small .steam-btn-text small { display: none; } }
+@media (prefers-reduced-motion: reduce) { .steam-btn, .steam-btn:hover { transition: none; transform: none; } }

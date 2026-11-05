@@ -8,6 +8,7 @@ import { settings, setToggle, M_YAW } from './settings.js';
 import { clamp } from '../lib/math.js';
 import { useItems } from './items.js';
 import { TouchControls, touchQuery } from '../ui/touch.js';
+import { freeLook } from './replay-view.js';
 
 const keys = new Set();
 let wheelJump = 0;
@@ -25,6 +26,7 @@ export function takeLookDelta() {
   return d;
 }
 export function clearKeys() { keys.clear(); }
+export const keyHeld = (code) => keys.has(code); // app/replay-view.js's free camera
 
 export function readInput() {
   const k = (c) => keys.has(c);
@@ -42,6 +44,7 @@ export function readInput() {
 
 // Turn the view by yaw / pitch degrees (mouse and touch both come through here).
 function look(dy, dp) {
+  if (S.replay) { if (S.replay.cam === 'free' && S.locked) freeLook(dy, dp); return; } // the recorded view is the replay's
   const p = S.player;
   if (!S.locked || !p || S.paused) return;
   p.yaw -= dy;
@@ -125,6 +128,7 @@ export function installInput(canvas, actions) {
 
   document.addEventListener('pointerlockchange', () => {
     S.locked = document.pointerLockElement === canvas;
+    if (S.replay) return; // a replay plays on with or without the mouse (it only steers the free camera)
     if (S.locked && S.run && !S.run.done) actions.unpause();
     else actions.pause();
   });
@@ -135,12 +139,15 @@ export function installInput(canvas, actions) {
     if (document.pointerLockElement) document.exitPointerLock?.();
     actions.pause();
   });
-  canvas.addEventListener('click', () => { if (!S.locked && S.run && !S.run.done && !G.overlay.open) actions.resume(); });
+  canvas.addEventListener('click', () => {
+    if (S.replay) { if (S.replay.cam === 'free' && !S.locked) lockPointer(canvas); return; } // mouse look for the free camera
+    if (!S.locked && S.run && !S.run.done && !G.overlay.open) actions.resume();
+  });
   // Ctrl+W outside fullscreen can't be blocked; at least ask before the tab goes.
-  window.addEventListener('beforeunload', (ev) => { if (S.run && !S.run.done) { ev.preventDefault(); ev.returnValue = ''; } });
+  window.addEventListener('beforeunload', (ev) => { if (S.run && !S.run.done && !S.replay) { ev.preventDefault(); ev.returnValue = ''; } });
 
   document.addEventListener('mousedown', (ev) => {
-    if (!S.locked || ev.sourceCapabilities?.firesTouchEvents) return; // a tap's emulated mouse is not Mouse 1
+    if (!S.locked || S.replay || ev.sourceCapabilities?.firesTouchEvents) return; // a tap's emulated mouse is not Mouse 1
     if (ev.button === 0) G.vm.trigger(true);
     if (ev.button === 2) G.vm.trigger2(true);
   });
@@ -164,6 +171,14 @@ export function installInput(canvas, actions) {
 
   document.addEventListener('keydown', (ev) => {
     if (G.overlay.open) return; // the end card has its own keys
+    // a replay has its own keys (app/replay.js); Esc gives the mouse back first. Held keys fly the free camera.
+    if (S.replay) {
+      if (ev.code === 'Escape' && document.pointerLockElement) { document.exitPointerLock?.(); return; }
+      if (ev.target instanceof HTMLInputElement) return; // the replay bar's scrubber has its own arrow keys
+      if (ev.code === 'Space' || ev.code === 'Tab' || ev.code.startsWith('Arrow')) ev.preventDefault();
+      if (!ev.repeat) { keys.add(ev.code); act.replayKey?.(ev.code); }
+      return;
+    }
     // Esc is a tap: in fullscreen the keyboard lock delivers it to us, so we release the mouse ourselves;
     // in the menu, a tap resumes.
     // One tap leaves the game completely: mouse released AND fullscreen exited, menu up (Resume goes back in).

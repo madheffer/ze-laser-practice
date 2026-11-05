@@ -67,8 +67,6 @@ export class CoopClient {
   list() { this.send({ t: 'list' }); }
   // the home page's live feed (server/activity.js): 'feed' (the recent rows + numbers), then 'act' / 'stats' pushes
   watchFeed(on = true) { if (on || this.ws?.readyState === 1) this.send({ t: 'feed', on }); }
-  // your own solo run, for the feed (only while connected: a finished run never opens a socket by itself)
-  reportSolo(run) { if (this.ws?.readyState === 1) this.ws.send(JSON.stringify({ t: 'solo', ...run })); }
   setSettings(settings) { if (this.isHost) this.send({ t: 'settings', settings }); }
   setMap(map) { if (this.isHost && isMapName(map)) this.send({ t: 'map', map }); }
   kick(id) { if (this.isHost) this.send({ t: 'kick', id }); }

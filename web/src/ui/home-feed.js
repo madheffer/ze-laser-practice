@@ -1,14 +1,17 @@
 // The home page's live feed (server/activity.js): every run anyone finishes on this server, newest on top, sliding
-// in as it happens, with relative times that keep ticking. Plus the server's numbers (online, open rooms, rounds
-// live) for the home page's header and stats row.
+// in as it happens, with relative times that keep ticking; a shared solo run has a Watch button (its replay, app/replay.js).
+// Plus the server's numbers (online, open rooms, rounds live) for the home page's header and stats row.
+// Its second tab is your own runs (ui/home-history.js).
 //
 // Every row came from the server, and a solo row from another player's page: the fields are cleaned here and
 // only ever reach the DOM as text.
 import { cleanText } from '../lib/room-rules.js';
 import { isMapName } from '../lib/paths.js';
-import { formatTime } from '../lib/format.js';
+import { formatTime, ago } from '../lib/format.js';
 import { displayName } from './maps.js';
 import { sharesRuns, setSharesRuns } from '../app/activity.js';
+import { HomeHistory } from './home-history.js';
+import { playButton, viewsBadge } from './replay-buttons.js';
 
 const SHOW = 30; // rows on screen
 const RETRY_MS = [3000, 6000, 15000, 30000, 60000];
@@ -27,6 +30,8 @@ function cleanItem(x) {
     time: Number.isFinite(x.time) && x.time >= 0 ? x.time : null, hits: Number.isInteger(x.hits) ? x.hits : null,
     names: names(x.names), winners: names(x.winners), room: cleanText(x.room, 32), cause: cleanText(x.cause, 40),
     players: Number.isInteger(x.players) ? Math.max(1, Math.min(8, x.players)) : 1,
+    replay: Number.isInteger(x.replay) && x.replay > 0 ? x.replay : null,
+    views: Number.isInteger(x.views) && x.views > 0 ? x.views : 0,
   };
 }
 
@@ -52,15 +57,7 @@ function describe(it) {
   return { tone: 'lose', who: squad, verb: 'wiped on', what: it.stage, stat: t };
 }
 
-export function ago(ms) {
-  const s = Math.max(0, Math.round(ms / 1000));
-  if (s < 10) return 'just now';
-  if (s < 60) return `${s}s ago`;
-  const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m ago`;
-  const h = Math.floor(m / 60);
-  return h < 24 ? `${h}h ago` : `${Math.floor(h / 24)}d ago`;
-}
+export { ago };
 
 const ICONS = { // constant SVG, never data
   win: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
@@ -71,11 +68,14 @@ const ICONS = { // constant SVG, never data
 };
 
 export class HomeFeed {
-  // net: CoopClient; mapTitle(name) -> display title; onStats(stats | null) for the header (null = offline)
-  constructor({ net, mapTitle, onStats }) {
+  // net: CoopClient; mapTitle(name) -> display title; onStats(stats | null) for the header (null = offline);
+  // onWatch(replay id): watch a run's replay
+  constructor({ net, mapTitle, onStats, onWatch }) {
     this.net = net;
     this.mapTitle = mapTitle;
     this.onStats = onStats;
+    this.onWatch = onWatch;
+    this.history = new HomeHistory({ mapTitle, onWatch });
     this.rows = new Map(); // id -> { li, at, time }
     this.offset = 0; // our clock - the server's
     this.watching = false;
@@ -95,6 +95,18 @@ export class HomeFeed {
     title.id = 'hf-title';
     title.append(el('span', 'hf-live', 'Live'), 'Activity');
     this.state = el('span', 'hf-state');
+    // Live | Your runs
+    const tabs = el('div', 'hf-tabs');
+    tabs.setAttribute('role', 'tablist');
+    this.tabs = {};
+    for (const [k, label] of [['live', 'Everyone'], ['mine', 'Your runs']]) {
+      const b = el('button', 'hf-tab', label);
+      b.type = 'button';
+      b.setAttribute('role', 'tab');
+      b.addEventListener('click', () => this.tab(k));
+      this.tabs[k] = b;
+      tabs.append(b);
+    }
     head.append(title, this.state);
     this.list = el('ol', 'hf-list');
     this.list.setAttribute('aria-live', 'polite');
@@ -108,11 +120,23 @@ export class HomeFeed {
     this.share.type = 'checkbox';
     this.share.checked = sharesRuns();
     this.share.addEventListener('change', () => setSharesRuns(this.share.checked));
-    sw.append(this.share, el('span', 'hf-track'), el('span', null, 'Share my solo runs here'));
+    sw.append(this.share, el('span', 'hf-track'), el('span', null, 'Share my solo runs and replays here'));
     foot.append(sw);
-    root.append(head, this.list, this.empty, foot);
+    this.history.root.hidden = true;
+    root.append(head, tabs, this.list, this.empty, this.history.root, foot);
     this.status(this.net.status);
+    this.tab('live', root);
     return root;
+  }
+
+  tab(k, root = this.root) {
+    this.view = k;
+    for (const [name, b] of Object.entries(this.tabs)) b.setAttribute('aria-selected', String(name === k));
+    const mine = k === 'mine';
+    this.list.hidden = mine;
+    this.history.root.hidden = !mine;
+    root.classList.toggle('mine', mine);
+    if (mine) { this.empty.hidden = true; this.history.load(); } else this.renderEmpty();
   }
 
   // the page shows the feed: subscribe (and keep trying while it's up); hidden: stop the clock and the retries
@@ -172,12 +196,21 @@ export class HomeFeed {
     const bits = [it.map ? displayName(this.mapTitle(it.map)) : '', it.kind === 'solo' ? 'Solo' : it.kind === 'versus' ? 'Versus' : 'Co-op'];
     if (d.cause) bits.push(`to ${d.cause}`);
     meta.append(el('span', null, bits.filter(Boolean).join(' · ')));
+    if (it.replay) meta.append(viewsBadge(it.views));
     const when = el('time', 'hf-when');
     body.append(line, meta);
     const side = el('div', 'hf-side');
     if (d.stat) side.append(el('span', 'hf-stat', d.stat));
     side.append(when);
-    li.append(icon, body, side);
+
+    // the replay, when it was shared: a play button at the row's end (and the row itself)
+    const act = el('div', 'hf-act');
+    if (it.replay) {
+      act.append(playButton(`Watch ${d.who}'s run on ${d.what}`, () => this.onWatch(it.replay)));
+      li.classList.add('has-replay');
+      li.addEventListener('click', () => this.onWatch(it.replay));
+    }
+    li.append(icon, body, side, act);
     this.rows.set(it.id, { li, at: it.at, when });
     this.setWhen(this.rows.get(it.id));
     this.list.prepend(li);
@@ -199,6 +232,7 @@ export class HomeFeed {
 
   renderEmpty() {
     if (!this.empty) return;
+    if (this.view === 'mine') { this.empty.hidden = true; return; }
     const none = !this.rows.size;
     this.empty.hidden = !none;
     this.emptyText.textContent = this.net.status === 'offline'

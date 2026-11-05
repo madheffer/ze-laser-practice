@@ -10,6 +10,8 @@ import { settings } from './settings.js';
 import { rule, godMode } from './rules.js';
 import { submitRun, getRecord } from './records.js';
 import { reportSolo } from './activity.js';
+import { ReplayRecorder, keepLastRun, lastRun } from './replay-record.js';
+import { account } from './account.js';
 import { formatTime, plural } from '../lib/format.js';
 
 export function endRun() {
@@ -24,7 +26,7 @@ export function endRun() {
 // The scenario's `start` inputs (at the stage start, and again for each endless repeat).
 export function fireStart() { S.run?.fireStart?.(); }
 
-// mode: 'normal' | 'endless'
+// mode: 'normal' | 'endless'. A replay (S.replay, app/replay.js) rebuilds its run: its seed, its rules, no recording.
 export function startScenario(i, mode = 'normal') {
   const { map, player } = S;
   endRun();
@@ -43,6 +45,8 @@ export function startScenario(i, mode = 'normal') {
     hits: 0, done: false, result: '', mode: endless ? 'endless' : 'normal', endless,
     winAfter: endless ? null : scenario?.winAfter, fireAcc: 0, myHits: 0, myDamage: 0, noFall: false, bossPeak: new Map(),
     endlessTick: null,
+    // the stage's random rolls; a replay must play on the seed it was recorded with
+    seed: S.replay ? S.replay.meta.seed : (S.mp?.rules.seed || settings.seed || (Date.now() & 0xffff)),
   };
 
   player.gravityScale = scenario?.player?.gravity ?? 1;
@@ -54,7 +58,9 @@ export function startScenario(i, mode = 'normal') {
     // (GFL servers run none; a map sets it for an area); the "Fall damage everywhere" option forces scale 1
     const scale = rule('fallDamage') ? 1 : Math.max(0, parseFloat(run.cvars?.sv_falldamage_scale) || 0);
     if (!run.started || run.done || run.noFall || !scale || v <= 580) return;
-    hurtPlayer((v - 580) * (100 / (1024 - 580)) * scale, 'fall');
+    const dmg = (v - 580) * (100 / (1024 - 580)) * scale;
+    run.rec?.event(run.ticks, 'fall', { damage: Math.round(dmg * 10) });
+    hurtPlayer(dmg, 'fall');
   };
   player.onJump = () => G.audio.play('jump', { pos: player.origin });
 
@@ -64,9 +70,10 @@ export function startScenario(i, mode = 'normal') {
   createRunEngine({
     entities: map.entities, hulls: map.hulls, bounds: map.bounds, animations: map.animations,
     traceBox: (s, e, h) => S.world.traceBox(s, e, h, undefined, true),
-    scenario, mode, seed: S.mp?.rules.seed || settings.seed || (Date.now() & 0xffff),
+    scenario, mode, seed: run.seed,
     humans: rule('humans'), bossHp: rule('bossHp'), items: heldItems(), run,
-    hooks: {
+    // kept on the run: a replay's seek mutes the map the same way (app/replay.js)
+    hooks: run.hooks = {
       attach(engine) {
         S.engine = engine;
         engine.on('spawn', (e) => G.renderer.addEntity(e, map));
@@ -123,6 +130,14 @@ export function startScenario(i, mode = 'normal') {
   S.engine.on('cvar', (n, v) => setMoveCvar(player, n, v));
   // a round runs on the wall clock from here (loop.js simulate), so every client's map stays in step
   run.wall0 = performance.now();
+  // your solo runs on a stage are recorded for their replay (app/replay-record.js), never a round's or a replay's
+  if (scenario && !S.mp && !S.replay) {
+    run.rec = new ReplayRecorder({
+      seed: run.seed, map: map.name, mapVersion: map.version || '', stage: scenario.id, mode: run.mode,
+      weapon: scenario.weapon || 'knife',
+      rules: { humans: rule('humans'), bossHp: rule('bossHp'), autoFire: rule('autoFire'), perfectTeam: rule('perfectTeam'), fallDamage: rule('fallDamage'), healItem: !!settings.healItem },
+    });
+  }
   G.vm.reset(scenario?.weapon || 'knife');
   G.hud.showWeapons(G.vm.weapon);
   G.menu.update();
@@ -172,6 +187,7 @@ export function finish(result) {
   run.done = true;
   run.result = result;
   const t = stageTime();
+  if (S.replay) { G.replayOver?.(result, t); return; } // app/replay.js: its own end card, nothing recorded
   const scenario = S.scenario;
   const map = S.map.name;
   const stage = scenario?.id || 'free';
@@ -182,10 +198,16 @@ export function finish(result) {
   if (scenario && (result === 'win' || run.endless)) {
     rec = submitRun(map, stage, run.mode, { time: t, hits: run.hits, humans: settings.humans, bossHp: settings.bossHp });
   }
-  reportSolo({ map, stage, mode: run.mode, result, time: t, hits: run.hits, cause: result === 'dead' ? hazardName(run.killedBy) : '', name: G.lobby?.name || '', god: godMode() });
+  // the run's replay (app/replay-record.js): kept for "Watch replay" and sent with the run (app/activity.js)
+  const replay = run.rec?.finish() || null;
+  const info = { name: account.user?.name || G.lobby?.name || 'You', time: t, result };
+  keepLastRun(replay, info);
+  reportSolo({ map, stage, mode: run.mode, result, time: t, hits: run.hits, cause: result === 'dead' ? hazardName(run.killedBy) : '', name: G.lobby?.name || '', god: godMode() }, replay)
+    .then((r) => { if (r?.replay && lastRun()?.info === info) info.id = String(r.replay); }); // its link (Copy link)
   const best = getRecord(map, stage, run.mode);
   const retry ={ label: 'Retry', key: 'Enter', primary: result !== 'win', onClick: () => G.play(S.scenarioIndex, run.mode) };
   const menu = { label: 'Menu', key: 'Escape', onClick: () => { G.overlay.hide(); G.menu.update(); } };
+  const watch = replay ? [{ label: 'Watch replay', key: 'w', onClick: () => G.watchLastRun() }] : [];
   const stats = [
     [run.endless ? 'Survived' : result === 'win' ? 'Time' : 'Survived', formatTime(t), !!rec?.improved.time],
     ['Hits taken', String(run.hits), !!rec?.improved.hits],
@@ -197,14 +219,14 @@ export function finish(result) {
     G.overlay.show({
       kind: 'endless', kicker: `${scenario.name} · endless`, title: 'RUN OVER',
       subtitle: result === 'dead' ? `Killed by ${hazardName(run.killedBy)}` : 'Stage failed',
-      record: rec?.improved.time ? 'New personal best' : '', stats, buttons: [retry, menu],
+      record: rec?.improved.time ? 'New personal best' : '', stats, buttons: [retry, ...watch, menu],
     }); G.menu.update();
     return;
   }
   if (result === 'win') {
     const buttons = [];
     if (scenario?.endless) buttons.push({ label: 'Endless mode', key: 'e', primary: true, onClick: () => G.play(S.scenarioIndex, 'endless') });
-    buttons.push({ ...retry, primary: !scenario?.endless }, menu);
+    buttons.push({ ...retry, primary: !scenario?.endless }, ...watch, menu);
     G.overlay.show({
       kind: 'win', kicker: scenario?.name || '', title: 'STAGE CLEARED',
       subtitle: run.hits ? `${plural(run.hits, 'hit')} taken` : 'Clean run, no hits',
@@ -215,7 +237,7 @@ export function finish(result) {
   G.overlay.show({
     kind: 'dead', kicker: scenario?.name || 'Free roam', title: result === 'dead' ? 'YOU DIED' : 'STAGE FAILED',
     subtitle: result === 'dead' ? `Killed by ${hazardName(run.killedBy)}${run.lastHurt ? ` (${Math.round(run.lastHurt.dmg)})` : ''}` : 'The boss got away',
-    stats, buttons: [retry, menu],
+    stats, buttons: [retry, ...watch, menu],
   });
   G.menu.update();
 }

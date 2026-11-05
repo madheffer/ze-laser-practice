@@ -5,7 +5,9 @@ import { CSP, CSP_HEADER, IMMUTABLE_CACHE, isImmutable } from './server/http-pol
 
 // The run store's database (server/db/store.js): DATABASE_URL from the environment, else from web/.env
 // (gitignored). Server-side only: it is not a VITE_ variable, so it never reaches the page.
-process.env.DATABASE_URL ??= loadEnv('', fileURLToPath(new URL('.', import.meta.url)), 'DATABASE_').DATABASE_URL;
+// Steam sign-in's settings the same way (server/auth/index.js): STEAM_API_KEY, STEAM_RETURN_HOST, SESSION_SECRET.
+const serverEnv = loadEnv('', fileURLToPath(new URL('.', import.meta.url)), ['DATABASE_', 'STEAM_', 'SESSION_']);
+for (const k of ['DATABASE_URL', 'STEAM_API_KEY', 'STEAM_RETURN_HOST', 'SESSION_SECRET']) if (!process.env[k] && serverEnv[k]) process.env[k] = serverEnv[k];
 
 // versioned maps + sounds are cached for a year (server/http-policy.js)
 function longCacheForAssets() {

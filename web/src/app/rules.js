@@ -2,17 +2,19 @@
 // (lib/room-rules.js), sent by the server with the round start: every client runs the same simulation (same
 // humans, boss HP, team fire), and cheats (god mode, hitboxes, auto bunnyhop) are off unless the room owner
 // turned them on. Your own toggles do nothing in a round, and the room's rules are never saved into your settings.
+// A replay (app/replay.js) plays by the rules it was recorded with (lib/replay-codec.js cleanMeta), cheats off.
 import { S } from './state.js';
 import { settings } from './settings.js';
 import { RULE_DEFAULTS } from '../lib/room-rules.js';
 
 export function rule(key) {
   if (S.mp && Object.hasOwn(RULE_DEFAULTS, key)) return S.mp.rules[key];
+  if (S.replay) return Object.hasOwn(S.replay.meta.rules, key) ? S.replay.meta.rules[key] : (Object.hasOwn(RULE_DEFAULTS, key) ? RULE_DEFAULTS[key] : settings[key]);
   return settings[key];
 }
 
 // a round runs on the server's clock: no slow motion
-export const timescale = () => (S.mp ? 1 : settings.timescale);
+export const timescale = () => (S.mp ? 1 : S.replay ? S.replay.speed : settings.timescale);
 export const godMode = () => rule('god');
 
 // what movement reads (player.tick's settings): the room's auto bunnyhop in a round

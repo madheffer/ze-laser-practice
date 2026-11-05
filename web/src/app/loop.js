@@ -5,7 +5,10 @@ import { settings } from './settings.js';
 import { rule, timescale, godMode, moveSettings } from './rules.js';
 import { clamp } from '../lib/math.js';
 import { readInput, takeLookDelta } from './input.js';
-import { bossFire, bossStatus, trackSegments } from './bosses.js';
+import { bossFire, bossStatus, trackSegments, shootAs } from './bosses.js';
+import { applyPose, eventsAfter, eventsDuring } from './replay-play.js';
+import { replayView } from './replay-view.js';
+import { useItems as pressItems } from '../world/items.js';
 import { startScenario, fireStart, hurtPlayer, healPlayer, finish, stageTime } from './session.js';
 import { bossHudHtml } from '../ui/hud.js';
 import { formatTime, plural } from '../lib/format.js';
@@ -35,7 +38,7 @@ export function simulate(now) {
     acc = clamp((now - run.wall0) / 1000 - run.ticks * CS.tick, 0, CS.tick);
     return;
   }
-  if (S.paused) return;
+  if (S.paused || S.replay?.paused || S.replay?.fast) { lastSim = now; return; } // a replay's pause / seek (app/replay.js)
   // solo: a stage's clock waits until the world around you is drawn (world/stream.js); a round never waits
   if (!run.started && G.stream && !G.stream.ready(player.origin)) { lastSim = now; return; }
   const realDt = Math.min(0.1, (now - lastSim) / 1000);
@@ -74,8 +77,11 @@ export function frame(now) {
   const spec = S.run?.spectating ? S.mp?.spectateView() : null;
   if (spec) { eye = spec.eye; view = spec; }
   // third person (CS2Fixes !tp): camera behind you, your CT body drawn, no viewmodel (as CS2 does)
-  const tp = !!(S.run && settings.thirdPerson && !S.run.spectating);
-  G.renderer.setView(cameraPosition(S.world, eye, view.yaw, view.pitch, tp, settings.tpDist), view.yaw, view.pitch);
+  let tp = !!(S.run && settings.thirdPerson && !S.run.spectating);
+  // a replay: its own camera (first person, third person or a free camera; app/replay-view.js)
+  const rv = S.replay && S.run ? replayView(eye, a, realDt) : null;
+  if (rv) { G.renderer.setView(rv.pos, rv.yaw, rv.pitch); tp = rv.body; }
+  else G.renderer.setView(cameraPosition(S.world, eye, view.yaw, view.pitch, tp, settings.tpDist), view.yaw, view.pitch);
   G.body?.update({ visible: tp, origin: o, yaw: player.yaw, ducked: player.ducked, duckAmount: player.duckAmount, onGround: player.onGround });
   G.peers?.update(S.run && S.mp ? S.run.t - S.mp.interpDelay : null, G.renderer.camera, spec?.id);
   G.renderer.showHitboxes = rule('hitboxes'); // a round's are the room's
@@ -87,6 +93,7 @@ export function frame(now) {
   G.radar?.draw();
   const look = takeLookDelta();
   G.vm.visible = !tp && !S.run?.spectating;
+  if (rv && S.replay.gun !== (G.vm.weapon === 'gun')) { G.vm.setWeapon(S.replay.gun ? 'gun' : 'knife'); G.hud.showWeapons(G.vm.weapon); }
   if (S.run) {
     // the viewmodel keeps animating behind the menu (triggers are released on pause, shots are ignored)
     G.vm.update(Math.max(1e-3, realDt) * timescale(), {
@@ -96,7 +103,8 @@ export function frame(now) {
     G.vm.setParticleLights(G.renderer.lighting?.barnUniforms, G.renderer.camera, (G.renderer.post?.uniforms?.cs2Exposure?.value ?? 1) * 2.8);
     G.vm.render(G.renderer.camera.aspect);
   }
-  G.audio.setListener(eye, player.yaw, player.pitch);
+  if (rv) G.audio.setListener(rv.pos, rv.yaw, rv.pitch);
+  else G.audio.setListener(eye, player.yaw, player.pitch);
   hudClock += realDt;
   if (S.run && hudClock >= 0.05) { hudClock = 0; updateHud(); }
 }
@@ -107,9 +115,12 @@ export function step() {
   const run = S.run;
   run.t += CS.tick;
   run.ticks++;
+  // a replay: what the player did between the last tick and this one (shots, E), as they did it
+  if (S.replay) eventsAfter(run.ticks - 1, { shoot: replayShot, use: () => { if (run.items?.length && run.started) pressItems(engine, run.items); } });
   if (!run.started && run.t >= run.startAt) {
     run.started = true;
     run.startTime = engine.time;
+    run.startTick = run.ticks; // a replay's clock (app/replay.js)
     fireStart();
   }
   // a spectator's map keeps running (lasers, the boss, the end), without them in it
@@ -126,13 +137,21 @@ export function step() {
   G.renderer.record(engine.time);
   if (ground) player.ride(ground, groundBefore, ground.getWorld());
   world.dynamic = engine.solids();
-  // window.__lasersInput drives the player in tests: solo only (no bots in a round)
-  const inp = (!S.mp && window.__lasersInput?.(run.t)) || (S.locked ? readInput() : { forward: 0, side: 0, jump: false, duck: false, walk: false });
-  player.maxSpeed = G.vm.weapon === 'knife' ? 250 : 215; // CS2: knife 250, AK-47 215
   const before = player.origin;
-  player.tick(inp, moveSettings());
-  S.mp?.record(run.ticks, player); // a round's server replays your run from these (the anti-cheat)
-  footsteps(inp, before);
+  if (S.replay) {
+    // where the recorded player stood on this tick (app/replay-play.js); the recording's end is the replay's
+    if (!applyPose(run.ticks, player)) { finish('end'); return; }
+    eventsDuring(run.ticks, { hurt: hurtPlayer });
+    footsteps(IDLE, before);
+  } else {
+    // window.__lasersInput drives the player in tests: solo only (no bots in a round)
+    const inp = (!S.mp && window.__lasersInput?.(run.t)) || (S.locked ? readInput() : IDLE);
+    player.maxSpeed = G.vm.weapon === 'knife' ? 250 : 215; // CS2: knife 250, AK-47 215
+    player.tick(inp, moveSettings());
+    S.mp?.record(run.ticks, player); // a round's server replays your run from these (the anti-cheat)
+    run.rec?.pose(run.ticks, player, G.vm.weapon === 'gun'); // your solo run's replay (app/replay-record.js)
+    footsteps(inp, before);
+  }
 
   for (const ev of engine.updateTriggers(player)) {
     if (ev.type === 'hurt' && run.started && !run.done) {
@@ -160,8 +179,16 @@ export function step() {
   if (run.spectating || run.done) return;
   if (player.origin[2] < -20000) {
     // off the map: solo restarts, a round counts it as a death
-    if (S.mp) { run.killedBy = 'void'; finish('dead'); } else startScenario(S.scenarioIndex, run.mode);
+    if (S.mp) { run.killedBy = 'void'; finish('dead'); } else if (S.replay) finish('end'); else startScenario(S.scenarioIndex, run.mode);
   }
+}
+
+const IDLE = Object.freeze({ forward: 0, side: 0, jump: false, duck: false, walk: false });
+
+// a recorded shot: the same trace on the same tick, and the viewmodel plays it when you watch through their eyes
+function replayShot(shot, yaw, pitch) {
+  if (S.replay.cam === 'first' && !S.replay.fast) G.vm.playShot?.(shot.kind);
+  shootAs(shot, yaw, pitch);
 }
 
 // the team's fire, endless repeats and the stage clock: these run for a spectator too
@@ -205,7 +232,7 @@ export function updateHud() {
     sub.push(best ? `best ${formatTime(best.time)}` : 'endless');
   }
   G.hud.update({
-    title: scenario ? scenario.name + (run.endless ? ' · ENDLESS' : '') : 'Free roam',
+    title: (S.replay ? 'REPLAY · ' : '') + (scenario ? scenario.name + (run.endless ? ' · ENDLESS' : '') : 'Free roam'),
     timer: scenario ? (t < 0 ? `starts in ${(-t).toFixed(1)}` : formatTime(t)) : '',
     sub: sub.join(' · '),
     hp: run.spectating ? (S.mp?.spectateView()?.hp ?? 0) : run.hp, god: godMode(), armor: run.armor,

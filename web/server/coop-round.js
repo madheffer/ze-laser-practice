@@ -33,7 +33,7 @@ export class Round {
     this.dmg = new Map();
     this.clockAt = 0; this.bossAt = 0;
     this.ended = false;
-    this.players = new Map(room.members.map((c) => [c.id, { id: c.id, name: c.name, alive: true, deadAt: null, cheat: '', budget: { at: 0, n: 0 } }]));
+    this.players = new Map(room.members.map((c) => [c.id, { id: c.id, name: c.name, steamId: c.user?.steamId || null, alive: true, deadAt: null, cheat: '', budget: { at: 0, n: 0 } }]));
     // who starts holding the map's heal: the room's choice against who is in this round
     this.holders = assets.heals.length ? healHolders(rules.heal, [...this.players.keys()], this.seed) : [];
     for (const p of this.players.values()) {

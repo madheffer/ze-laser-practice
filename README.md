@@ -80,6 +80,10 @@ order and recorded in `schema_migrations`; to change the schema, add a new file,
 | `runs` | one row per finished run: `kind` (solo / coop / versus), `verified`, `map`, `stage_id`, `mode` (normal / endless), `result`, `time_s`, `players`, `named`, `room_name`, `cheats` (the room had a cheat rule on), `cause`, `finished_at` |
 | `run_players` | who played it: `name`, `won`, `hits`, `survived_s`, `removed` (taken out by the anti-cheat). A private room's players are never written |
 | `ranked_runs` (view) | the rows a leaderboard may rank: no cheat rules, not removed, and normal runs only when cleared |
+| `players` | everyone who signed in through Steam: `steam_id` (SteamID64), `name` (persona at last sign-in), `avatar` |
+| `run_players.steam_id` | the player, when signed in: a leaderboard counts a signed-in player once by it, whatever name they used |
+| `runs.listed` | `false`: kept for its player's history only, not on the home feed ("Share my runs" off) |
+| `replays` | a solo run's replay (see "Replays"): `owner`, `public`, `pinned`, `views`, `meta` (seed, rules, stage), `data` (gzip) |
 
 Leaderboards rank each player's best run: normal = fastest clear, then fewest hits; endless = longest survived.
 Solo names are whatever the player typed, so use `verified` if you only want rounds the server watched.
@@ -89,7 +93,8 @@ Solo names are whatever the player typed, so use `verified` if you only want rou
 Over HTTP (served by the dev / preview server and by `npm run coop-server`, read-only, JSON):
 
 - `GET /api/leaderboard?map=ze_mist_p&stage=throne&mode=normal&kind=solo&limit=25`
-- `GET /api/runs?limit=40` (newest first)
+- `GET /api/runs?limit=40` (newest first, the feed's runs)
+- `GET /api/replays/<id>` (a shared replay; counts a view), `GET /api/me/runs` (your history, signed in)
 
 Or straight from SQL, e.g. the fastest solo clears of a stage:
 
@@ -106,6 +111,40 @@ Backups: `pg_dump -U lasers -Fc lasers > lasers.dump`, restore with `pg_restore 
 Serve the built game (`npm --prefix web run build` -> `web/dist/`) from any web server and reverse-proxy `/coop`
 (WebSocket) and `/api/` to `npm --prefix web run coop-server` (port 5810, `--port` to change) on the same origin.
 `/healthz` answers `ok`.
+
+## Replays, run history, Steam sign-in
+
+**Replays** (`lib/replay-codec.js`, `app/replay-*.js`). Every solo stage run is recorded: where the player stood and
+looked on each 64-tick step (1/32 unit, 1/10 degree, delta + varint, gzipped), plus the few things they did that the
+map reacts to (shots at a boss with the view they were fired at, the map item's E, fall damage). Nothing about the map
+is stored: the header carries the run's **seed**, its rules (humans, boss HP, team fire, heal item), the stage and the
+map's bake version, and playback rebuilds the stage from those and lets the map's own entity logic play out, the same
+way the co-op anti-cheat replays a round (`server/coop-check.js`). A 3-minute run is ~25-45 KB. Playback re-runs the
+simulation, so seeking back rebuilds the stage and fast-forwards. A map re-baked since the run gets a warning (it may
+play out differently).
+
+Watching: the play button on a feed row or in Your runs, Watch replay on the end card (your last run, works offline),
+or a link `/?replay=<id>`. Cameras: their eyes (V / 1), behind them (CS2Fixes third person, 2), free camera (3: click
+for the mouse, WASD, Space / Ctrl up and down, Shift faster). Space pause, Left / Right 5 s, `[` `]` speed, R restart,
+Esc gives the mouse back, then leaves.
+
+**Who keeps what.** "Share my solo runs" on (the home feed's switch): the run is on the live feed and anyone can watch
+its replay. Signed in through Steam, every run is also kept for **Your runs** (the feed's second tab), shared or not;
+from there Share makes a link anyone can watch and keeps that replay for good. Kept: a player's newest 200 replays
+plus everything they shared; a guest's shared replays 14 days. `replays.views` counts others watching (one per viewer
+per replay per 30 minutes; the owner's own don't count). Solo runs are still the page's word (`verified = false`).
+
+**Steam sign-in** (`server/auth/`), the same OpenID 2.0 flow and checks as vpkstuff's `SteamService`: the assertion is
+bound to this server (Steam's `op_endpoint`, our `return_to`, a signature over the trusted fields, a single-use nonce)
+before Steam's own `check_authentication`, and an anti-CSRF state rides in the signed `return_to` and a cookie. The
+session is a signed HttpOnly cookie (30 days). Set in `web/.env` (see `.env.example`):
+
+- `SESSION_SECRET`: 32+ random characters. Without it a random key is made at start and sign-ins end on a restart.
+- `STEAM_API_KEY` (optional, https://steamcommunity.com/dev/apikey): players' Steam names; without it "Steam player 1234".
+- `STEAM_RETURN_HOST` (optional, e.g. `https://lasers.example.com`): the public origin Steam returns to, behind a proxy.
+
+A signed-in player's co-op / versus rounds carry their SteamID too (public rooms only: a private room's players are
+still never written).
 
 ## The map folder (shared with lasers.cybo.dev)
 
@@ -395,8 +434,10 @@ web/src/
                      paths, asset keys, versioned URLs), format, math (clamp, approach, bounds), storage, fetch
   app/               state, settings (sanitised, CS2 cvars), session (one attempt), loop (frames + 64-tick step),
                      input (keys, raw mouse, touch, fullscreen, keyboard lock), camera (first / third person),
-                     bosses (squad fire, shots, BossHUD numbers), endless, records
+                     bosses (squad fire, shots, BossHUD numbers), endless, records, account (Steam sign-in state),
+                     activity (your runs to the server), replay-record / replay-play / replay-view / replay (replays)
   ui/                maps (the map picker), menu (tabs: Play / Settings), hud (CS2 Panorama HUD + BossHUD panel), overlay (end cards),
+                     home / home-feed / home-history (the home page, live feed, Your runs), replay-bar, steam-button,
                      touch (joystick, look, jump / crouch / fire buttons) + their css
   world/             collision (box traces, BVH, ray-vs-hull), movement (CS2), render (three.js, ping history),
                      assets, body (third-person CT), entities/ (engine, entity, keyvalues, math, registry,
@@ -419,6 +460,7 @@ bake/                Program.cs (map bake), PanoramaBake.cs, SoundBake (stock + 
 Panorama assets: `lasers-bake --panorama web/public/panorama` exports the HUD's SVG icons, its vxml/vcss (reference)
 and the Stratum2 fonts (from `stratum2.uifont`) — Valve content, gitignored.
 
-`window.__lasers` is a debug handle. `__lasers.advance(seconds)` steps the simulation synchronously, and
+`window.__lasers` is a debug handle. `__lasers.advance(seconds)` steps the simulation synchronously (a replay too:
+set `__lasers.replay.paused = true` first), `__lasers.watchLastRun()` / `watchReplay(id)` play a replay, and
 `window.__lasersInput = (t) => input` drives the player, for automated checks. A hidden tab gets no
 animation frames, so the frame loop alone won't move.

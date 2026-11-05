@@ -7,6 +7,7 @@
 //   vm.trigger(down)                          // Mouse 1 held/released
 //   vm.trigger2(down)                         // Mouse 2 (knife stab)
 //   vm.inspect()                              // F
+//   vm.playShot(kind)                         // a replay's recorded shot: the animation only, no onShot
 //   vm.onShot = (shot) => {}                  // set by main: called per bullet/slash that should be traced:
 //                                             //   shot = { kind: 'bullet'|'slash'|'stab', damage, range }
 //   vm.render(aspect)                         // after the world pass (own camera, viewmodel FOV 68, cleared depth)
@@ -220,6 +221,12 @@ export class Viewmodel {
       this._shot({ kind: 'stab', damage: K.stab.damage, range: K.stab.range });
       this._play(KNIFE_HEAVY);
     }
+  }
+
+  // A replay's recorded shot (app/loop.js): the animation only; the replay traces the shot itself.
+  playShot(kind) {
+    if (kind === 'bullet') { if (this.weapon !== 'gun') return; this._play(undefined); this._kick = Math.min(this._kick + 1, 3); }
+    else if (this.weapon === 'knife') this._play(kind === 'stab' ? KNIFE_HEAVY : KNIFE_LIGHT);
   }
 
   _shot(shot) {

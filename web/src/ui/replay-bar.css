@@ -1,0 +1,35 @@
+/* The replay bar (ui/replay-bar.js): along the bottom, over the game, the HUD's health / ammo lifted above it. */
+.rb {
+  position: fixed; left: 50%; bottom: max(12px, var(--safe-b, 0px)); transform: translateX(-50%); z-index: 30;
+  width: min(980px, calc(100vw - 24px)); padding: 8px 12px 10px; border-radius: 12px;
+  background: rgba(10, 14, 19, 0.82); border: 1px solid var(--line, #263241); color: var(--text, #e6edf3);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); font: 13px/1.3 system-ui, 'Segoe UI', sans-serif;
+}
+.rb.hidden { display: none; }
+.rb .grow { flex: 1; }
+.rb-top { display: flex; align-items: center; gap: 10px; min-width: 0; margin-bottom: 6px; }
+.rb-badge { font-size: 10px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: #fff; background: var(--accent, #e5484d); border-radius: 4px; padding: 2px 6px; }
+.rb-title { margin: 0; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rb-hint { margin: 0; color: var(--dim, #8b98a5); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rb-row { display: flex; align-items: center; gap: 8px; }
+.rb button {
+  min-height: 32px; padding: 0 10px; border-radius: 7px; border: 1px solid var(--line, #263241);
+  background: rgba(255, 255, 255, 0.04); color: inherit; font: inherit; font-weight: 600; cursor: pointer;
+}
+.rb button:hover:not(:disabled) { background: rgba(255, 255, 255, 0.1); }
+.rb button:focus-visible, .rb input:focus-visible { outline: 2px solid var(--focus, #6cb6ff); outline-offset: 2px; }
+.rb-play { min-width: 44px; font-size: 14px; }
+.rb-time { font-variant-numeric: tabular-nums; color: var(--dim, #8b98a5); min-width: 96px; text-align: center; }
+.rb-scrub { flex: 1; min-width: 80px; accent-color: var(--accent, #e5484d); }
+.rb-speed { min-width: 38px; text-align: center; font-variant-numeric: tabular-nums; font-weight: 700; }
+.rb-cams { display: inline-flex; gap: 2px; padding: 2px; border: 1px solid var(--line, #263241); border-radius: 9px; }
+.rb-cams .rb-cam { border: 0; background: transparent; color: var(--dim, #8b98a5); }
+.rb-cams .rb-cam[aria-pressed="true"] { background: #1d2733; color: #fff; box-shadow: inset 0 -2px 0 var(--accent, #e5484d); }
+.rb.seeking .rb-scrub { opacity: 0.6; }
+.rb-leave { color: #ff9b9b; }
+body.replaying #hud .hud-ha { bottom: calc(16 * var(--u) + 92px); }
+@media (max-width: 720px) {
+  .rb-hint, .rb-copy, .rb-time { display: none; }
+  .rb-row { flex-wrap: wrap; }
+  .rb-scrub { order: -1; flex-basis: 100%; }
+}

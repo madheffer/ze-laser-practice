@@ -20,6 +20,8 @@ import { mapStore } from './map-store.js';
 import { activityFeed } from './activity.js';
 import { apiHandler } from './api.js';
 import { openStore } from './db/store.js';
+import { sameOriginSocket, clientAddress } from './http-util.js';
+import { serverAuth } from './auth/index.js';
 
 export const PATH = '/coop';
 const MAX_ROOMS = 300;
@@ -41,21 +43,6 @@ function newCode(rooms) {
   return null;
 }
 
-// A page on another site must not open a socket here: when an Origin is sent it has to be this host.
-function sameOrigin(req) {
-  const origin = req.headers.origin;
-  if (!origin) return true; // not a browser
-  try { return new URL(origin).host === req.headers.host; } catch { return false; }
-}
-
-// The address the per-address cap counts. Behind a reverse proxy / tunnel every socket comes from the proxy, so
-// the host names the header that proxy sets to the real client (ipHeader, e.g. cf-connecting-ip). Only set it when
-// a proxy you run always sets that header: otherwise a client could send any value. Never logged or sent anywhere.
-function clientAddress(req, ipHeader) {
-  const fromProxy = ipHeader ? String(req.headers[ipHeader] || '').split(',')[0].trim().slice(0, 64) : '';
-  return fromProxy || req.socket.remoteAddress || '';
-}
-
 // a name nobody else in the room has: "Bob", "Bob (2)"
 function uniqueName(room, name, self) {
   const taken = new Set(room.members.filter((m) => m !== self).map((m) => m.name));
@@ -65,7 +52,9 @@ function uniqueName(room, name, self) {
 }
 
 // store: db/store.js's run store (or a promise for one): every finished run is written there
-export function attachCoopRelay(httpServer, { log = () => {}, store = openStore({ log }), ipHeader = '', scenariosDir = path.resolve(HERE, '../public/scenarios'), mapsDir = path.resolve(HERE, '../public/maps') } = {}) {
+// sessions: auth/session.js's: a signed-in player's socket carries their SteamID into the runs they play
+// Returns the WebSocket server; .feed is the activity feed (POST /api/solo writes to it, runs-http.js)
+export function attachCoopRelay(httpServer, { log = () => {}, store = openStore({ log }), sessions = null, ipHeader = '', scenariosDir = path.resolve(HERE, '../public/scenarios'), mapsDir = path.resolve(HERE, '../public/maps') } = {}) {
   const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_FRAME, perMessageDeflate: false });
   const rooms = new Map(); // code -> room
   const perAddress = new Map();
@@ -202,7 +191,6 @@ export function attachCoopRelay(httpServer, { log = () => {}, store = openStore(
       case 'hit': if (round && m.r === round.r) round.onHit(c, m); break;
       // the home page's live feed: watch it, or report your own solo run to it
       case 'feed': feed.watch(c, m.on !== false); break;
-      case 'solo': feed.solo(c, m).catch(() => {}); break;
       case 'reload': if (round && m.r === round.r) round.onReload(c); break;
       case 'use': if (round && m.r === round.r) round.onUse(c, m); break;
     }
@@ -210,7 +198,7 @@ export function attachCoopRelay(httpServer, { log = () => {}, store = openStore(
 
   wss.on('connection', (ws, req) => {
     const addr = clientAddress(req, ipHeader);
-    const c = { id: nextId++, name: 'Player', ws, room: null, windowAt: Date.now(), count: 0, listAt: 0, addr };
+    const c = { id: nextId++, name: 'Player', ws, room: null, windowAt: Date.now(), count: 0, listAt: 0, addr, user: sessions?.user(req) || null };
     ws.isAlive = true;
     ws.on('pong', () => { ws.isAlive = true; });
     send(c, { t: 'welcome', you: c.id, max: ROOM_MAX });
@@ -245,25 +233,28 @@ export function attachCoopRelay(httpServer, { log = () => {}, store = openStore(
   httpServer.on('upgrade', (req, socket, head) => {
     if ((req.url || '').split('?')[0] !== PATH) return; // Vite's own HMR socket and anything else
     const addr = clientAddress(req, ipHeader);
-    if (!sameOrigin(req) || (perAddress.get(addr) || 0) >= PER_ADDRESS) {
+    if (!sameOriginSocket(req) || (perAddress.get(addr) || 0) >= PER_ADDRESS) {
       socket.write('HTTP/1.1 403 Forbidden\r\n\r\n'); socket.destroy(); return;
     }
     perAddress.set(addr, (perAddress.get(addr) || 0) + 1);
     wss.handleUpgrade(req, socket, head, (ws) => wss.emit('connection', ws, req));
   });
+  wss.feed = feed;
   return wss;
 }
 
 // Vite plugin: the co-op server on the dev server (npm run dev) and the preview server (npm run play / host).
 // The run store opens once (DATABASE_URL from web/.env or the environment; memory without one) and also answers
-// /api/ (api.js).
+// /api/ (api.js), with Steam sign-in (auth/).
 export function coopRelayPlugin() {
-  let store = null;
+  let store = null, auth = null;
   const attach = (server) => {
     const log = (m) => server.config.logger.info(m);
     store ||= openStore({ log });
-    server.middlewares.use(apiHandler(store));
-    if (server.httpServer) attachCoopRelay(server.httpServer, { log, store });
+    auth ||= serverAuth({ log });
+    let relay = null;
+    server.middlewares.use(apiHandler(store, { auth, feed: () => relay?.feed }));
+    if (server.httpServer) relay = attachCoopRelay(server.httpServer, { log, store, sessions: auth.sessions });
   };
   return { name: 'coop-relay', configureServer: attach, configurePreviewServer: attach };
 }

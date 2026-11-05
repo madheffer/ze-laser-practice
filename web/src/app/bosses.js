@@ -128,11 +128,19 @@ function attackActive() {
 
 // A shot from the viewmodel (bullet or knife): trace it against the world and the bosses.
 export function onShot(shot) {
+  const { run, engine, player } = S;
+  if (!run || S.paused || run.done || run.spectating || !engine || S.replay) return;
+  run.rec?.shot(run.ticks, shot, player.yaw, player.pitch); // its replay redoes it on the same tick (app/replay-play.js)
+  shootAs(shot, player.yaw, player.pitch);
+}
+
+// the shot itself, fired along yaw / pitch from the player's eye (a replay passes the recorded view)
+export function shootAs(shot, yaw, pitch) {
   const { run, engine, player, world, scenario } = S;
-  if (!run || S.paused || run.done || run.spectating || !engine) return;
+  if (!run || run.done || !engine) return;
   G.audio.play(shot.kind === 'bullet' ? 'gun.fire' : shot.kind === 'stab' ? 'knife.stab' : 'knife.slash', { pos: player.origin });
   const noDamage = run.endless && scenario?.endless?.noBossDamage;
-  const dir = angleForward([player.pitch, player.yaw, 0]);
+  const dir = angleForward([pitch, yaw, 0]);
   const eye = eyePos();
   const range = shot.range || 8192;
   const wallTr = world.traceRay(eye, eye.map((v, i) => v + dir[i] * range), undefined, true);

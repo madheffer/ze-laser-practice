@@ -244,3 +244,54 @@
 /* the menu's way back home (index.html #go-home) */
 #menu .home-btn { display: inline-grid; place-items: center; width: var(--tap); height: var(--tap); padding: 0; margin-right: 4px; }
 #menu .home-btn svg { width: 18px; height: 18px; }
+
+/* ---- Steam account (ui/home.js), the feed's tabs, replay buttons and views (ui/home-feed.js, ui/home-history.js,
+   ui/replay-buttons.js) */
+.home-account { display: flex; align-items: center; gap: 8px; }
+.home-user { font-size: 13px; font-weight: 600; color: var(--text); max-width: 16ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* tabs: an underlined strip under the title, the whole width */
+.hf-head { padding-bottom: 6px; }
+.hf-tabs { display: flex; gap: 4px; margin: 0 18px 6px; border-bottom: 1px solid var(--edge); }
+.hf-tab {
+  position: relative; flex: 0 0 auto; border: 0; background: none; color: var(--dim); cursor: pointer;
+  font: inherit; font-size: 13px; font-weight: 600; padding: 8px 4px 10px; margin-right: 14px; transition: color 0.15s;
+}
+.hf-tab:hover { color: var(--text); }
+.hf-tab[aria-selected="true"] { color: var(--text); }
+.hf-tab[aria-selected="true"]::after { content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; border-radius: 2px; background: var(--accent); }
+.hf-tab:focus-visible { outline: 2px solid var(--focus, #6cb6ff); outline-offset: 2px; border-radius: 4px; }
+
+/* rows: icon | what | time + when | play */
+.hf-row { grid-template-columns: 32px minmax(0, 1fr) auto 32px; }
+.hf-row.has-replay { cursor: pointer; }
+.hf-row.has-replay:hover .rbtn-play { color: #fff; background: var(--accent); border-color: transparent; transform: scale(1.06); }
+.hf-act { display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
+.hh-row { grid-template-columns: 32px minmax(0, 1fr) auto auto; }
+.hh-row .hf-act { min-width: 32px; }
+.hf-meta { display: flex; align-items: center; gap: 8px; }
+.hf-meta > span:first-child { overflow: hidden; text-overflow: ellipsis; }
+
+.rbtn {
+  display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border-radius: 50%; cursor: pointer;
+  color: var(--text); background: rgba(255, 255, 255, 0.05); border: 1px solid var(--edge);
+  transition: background-color 0.15s, color 0.15s, border-color 0.15s, transform 0.15s;
+}
+.rbtn svg { width: 14px; height: 14px; }
+.rbtn-play svg { margin-left: 2px; }
+.rbtn:hover { background: rgba(255, 255, 255, 0.12); }
+.rbtn-play:hover { color: #fff; background: var(--accent); border-color: transparent; }
+.rbtn-share { color: var(--dim); }
+.rbtn-share.on { color: var(--good); border-color: rgba(61, 220, 132, 0.35); }
+.rbtn-share.done { color: #fff; background: var(--good); border-color: transparent; }
+.rbtn:disabled { opacity: 0.5; cursor: progress; }
+.rbtn:focus-visible { outline: 2px solid var(--focus, #6cb6ff); outline-offset: 2px; }
+.rviews { display: inline-flex; align-items: center; gap: 4px; flex: none; font-size: 11.5px; color: var(--dim); font-variant-numeric: tabular-nums; }
+.rviews svg { width: 13px; height: 13px; opacity: 0.8; }
+
+.hh-dot::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+.hh-dot { display: grid; place-items: center; }
+.hh .hf-empty .steam-btn { margin-top: 4px; }
+.hf.mine .hf-foot { display: none; }
+.hh[hidden] { display: none; }
+@media (prefers-reduced-motion: reduce) { .rbtn, .hf-row.has-replay:hover .rbtn-play { transition: none; transform: none; } }

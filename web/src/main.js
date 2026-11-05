@@ -31,7 +31,7 @@ import { ItemHud } from './ui/itemhud.js';
 import { Killfeed } from './ui/killfeed.js';
 import { Lobby } from './ui/lobby.js';
 import { Home } from './ui/home.js';
-import { installActivity } from './app/activity.js';
+import { installReplays, bootReplays, replayKey, hasReplayLink } from './app/replay-boot.js';
 import { Peers } from './world/peers.js';
 import { usableHeals } from './world/items.js';
 import { applyGamma } from './ui/gamma.js';
@@ -142,6 +142,7 @@ installInput(canvas, {
   weapon,
   lastWeapon: () => { const before = G.vm.weapon; G.vm.swapLast(); if (G.vm.weapon !== before) { G.hud.showWeapons(G.vm.weapon); G.audio.play(G.vm.weapon === 'gun' ? 'gun.deploy' : 'knife.deploy'); } },
   reload: () => G.vm.reload(),
+  replayKey, // a replay's keys (app/replay.js)
   restart: () => { if (net.inRoom) { if (net.isHost) hostStart(S.scenarioIndex, S.run?.mode); } else startScenario(S.scenarioIndex, S.run?.mode); },
 });
 
@@ -224,7 +225,8 @@ async function init() {
   else G.maps.focusCurrent();
   // first visit (no ?map, no invite link): the home page
   G.home.setMaps(S.mapIndex);
-  if (!asked && !net.inRoom && !new URLSearchParams(location.search).has('room')) G.home.show();
+  if (!asked && !net.inRoom && !new URLSearchParams(location.search).has('room') && !hasReplayLink()) G.home.show();
+  await bootReplays(); // who is signed in, then a shared replay link (?replay=<id>)
 }
 
 // the quality tier to load a map at (lasers-bake --tiers): '' = high
@@ -251,7 +253,7 @@ G.lobby = new Lobby($('#lobby'), {
   hasHeal: () => usableHeals(S.map?.items).length > 0,
 });
 installCoop();
-installActivity(net);
+installReplays(); // replays + the Steam account (app/replay-boot.js)
 
 // the home page: every way in leads to the menu (its Home button comes back)
 const toMenu = () => { G.home.hide(); G.menu.show(G.menu.view); };
@@ -264,6 +266,7 @@ G.home = new Home($('#home'), {
     join: (code) => { toMenu(); G.lobby.joinCode(code); },
     map: (name) => { G.home.hide(); G.menu.show('maps'); openMap(name); },
     settings: () => { G.home.hide(); G.menu.selectTab($('#tab-settings')); },
+    watch: (id) => G.watchReplay(id),
   },
 });
 $('#go-home').addEventListener('click', () => G.home.show());
@@ -274,6 +277,7 @@ window.__lasers = {
   get paused() { return S.paused; }, get renderer() { return G.renderer; }, get map() { return S.map; }, get vm() { return G.vm; }, get body() { return G.body; }, get audio() { return G.audio; }, get overlayOpen() { return G.overlay.open; },
   get stream() { return G.stream; },
   startScenario, settings, scenarios: () => S.scenarios,
+  get replay() { return S.replay; }, watchReplay: (id) => G.watchReplay(id), watchLastRun: () => G.watchLastRun(),
   coop: { net, lobby, get round() { return S.mp; }, peers: G.peers },
   // run the simulation n seconds synchronously (tests; a hidden tab gets no animation frames)
   // solo only: a co-op / versus round runs on the server's clock

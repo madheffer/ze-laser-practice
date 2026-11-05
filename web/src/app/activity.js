@@ -1,19 +1,30 @@
-// Your solo runs on the home page's live feed (server/activity.js). Only finished stages are sent: map, stage,
-// win / death, time, hits, what killed you, and the name you typed in the lobby. Off with the home page's
-// "Share my runs" switch (kept in this browser), and never for runs with god mode on (nothing to show).
-// main.js hands over the co-op socket (installActivity) so this file doesn't import app/coop.js (which imports
-// session.js, which reports here).
+// Your solo runs, to the server (POST /api/solo, server/runs-http.js): map, stage, win / death, time, hits, what
+// killed you, the name you typed in the lobby, and the run's replay (app/replay-record.js: your position and view
+// on every tick, gzipped). Only finished stages, never runs with god mode on.
+//   "Share my runs" on (the home page's switch, kept in this browser): it goes on the live feed, and anyone can watch
+//   its replay. Off: signed in through Steam, it is still kept for your run history (only you can watch it);
+//   signed out, nothing is sent.
 import { loadJson, saveJson } from '../lib/storage.js';
+import { gzip, toBase64 } from '../lib/bytes.js';
+import { signedIn } from './account.js';
 
 const KEY = 'lasers.home'; // { share: boolean }
-let net = null;
 
-export function installActivity(client) { net = client; }
 export function sharesRuns() { return loadJson(KEY).share !== false; }
 export function setSharesRuns(on) { saveJson(KEY, { ...loadJson(KEY), share: !!on }); }
 
-// { map, stage, mode, result: 'win' | 'dead' | 'lose', time, hits, cause, name, god }
-export function reportSolo({ god, ...run }) {
-  if (god || !net || !sharesRuns() || !run.stage || run.stage === 'free') return;
-  net.reportSolo(run);
+// run: { map, stage, mode, result: 'win' | 'dead' | 'lose', time, hits, cause, name, god }; replay: { meta, bytes } or null
+// -> the server's { id, replay } (replay: the id to watch it by), or null
+export async function reportSolo({ god, ...run }, replay) {
+  if (god || !run.stage || run.stage === 'free') return null;
+  const share = sharesRuns();
+  if (!share && !signedIn()) return null;
+  const body = { ...run, share };
+  try {
+    if (replay) body.replay = { meta: replay.meta, data: toBase64(await gzip(replay.bytes)) };
+    const r = await fetch('/api/solo', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    return r.ok ? await r.json() : null;
+  } catch {
+    return null; // offline / a static host without the server: the run stays local
+  }
 }

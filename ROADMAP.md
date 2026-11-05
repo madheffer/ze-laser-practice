@@ -64,7 +64,12 @@ exact map-folder format so he can lift our maps straight into his site. See [REA
 - [ ] **Teammate animation + sounds** — peers slide in the knife idle (same as third person); their footsteps / shots aren't heard
 - [x] **Runs + leaderboards in Postgres (2026-11-05)** — every finished run (server-checked co-op / versus rounds, page-reported solo runs marked unverified) is stored in PostgreSQL (`server/db/`: numbered SQL migrations, `runs` + `run_players` + the `ranked_runs` view; memory store when DATABASE_URL is unset in dev); the home feed refills from it after a restart; read-only `/api/leaderboard` + `/api/runs`; private rooms' players are never written; README "Database" has the full setup
 - [ ] **Leaderboard UI** — show `/api/leaderboard` in the game (stage list / end card), next to the browser's own personal best
-- [ ] **Steam sign-in for leaderboard names** — solo names are whatever the player typed (`verified = false`); a sign-in would make names real and let solo runs be checked like co-op rounds
+- [x] **Steam sign-in, run history, replays (2026-11-05)** — Sign in through Steam (OpenID 2.0, vpkstuff's checks; signed session cookie); signed-in runs carry the SteamID and leaderboards count a player once by it; every solo run records a replay (per-tick position + view, shots / E / fall damage, the run's seed and rules; ~25-45 KB per 3 min) played back on the map's own logic with first person / third person / free camera, seek and speed; Watch on the live feed, on the end card and in Your runs (the feed's second tab); Share links (`/?replay=<id>`); view counts per replay
+- [ ] **Solo runs checked from their replay** — the server could run a solo replay through `coop-check.js` like a round and mark it verified
+- [ ] **Co-op / versus replays** — the server already has every player's per-tick positions (the anti-cheat); store them per round and play several bodies back
+- [ ] **Leaderboard replays** — a Watch button on each leaderboard row (pin the replay of a player's best)
+- [ ] **Live view counts** — feed rows show the views they had when the page loaded; push changes
+- [ ] **Sign-out on the co-op socket** — the socket keeps the SteamID it opened with until it reconnects
 - [ ] **Rate-limit /api/** — the read endpoints are indexed and capped at 100 rows, but have no per-address limit yet
 - [ ] **Leaderboard filters** — by humans/boss-HP settings and ping, so a 200 ms run isn't ranked against 0 ms
 - [ ] **Endless difficulty ramp** — balls/lasers speed up or overlap more the longer you last (a scenario `endless.ramp`), instead of a flat repeat

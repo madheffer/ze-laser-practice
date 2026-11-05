@@ -9,6 +9,8 @@ import './home.css';
 import { ROOM_CODE } from '../net/coop-client.js';
 import { Backdrop, Strip, shotsOf } from './home-hero.js';
 import { HomeFeed } from './home-feed.js';
+import { account, onAccount, signOut } from '../app/account.js';
+import { steamButton } from './steam-button.js';
 
 function el(tag, cls, t) { const e = document.createElement(tag); if (cls) e.className = cls; if (t != null) e.textContent = t; return e; }
 
@@ -20,13 +22,14 @@ const ICON = { // constant SVG, never data
 };
 
 export class Home {
-  // net: CoopClient; mapTitle(name); on: { play(), find(), make(), join(code), map(name), settings() }
+  // net: CoopClient; mapTitle(name); on: { play(), find(), make(), join(code), map(name), settings(), watch(replay id) }
   constructor(root, { net, mapTitle, on }) {
     this.root = root;
     this.on = on;
     this.mapTitle = mapTitle;
-    this.feed = new HomeFeed({ net, mapTitle, onStats: (s) => this.stats(s) });
+    this.feed = new HomeFeed({ net, mapTitle, onStats: (s) => this.stats(s), onWatch: (id) => on.watch(id) });
     this.build();
+    onAccount(() => this.renderAccount());
   }
 
   build() {
@@ -47,8 +50,11 @@ export class Home {
     const settings = el('button', 'home-link', 'Settings');
     settings.type = 'button';
     settings.addEventListener('click', () => this.on.settings());
+    // Steam: sign in (a link: Steam's own page, then back here), or who you are + sign out
+    this.accountBox = el('div', 'home-account');
     const navEnd = el('div', 'home-nav-end');
-    navEnd.append(this.pill, settings);
+    navEnd.append(this.pill, this.accountBox, settings);
+    this.renderAccount();
     nav.append(brand, navEnd);
 
     // left: the pitch, the actions, join by code, the numbers
@@ -116,6 +122,19 @@ export class Home {
     b.append(icon, text, arrow);
     b.addEventListener('click', onClick);
     return b;
+  }
+
+  renderAccount() {
+    const box = this.accountBox;
+    if (!box) return;
+    if (account.user) {
+      const out = el('button', 'home-link', 'Sign out');
+      out.type = 'button';
+      out.addEventListener('click', () => signOut());
+      box.replaceChildren(el('span', 'home-user', account.user.name), out);
+    } else {
+      box.replaceChildren(steamButton({ size: 'small' }));
+    }
   }
 
   setMaps(maps) {
