@@ -224,7 +224,7 @@ All coordinates are Source units (inches, Z up), except the glbs, which are VRF'
 `start` inputs fire 1 s after spawn. You win either after `winAfter` seconds, or when `win: {target, input}`
 is received (`survive: s` on it: only if you are still alive s seconds later, for a nuke's `Enable`, ze_deadcore's
 endings; `from: name`: only when that entity sends it, ze_deadcore's dodge corridor end trigger, not the clock sending
-the same input). Check a map's stages with `node tools/audit-stages.mjs web/public/maps/<map>`: inputs to entities the
+the same input). Check a map's sounds with `node tools/audit-sounds.mjs web/public/maps/<map>` (requests no table defines, events with no file, stacks of one event on one tick, peak voices). Check a map's stages with `node tools/audit-stages.mjs web/public/maps/<map>`: inputs to entities the
 stage never spawned, effects / models not baked, drills that end before their own attack hurts, and wins you'd get
 standing still. Fields we added (cybo's site ignores them):
 
@@ -351,7 +351,7 @@ world triangle from `--collision`;
 `lasers-bake --stock-sounds web/public/sounds` writes the stock knife / buyable guns / player set (gitignored);
 the entity engine only emits sound requests (`world/entities/sound.js`: breakable break / hit by material, env_explosion,
 train move / ping / start / stop, door and movelinear sounds, from server.dll / Source) and
-`audio/audio.js` plays them (CS2 distance curves, csgo_mega voice limits in `audio/limits.js`, music through the music volume, then CS2's final-mix compressor `FinalMixGlue` from `sounds/graphs/__main__.vmix`: `audio/mixglue.js`). Test pages:
+`audio/audio.js` plays them (CS2 distance curves, csgo_mega voice limits in `audio/limits.js`, every voice x its mix group's Default_Mix level as CS2's soundmixers.txt sets it (World 0.4, Weapons 0.6, BulletImpacts 0.3 ...; `audio/mix.js`, table `lib/sound-mix-cs2.js` from `lasers-bake --mixers`), the event's distance_multiplier and volume randomness, music through the music volume, then CS2's final-mix compressor `FinalMixGlue` from `sounds/graphs/__main__.vmix`: `audio/mixglue.js`). Test pages:
 `audio-test.html`, `vm-test.html`.
 
 Third person (CS2Fixes `!tp`, menu "Video & camera"): `world/body.js` draws your CT, the stock

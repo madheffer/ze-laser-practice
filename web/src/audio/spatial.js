@@ -20,12 +20,14 @@ export function evalCurve(curve, d) {
   return curve[curve.length - 1][1];
 }
 
-// gain (the voice's own gain x distance curve) and pan (-1 left .. 1 right) for a sound at pos.
-export function spatialMix(pos, listener, curve, gain) {
+// gain (the voice's own gain x distance curve) and pan (-1 left .. 1 right) for a sound at pos. distMult: the
+// event's distance_multiplier (csgo_mega multiplied_distance = distance x it): 0 = always at the curve's start
+// (ze_neochrome's intro / door / boss-end / rotating-laser sounds are heard map-wide at full volume).
+export function spatialMix(pos, listener, curve, gain, distMult = 1) {
   const L = listener.pos;
   const dx = pos[0] - L[0], dy = pos[1] - L[1], dz = pos[2] - L[2];
   const d = Math.hypot(dx, dy, dz);
-  const g = gain * evalCurve(curve || DEFAULT_CURVE, d);
+  const g = gain * evalCurve(curve || DEFAULT_CURVE, d * (Number.isFinite(distMult) && distMult >= 0 ? distMult : 1));
   let p = 0;
   const hd = Math.hypot(dx, dy);
   if (hd > 1) {

@@ -230,6 +230,13 @@ static class SoundBake
                 if (pts.Count > 0 && useCurve) ev["curve"] = pts;
             }
             if (f.TryGetValue("position_relative_to_player", out var rel) && Num(rel) != 0) ev["local"] = true;
+            // the mixer and the stack's volume / distance inputs (audio/mix.js, audio.js): only what the event sets
+            if (f.TryGetValue("mixgroup", out var mg) && mg.ValueType == KVValueType.String && mg.ToString(CultureInfo.InvariantCulture).Length > 0)
+                ev["mixgroup"] = mg.ToString(CultureInfo.InvariantCulture);
+            if (f.TryGetValue("distance_multiplier", out var dm) && Num(dm) != 1) ev["distanceMultiplier"] = Math.Round(Num(dm), 4);
+            var vrMin = f.TryGetValue("volume_random_min", out var vmn) ? Num(vmn) : 0;
+            var vrMax = f.TryGetValue("volume_random_max", out var vmx) ? Num(vmx) : 0;
+            if (vrMin != 0 || vrMax != 0) ev["volumeRandom"] = new JsonArray(Math.Round(vrMin, 4), Math.Round(vrMax, 4));
             if (f.TryGetValue("vsnd_duration", out var dur)) ev["duration"] = Math.Round(Num(dur), 3);
             // voice management (audio/limits.js): only what the event sets; the stack's defaults live in the player
             if (f.TryGetValue("instance_limit", out var il) && Num(il) > 0) ev["instanceLimit"] = Math.Round(Num(il));
@@ -261,6 +268,14 @@ static class SoundBake
         try
         {
             var res = loader.LoadFile(path + "_c");
+            // an event may name the source file (ze_offliner: "sounds/ambient/waterrun.wav", "sounds/contest/torpedo.mp3");
+            // the resource compiler writes it as <name>.vsnd_c, which is what the game loads
+            if (res?.DataBlock is not Sound && !path.EndsWith(".vsnd", StringComparison.OrdinalIgnoreCase))
+            {
+                var compiled = Path.ChangeExtension(path, ".vsnd");
+                var alt = loader.LoadFile(compiled + "_c");
+                if (alt?.DataBlock is Sound) { res = alt; path = compiled; }
+            }
             if (res?.DataBlock is not Sound snd) { failed.Add($"{path} (missing)"); return (null, null); }
             var bytes = snd.GetSound();
             if (bytes.Length > MaxSoundBytes) { failed.Add($"{path} (over {MaxSoundBytes / 1048576} MB)"); return (null, null); }

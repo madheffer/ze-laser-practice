@@ -141,6 +141,17 @@ exact map-folder format so he can lift our maps straight into his site. See [REA
       (+14 dB, clipped); CS2 runs every sound through its final-mix compressor (`__main__.vmix` FinalMixGlue: -6 dB,
       40:1, 4 / 458 ms, peak mode), now `audio/mixglue.js`: the same strike peaks at 0.75, quiet sounds untouched
     - [ ] the rest of the map (15 random rooms, the puro chase in room 4) has no stages yet
+- [x] **Sound as CS2 mixes it, every map (2026-11-06)** — `tools/audit-sounds.mjs` runs each stage and reports silent
+  requests, events with no file, same-tick stacks and peak voices; the maps' `.vsndevts` were diffed against the
+  csgo_mega / csgo_music stack defaults for fields that change the sound. Fixed: every voice x its mix group level
+  (soundmixers.txt Default_Mix x parents, soundsystem.dll FUN_180034870; `audio/mix.js`, `lasers-bake --mixers`):
+  guns 0.6, impacts 0.3, breakables / physics 0.8, ambients 0.45; `distance_multiplier` (neochrome's intro, doors,
+  boss end and lasers are 0: heard map-wide); `volume_random_*`; ze_offliner named sounds by their source file
+  (`.wav` / `.mp3`) and the bake dropped them (the boss death, Shockwave, music, 4 ambients): they resolve to
+  `.vsnd_c` as CS2 does. Stacks after that (13 breakables at once, deadcore) are held by the final-mix compressor
+  - [ ] soundscapes (env_soundscape*, the `amb.*` events: retrigger, random position, time / fade curves) aren't played
+  - [ ] reverb / DSP presets, mix layers and ducking (other mixers than Default_Mix), occlusion aren't modelled
+  - [ ] a stopped voice fades 50 ms; csgo_mega's default stops at once unless the event has a fade curve (16 amb.* do)
   - [ ] **ze_ffvii_mako_reactor_v5_p** (3513334092) — 85, 5 laser templates; Heal Materia + 7 materia
   - [ ] **ze_ffvii_mako_reactor_v6_p** (3378273414) — 80, 12 laser templates; Heal Materia + 11 materia (Mimic, Barrier, Ultima ...)
   - [ ] **ze_offliner** (3559892707) — 84, 7 laser templates; no heal (Shockwave only)

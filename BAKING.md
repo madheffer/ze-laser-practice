@@ -122,6 +122,7 @@ Shared assets, once per checkout (not per map):
 
 ```bash
 ./bake/bin/Release/net10.0/lasers-bake.exe --stock-sounds web/public/sounds   # knife / AK / player sounds
+./bake/bin/Release/net10.0/lasers-bake.exe --mixers web/src/lib/sound-mix-cs2.js  # CS2's mix group levels (committed; rerun after a CS2 update)
 # per map, sounds only (soundevents.json + sounds/, the stock events its entities name included; manifest version bumped):
 # ./bake/bin/Release/net10.0/lasers-bake.exe --sounds <workshop.vpk> web/public/maps/<map>
 ./bake/bin/Release/net10.0/lasers-bake.exe --panorama web/public/panorama     # HUD icons, fonts, Panorama reference
@@ -170,6 +171,7 @@ For a map that's already baked, each piece can be redone on its own (`lasers-bak
 | `--collision` | `collision_fx.bin` + layers only (the particle trace set); takes `web/public/maps`, not the map dir |
 | `--overview` | the CS2 radar (`overview/`) |
 | `--shots` | the loading-screen screenshots (`shots/`) |
+| `--sounds` | `soundevents.json` + `sounds/` only (the map's events and the stock ones its entities name); bumps the manifest version |
 
 And `--scan <workshop/content/730> scan.json` ranks a local workshop library for laser-heavy maps.
 

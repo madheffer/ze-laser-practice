@@ -46,6 +46,14 @@ public static class Program
             if (wCs2 == null) { Console.Error.WriteLine("no CS2 install found (--cs2 <game/csgo>)"); return 1; }
             return WeaponBake.Run(Path.Combine(wCs2, "pak01_dir.vpk"), Path.GetFullPath(args[1]));
         }
+        if (args.Length >= 2 && args[0] == "--mixers")
+        {
+            // lasers-bake --mixers <web/src/lib/sound-mix-cs2.js> [--cs2 <game/csgo>]: CS2's mix group levels (MixerBake.cs)
+            var mi = Array.IndexOf(args, "--cs2");
+            var mCs2 = mi > 0 && mi + 1 < args.Length ? args[mi + 1] : FindCs2();
+            if (mCs2 == null) { Console.Error.WriteLine("no CS2 install found (--cs2 <game/csgo>)"); return 1; }
+            return MixerBake.Run(Path.Combine(mCs2, "pak01_dir.vpk"), Path.GetFullPath(args[1]));
+        }
         if (args.Length >= 3 && args[0] == "--sounds")
         {
             // lasers-bake --sounds <workshop.vpk> <web/public/maps/<name>> [--cs2 <game/csgo>]: only soundevents.json + sounds/

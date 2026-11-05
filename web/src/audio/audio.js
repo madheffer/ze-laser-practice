@@ -31,6 +31,7 @@ import { mapName } from '../lib/paths.js';
 import { spatialMix } from './spatial.js';
 import { VoiceLimits } from './limits.js';
 import { createMixGlue } from './mixglue.js';
+import { mixVolume, eventVolume } from './mix.js';
 import { SurfaceSounds } from './surfaces.js';
 import { ALIASES, readTable, fileUrl } from './tables.js';
 import { DEFAULT_GUN, gunSounds } from '../lib/weapons.js';
@@ -324,7 +325,8 @@ export class GameAudio {
         slot: o.slot ?? null, follow: o.follow || null, repeat: !!o.repeat,
         offset: o.offset || 0, // seconds already played (a stage that starts mid-ending joins its music mid-track)
         spatial: !!o.pos && !o.local && !def.local && !isMusic, music: isMusic, rate,
-        baseVolume: (def.volume ?? 1) * hit.volume * (o.volume ?? 1), userVolume: 1, userPitch: 1, stopped: false,
+        // the event's volume (+ its random variance) x CS2's mix group level (mix.js) x the request's
+        baseVolume: eventVolume(def) * mixVolume(def) * hit.volume * (o.volume ?? 1), userVolume: 1, userPitch: 1, stopped: false,
       };
       this._track(v);
       this._buffer(this._fileUrl(table, file)).then((buf) => {
@@ -393,7 +395,7 @@ export class GameAudio {
     let g = v.baseVolume * v.userVolume, p = 0;
     if (v.spatial) {
       const pos = (v.ent && v.ent.alive !== false && (v.follow ? safeCall(v.follow) : typeof v.ent.worldOrigin === 'function' && safeOrigin(v.ent))) || v.pos;
-      ({ gain: g, pan: p } = spatialMix(pos, this.listener, v.def.curve, g));
+      ({ gain: g, pan: p } = spatialMix(pos, this.listener, v.def.curve, g, v.def.distanceMultiplier ?? 1));
     }
     const t = this.ctx.currentTime;
     if (immediate) {
