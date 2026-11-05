@@ -1,6 +1,7 @@
 // Keyvalue inputs: AddOutput / KeyValue on an entity, and the inputs a map aims at you (!activator / !player).
 // Split out of engine.js (EntityEngine.addOutput / playerInput call these with the engine).
 import { stripName } from './entity.js';
+import { setPlayerFog } from './classes/fog.js';
 import { num, parseVec, angleQuat, poseMatrix, rotationOf } from './math.js';
 
 // AddOutput "key value" or "OnX target:input:param:delay:times" (Source 1) or "OnX>target>input>param>delay>times" (CS2)
@@ -68,7 +69,7 @@ export function playerInput(engine, q) {
     case 'setdamagefilter': P?.setDamageFilter(stripName(q.param)); return;
     case 'addcontext': (me.contexts ||= new Set()).add(context()); return;
     case 'removecontext': me.contexts?.delete(context()); return;
-    case 'setfogcontroller': return; // fog is visual only
+    case 'setfogcontroller': setPlayerFog(engine, q.param); return; // which fog you see (classes/fog.js)
     case 'ignitelifetime': case 'ignite': return; // zombie items
   }
   engine.warnOnce('player.' + inp, `player input ${q.input} ignored`);

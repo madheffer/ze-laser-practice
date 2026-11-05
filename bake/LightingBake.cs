@@ -40,7 +40,8 @@ static class LightingBake
         _ => null,
     };
 
-    public static int Run(string vpk, string mapDir)
+    // skyOnly: just the skies + reflection cubemaps (SkyBake.cs), merged into an existing lighting.json
+    public static int Run(string vpk, string mapDir, bool skyOnly = false)
     {
         if (!File.Exists(Path.Combine(mapDir, "manifest.json"))) { Console.Error.WriteLine($"not a baked map folder: {mapDir}"); return 1; }
         var outer = new Package();
@@ -57,6 +58,19 @@ static class LightingBake
             }
         var mapName = Path.GetFileName(mapDir.TrimEnd('/', '\\'));
         if (!SafePath.IsMapName(mapName)) { Console.Error.WriteLine($"bad map folder name: {mapName}"); return 1; }
+        if (skyOnly)
+        {
+            var outDir = Path.Combine(mapDir, "lighting");
+            var path = Path.Combine(outDir, "lighting.json");
+            if (JsonNode.Parse(File.Exists(path) ? File.ReadAllText(path) : "null") is not JsonObject json) { Console.Error.WriteLine("run --lighting first"); return 1; }
+            var sky = SkyBake.Write(p => Load(paks, p), mapName, mapDir, outDir, Console.WriteLine);
+            json.Remove("cubemaps");
+            if (sky["cubemaps"] is { } cubes) json["cubemaps"] = cubes.DeepClone();
+            json["skies"] = sky["skies"]!.DeepClone();
+            json["version"] = DateTime.UtcNow.ToString("yyyyMMddHHmmss");
+            File.WriteAllText(SafePath.OutFile(outDir, "lighting.json"), json.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
+            return 0;
+        }
         return Write(paks, mapName, mapDir, Console.WriteLine) ? 0 : 1;
     }
 
@@ -118,6 +132,9 @@ static class LightingBake
         json["textures"] = textures;
         json["post"] = WritePost(paks, outDir, log);
         if (ProbeBake.Write(p => Load(paks, p), mapName, mapDir, outDir, log) is { } probes) json["probes"] = probes;
+        var sky = SkyBake.Write(p => Load(paks, p), mapName, mapDir, outDir, log);
+        if (sky["cubemaps"] is { } cubes) json["cubemaps"] = cubes.DeepClone();
+        json["skies"] = sky["skies"]!.DeepClone();
         Directory.CreateDirectory(outDir);
         File.WriteAllText(SafePath.OutFile(outDir, "lighting.json"), json.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
         return true;

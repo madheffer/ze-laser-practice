@@ -42,7 +42,7 @@ static class ParticleBake
         }
         using var loader = new GameFileLoader(map, null);
         if (map != outer) loader.AddPackageToSearch(outer);
-        if (cs2 != null && File.Exists(Path.Combine(cs2, "pak01_dir.vpk"))) loader.AddPackageToSearch(Path.Combine(cs2, "pak01_dir.vpk"));
+        if (cs2 != null) foreach (var pak in Program.StockPaks(cs2)) loader.AddPackageToSearch(pak);
         var missing = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
         Write(loader, effects, mapDir, Console.WriteLine, missing);
         if (missing.Count > 0) Console.WriteLine($"missing: {string.Join(", ", missing.Take(20))}{(missing.Count > 20 ? " ..." : "")}");

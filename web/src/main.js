@@ -6,6 +6,7 @@
 //   audio.js, viewmodel.js (+ fp/): sound and the first-person weapon
 import { loadMapIndex, loadMap, loadScenarios } from './world/assets.js';
 import { CollisionWorld } from './world/collision.js';
+import { particleTrace } from './fx/trace.js';
 import { Player, CS } from './world/movement.js';
 import { Renderer } from './world/render.js';
 import { parseVec } from './world/entities/index.js';
@@ -102,6 +103,8 @@ function applySettings() {
   if (S.engine) S.engine.humans = rule('humans');
   G.audio.setVolumes({ sfx: settings.sfx, music: settings.music });
   applyGamma(settings.gamma); // r_fullscreen_gamma (ui/gamma.js)
+  G.renderer.setQuality({ renderScale: settings.renderScale, msaa: settings.msaa });
+  G.renderer.lighting.setOptions({ fog: settings.fog, reflections: settings.reflections });
 }
 
 // ---- weapons (CS2: 1 primary, 3 knife, Q last weapon, R reload)
@@ -149,15 +152,20 @@ async function openMap(name, fromRound = false) {
     progress('starting');
     abortRound(); // the host leaving a live round for another map ends it for everyone
     endRun();
-    S.map = await loadMap(name, progress);
+    // quality: the setting, or Auto (high with BC6H/BC7 on the GPU, low without); a tier the map wasn't baked at is high
+    const tier = await pickTier(name);
+    S.map = await loadMap(name, progress, { tier });
     // the map's own CS2 lighting and post-processing (lasers-bake --lighting; the old fixed lighting without it)
     progress('lighting');
-    const lightmaps = await loadLightmaps(`maps/${name}/`, G.renderer.renderer, log).catch((e) => { log(`lighting: ${e.message || e}`); return null; });
+    // off in the settings: none of it is downloaded, the simple lighting stays
+    const lightmaps = !settings.bakedLighting ? null : await loadLightmaps(`maps/${name}/`, G.renderer.renderer, log, { reflections: settings.reflections, tier })
+      .catch((e) => { log(`lighting: ${e.message || e}`); return null; });
     G.renderer.lighting.setMap(S.map.entities, lightmaps);
     await G.renderer.post.setMap(`maps/${name}/`, S.map.entities, lightmaps);
     G.renderer.setWorld(S.map.world);
     G.radar.setMap(S.map.radar);
     S.world = new CollisionWorld(S.map.collision);
+    if (S.map.effects) S.map.effects.trace = particleTrace(S.world, S.map.collisionFx);
     S.player = new Player(S.world);
     G.audio.loadMap(name, S.map.version).catch((e) => log(`audio: ${e.message || e}`));
     const file = await loadScenarios(name);
@@ -202,6 +210,18 @@ async function init() {
   // first visit (no ?map, no invite link): the home page
   G.home.setMaps(S.mapIndex);
   if (!asked && !net.inRoom && !new URLSearchParams(location.search).has('room')) G.home.show();
+}
+
+// the quality tier to load a map at (lasers-bake --tiers): '' = high
+async function pickTier(name) {
+  const want = settings.quality === 3 ? '' : settings.quality === 2 ? 'medium' : settings.quality === 1 ? 'low'
+    : (G.renderer.renderer.extensions.has('EXT_texture_compression_bptc') ? '' : 'low');
+  if (!want) return '';
+  // read it, not just HEAD: an SPA fallback (vite preview, static hosts) answers a missing file with index.html + 200
+  const ok = await fetch(`maps/${name}/q/${want}/lighting/lighting.json`, { cache: 'no-cache' })
+    .then((r) => (r.ok ? r.json() : null)).then((j) => j?.tier === want, () => false);
+  if (!ok) log(`quality ${want}: not baked for ${name} (lasers-bake --tiers), loading high`);
+  return ok ? want : '';
 }
 
 // a round's start can bring the host's map: load it the way picking it does

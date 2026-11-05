@@ -2,7 +2,7 @@
 // contract). Rules cite RE §n of PARTICLE_RENDERING.md; anything without evidence is UNSETTLED.
 import { evalFloat } from './inputs.js';
 import {
-  A, INT_ATTRS, STREAMS, VECTOR_ATTRS, makeRandomTable, newControlPoint, setCpOrientation, setCpPosition, vec3,
+  A, FORCE_SCALE_DEFAULT, INT_ATTRS, STREAMS, VECTOR_ATTRS, makeRandomTable, newControlPoint, setCpOrientation, setCpPosition, vec3,
 } from './functions/common.js';
 import { FUNCTIONS } from './functions/index.js';
 
@@ -299,6 +299,43 @@ const impl = (c, fn) => {
 };
 const stateOf = (c, fn) => { if (!c.state.has(fn)) c.state.set(fn, {}); return c.state.get(fn); };
 
+// What C_OP_BasicMovement (functions/ported_movement.js, 0x1801c0ba0) runs: the force generators and the
+// constraints live in its Operate, not in the frame loop, so a system without it moves and constrains nothing.
+const SUB = {
+  // every m_ForceGenerators entry with strength > 0 (0x18003f820) gets the gravity (slot 35) and adds into acc (slot 34)
+  forces(c, acc, gravity) {
+    for (const fn of c.def.m_ForceGenerators) {
+      const f = impl(c, fn);
+      if (!f || !f.force) continue;
+      const s = runStrength(fn, c);
+      if (s <= 0) continue;
+      const st = stateOf(c, fn);
+      st.gravity = gravity;
+      f.force(fn, c, acc, s, st);
+    }
+  },
+  // Every constraint's slot 34 (prepare) runs first, and slot 36 says whether it runs once after the passes (final).
+  // Then up to maxPasses passes: each constraint not yet done in this round runs (slot 35, strength > 0); one that
+  // reports a change (a truthy return) makes every other one run again. A pass with no change ends the passes.
+  constraints(c, maxPasses) {
+    const list = c.def.m_Constraints.map((fn) => [fn, impl(c, fn)]).filter(([, f]) => f && f.constrain);
+    if (!list.length || !c.count) return;
+    for (const [fn, f] of list) f.prepare?.(fn, c, stateOf(c, fn));
+    const done = new Uint8Array(list.length);
+    for (let pass = 0; pass < maxPasses; pass++) {
+      let changed = false;
+      list.forEach(([fn, f], i) => {
+        if (done[i]) return;
+        done[i] = 1;
+        if ((typeof f.final === 'function' ? f.final(fn) : f.final) || runStrength(fn, c) <= 0) return;
+        if (f.constrain(fn, c, stateOf(c, fn))) { changed = true; done.fill(0); done[i] = 1; }
+      });
+      if (!changed) break;
+    }
+    for (const [fn, f] of list) if ((typeof f.final === 'function' ? f.final(fn) : f.final) && runStrength(fn, c) > 0) f.constrain(fn, c, stateOf(c, fn));
+  },
+};
+
 // Spawn particles, one per age-at-spawn, then run the initializers on them.
 export function emitParticles(c, ages) {
   const def = c.def;
@@ -326,6 +363,8 @@ export function emitParticles(c, ages) {
     c.attr[A.ALPHA][i] = 1;
     c.attr[A.ALPHA2][i] = 1;
     c.attr[A.TRAIL][i] = 0.1;
+    // Force scale: the collection constant 1.0 (FUN_18003b6f0, coll+0x8a8 + 34*0x60 = DAT_180534200).
+    c.attr[A.FORCE_SCALE][i] = FORCE_SCALE_DEFAULT;
     c.attr[A.CREATION][i] = c.time - age;
     // Particle ID: the number emitted so far in this collection. UNSETTLED.
     c.attr[A.ID][i] = c.nextId++;
@@ -355,7 +394,9 @@ export function emitParticles(c, ages) {
 // constraints, kills. Time precedes pre-emission (0x180047af9 < 0x180047cb0, RE §11); the rest of the order is
 // a VRF cross-check, UNSETTLED.
 function simulate(c, dt) {
-  if (dt !== 0) c.prevDt = dt; // previous non-zero dt, written at frame start (0x180047adb)
+  // coll+0x68 takes the last frame's dt when that was non-zero, then coll+0x64 the new one (0x180047aca..0x180047af4).
+  // UNSETTLED: the collection's first value of +0x68; the first frame's dt here, so dt / prevDt starts at 1.
+  if (c.dt !== 0) c.prevDt = c.dt; else if (!c.prevDt) c.prevDt = dt;
   c.dt = dt;
   c.time += dt;
   const def = c.def;
@@ -387,15 +428,8 @@ function simulate(c, dt) {
     if (!f || !f.op) continue;
     const s = runStrength(fn, c);
     if (s <= 0) continue;
-    f.op(fn, c, s, stateOf(c, fn));
+    f.op(fn, c, s, stateOf(c, fn), SUB);
   }
-  for (const fn of def.m_Constraints) {
-    const f = impl(c, fn);
-    if (!f || !f.constrain) continue;
-    if (runStrength(fn, c) <= 0) continue;
-    f.constrain(fn, c, stateOf(c, fn));
-  }
-  for (const fn of def.m_ForceGenerators) impl(c, fn);
   compact(c);
   if (c.restartAt != null && c.time >= c.restartAt) rearm(c);
 }

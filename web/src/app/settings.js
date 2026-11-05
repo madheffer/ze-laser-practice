@@ -24,13 +24,16 @@ export const DEFAULTS = {
   ping: 0, // simulated round trip in ms (0-500): the map's entities are drawn this late (see render.js record())
   thirdPerson: false, tpDist: 65,
   gamma: 2,
+  // performance (Video): render resolution (x the screen's pixel ratio, capped at 2), MSAA, and the CS2 lighting
+  // pieces. Fog / reflections switch instantly; baked lighting + quality apply when a map loads (quality 0 = auto)
+  renderScale: 1, msaa: true, fog: true, reflections: true, bakedLighting: true, quality: 0,
   touchSens: 1, touchCrouch: false, // phone / tablet: look speed multiplier, crouch as a toggle instead of hold
 };
 
 // Allowed range per numeric setting; a saved value outside it is clamped (the menu can't produce one).
 const RANGES = {
   sens: [0.001, 100], timescale: [0.01, 4], humans: [1, 64], bossHp: [1, 100], ping: [0, 500],
-  sfx: [0, 1], music: [0, 1], tpDist: [15, 150], gamma: [1, 2.5], touchSens: [0.2, 3],
+  sfx: [0, 1], music: [0, 1], tpDist: [15, 150], gamma: [1, 2.5], renderScale: [0.25, 1], quality: [0, 3], touchSens: [0.2, 3],
 };
 const DROPPED = new Set(['myaw', 'fov', 'stamina', 'volume']);
 const FORBIDDEN = new Set(['__proto__', 'constructor', 'prototype']);
@@ -90,6 +93,8 @@ export function bindSettings(onChange) {
   bindPair('#ping', '#ping-num', 'ping', 0, 500, onChange);
   bindPair('#tpdist', '#tpdist-num', 'tpDist', 15, 150, onChange);
   bindPair('#gamma', '#gamma-num', 'gamma', 1, 2.5, onChange, 0.05);
+  bind('#renderscale', 'renderScale', (v) => `${Math.round(v * 100)}%`); bind('#msaa', 'msaa');
+  bind('#fog', 'fog'); bind('#reflections', 'reflections'); bind('#bakedlighting', 'bakedLighting'); bind('#quality', 'quality');
   // 0-1 like CS2's console values: game sound (the menu's #volume pair, labelled SFX) and `snd_musicvolume`
   bindPair('#volume', '#volume-num', 'sfx', 0, 1, onChange, 0.01);
   bindPair('#musicvol', '#musicvol-num', 'music', 0, 1, onChange, 0.01);

@@ -130,8 +130,12 @@ function clipPlane(nx, ny, nz, dist, s, e) {
 }
 
 // Both faces of a slab along unit axis d: [lo - r, hi + r].
+// A slab thinner than 2 * DIST_EPSILON (a flat triangle's face or axis slab swept by a ray, h = 0) gets that thickness:
+// otherwise the epsilon pulls the enter fraction past the leave fraction and a ray through the triangle misses.
+// A box trace never meets this (its support r thickens every slab), so movement is unchanged.
 function clipSlab(dx, dy, dz, lo, hi, h, s, e) {
-  const r = Math.abs(dx) * h[0] + Math.abs(dy) * h[1] + Math.abs(dz) * h[2];
+  let r = Math.abs(dx) * h[0] + Math.abs(dy) * h[1] + Math.abs(dz) * h[2];
+  if (hi - lo + 2 * r < 2 * DIST_EPSILON) r = DIST_EPSILON - (hi - lo) / 2;
   clipPlane(dx, dy, dz, hi + r, s, e);
   clipPlane(-dx, -dy, -dz, -(lo - r), s, e);
 }
@@ -209,15 +213,18 @@ export function clipHull(hull, h, s, e, tr, ref) {
 
 export class CollisionWorld {
   // tris: collision.bin's floats, or an already built TriangleBVH (the co-op server shares one per map)
-  constructor(tris) {
+  // layers: optional Uint32Array, one interaction-layer bit set per triangle (collision_fx_layers.bin)
+  constructor(tris, layers = null) {
     this.bvh = tris instanceof TriangleBVH ? tris : new TriangleBVH(tris);
+    this.layers = layers;
     this.dynamic = []; // [{ hulls: [{planes,min,max}], min, max, ref }] refreshed by the entity system each tick
     this._lo = [0, 0, 0];
     this._hi = [0, 0, 0];
   }
 
-  // Sweep a box (half extents h, centred) from s to e. Returns a trace.
-  traceBox(s, e, h, tr = makeTrace(), worldOnly = false) {
+  // Sweep a box (half extents h, centred) from s to e. Returns a trace. mask (interaction-layer bits) skips triangles
+  // and hulls that carry layers none of which it has; 0 = no layer test (movement).
+  traceBox(s, e, h, tr = makeTrace(), worldOnly = false, mask = 0) {
     tr.fraction = 1; tr.startSolid = false; tr.allSolid = false; tr.hit = null;
     tr.normal[0] = tr.normal[1] = tr.normal[2] = 0;
     const lo = this._lo, hi = this._hi;
@@ -226,10 +233,11 @@ export class CollisionWorld {
       hi[a] = Math.max(s[a], e[a]) + h[a] + 1;
     }
     const T = this.bvh.tris;
-    this.bvh.query(lo, hi, (t) => clipTriangle(T, t * 9, h, s, e, tr));
+    const L = mask ? this.layers : null;
+    this.bvh.query(lo, hi, L ? (t) => { if (L[t] & mask) clipTriangle(T, t * 9, h, s, e, tr); } : (t) => clipTriangle(T, t * 9, h, s, e, tr));
     for (const d of worldOnly ? [] : this.dynamic) {
       if (d.max[0] < lo[0] || d.min[0] > hi[0] || d.max[1] < lo[1] || d.min[1] > hi[1] || d.max[2] < lo[2] || d.min[2] > hi[2]) continue;
-      for (const hull of d.hulls) clipHull(hull, h, s, e, tr, d.ref);
+      for (const hull of d.hulls) if (!mask || hull.layers == null || (hull.layers & mask)) clipHull(hull, h, s, e, tr, d.ref);
     }
     const f = tr.fraction;
     tr.endPos[0] = s[0] + (e[0] - s[0]) * f;
@@ -239,8 +247,8 @@ export class CollisionWorld {
   }
 
   // Ray (zero-size box) for picking / ground probes.
-  traceRay(s, e, tr, worldOnly = false) {
-    return this.traceBox(s, e, [0, 0, 0], tr, worldOnly);
+  traceRay(s, e, tr, worldOnly = false, mask = 0) {
+    return this.traceBox(s, e, [0, 0, 0], tr, worldOnly, mask);
   }
 }
 

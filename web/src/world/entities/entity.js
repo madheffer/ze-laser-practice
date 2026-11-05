@@ -109,7 +109,7 @@ export class Entity {
         planes[i] = n.x; planes[i + 1] = n.y; planes[i + 2] = n.z;
         planes[i + 3] = h.planes[i + 3] + n.x * e[12] + n.y * e[13] + n.z * e[14];
       }
-      out.push({ planes, min, max, solid: h.solid });
+      out.push({ planes, min, max, solid: h.solid, layers: h.layers ?? null });
     }
     void stamp;
     this.placedHulls = out;

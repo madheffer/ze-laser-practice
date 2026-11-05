@@ -11,13 +11,17 @@ export const A = {
   POSITION: 0, LIFE: 1, PREV: 2, RADIUS: 3, ROLL: 4, ROLL_SPEED: 5, COLOR: 6, ALPHA: 7, CREATION: 8,
   SEQUENCE: 9, TRAIL: 10, ID: 11, YAW: 12, SEQUENCE1: 13, HITBOX: 14, HITBOX_OFFSET: 15, ALPHA2: 16,
   SCRATCH_VEC: 17, SCRATCH: 18, NONE: 19, PITCH: 20, NORMAL: 21, GLOW_RGB: 22, GLOW_ALPHA: 23,
-  SCRATCH2: 26, SCRATCH3: 27, SCRATCH_VEC2: 30,
+  SCRATCH2: 26, SCRATCH3: 27, SCRATCH_VEC2: 30, FORCE_SCALE: 34,
 };
-// Which streams the runtime keeps. Pointer attributes (24, 25, 28, 29, 31+) carry no simulation state.
+// Which streams the runtime keeps. Pointer attributes (24, 25, 28, 29, 31-33, 35+) carry no simulation state.
+// 34 is "Force Scale" (name table 0x1804d7a30 + 8*34 -> "Force Scale"): a float C_OP_BasicMovement multiplies the
+// acceleration by; FORCE_SCALE_DEFAULT is its collection constant (FUN_18003b6f0 fills coll+0x8a8 block 34*0x60
+// with DAT_180534200 = 1.0), so a particle nothing writes reads 1.
 export const VECTOR_ATTRS = new Set([0, 2, 6, 15, 17, 21, 22, 30]);
 export const INT_ATTRS = new Set([11, 14]); // RE §11: 11, 14, 33, 40-43 are int32 (mask 0xf00200004800)
 export const ANGLE_ATTRS = new Set([4, 5, 12, 20]); // RE §11: mask 0x101030, stored radians
-export const STREAMS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 20, 21, 22, 23, 26, 27, 30];
+export const STREAMS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 20, 21, 22, 23, 26, 27, 30, 34];
+export const FORCE_SCALE_DEFAULT = 1;
 
 export const add = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
 export const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];

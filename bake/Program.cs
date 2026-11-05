@@ -48,6 +48,13 @@ public static class Program
             PanoramaBake.Run(pCs2, Path.GetFullPath(args[1]));
             return 0;
         }
+        if (args.Length >= 3 && args[0] == "--collision")
+        {
+            // lasers-bake --collision <workshop.vpk> <web/public/maps>: only collision_fx.bin + collision_fx_layers.bin
+            // (the particle collision set, Baker.WriteParticleCollision); the rest of the map folder is untouched
+            new Baker(Path.GetFullPath(args[1]), Path.GetFullPath(args[2]), null, false) { CollisionOnly = true }.Run();
+            return 0;
+        }
         if (args.Length >= 3 && args[0] == "--shots")
         {
             // lasers-bake --shots <workshop.vpk> <web/public/maps/<name>>: only the map's screenshots (ShotsBake.cs)
@@ -75,6 +82,16 @@ public static class Program
             // lasers-bake --alpha <workshop.vpk> <web/public/maps/<name>> [--cs2 <game/csgo>]: put back cut-out alpha (AlphaBake.cs)
             var ai = Array.IndexOf(args, "--cs2");
             return AlphaBake.Run(Path.GetFullPath(args[1]), Path.GetFullPath(args[2]), ai > 0 && ai + 1 < args.Length ? args[ai + 1] : FindCs2());
+        }
+        if (args.Length >= 3 && args[0] == "--tiers")
+        {
+            // lasers-bake --tiers <workshop.vpk> <web/public/maps/<name>>: medium / low quality copies (TierBake.cs)
+            return TierBake.Run(Path.GetFullPath(args[1]), Path.GetFullPath(args[2]));
+        }
+        if (args.Length >= 3 && args[0] == "--sky")
+        {
+            // lasers-bake --sky <workshop.vpk> <web/public/maps/<name>>: only the skies + reflection cubemaps (SkyBake.cs)
+            return LightingBake.Run(Path.GetFullPath(args[1]), Path.GetFullPath(args[2]), skyOnly: true);
         }
         if (args.Length >= 3 && args[0] == "--lighting")
         {
@@ -119,6 +136,14 @@ public static class Program
         }
         return null;
     }
+
+    // CS2's stock content packs beside <game/csgo>: csgo's own and the engine's core pack (game/core), which carries
+    // shared particle textures (materials/particle/fire_particle_4 and others effects name). Existing files only.
+    internal static IEnumerable<string> StockPaks(string cs2)
+    {
+        foreach (var p in new[] { Path.Combine(cs2, "pak01_dir.vpk"), Path.Combine(cs2, "..", "core", "pak01_dir.vpk") })
+            if (File.Exists(p)) yield return Path.GetFullPath(p);
+    }
 }
 
 sealed class Baker(string input, string outRoot, string? cs2, bool textures)
@@ -161,14 +186,11 @@ sealed class Baker(string input, string outRoot, string? cs2, bool textures)
 
         using var loader = new GameFileLoader(map, null);
         if (inner != null) loader.AddPackageToSearch(outer);
+        if (CollisionOnly) { WriteParticleCollision(loader); return; }
         if (cs2 != null)
         {
             // Stock CS2 content (dev textures, base props, tool materials) the map references but does not ship.
-            foreach (var p in new[] { "pak01_dir.vpk" })
-            {
-                var path = Path.Combine(cs2, p);
-                if (File.Exists(path)) { loader.AddPackageToSearch(path); Log($"+ {path}"); }
-            }
+            foreach (var path in Program.StockPaks(cs2)) { loader.AddPackageToSearch(path); Log($"+ {path}"); }
         }
         else Log("WARNING: no CS2 install found; stock textures will be missing (--cs2 <game/csgo>)");
 
@@ -198,6 +220,8 @@ sealed class Baker(string input, string outRoot, string? cs2, bool textures)
         Buffer.BlockCopy(tris.ToArray(), 0, bin, 0, bin.Length);
         File.WriteAllBytes(Path.Combine(outDir, "collision.bin"), bin);
         Log($"collision: {tris.Count / 9} triangles");
+
+        WriteParticleCollision(loader);
 
         // 3. hulls.json: each entity model's physics as convex hulls (verts + planes) and mesh triangles, model space.
         //    Brush entities (doors, movelinears, breakables, triggers) collide/overlap with these at runtime.
@@ -486,6 +510,30 @@ sealed class Baker(string input, string outRoot, string? cs2, bool textures)
         return null;
     }
 
+    // lasers-bake --collision: only these two files (the rest of the map folder untouched)
+    public bool CollisionOnly { get; init; }
+
+    void WriteParticleCollision(GameFileLoader loader)
+    {
+        // collision_fx.bin + collision_fx_layers.bin: the static world as particle traces see it. A particle trace
+        //    interacts with layers 0x1db001 at most (particles.dll 63babcbf: 0x1c3001, 0x1db001 with m_bIncludeWater),
+        //    so player clips (layer 4) and sky (3) are left out; each triangle keeps its layer bits (uint32) so the
+        //    runtime can apply the exact mask of each trace. Ours only: cybo's format is unchanged.
+        var fxTris = new List<float>();
+        var fxLayers = new List<uint>();
+        if (loader.LoadFile($"maps/{mapName}/world_physics.vmdl_c")?.DataBlock is Model physModel2 && PhysOf(loader, physModel2) is { } phys2)
+        {
+            AppendTriangles(phys2, Matrix4x4.Identity, fxTris, playerSolidOnly: false, fxLayers, ParticleLayers);
+        }
+        var fxBin = new byte[fxTris.Count * 4];
+        Buffer.BlockCopy(fxTris.ToArray(), 0, fxBin, 0, fxBin.Length);
+        File.WriteAllBytes(Path.Combine(outDir, "collision_fx.bin"), fxBin);
+        var layerBin = new byte[fxLayers.Count * 4];
+        Buffer.BlockCopy(fxLayers.ToArray(), 0, layerBin, 0, layerBin.Length);
+        File.WriteAllBytes(Path.Combine(outDir, "collision_fx_layers.bin"), layerBin);
+        Log($"collision_fx: {fxLayers.Count} triangles");
+    }
+
     // Collision groups a CS2 player stands on / is blocked by. Triggers, debris and "never collides" are skipped.
     static bool IsPlayerSolid(PhysAggregateData phys, int attrIndex)
     {
@@ -501,7 +549,41 @@ sealed class Baker(string input, string outRoot, string? cs2, bool textures)
         return true;
     }
 
-    static void AppendTriangles(PhysAggregateData phys, Matrix4x4 xf, List<float> outTris, bool playerSolidOnly)
+    // CS2's interaction layers by bit (CS2Fixes sdk/public/const.h BuiltInInteractionLayer_t + StandardInteractionLayers_t;
+    // names as vphysics2's intersection dictionary spells them, compared case-insensitively).
+    static readonly string[] LayerNames =
+    [
+        "solid", "hitboxes", "trigger", "sky", "playerclip", "npcclip", "blocklos", "blocklight", "ladder", "pickup",
+        "blocksound", "nodraw", "window", "passbullets", "worldgeometry", "water", "slime", "touchall", "player", "npc",
+        "debris", "physics_prop", "navignore", "navlocalignore", "postprocessingvolume", "unused_layer3", "carriedobject",
+        "pushaway", "serverentityonclient", "carriedweapon", "staticlevel",
+    ];
+    // every layer some particle trace can hit (0x1db001: solid, window, passbullets, water, slime, player, npc, debris)
+    internal const uint ParticleLayers = 0x1db001;
+
+    // A collision attribute's interaction layers (m_InteractAsStrings) as bits; 0 for the trigger / never groups,
+    // which no trace collides with. Any other group but conditionallysolid is solid to everything (CS2Fixes const.h
+    // BuiltInCollisionGroup_t; world brushes are "Default" with no layer strings), so it carries the solid bit too;
+    // a conditionallysolid shape (player clip, sky, window) is only what its strings say. Out of range: plain solid.
+    internal static uint LayersOf(PhysAggregateData phys, int attrIndex)
+    {
+        var attrs = phys.CollisionAttributes;
+        if (attrIndex < 0 || attrIndex >= attrs.Count) return 1;
+        var a = attrs[attrIndex];
+        var group = a.GetStringProperty("m_CollisionGroupString")?.ToLowerInvariant() ?? "";
+        if (group is "trigger" or "never") return 0;
+        uint bits = group == "conditionallysolid" ? 0u : 1u;
+        foreach (var s in a.GetArray<string>("m_InteractAsStrings") ?? [])
+        {
+            var i = Array.FindIndex(LayerNames, n => n.Equals(s, StringComparison.OrdinalIgnoreCase));
+            if (i >= 0) bits |= 1u << i;
+        }
+        return bits;
+    }
+
+    // outLayers / layerMask: keep only shapes whose layers meet layerMask and record each triangle's layer bits.
+    static void AppendTriangles(PhysAggregateData phys, Matrix4x4 xf, List<float> outTris, bool playerSolidOnly,
+        List<uint>? outLayers = null, uint layerMask = 0)
     {
         var bind = phys.BindPose;
         for (var p = 0; p < phys.Parts.Length; p++)
@@ -511,6 +593,9 @@ sealed class Baker(string input, string outRoot, string? cs2, bool textures)
             foreach (var h in shape.Hulls)
             {
                 if (playerSolidOnly && !IsPlayerSolid(phys, h.CollisionAttributeIndex)) continue;
+                var layers = outLayers == null ? 0 : LayersOf(phys, h.CollisionAttributeIndex);
+                if (outLayers != null && (layers & layerMask) == 0) continue;
+                var before = outTris.Count;
                 var verts = h.Shape.GetVertexPositions();
                 var edges = h.Shape.GetEdges();
                 foreach (var face in h.Shape.GetFaces())
@@ -526,15 +611,20 @@ sealed class Baker(string input, string outRoot, string? cs2, bool textures)
                         e = next;
                     }
                 }
+                for (var k = before; k < outTris.Count; k += 9) outLayers?.Add(layers);
             }
             foreach (var m in shape.Meshes)
             {
                 if (playerSolidOnly && !IsPlayerSolid(phys, m.CollisionAttributeIndex)) continue;
+                var layers = outLayers == null ? 0 : LayersOf(phys, m.CollisionAttributeIndex);
+                if (outLayers != null && (layers & layerMask) == 0) continue;
+                var before = outTris.Count;
                 var verts = m.Shape.GetVertices();
                 foreach (var t in m.Shape.GetTriangles())
                 {
                     Tri(outTris, Vector3.Transform(verts[t.X], pose), Vector3.Transform(verts[t.Y], pose), Vector3.Transform(verts[t.Z], pose));
                 }
+                for (var k = before; k < outTris.Count; k += 9) outLayers?.Add(layers);
             }
         }
     }
@@ -573,7 +663,7 @@ sealed class Baker(string input, string outRoot, string? cs2, bool textures)
 
     static float R(float v) => MathF.Round(v, 5);
 
-    // Same shape as cybo's hulls.json, plus "solid" (does it block players) and a "tris" entry for mesh shapes.
+    // Same shape as cybo's hulls.json, plus "solid" (does it block players), "layers" (its interaction-layer bits, LayersOf) and a "tris" entry for mesh shapes.
     static JsonArray HullsOf(PhysAggregateData phys)
     {
         var list = new JsonArray();
@@ -597,7 +687,7 @@ sealed class Baker(string input, string outRoot, string? cs2, bool textures)
                     var point = Vector3.Transform(pl.Normal * pl.Offset, pose);
                     planes.Add(R(n.X)); planes.Add(R(n.Y)); planes.Add(R(n.Z)); planes.Add(R(Vector3.Dot(n, point)));
                 }
-                list.Add(new JsonObject { ["verts"] = verts, ["planes"] = planes, ["solid"] = IsPlayerSolid(phys, h.CollisionAttributeIndex) });
+                list.Add(new JsonObject { ["verts"] = verts, ["planes"] = planes, ["solid"] = IsPlayerSolid(phys, h.CollisionAttributeIndex), ["layers"] = LayersOf(phys, h.CollisionAttributeIndex) });
             }
             foreach (var m in shape.Meshes)
             {
@@ -607,7 +697,7 @@ sealed class Baker(string input, string outRoot, string? cs2, bool textures)
                 {
                     Tri(tris, Vector3.Transform(verts[t.X], pose), Vector3.Transform(verts[t.Y], pose), Vector3.Transform(verts[t.Z], pose));
                 }
-                list.Add(new JsonObject { ["tris"] = new JsonArray([.. tris.Select(f => (JsonNode)R(f)!)]), ["solid"] = IsPlayerSolid(phys, m.CollisionAttributeIndex) });
+                list.Add(new JsonObject { ["tris"] = new JsonArray([.. tris.Select(f => (JsonNode)R(f)!)]), ["solid"] = IsPlayerSolid(phys, m.CollisionAttributeIndex), ["layers"] = LayersOf(phys, m.CollisionAttributeIndex) });
             }
         }
         return list;

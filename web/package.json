@@ -9,7 +9,9 @@
     "preview": "vite preview",
     "play": "vite build && vite preview",
     "host": "vite build && vite preview --host",
-    "coop-server": "node server/main.js"
+    "coop-server": "node server/main.js",
+    "bake": "node ../tools/bake-map.mjs",
+    "index-maps": "node ../tools/index-maps.mjs"
   },
   "dependencies": {
     "three": "0.170.0",

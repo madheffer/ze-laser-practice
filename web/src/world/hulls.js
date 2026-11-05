@@ -23,8 +23,9 @@ export function normaliseHulls(hullsRaw) {
         min[a] = Math.min(min[a], v[i + a]); max[a] = Math.max(max[a], v[i + a]);
       }
       growBounds(all.min, all.max, min, max);
-      if (h.planes) out.push({ verts: h.verts, planes: h.planes, solid: h.solid !== false });
-      else if (v.length) out.push(boxHull(min, max, h.solid !== false));
+      const layers = Number.isInteger(h.layers) ? h.layers >>> 0 : null; // interaction-layer bits (bake LayersOf), null in older bakes
+      if (h.planes) out.push({ verts: h.verts, planes: h.planes, solid: h.solid !== false, layers });
+      else if (v.length) out.push({ ...boxHull(min, max, h.solid !== false), layers });
     }
     if (out.length) { hulls[key] = out; bounds[key] = all; }
   }

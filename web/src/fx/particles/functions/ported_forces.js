@@ -8,8 +8,7 @@
 // (force, acc, collection, &state, blocks, strength). Integration is pos += (pos - prev) * drag + attr34 * dt^2 * acc.
 // The entries here carry `force(fn, c, acc, strength, state)`: acc is a Float32Array of 3 * c.count (x, y, z per
 // particle) that BasicMovement starts at its gravity and integrates after every force has added to it.
-// Initializers and constraints follow initializers.js / constraints.js; WorldTraceConstraint's constraint passes run
-// inside BasicMovement in the game (0x1801c0ba0 after the integration), here through the runtime's constraint list.
+// Initializers follow initializers.js. C_OP_WorldTraceConstraint lives in ported_collision.js.
 //
 // World traces go through ParticleSystem opts.trace(from, dir, length, query) -> { hit, position, normal,
 // startSolid? } | null, the contract preemission.js uses; `query` (new here) carries what the game's trace call
@@ -484,7 +483,8 @@ export const ported_forces = {
   },
 
   // particles.dll 63babcbf: C_INIT_CreationNoise per-particle slot 34 0x180147050, block slot 35 0x180146da0.
-  // Per particle: noise(t*scale + ms*wts + (pos.x + offLoc.x) * scaleLoc, ...) with t = creation time + m_flOffset,
+  // Per particle: noise(t*scale + ms*wts + (pos.x + offLoc.x) * scaleLoc, ...) with t = creation time of the call's
+  // first particle + m_flOffset,
   // ms = Plat_MSTime(), wts = m_flWorldTimeScale; |n| with m_bAbsVal (scale 1, else 0.5); 1 - n with m_bAbsValInv;
   // out = n*(max-min)*s + (1-s)*(max-min) + min, alpha outputs clamped [0, 1], angle outputs' min/max * DAT_180534170.
   // The block slot (0x180146f70 loop) drops the world-time term and adds, for lane k of every block, the creation
@@ -509,8 +509,9 @@ export const ported_forces = {
         setF(c, out, i, v);
       };
       const single = (a, b) => {
+        // The creation time is read once, for the call's first particle, before the loop (0x180147050).
+        const t = F(getF(c, A.CREATION, a) + off) * ns + ms * wts;
         for (let i = a; i < b; i++) {
-          const t = F(getF(c, A.CREATION, i) + off) * ns + ms * wts;
           const p = getV(c, A.POSITION, i);
           write(i, valueNoise3(t + (p[0] + ol[0]) * nsl, t + (p[1] + ol[1]) * nsl, t + (p[2] + ol[2]) * nsl));
         }

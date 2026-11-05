@@ -21,9 +21,14 @@ export const GLTF_TO_SOURCE = new THREE.Matrix4().set(
 );
 
 // A glb loader whose every request (the glb and the textures beside it) carries the map's version.
-function glbLoader(version) {
+// texBase: a quality tier's folder (maps/<map>/q/<tier>/tex/): the glbs' PNGs come from there instead
+function glbLoader(version, mapBase = '', texBase = '') {
   const manager = new THREE.LoadingManager();
-  manager.setURLModifier((url) => (/^(blob|data):/.test(url) ? url : versioned(url, version)));
+  manager.setURLModifier((url) => {
+    if (/^(blob|data):/.test(url)) return url;
+    if (texBase) { const i = url.indexOf(mapBase); if (i >= 0 && /\.png$/i.test(url)) url = texBase + url.slice(i + mapBase.length); }
+    return versioned(url, version);
+  });
   return new GLTFLoader(manager).setMeshoptDecoder(MeshoptDecoder);
 }
 
@@ -42,7 +47,8 @@ function manifestPath(value, fallback) {
   return p;
 }
 
-export async function loadMap(name, onProgress = () => {}) {
+// opts.tier: 'medium' | 'low' (a lasers-bake --tiers copy, textures from q/<tier>/tex/), else high
+export async function loadMap(name, onProgress = () => {}, opts = {}) {
   const base = `maps/${mapName(name)}/`;
   onProgress('manifest');
   // manifest.json says which version the rest is; everything after it is fetched as <file>?v=<version>, so it
@@ -50,7 +56,8 @@ export async function loadMap(name, onProgress = () => {}) {
   const manifest = await fetchJson(base + 'manifest.json', FRESH);
   const version = manifest.version;
   const url = (rel) => versioned(base + rel, version);
-  const loader = glbLoader(version);
+  const tier = opts.tier === 'medium' || opts.tier === 'low' ? opts.tier : '';
+  const loader = glbLoader(version, base, tier ? `${base}q/${tier}/tex/` : '');
   onProgress('entities');
   const [entities, hullsRaw, colBuf, particles, entwatch, overview] = await Promise.all([
     fetchJson(url('entities.json')),
@@ -61,6 +68,9 @@ export async function loadMap(name, onProgress = () => {}) {
     fetchJson(url('entwatch.json')).catch(() => null),
     fetchJson(url('overview/overview.json')).catch(() => null),
   ]);
+  // optional: the static world as particle traces see it (lasers-bake collision_fx*.bin; older bakes have none)
+  const [fxBuf, fxLayerBuf] = await Promise.all([fetchBuffer(url('collision_fx.bin')).catch(() => null), fetchBuffer(url('collision_fx_layers.bin')).catch(() => null)]);
+  const collisionFx = fxBuf && fxLayerBuf && fxBuf.byteLength === fxLayerBuf.byteLength * 9 ? { tris: new Float32Array(fxBuf), layers: new Uint32Array(fxLayerBuf) } : null;
   const collision = new Float32Array(colBuf);
 
   const { hulls, bounds } = normaliseHulls(hullsRaw);
@@ -87,7 +97,7 @@ export async function loadMap(name, onProgress = () => {}) {
   // the map's particle effects as the game has them (bake fx/), run by fx/particles; null for an older bake
   const effects = await MapEffects.load((rel) => url(rel), fetchJson);
   const radar = radarInfo(overview, (rel) => url(rel));
-  return { name, version, manifest, entities, collision, hulls, bounds, world, getModel, particles: fx, items, radar, effects };
+  return { name, version, manifest, entities, collision, collisionFx, hulls, bounds, world, getModel, particles: fx, items, radar, effects };
 }
 
 // (the loader adds ?v=)

@@ -51,6 +51,7 @@ export class MapEffects {
     this.texCache = new Map(); // url -> { tex, variants }
     this.loader = new THREE.TextureLoader();
     this.reports = new Set();
+    this.trace = null; // (from, dir, length, query) -> hit | null: fx/trace.js on the map collision
   }
 
   has(effect) { return Object.hasOwn(this.index.systems, norm(effect)); }
@@ -136,7 +137,8 @@ export class EffectInstance {
   constructor(effects, doc, { seed = 1, camera = null } = {}) {
     this.effects = effects;
     this.doc = doc;
-    this.sys = new ParticleSystem(doc, { defaults: expanded, random: seed, now: () => this.time, camera });
+    // world traces through MapEffects.trace (fx/trace.js), set once the map's collision is built
+    this.sys = new ParticleSystem(doc, { defaults: expanded, random: seed, now: () => this.time, camera, trace: (...a) => effects.trace?.(...a) ?? null });
     this.time = 0;
     this.group = new THREE.Group();
     this.group.matrixAutoUpdate = false; // world space: the systems already work in Source units

@@ -19,6 +19,7 @@ import './classes/fx.js';
 import './classes/physics.js';
 import './classes/server.js';
 import './classes/beams.js';
+import { fogState } from './classes/fog.js';
 
 // Limits on what a map's data can make the engine do (a map is untrusted). Far above any real map:
 // ze_mist_p peaks at ~2000 live entities in a firestorm wave and ~20 simulated humans.
@@ -363,6 +364,9 @@ export class EntityEngine {
 
   addOutput(e, param) { addOutput(this, e, param); }
   playerInput(q) { playerInput(this, q); }
+
+  // the fog the player sees now (classes/fog.js): read by the renderer each frame
+  fogState() { return fogState(this); }
 
   // A new targetname (AddOutput targetname): move e in the name index.
   rename(e, name) {

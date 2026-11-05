@@ -145,27 +145,6 @@ export const operators = {
     },
   },
 
-  // VRF cross-check, UNSETTLED (constructor 0x1801c0870 only in the notes): Verlet, gravity and
-  // drag, the inertia term scaled by the current-to-previous step ratio.
-  C_OP_BasicMovement: {
-    evidence: 'VRF',
-    op(fn, c, _s, st) {
-      const dt = c.dt;
-      if (!(dt > 0)) return;
-      const g = mul(evalVec(fn.m_Gravity, c, -1), dt * dt);
-      const drag = clamp(evalFloat(fn.m_fDrag, c, -1), 0, 0.9999999);
-      let k = Math.exp((Math.log(1 - drag) / (1 / 30)) * dt);
-      if (st.prevDt > 0) k *= dt / st.prevDt;
-      st.prevDt = dt;
-      for (let i = 0; i < c.count; i++) {
-        const p = getV(c, A.POSITION, i), q = getV(c, A.PREV, i);
-        const step = add(g, mul(sub(p, q), k));
-        setV(c, A.PREV, i, p);
-        setV(c, A.POSITION, i, add(p, step));
-      }
-    },
-  },
-
   // VRF cross-check, UNSETTLED: radius = initial radius * lerp(start, end, t) over the window.
   C_OP_InterpolateRadius: {
     evidence: 'VRF',

@@ -14,13 +14,12 @@ tools/   io-graph.mjs + sim.mjs (scenario authoring), index-maps.mjs (rebuild ma
 ## Run it locally
 
 ```bash
-dotnet build ./bake -c Release
-./bake/bin/Release/net10.0/lasers-bake.exe D:/Steam/steamapps/workshop/content/730/3318738050/3318738050.vpk ./web/public/maps
-node ./tools/index-maps.mjs
+node ./tools/bake-map.mjs 3318738050   # build the bake, bake the map + lighting + quality tiers, rebuild the index
 npm --prefix ./web install
 npm --prefix ./web run dev      # http://localhost:5804
 ```
 
+[BAKING.md](BAKING.md) has every bake step, the quality tiers and the shared assets (sounds, HUD, player).
 The bake finds CS2's `pak01_dir.vpk` for stock textures; pass `--cs2 <game/csgo>` if it's elsewhere.
 Baked maps are gitignored (100+ MB each). Scenarios in `web/public/scenarios/` are committed.
 
@@ -29,6 +28,8 @@ Baked maps are gitignored (100+ MB each). Scenarios in `web/public/scenarios/` a
 | ze_mist_p | 3318738050 |
 | ze_ffxii_westersand_v8 | 3363745150 (split VPK: pass `3363745150_dir.vpk`) |
 | ze_deadcore | 3351649726 (`3351649726_dir.vpk`) |
+| ze_dreamin | 3415958616 (`3415958616_dir.vpk`) |
+| ze_gris_p | 3633040749 (`3633040749_dir.vpk`) |
 
 ## The map folder (shared with lasers.cybo.dev)
 
@@ -40,7 +41,8 @@ All coordinates are Source units (inches, Z up), except the glbs, which are VRF'
 | `manifest.json` | map, version, world glb path, collision triangle count, `renderModels` |
 | `entities.json` | `{ lumps: { <lump name>: [{ kv: {...}, io: [{output, target, input, param, delay, times}] }] } }`, every lump, template lumps included |
 | `collision.bin` | the static world's player-solid triangles: raw float32, 9 per triangle, no header |
-| `hulls.json` | `{ <model path>: [{ verts, planes, solid }] }` convex hulls in model space, for brush entities (movers, breakables, triggers). Mesh-only shapes come as `{ tris }` |
+| `collision_fx.bin` + `collision_fx_layers.bin` | *(ours)* the static world as particle traces see it: every shape a particle trace can hit (CS2 interaction layers 0x1db001: no player clips, no sky), float32 x 9 per triangle, plus one uint32 of layer bits per triangle (bit = CS2 layer index: 0 solid, 3 sky, 4 playerclip, 12 window, 15 water, ...). Only this pair: `lasers-bake --collision <workshop.vpk> web/public/maps` |
+| `hulls.json` | `{ <model path>: [{ verts, planes, solid, layers? }] }` convex hulls (`layers`, ours: the shape's interaction-layer bits) in model space, for brush entities (movers, breakables, triggers). Mesh-only shapes come as `{ tris }` |
 | `particles.json` | *(ours)* a summary per effect an `info_particle_system` plays: colour, emit box, radius, rate, children |
 | `world/<map>.glb` | the world node, textures beside it as PNGs capped at 1024 px |
 | `models/<path>.glb` | each entity model, placed and moved at runtime |
@@ -279,8 +281,19 @@ are dimmed. If the owner leaves, the next oldest member owns the room.
     `bakedshadowindex` channel; CS2's diffuse has no 1/pi, so three's numbers are scaled by pi to match
   - the frame: CS2's tone curve (x 2.8, white point clamp, Hable-style curve from the `.vpost` or CS2's defaults), the map's
     exposure range, sRGB, the colour lookup, then gamma
-  - not yet: fog, the skybox, env_cubemap reflections, bloom, auto exposure, per-area post volumes; a GPU without BC6H/BC7
-    (phones) keeps the old fixed lighting
+  - fog, from the map's entities (`entities/classes/fog.js`, any map): `env_fog_controller` (start / end / max density /
+    exponent, colour x hdrcolorscale, fogblend by fogdir, farz; the master or the player's `SetFogController`, and the
+    `*LerpTo` / `StartFogTransition` inputs) and `env_gradient_fog` (distance + height bias / scale / exponent, max opacity,
+    Enable / Disable fades; the last one enabled wins); the 2D sky is fogged by the controller only
+  - the sky (`env_sky` + its `sky.vfx` material, `SkyBake.cs`): the cube sampled with Source directions, x 2^exposure bias x
+    tint x brightnessscale
+  - reflections (`env_cubemap` / `env_combined_light_probe_volume`, `SkyBake.cs`): the map's cubemap array, volumes by
+    indoor level then size, edge-fade blending, box parallax, roughness mip, normalised by the cubemap's SH vs the lightmap
+  - quality tiers (`--tiers`, BAKING.md): medium / low copies with smaller textures and RGBM PNG lightmaps, so a GPU
+    without BC6H/BC7 (phones) gets the map's lighting too; Auto picks low there
+  - not yet: bloom, auto exposure, per-area post volumes
+- **Performance** (Settings → Video): render resolution, MSAA, fog, reflections (instant: uniforms, nothing recompiles),
+  CS2 baked lighting off (skips the download) and Quality (Auto / High / Medium / Low, next map load).
 - **Cut-out alpha** (`AlphaBake.cs`, also `lasers-bake --alpha`): VRF 20.1's glTF exporter writes alpha-tested materials
   (tree leaves, grass, fences) as `alphaMode: MASK` with an RGB-only base colour, so they drew solid; the bake puts the
   alpha back from the vmat's `g_tColor` (VRF's RGB kept).

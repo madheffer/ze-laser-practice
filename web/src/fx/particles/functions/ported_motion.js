@@ -130,8 +130,7 @@ export const ported_motion = {
   // normalised (rsqrtps + Newton, exact here); centre = CP position at curTime (0x180053d30). Per particle:
   // dn = normalize(p - C); v = dn * (1 - n.dn) (sic: dn, not n, is scaled; disassembly 0x1801107f5..80e);
   // acc += cross(normalize(v), n) * force * strength, only where |p - C|^2 and |v|^2 exceed FLT_EPSILON (DAT_1805890b0).
-  // `acc` is a flat [x, y, z] * count array. UNSETTLED: system.js does not run force generators yet (it only looks
-  // them up), so nothing calls force(); and the axis-frame CP is m_nControlPointNumber only when *(def+8) > 2 (else 0),
+  // `acc` is a flat [x, y, z] * count array (C_OP_BasicMovement fills it, ported_movement.js). UNSETTLED: the axis-frame CP is m_nControlPointNumber only when *(def+8) > 2 (else 0),
   // a definition field not decoded (taken as m_nControlPointNumber).
   C_OP_TwistAroundAxis: {
     evidence: 'RE',

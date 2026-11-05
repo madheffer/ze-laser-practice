@@ -21,6 +21,8 @@ const MAX_FX_PER_ENTITY = 64;
 export class Renderer {
   constructor(canvas) {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+    this.renderScale = 1; // settings: render resolution (setQuality)
+    this.msaa = true;
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -55,6 +57,13 @@ export class Renderer {
     this.hitboxMat = new THREE.MeshBasicMaterial({ color: 0x30ff90, wireframe: true, transparent: true, opacity: 0.6, depthWrite: false });
     this.resize();
     window.addEventListener('resize', () => this.resize());
+  }
+
+  // performance settings: render resolution (x the screen's pixel ratio) and MSAA on the HDR target
+  setQuality({ renderScale = 1, msaa = true } = {}) {
+    const ratio = Math.min(window.devicePixelRatio, 2) * Math.min(1, Math.max(0.25, renderScale));
+    if (Math.abs(this.renderer.getPixelRatio() - ratio) > 1e-3) { this.renderer.setPixelRatio(ratio); this.resize(); }
+    if (this.msaa !== msaa) { this.msaa = msaa; if (this.hdr) { this.hdr.dispose(); this.hdr = null; this.blitScene = null; } }
   }
 
   resize() {
@@ -185,6 +194,11 @@ export class Renderer {
               });
             }
             group.add(holder);
+            // probe-lit like the props (world/lighting.js): placed first, so the probe volume is picked where the
+            // entity is. UNSETTLED: a mover keeps the volume of where it spawned
+            group.matrix.copy(e.getWorld());
+            group.updateMatrixWorld(true);
+            inst.traverse((o) => { if (o.isMesh) this.lighting?.applyProbes(o); });
           });
         }
       }
@@ -422,7 +436,7 @@ export class Renderer {
     const r = this.renderer;
     const size = r.getDrawingBufferSize(this._size || (this._size = new THREE.Vector2()));
     if (!this.hdr) {
-      this.hdr = new THREE.WebGLRenderTarget(size.x, size.y, { type: THREE.HalfFloatType, samples: 4 });
+      this.hdr = new THREE.WebGLRenderTarget(size.x, size.y, { type: THREE.HalfFloatType, samples: this.msaa ? 4 : 0 });
       const mat = new THREE.ShaderMaterial({
         uniforms: { tHdr: { value: this.hdr.texture }, ...this.post.uniforms },
         vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
