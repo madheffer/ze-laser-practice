@@ -19,6 +19,7 @@ import { LightRenderer } from './particles/render/lights.js';
 import { SoundRenderer } from './particles/render/sound.js';
 import { liveMaterials } from './particles/render/spritecard.js';
 import { barnUniforms } from '../world/lighting.js';
+import { sceneCopyUniforms } from '../world/scenecopy.js';
 import { safeRelPath } from '../lib/paths.js';
 
 // particles.dll's class defaults (2.3 MB generated): loaded with the first map that has effects, not at page start
@@ -33,9 +34,10 @@ const FOG_OFF = () => ({
   cs2FogType: { value: 0 }, cs2FogColor: { value: new THREE.Color(0, 0, 0) },
   cs2FogDist: { value: new THREE.Vector4() }, cs2FogHeight: { value: new THREE.Vector4() }, cs2FogStartSq: { value: 0 },
 });
+// The scene copy (world/scenecopy.js) feeds depth feathering and refraction.
 export const fxShared = {
   uCamPos: { value: new THREE.Vector3() }, uCamUp: { value: new THREE.Vector3() }, uCamFwd: { value: new THREE.Vector3() },
-  uAmbient: { value: new THREE.Vector3(1, 1, 1) }, ...barnUniforms(), ...FOG_OFF(),
+  uAmbient: { value: new THREE.Vector3(1, 1, 1) }, ...barnUniforms(), ...FOG_OFF(), ...sceneCopyUniforms,
 };
 let boundLighting = null;
 // share a MapLighting's barn + fog uniform objects with every particle material (live ones are repointed)

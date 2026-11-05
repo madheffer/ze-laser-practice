@@ -1,16 +1,17 @@
 import * as THREE from 'three';
-import { MAX_LIGHTS, FOG_PARS } from '../../../world/lighting.js';
+import { MAX_LIGHTS } from '../../../world/lighting.js';
+import { PS } from './spritecard-ps.js';
 
-// spritecard.vfx as a ShaderMaterial (RE §3, §4), a line-for-line GLSL port of the dumped combos (PS0 =
-// spritecard_vulkan_50_ps_s0_f0.cb.hlsl, VS0 = _vs_s0_f0.cb.hlsl), all in Source space: modelViewMatrix carries
-// the axis swap and camera vectors arrive as Source-space uniforms. controls.js fills the cbuffer slots.
+// spritecard.vfx as a ShaderMaterial (RE §3, §4), a line-for-line GLSL port of the dumped combos (VS0 =
+// spritecard_vulkan_50_vs_s0_f0, VSL = _vs_s128_f0 (S_TEXTURE_LAYERS=1; s256 / s384 repeat the layer block); the pixel
+// shader is spritecard-ps.js), all in Source space: modelViewMatrix carries the axis swap and camera vectors arrive as
+// Source-space uniforms. controls.js fills the cbuffer slots.
 
 // Particles take the scene's barn lights per vertex (VS0:3380-3650: the same g_BarnLights list and cluster cull bits
 // csgo_complex reads, RE §8), so they share the world's packed set: world/lighting.js barnUniforms() (cs2Barn*,
 // MAX_LIGHTS, ranked by setLights), bound by effects.js setFxCamera(). The gather is lighting.js's cs2Barn() term for
 // term (colour x gain x 1/max(d^2, 1) x smoothstep(fade), 0 at d >= R, the cone) with no N.L and no pi: the VS sums
 // the light and PS0:689 multiplies the colour by it (RE §8: particles have no N.L). The GLSL twin of barn.js.
-export const MAX_BARNS = MAX_LIGHTS;
 export const BARN_GLSL = /* glsl */`
 uniform int cs2BarnCount;
 uniform vec3 cs2BarnPos[${MAX_LIGHTS}];
@@ -46,8 +47,22 @@ const COMMON_VS = /* glsl */`
 uniform vec3 uCamPos, uCamUp, uCamFwd;
 uniform vec3 uAmbient;
 uniform vec4 VC_c0, VC_c1, VC_c2, VC_c3, VC_c4, VC_c5;
+uniform vec4 uLayerOS[3];   // layers 1-3: offset U/V, scale U/V (VSL VC_c6.. as VC_c5 for the base layer)
+uniform vec2 uLayerRZ[3];   // layers 1-3: UV rotation, zoom
 uniform int uOrient;
 varying vec4 vUv;
+#if LAYERS > 1
+varying vec4 vUv1;
+#endif
+#if LAYERS > 2
+varying vec4 vUv2;
+#endif
+#if LAYERS > 3
+varying vec4 vUv3;
+#endif
+#if MOTION
+varying vec4 vUvM;
+#endif
 varying vec4 vColor;
 varying vec3 vWorld;
 flat varying vec4 vSheet;
@@ -61,6 +76,21 @@ vec4 efxProject(vec3 p) {
   if (VC_c1.x != 0.0) { vec4 b = projectionMatrix * modelViewMatrix * vec4(p + uCamFwd * VC_c1.x, 1.0); cp.z = cp.w * (b.z / b.w); }
   return cp;
 }
+// One layer's UV (VS0:1025-1135 / 1731-1738; VSL:4300-4470 for layer 1 with its own VC_c6, zoom and sheet rows).
+// With a sheet (w > -0.5): the zoom lerp, then offset/scale, into each frame's rect (the crop rect R is taken as the
+// whole frame: the sheet JSON carries cropped rects only). Without: rotate about the centre, divide by the scale,
+// add frac(offset + 0.5). Every per-particle scale source is NONE (controls.js reports the others).
+vec4 efxLayerUV(vec2 uvc, vec4 os, float rot, float zoom, vec4 r0, vec4 r1, float w) {
+  if (w > -0.5) {
+    vec2 z = (uvc - 0.5) * clamp(1.0 / zoom, 0.0, 1.0) + 0.5;
+    vec2 l0 = mix(uvc, z, w * 0.5 + 0.5) / os.zw + os.xy;
+    vec2 l1 = mix(uvc, z, w * 0.5) / os.zw + os.xy;
+    return vec4(r0.xy + l0 * (r0.zw - r0.xy), r1.xy + l1 * (r1.zw - r1.xy));
+  }
+  vec2 q = uvc - 0.5;
+  float c = cos(rot), s = sin(rot);
+  return vec4(vec2(q.x * c - q.y * s, q.x * s + q.y * c) / os.zw + fract(os.xy + 0.5), 1.0, 1.0);
+}
 `;
 
 const SPRITE_VS = /* glsl */`
@@ -72,6 +102,20 @@ attribute vec3 iNormal;   // T4
 attribute vec4 iRect0;
 attribute vec4 iRect1;
 attribute float iBlend;   // sheet blend weight, < -0.5 without a sheet
+// only what the combo reads is declared: WebGL allows 16 vertex attributes, some drivers count declared ones
+#if LAYERS > 1
+attribute vec3 iLBlend;   // layers 1-3: sheet blend weights
+attribute vec4 iL1a, iL1b;  // layer 1's frame rects
+#endif
+#if LAYERS > 2
+attribute vec4 iL2a, iL2b;
+#endif
+#if LAYERS > 3
+attribute vec4 iL3a, iL3b;
+#endif
+#if MOTION
+attribute vec4 iMa, iMb;  // the motion-vector texture's two frame rects (PSM input_6; UNSETTLED: VS s160 not ported, raw frame UVs)
+#endif
 ${COMMON_VS}
 void main() {
   vec3 centre = iPos;
@@ -105,24 +149,24 @@ void main() {
     r = min(max(r, VC_c0.x * d), VC_c0.w * d);
   }
   vec3 world = centre + off * (col.a < 0.0039215688593685627 ? 0.0 : r);     // VS0:3329
-  if (iBlend > -0.5) {
-    // VS0:1731-1738: zoom lerp, then the texture offset/scale, then into each frame's rect. The
-    // crop rect R is taken as the whole frame: the sheet JSON carries cropped rects only.
-    float w = iBlend;
-    vec2 z = (uvc - 0.5) * clamp(1.0 / VC_c3.y, 0.0, 1.0) + 0.5;
-    vec2 l0 = mix(uvc, z, w * 0.5 + 0.5) / VC_c5.zw + VC_c5.xy;
-    vec2 l1 = mix(uvc, z, w * 0.5) / VC_c5.zw + VC_c5.xy;
-    vUv = vec4(iRect0.xy + l0 * (iRect0.zw - iRect0.xy), iRect1.xy + l1 * (iRect1.zw - iRect1.xy));
-    vSheet = vec4(w, 0.0, 1.0, 0.0);
-  } else {
-    // VS0:1025-1135 with every per-particle scale source NONE: rotate about the centre by VC_c4.w,
-    // divide by the scale, add frac(offset + 0.5).
-    vec2 q = uvc - 0.5;
-    float c4 = cos(VC_c4.w), s4 = sin(VC_c4.w);
-    vec2 rq = vec2(q.x * c4 - q.y * s4, q.x * s4 + q.y * c4);
-    vUv = vec4(rq / VC_c5.zw + fract(VC_c5.xy + 0.5), 1.0, 1.0);
-    vSheet = vec4(-1.0, -1.0, 1.0, 0.0);
-  }
+  vUv = efxLayerUV(uvc, VC_c5, VC_c4.w, VC_c3.y, iRect0, iRect1, iBlend);
+#if LAYERS > 1
+  vSheet = vec4(iBlend > -0.5 ? iBlend : -1.0, iLBlend.x > -0.5 ? iLBlend.x : -1.0, iLBlend.y > -0.5 ? iLBlend.y : -1.0, iLBlend.z > -0.5 ? iLBlend.z : -1.0);
+#else
+  vSheet = vec4(iBlend > -0.5 ? iBlend : -1.0, -1.0, -1.0, -1.0);
+#endif
+#if LAYERS > 1
+  vUv1 = efxLayerUV(uvc, uLayerOS[0], uLayerRZ[0].x, uLayerRZ[0].y, iL1a, iL1b, iLBlend.x);
+#endif
+#if LAYERS > 2
+  vUv2 = efxLayerUV(uvc, uLayerOS[1], uLayerRZ[1].x, uLayerRZ[1].y, iL2a, iL2b, iLBlend.y);
+#endif
+#if LAYERS > 3
+  vUv3 = efxLayerUV(uvc, uLayerOS[2], uLayerRZ[2].x, uLayerRZ[2].y, iL3a, iL3b, iLBlend.z);
+#endif
+#if MOTION
+  vUvM = vec4(iMa.xy + uvc * (iMa.zw - iMa.xy), iMb.xy + uvc * (iMb.zw - iMb.xy));
+#endif
   vColor = col;
   vWorld = world;
   vLight = vec4(uAmbient + efxBarnSum(world), 0.0);                         // VS0:3380-3650, in5.w = 0
@@ -130,98 +174,28 @@ void main() {
 }
 `;
 
-// Ropes are tessellated on the CPU (ropes.js, from basis.js); this VS only lights and projects.
+// Ropes and trails are tessellated on the CPU (ropes.js / trails.js); this VS only lights and projects. Their extra
+// layers read the strip's UV. UNSETTLED: the trail combo's per-layer UVs (S_DRAW_AS_TRAIL with layers not dumped).
 const MESH_VS = /* glsl */`
 attribute vec4 uv4;
 attribute vec4 color4;
 ${COMMON_VS}
 void main() {
   vUv = uv4;
+#if LAYERS > 1
+  vUv1 = uv4;
+#endif
+#if LAYERS > 2
+  vUv2 = uv4;
+#endif
+#if LAYERS > 3
+  vUv3 = uv4;
+#endif
   vColor = color4;
   vWorld = position;
-  vSheet = vec4(-1.0, -1.0, 1.0, 0.0);
+  vSheet = vec4(-1.0);
   vLight = vec4(uAmbient + efxBarnSum(position), 0.0);
   gl_Position = efxProject(position);
-}
-`;
-
-// PS0 (static 0, dynamic 0), DIFFUSE texture type. Line numbers are PS0's.
-const PS = /* glsl */`
-uniform sampler2D uBase;
-${FOG_PARS}
-uniform vec4 PC_c0, PC_c1, PC_c3, PC_c4, PC_c5, PC_c6, PC_c8, PC_c9;
-uniform int PC_c19x, PC_c19y, PC_c19z;
-varying vec4 vUv;
-varying vec4 vColor;
-varying vec3 vWorld;
-flat varying vec4 vSheet;
-varying vec4 vLight;
-float hstep(float e0, float e1, float x) { float t = clamp((x - e0) / (e1 - e0), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
-float lum601(vec3 c) { return dot(c, vec3(0.2989999949932098, 0.5870000123977661, 0.1140000000596046)); }
-float lum709(vec3 c) { return dot(c, vec3(0.2125000059604645, 0.7153999805450439, 0.0720999985933304)); }
-void main() {
-  bool mod2x = (PC_c19z & 1) != 0;
-  vec4 s0 = texture2D(uBase, vUv.xy);                                        // 85-88
-  if (mod2x) s0.rgb -= vec3(0.005859375, 0.009765625, 0.005859375);          // 94
-  vec4 t = s0;
-  if ((PC_c19z & 32768) != 0 && vSheet.x > -1.0) {                           // 106-170
-    vec4 s1 = texture2D(uBase, vUv.zw);
-    if (mod2x) s1.rgb -= vec3(0.005859375, 0.009765625, 0.005859375);
-    if ((PC_c19z & 1024) != 0) t = mix(s0, s1, vSheet.x);
-  }
-  int chan = PC_c19x & 15;
-  int bm = (PC_c19x >> 4) & 15;
-  float k = bm == 4 ? 0.0 : 1.0;
-  float blendAmt = ((int(PC_c3.z) >> 12) & 1) != 0 ? PC_c8.y * vUv.w : PC_c8.y; // 413-420
-  vec4 c = t;                                                                // 422-548
-  if (chan == 0) c = vec4(t.rgb, k);
-  else if (chan == 2) c = vec4(vec3(k), t.a);
-  else if (chan == 4) c = vec4(mix(vec3(1.0), t.rgb, t.a), 1.0);
-  else if (chan == 5) c = vec4(mix(vec3(1.0), t.rgb, lum601(t.rgb)), 1.0);
-  else if (chan == 6) c = vec4(t.rgb, lum601(t.rgb));
-  else if (chan == 7) c = vec4(vec3(k), lum601(t.rgb));
-  else if (chan == 8) c = vec4(1.0, 1.0, 1.0, lum601(t.rgb));
-  else if (chan == 9) c = vec4(t.r, k * t.r, k * t.r, k);
-  else if (chan == 10) c = vec4(k * t.g, t.g, k * t.g, k);
-  else if (chan == 11) c = vec4(k * t.b, k * t.b, t.b, k);
-  else if (chan == 12) c = vec4(t.r, k * t.r, k * t.r, t.r);
-  else if (chan == 13) c = vec4(k * t.g, t.g, k * t.g, t.g);
-  else if (chan == 14) c = vec4(k * t.b, k * t.b, t.b, t.b);
-  if (bm == 3) c = 1.0 + c;                                                  // 550-596
-  else if (bm == 4) c = 1.0 - c;
-  else if (bm == 1) c = c * 2.0;
-  else if (bm == 5) c = (1.0 + c) * 0.5;
-  else if (bm == 6) c = vec4(vec3(lum709(c.rgb)), c.a);
-  c = max(mix(vec4(1.0), c, blendAmt), vec4(0.0));                           // 598
-  c.rgb *= vColor.rgb;                                                       // 599
-  float a0 = c.a;
-  if (PC_c0.w < PC_c0.z) c.a = hstep(PC_c0.w, PC_c0.z, a0);                  // 612-614
-  if (a0 >= PC_c6.x && a0 <= PC_c6.w) {                                      // 621-642
-    float o = a0 <= PC_c6.z ? hstep(PC_c6.x, PC_c6.z, a0) : hstep(PC_c6.w, PC_c6.y, a0);
-    c = mix(c, PC_c5, o);
-  }
-  c.rgb = mix(c.rgb, vec3(lum709(c.rgb)), PC_c9.x);                          // 654
-  c = PC_c4 * c;                                                             // 659
-  c.a += PC_c8.x;                                                            // 660
-  if ((PC_c19z & 1024) != 0) c.a = clamp(c.a, 0.0, 1.0);                     // 664-667
-  c.a *= vColor.a;                                                           // 686
-  vec3 lit = c.rgb * (vLight.rgb * PC_c0.y + PC_c0.x + vLight.w);            // 689
-  float a = (PC_c19z & 524288) != 0 ? clamp(c.a * 128.0, 0.0, 1.0) : c.a;    // 695-702
-  vec4 o;
-  if (mod2x) {                                                               // 705-713, 803-807
-    o = vec4(clamp(mix(vec3(0.5), mix(vec3(0.5), c.rgb, vColor.rgb), a), 0.0, 1.0), a * abs(PC_c1.w));
-  } else {
-    if ((PC_c19z & 16) != 0) lit *= PC_c1.z;                                 // 718-720 (F_ADDSELF: 1 + add self)
-    // 733-790, F_FOG_PARTICLES: rgb = lerp(fogColour * PC_c1.w, rgb, 1 - amount), alpha kept. The world's own fog
-    // (world/lighting.js cs2ApplyFog, which mixes toward the colour) gives both terms: mix(rgb, C, t) - C t + w C t.
-    if ((PC_c19z & 128) != 0) {
-      vec3 fogC = cs2ApplyFog(vec3(0.0), vWorld);
-      lit = cs2ApplyFog(lit, vWorld) + (PC_c1.w - 1.0) * fogC;
-    }
-    lit *= mix(a, 1.0, clamp(-PC_c1.w, 0.0, 1.0));                           // 795
-    o = vec4(lit, a * abs(PC_c1.w));                                         // 803
-  }
-  gl_FragColor = o;
 }
 `;
 
@@ -236,19 +210,25 @@ export const liveMaterials = new Set();
 
 /**
  * A spritecard material. `shared` holds the per-frame uniforms every particle material of a side
- * reads (camera vectors, ambient, the world's barn lights and fog: effects.js fxShared), written once per frame.
+ * reads (camera vectors, ambient, the world's barn lights and fog, the scene copy: effects.js fxShared).
  */
 export function createSpritecardMaterial(kind, shared, texture) {
   const v4 = () => new THREE.Vector4();
   const uniforms = {
     ...shared,
-    uBase: { value: texture },
+    uBase: { value: texture }, uLayer1: { value: texture }, uLayer2: { value: texture }, uLayer3: { value: texture },
+    uMotion: { value: texture },
     uOrient: { value: 0 },
+    uLayerOS: { value: [v4().set(0, 0, 1, 1), v4().set(0, 0, 1, 1), v4().set(0, 0, 1, 1)] },
+    uLayerRZ: { value: [new THREE.Vector2(0, 1), new THREE.Vector2(0, 1), new THREE.Vector2(0, 1)] },
+    uRefractTaps: { value: Array.from({ length: 25 }, () => v4()) }, uRefractTapCount: { value: 0 },
     PC_c19x: { value: 0 }, PC_c19y: { value: 0 }, PC_c19z: { value: 0 },
   };
-  for (const k of ['VC_c0', 'VC_c1', 'VC_c2', 'VC_c3', 'VC_c4', 'VC_c5', 'PC_c0', 'PC_c1', 'PC_c3', 'PC_c4', 'PC_c5', 'PC_c6', 'PC_c8', 'PC_c9']) uniforms[k] = { value: v4() };
+  for (const k of ['VC_c0', 'VC_c1', 'VC_c2', 'VC_c3', 'VC_c4', 'VC_c5', 'PC_c0', 'PC_c1', 'PC_c2', 'PC_c3', 'PC_c4', 'PC_c5',
+    'PC_c6', 'PC_c8', 'PC_c9', 'PC_c10', 'PC_c11']) uniforms[k] = { value: v4() };
   const mat = new THREE.ShaderMaterial({
     uniforms,
+    defines: { LAYERS: 1, FEATHER: 0, REFRACT: 0, MOTION: 0 },
     vertexShader: kind === 'sprite' ? SPRITE_VS : MESH_VS,
     fragmentShader: PS,
     transparent: true,
@@ -259,19 +239,31 @@ export function createSpritecardMaterial(kind, shared, texture) {
     side: THREE.DoubleSide,
     toneMapped: false,
   });
+  mat.userData.kind = kind;
   liveMaterials.add(mat);
   mat.addEventListener('dispose', () => liveMaterials.delete(mat));
   return mat;
 }
 
-/** Write one renderer's controls (controls.js) into its material, render state included. */
+/** Write one renderer's controls (controls.js) into its material, render state and shader defines included. */
 export function applyControls(mat, ctl) {
   const u = mat.uniforms;
   const set4 = (name, a) => u[name].value.set(a[0], a[1], a[2], a[3]);
-  for (const k of ['c0', 'c1', 'c3', 'c4', 'c5', 'c6', 'c8', 'c9']) set4('PC_' + k, ctl.pc[k]);
+  for (const k of ['c0', 'c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c8', 'c9', 'c10', 'c11']) set4('PC_' + k, ctl.pc[k]);
   for (const k of ['c0', 'c1', 'c2', 'c3', 'c4', 'c5']) set4('VC_' + k, ctl.vc[k]);
   u.PC_c19x.value = ctl.pc.c19x; u.PC_c19y.value = ctl.pc.c19y; u.PC_c19z.value = ctl.pc.c19z;
   u.uOrient.value = ctl.vc.orientation;
+  ctl.layers.slice(1, 4).forEach((l, i) => { u.uLayerOS.value[i].set(...l.os); u.uLayerRZ.value[i].set(l.rot, l.zoom); });
+  const taps = ctl.refractTaps || [];
+  taps.slice(0, 25).forEach((t, i) => u.uRefractTaps.value[i].set(t[0], t[1], t[2], 0));
+  u.uRefractTapCount.value = Math.min(25, taps.length);
+  const d = mat.defines, layers = Math.max(1, Math.min(4, ctl.layers.length)), feather = ctl.feather ? 1 : 0, refract = ctl.refract ? 1 : 0;
+  // motion vectors on sprites only: no dumped trail combo carries S_MOTION_VECTORS
+  // (and with at most 3 layers: 4 layers + motion would pass WebGL's 16 vertex attributes; the dumped motion combos have 2)
+  const motion = ctl.motion && mat.userData.kind === 'sprite' && layers < 4 ? 1 : 0;
+  if (d.LAYERS !== layers || d.FEATHER !== feather || d.REFRACT !== refract || d.MOTION !== motion) {
+    d.LAYERS = layers; d.FEATHER = feather; d.REFRACT = refract; d.MOTION = motion; mat.needsUpdate = true;
+  }
   const s = ctl.state;
   mat.blendEquation = EQUATION[s.blendOp];
   mat.blendSrc = FACTOR[s.src];
@@ -281,6 +273,54 @@ export function applyControls(mat, ctl) {
   mat.blendDstAlpha = FACTOR[s.dstAlpha];
   mat.depthWrite = s.depthWrite;
   mat.depthFunc = s.depthFunc === 'ALWAYS' ? THREE.AlwaysDepth : THREE.LessEqualDepth;
+}
+
+/** Does some live particle material read the scene copy (world/scenecopy.js): depth feathering or refraction. */
+export function sceneCopyWanted() {
+  for (const m of liveMaterials) if (m.defines.FEATHER || m.defines.REFRACT) return true;
+  return false;
+}
+
+const LAYER_UNIFORMS = ['uBase', 'uLayer1', 'uLayer2', 'uLayer3'];
+/**
+ * Point a material's layer samplers at the controls' textures (assets: effects.js MapEffects.assets()); a layer with
+ * m_bReplaceTextureWithGradient samples its gradient as a 1D strip (gradientTexture).
+ */
+export function bindTextures(mat, ctl, assets) {
+  LAYER_UNIFORMS.forEach((name, k) => {
+    const l = ctl.layers[k];
+    const tex = l?.gradient ? gradientTexture(l.gradient) : l?.texture ? assets.texture(l.texture, l.clamp) : null;
+    mat.uniforms[name].value = tex || whiteTexture();
+  });
+  mat.uniforms.uMotion.value = (ctl.motion && assets.texture(ctl.motion.texture, ctl.motion.clamp)) || whiteTexture();
+}
+
+// A texture group's m_Gradient as a 256 x 1 sRGB strip: the stops' colours (0-255) lerped by position, clamped at the
+// ends. UNSETTLED: the game bakes the gradient C++ side (its width and the colour space of the lerp are not read).
+const gradients = new Map();
+export function gradientTexture(gradient) {
+  const stops = (gradient?.m_Stops || []).filter((s) => Array.isArray(s?.m_Color))
+    .slice().sort((a, b) => (a.m_flPosition ?? 0) - (b.m_flPosition ?? 0));
+  const key = JSON.stringify(stops);
+  if (gradients.has(key)) return gradients.get(key);
+  const W = 256, data = new Uint8Array(W * 4);
+  for (let x = 0; x < W && stops.length; x++) {
+    const t = x / (W - 1);
+    let j = 0;
+    while (j < stops.length - 1 && (stops[j + 1].m_flPosition ?? 0) <= t) j++;
+    const a = stops[j], b = stops[Math.min(j + 1, stops.length - 1)];
+    const pa = a.m_flPosition ?? 0, pb = b.m_flPosition ?? 0;
+    const f = t <= pa ? 0 : pb > pa ? Math.min(1, (t - pa) / (pb - pa)) : 0;
+    for (let q = 0; q < 3; q++) data[4 * x + q] = Math.round((a.m_Color[q] ?? 0) + ((b.m_Color[q] ?? 0) - (a.m_Color[q] ?? 0)) * f);
+    data[4 * x + 3] = 255;
+  }
+  const tex = new THREE.DataTexture(data, W, 1);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
+  tex.magFilter = tex.minFilter = THREE.LinearFilter;
+  tex.needsUpdate = true;
+  gradients.set(key, tex);
+  return tex;
 }
 
 // A missing texture (a stock vtex no game pak supplied) samples white; the stage reports it.

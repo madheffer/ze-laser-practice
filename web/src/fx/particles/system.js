@@ -92,7 +92,8 @@ export class ParticleSystem {
     this.detailLevel = opts.detailLevel ?? 0;
     // Shifts every collection's seed offset, so separately spawned copies of one effect draw
     // different CONSTANT randoms, as each spawned system does in game (a per-shot tracer gate).
-    this.variant = opts.variant | 0;
+    // A numeric opts.random (an entity's id: render.js) is folded in the same way: the table itself is the game's one table.
+    this.variant = ((opts.variant | 0) + (typeof opts.random === 'number' ? opts.random | 0 : 0)) | 0;
     this.camera = opts.camera || null;
     this.table = makeRandomTable(opts.random);
     // opts.now: the stage's clock, a number or a function returning one (not used by the simulation).
@@ -463,11 +464,19 @@ function compact(c) {
   c.count = w;
 }
 
-// C_OP_RestartAfterDuration's restart: emitters re-arm on the current clock, live particles and
-// the clock are kept, children restart too (VRF cross-check, UNSETTLED).
+// The collection restart (particles.dll 63babcbf 0x18003ffb0, mode 0, C_OP_RestartAfterDuration's call): live
+// particles and the clock are kept; coll+0x88 / +0x8c are zeroed, the operator time origin (+0x60) becomes the
+// current time, every function's restart slot 21 runs on its state (an entry's `restart`; one without it gets a
+// fresh state, UNSETTLED), then the children restart.
 export function rearm(c) {
   c.restartAt = null;
-  for (const fn of [...c.def.m_Emitters, ...c.def.m_PreEmissionOperators]) c.state.delete(fn);
+  c.added88 = 0;
+  c.added8c = 0;
+  if (c.time !== -3.4028234663852886e38) c.opTimeOrigin = c.time;
+  for (const fn of [...c.def.m_Emitters, ...c.def.m_PreEmissionOperators]) {
+    const f = FUNCTIONS[fn._class];
+    if (f?.restart) f.restart(fn, c, stateOf(c, fn)); else c.state.delete(fn);
+  }
   for (const fn of c.def.m_Operators) if (FUNCTIONS[fn._class]?.rearm) FUNCTIONS[fn._class].rearm(stateOf(c, fn));
   c.emitterOrigin = c.time;
   for (const ch of c.children) rearm(ch);

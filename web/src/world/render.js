@@ -7,6 +7,8 @@ import { GLTF_TO_SOURCE } from './assets.js';
 import { DEG, parseVec, angleForward } from './entities/index.js';
 import { assetKey } from '../lib/paths.js';
 import { setFxCamera, fxShared } from '../fx/effects.js';
+import { sceneCopyWanted } from '../fx/particles/render/spritecard.js';
+import { SceneCopy } from './scenecopy.js';
 import { PropAnimator, cloneModel } from './anim.js';
 
 // an entity's world transform as a particle control point: position and its forward / left / up axes
@@ -499,6 +501,8 @@ void main() { vec3 c = cs2Tonemap(texture2D(tHdr, vUv).rgb); vec4 s = sRGBTransf
       this.blitCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
     }
     if (this.hdr.width !== size.x || this.hdr.height !== size.y) this.hdr.setSize(size.x, size.y);
+    // depth feathering / refraction read the frame after the opaques (scenecopy.js)
+    (this.sceneCopy ||= new SceneCopy(this.scene, sceneCopyWanted)).frame(r, this.hdr, this.camera);
     r.setRenderTarget(this.hdr);
     r.render(this.scene, this.camera);
     r.setRenderTarget(null);

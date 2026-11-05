@@ -10,15 +10,12 @@
 //
 // Traces go through ParticleSystem opts.trace(from, dir, length, query) -> { hit, position, normal, fraction,
 // startSolid } | null (null: no world, a miss). No opts.trace: the constraint does nothing.
-import { A, VECTOR_ATTRS, add, sub, mul, dot, len, getV, setV, getF, setF, getCp, mulberry32, attrIndex, vec3,
-  FLT_EPSILON } from './common.js';
+import { A, VECTOR_ATTRS, add, sub, mul, dot, len, getV, setV, getF, setF, getCp, attrIndex, vec3,
+  FLT_EPSILON, TRACE_SETS, enumIndex, threadRandom } from './common.js';
 import { evalFloat } from '../inputs.js';
 
 const MODES = { COLLISION_MODE_DISABLED: -1, COLLISION_MODE_INITIAL_TRACE_DOWN: 0, COLLISION_MODE_PER_FRAME_PLANESET: 1,
   COLLISION_MODE_USE_NEAREST_TRACE: 2, COLLISION_MODE_PER_PARTICLE_TRACE: 3 }; // schema ParticleCollisionMode_t
-const TRACE_SETS = ['PARTICLE_TRACE_SET_ALL', 'PARTICLE_TRACE_SET_STATIC', 'PARTICLE_TRACE_SET_STATIC_AND_KEYFRAMED',
-  'PARTICLE_TRACE_SET_DYNAMIC'];
-const enumIndex = (v, names, d = 0) => (typeof v === 'number' ? v : Math.max(names.indexOf(v), d));
 const NONE = A.NONE;
 const PLANES = 41; // 0x29: plane slots per cache
 const GRID = 26; // 0x1a: the 3x3x3 grid minus its centre
@@ -27,7 +24,7 @@ const CONFIRM_EXTEND = 64; // DAT_180534320: confirmation traces run 64 units pa
 const UP = [0, 0, 1]; // the result's normal before a trace writes it (DAT_180589050 into the z slot, 0x1800ede50)
 const MISS = { frac: 1, startSolid: false, normal: null };
 
-const rng = (st) => (st.rng ||= mulberry32(0x2545f491));
+const rng = threadRandom;
 const dist2 = (a, b) => { const d = sub(a, b); return dot(d, d); };
 
 // Slot 11: mode = m_nCollisionMode when the detail convar (DAT_18065b968 + 0x58) is >= it, else

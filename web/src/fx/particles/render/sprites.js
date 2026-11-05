@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { createSpritecardMaterial, applyControls, whiteTexture } from './spritecard.js';
+import { createSpritecardMaterial, applyControls, bindTextures, whiteTexture } from './spritecard.js';
 import { spritecardControls, makeInputs, normalizeRef } from './controls.js';
 import { colorBlend } from './barn.js';
 import { sheetSample } from './basis.js';
@@ -10,7 +10,11 @@ import { sheetSample } from './basis.js';
 
 const CORNERS = new Float32Array([-1, -1, 1, -1, 1, 1, -1, 1]);
 const INDEX = [0, 1, 2, 0, 2, 3];
-const LAYOUT = { iPos: 3, iColor: 4, iRot: 4, iNormal: 3, iRect0: 4, iRect1: 4, iBlend: 1 };
+const LAYOUT = {
+  iPos: 3, iColor: 4, iRot: 4, iNormal: 3, iRect0: 4, iRect1: 4, iBlend: 1,
+  iL1a: 4, iL1b: 4, iL2a: 4, iL2b: 4, iL3a: 4, iL3b: 4, iLBlend: 3, // texture layers 1-3: frame rects, blend (VSL)
+  iMa: 4, iMb: 4, // the motion-vector texture's frame rects
+};
 
 export class SpriteRenderer {
   constructor(shared, assets) {
@@ -41,9 +45,11 @@ export class SpriteRenderer {
     const sheetOf = (g) => !!(g.m_hTexture && this.assets.sheet(normalizeRef(g.m_hTexture)));
     const ctl = spritecardControls('C_OP_RenderSprites', p, raw, ev, col.time || 0, sheetOf);
     applyControls(this.material, ctl);
-    const tex = ctl.texture ? this.assets.texture(ctl.texture, ctl.clampUVs) : null;
-    this.material.uniforms.uBase.value = tex || whiteTexture();
-    const sheet = ctl.texture ? this.assets.sheet(ctl.texture) : null;
+    bindTextures(this.material, ctl, this.assets);
+    // each layer runs its own texture's sheet on the particle's sequence and age (VSL: one sheet row per layer)
+    const sheets = ctl.layers.map((l) => (l.texture ? this.assets.sheet(l.texture) : null));
+    const sheet = sheets[0];
+    const mvSheet = ctl.motion ? this.assets.sheet(ctl.motion.texture) : null;
     const n = col.count || 0;
     if (n > this.capacity) this._grow(n);
     const A = col.attr || {};
@@ -75,20 +81,31 @@ export class SpriteRenderer {
       g.iColor.setXYZW(j, rgb[0], rgb[1], rgb[2], alpha);
       g.iRot.setXYZW(j, (A[4]?.[i] ?? 0) * rollScale, A[12]?.[i] ?? 0, A[20]?.[i] ?? 0, (A[3]?.[i] ?? 5) * radiusScale);
       g.iNormal.setXYZ(j, A[21]?.[3 * i] ?? 0, A[21]?.[3 * i + 1] ?? 0, A[21]?.[3 * i + 2] ?? 1);
-      let s = null;
-      if (sheet) {
-        const age = time - (A[8]?.[i] ?? 0);
-        const seq = seqOverride >= 0 ? seqOverride : (A[9]?.[i] ?? 0);
-        // FIT_LIFETIME: the vertex age is (time - creation) / lifetime, 0 for a lifetime <= 0 (FUN_180033400, the
-        // FIT_LIFETIME vertex writer); the VS then runs the sheet at m_flAnimationRate as for FIXED_RATE (VS0:1693).
-        const life = A[1]?.[i] ?? 1;
-        s = sheetSample(sheet, seq, ctl.vc.animationType === 1 ? (life > 0 ? age / life : 0) : age, rate, inFps);
-      }
+      const age = time - (A[8]?.[i] ?? 0);
+      const seq = seqOverride >= 0 ? seqOverride : (A[9]?.[i] ?? 0);
+      // FIT_LIFETIME: the vertex age is (time - creation) / lifetime, 0 for a lifetime <= 0 (FUN_180033400, the
+      // FIT_LIFETIME vertex writer); the VS then runs the sheet at m_flAnimationRate as for FIXED_RATE (VS0:1693).
+      const life = A[1]?.[i] ?? 1;
+      const t = ctl.vc.animationType === 1 ? (life > 0 ? age / life : 0) : age;
+      const s = sheet ? sheetSample(sheet, seq, t, rate, inFps) : null;
       if (s) {
         g.iRect0.setXYZW(j, s.rect0[0], s.rect0[1], s.rect0[2], s.rect0[3]);
         g.iRect1.setXYZW(j, s.rect1[0], s.rect1[1], s.rect1[2], s.rect1[3]);
         g.iBlend.setX(j, s.blend);
       } else g.iBlend.setX(j, -1);
+      const lb = [-1, -1, -1];
+      for (let k = 1; k < sheets.length; k++) {
+        const ls = sheets[k] ? sheetSample(sheets[k], seq, t, rate, inFps) : null;
+        if (!ls) continue;
+        g['iL' + k + 'a'].setXYZW(j, ls.rect0[0], ls.rect0[1], ls.rect0[2], ls.rect0[3]);
+        g['iL' + k + 'b'].setXYZW(j, ls.rect1[0], ls.rect1[1], ls.rect1[2], ls.rect1[3]);
+        lb[k - 1] = ls.blend;
+      }
+      g.iLBlend.setXYZ(j, lb[0], lb[1], lb[2]);
+      // the motion texture runs its own sheet on the same sequence and age (its frames match the colour sheet's);
+      // without one it takes the base layer's frame rects
+      const ms = mvSheet ? sheetSample(mvSheet, seq, t, rate, inFps) : s;
+      if (ms) { g.iMa.setXYZW(j, ms.rect0[0], ms.rect0[1], ms.rect0[2], ms.rect0[3]); g.iMb.setXYZW(j, ms.rect1[0], ms.rect1[1], ms.rect1[2], ms.rect1[3]); }
     }
     for (const name of Object.keys(LAYOUT)) g[name].needsUpdate = true;
     this.geometry.instanceCount = n;

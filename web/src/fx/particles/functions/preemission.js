@@ -1,17 +1,10 @@
 // Pre-emission operators: run once per step before the emitters, and write control points.
 import { applyMap, evalFloat } from '../inputs.js';
 import {
-  add, clamp, cross, getCp, len, mul, norm, report, setCpField, setCpOrientation, setCpPosition, sub, vec3,
+  add, clamp, cross, getCp, len, mul, norm, report, setCpField, setCpOrientation, setCpPosition, sub, vec3, isZero,
+  frameFromNormal,
 } from './common.js';
 
-// VectorVectors (0x18035ed10): forward n, left = cross(Z, n)/|..|, up = cross(n, left); a vertical
-// n gives left (0,1,0), up (-n.z,0,0) (RE §11 C_OP_SetControlPointToImpactPoint).
-const frameFromNormal = (n) => {
-  if (Math.abs(n[0]) < 1e-6 && Math.abs(n[1]) < 1e-6) return [n, [0, 1, 0], [-n[2], 0, 0]];
-  const l = norm(cross([0, 0, 1], n));
-  return [n, l, cross(n, l)];
-};
-const isZero = (v) => !v[0] && !v[1] && !v[2];
 
 // One world trace through the stage's callback: opts.trace(from, dir, length) -> { hit, position,
 // normal } | null. A miss ends at from + dir*length with fraction 1. UNSETTLED: the normal a miss

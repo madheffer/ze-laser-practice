@@ -82,7 +82,7 @@ export const CONTROL_TABLE = [
     why: 'param_3[7] = DAT_180526f90[m_nOutputBlendMode]; PS0:795,803' },
   { slot: 'PC_c2', field: '(m_flRefractAmount, m_flFeatheringFilter, m_flFogAmount or 0 if fog DISABLED, m_flBumpStrength)', settled: true,
     why: 'param_3[8..10], FUN_1802c9e80 +0x2c. c2 is in no dumped combo but feathering (f1: c2.y), so fog amount is read by none' },
-  { slot: 'PC_c3.xy', field: 'motion vector scale U/V x sheet ratio', settled: true, why: 'param_3[0xc], [0xd]; motion vectors are not ported' },
+  { slot: 'PC_c3.xy', field: 'm_flMotionVectorScaleU/V x sheet ratio (ratio UNSETTLED, 1)', settled: false, why: 'param_3[0xc], [0xd]; PS s1056:122 warps each frame UV by the ANIMMOTIONVEC texture' },
   { slot: 'PC_c3.z', field: 'layer flags (clamp bit i, no-sheet bit 12+i) | renderer bits (flags.js layerFlags)', settled: true,
     why: 'param_3[0xe] = +0x2d18 | 0x800 (add self > 0); PS0:82 (bit 0), PS0:413 (bit 12)' },
   { slot: 'PC_c3.w', field: 'm_nLightingMode', settled: true, why: 'FUN_1802c9e80 +0x3c' },
@@ -91,6 +91,7 @@ export const CONTROL_TABLE = [
   { slot: 'PC_c5 / PC_c6', field: 'm_bOutline: (m_OutlineColor/255, m_nOutlineAlpha/255) / (Start0, End0, Start1, End1); else c6 (1000, 0, 0, -1000)', settled: true,
     why: 'FUN_1802c9e80 +0x50..0x6c; FUN_18035f2e0 converts the Color (UNSETTLED: /255 assumed, no gamma)' },
   { slot: 'PC_c8', field: '(-ToZero, layer 0 m_flTextureBlend, frac(zoom / 10) x 10, m_flDistortion)', settled: true, why: 'param_3[0x20..0x23]; PS0:598, 660' },
+  { slot: 'PC_c9.yzw, c10, c11', field: 'layers 1-3: (m_flTextureBlend, frac(zoom / 10) x 10, m_flDistortion); c10.x = c11.x = 0', settled: true, why: 'FUN_1802c0450 per layer; PSL:1050-1100' },
   { slot: 'PC_c9.x', field: 'saturate(m_flDesaturation + draw desaturation (0))', settled: true, why: 'param_3[0x24]; PS0:654' },
   { slot: 'PC_c19.xy', field: 'texture layer channel | blend << 4 (8 bits a layer); types << 16 (3 bits a layer)', settled: true, why: 'FUN_1802c0450 +0x2d10, +0x2d14; PS0:194, 422, 550' },
   { slot: 'PC_c19.z = VC_c16.w', field: 'the flag word (flags.js)', settled: true, why: 'FUN_1802c7600 +0x138, +0x10c' },
@@ -135,25 +136,29 @@ export const BLEND_SCALAR = [1, 0, -1, 0.5, -0.5, 1, 1];
 export function spritecardControls(cls, p, raw, ev, time = 0, sheetOf = () => false) {
   const unsupported = [];
   const isRope = cls === 'C_OP_RenderRopes' || cls === 'C_OP_RenderTrails';
-  const groups = textureGroups(raw);
+  const all = textureGroups(raw);
+  // an ANIMMOTIONVEC group is the S_MOTION_VECTORS texture (g_tMotionVectors), not a colour layer (PS s1056:103-122)
+  const mvGroup = all.find((x) => x.m_nTextureType === 6) || null;
+  const groups = all.filter((x) => x.m_nTextureType !== 6);
+  if (mvGroup && isRope) unsupported.push('motion vectors on a rope / trail (no dumped trail combo has S_MOTION_VECTORS)');
   const g = groups[0] || { ...TEXTURE_GROUP_DEFAULTS, m_TextureControls: {} };
-  if (groups.length > 1) unsupported.push(`${groups.length} texture layers (S_TEXTURE_LAYERS 1-4 are dumped, not ported)`);
-  if (g.m_nTextureType !== 0) unsupported.push(`texture type ${ENUMS.texType[g.m_nTextureType] || g.m_nTextureType} (only DIFFUSE is ported)`);
+  if (groups.length > 4) unsupported.push(`${groups.length} texture layers (the shader has 4: S_TEXTURE_LAYERS 0-3)`);
+  // types the dumped combos carry: DIFFUSE, ZOOM, 1D_COLOR_LOOKUP, UVDISTORTION, UVDISTORTION_ZOOM (spritecard-ps.js)
+  for (const x of groups.slice(0, 4)) if (x.m_nTextureType > 4) unsupported.push(`texture type ${ENUMS.texType[x.m_nTextureType] || x.m_nTextureType} (not ported)`);
   const tc = g.m_TextureControls || {};
   const output = enumIndex('output', p.m_nOutputBlendMode ?? 0);
   const mod2x = output === 5, lighten = output === 6;
   const f = (k, d) => ev.evalFloat(p[k], -1, d);
   const tf = (k, d) => ev.evalFloat(tc[k], -1, d);
-  if (p.m_bRefract) unsupported.push('m_bRefract (S_REFRACT is not dumped)');
+  const refract = !!p.m_bRefract;
   if (p.m_nHSVShiftControlPoint >= 0) unsupported.push('HSV shift (S_HSV_SHIFT is not dumped)');
-  if (p.m_bParticleShadows) unsupported.push('particle shadows (not dumped)');
+  if (p.m_bParticleShadows) unsupported.push('particle shadows (the shadow-caster pass is not ported)');
   const feather = (p.m_nFeatheringMode ?? 'PARTICLE_DEPTH_FEATHERING_OFF') !== 'PARTICLE_DEPTH_FEATHERING_OFF' && p.m_nFeatheringMode !== 0;
-  if (feather) unsupported.push('depth feathering (D_DEPTH_FEATHERING=1 is dumped; the scene depth is not sampled here)');
   if ((p.m_nPerParticleAlphaReference ?? 'SPRITECARD_TEXTURE_PP_SCALE_NONE') !== 'SPRITECARD_TEXTURE_PP_SCALE_NONE') unsupported.push('per-particle alpha reference');
-  if (p.m_nOrientationControlPoint >= 0) unsupported.push('m_nOrientationControlPoint');
   const orient = enumIndex('orientation', p.m_nOrientationType ?? 0);
   if (orient === 5) unsupported.push('FULL_3AXIS_ROTATION, which the shader clamps to 4 (VS0:153)');
   const anim = enumIndex('animation', p.m_nAnimationType ?? 0);
+  if (p.m_nOrientationControlPoint >= 0) unsupported.push('m_nOrientationControlPoint');
   if (anim === 2) unsupported.push('ANIMATION_TYPE_MANUAL_FRAMES');
   const zoom = tf('m_flZoomScale', 1);
   const addSelf = f('m_flAddSelfAmount', 0);
@@ -169,17 +174,47 @@ export function spritecardControls(cls, p, raw, ev, time = 0, sheetOf = () => fa
   const oc = p.m_OutlineColor || [255, 255, 255];
   const hasSheet = groups.some((x) => sheetOf(x));
   const flags = rendererFlags(p, { orient, output, hasSheet });
+  // Texture layers 0-3 (FUN_1802c0450): layer k's (blend, frac(zoom / 10) x 10, distortion) go to PC c(8+k).yzw, its
+  // channel | blend << 4 to c19.x byte k, its type to c19.y bits 16 + 3k; the VS takes its offset / scale (VC_c5 for
+  // layer 0, VSL VC_c6.. for the others), UV rotation and zoom.
+  const layers = (groups.length ? groups : [g]).slice(0, 4).map((x) => {
+    const xc = x.m_TextureControls || {};
+    const xf = (k, d) => ev.evalFloat(xc[k], -1, d);
+    const z = xf('m_flZoomScale', 1);
+    return {
+      texture: x.m_hTexture ? normalizeRef(x.m_hTexture) : null, group: x, clamp: !!xc.m_bClampUVs,
+      gradient: x.m_bReplaceTextureWithGradient && x.m_Gradient?.m_Stops?.length ? x.m_Gradient : null,
+      os: [xf('m_flFinalTextureOffsetU', 0), xf('m_flFinalTextureOffsetV', 0), xf('m_flFinalTextureScaleU', 1), xf('m_flFinalTextureScaleV', 1)],
+      rot: xf('m_flFinalTextureUVRotation', 0), zoom: z,
+      cb: [ev.evalFloat(x.m_flTextureBlend, -1, 1), (z / 10 - Math.floor(z / 10)) * 10, xf('m_flDistortion', 1)], // TextureControls_t default 1
+    };
+  });
+  const cb = (k) => layers[k]?.cb || [1, 0, 0];
+  // PC_c3.xy: the renderer's m_flMotionVectorScaleU / V with a motion-vector group (UNSETTLED: the sheet ratio FUN_1802c32b0
+  // applies is not read; 1)
+  const mc = mvGroup?.m_TextureControls || {};
+  const mvScale = mvGroup ? [f('m_flMotionVectorScaleU', 1), f('m_flMotionVectorScaleV', 1)] : [0, 0];
+  const motion = mvGroup?.m_hTexture ? { texture: normalizeRef(mvGroup.m_hTexture), clamp: !!mc.m_bClampUVs } : null;
+  let c19x = 0, c19y = 0;
+  layers.forEach((l, k) => {
+    c19x |= ((l.group.m_nTextureChannels & 15) | ((l.group.m_nTextureBlendMode & 15) << 4)) << (8 * k);
+    c19y |= l.group.m_nTextureType << (16 + 3 * k);
+  });
   const pc = {
     c0: [f('m_flSelfIllumAmount', 0), f('m_flDiffuseAmount', 1), c0z, c0w],
     c1: [feather ? f('m_flFeatheringMinDist', 0) : 1, feather ? f('m_flFeatheringMaxDist', 15) : 1, mod2x ? 1 : 1 + addSelf, BLEND_SCALAR[output] ?? 1],
-    c3: [0, 0, layerFlags(p, groups, sheetOf, addSelf), 0],
+    c2: [f('m_flRefractAmount', 0.1), f('m_flFeatheringFilter', 0), (p.m_nFogType ?? '') === 'PARTICLE_FOG_DISABLED' || p.m_nFogType === 2 ? 0 : f('m_flFogAmount', 1),
+      f('m_flBumpStrength', 1)],
+    c3: [...mvScale, layerFlags(p, groups, sheetOf, addSelf), 0],
     c4: [overbright, overbright, overbright, 1 / (toOne - toZero)],
     c5: outline ? [oc[0] / 255, oc[1] / 255, oc[2] / 255, num(p.m_nOutlineAlpha, 255) / 255] : [0, 0, 0, 0],
     c6: outline ? [num(p.m_flOutlineStart0, 0.5), num(p.m_flOutlineEnd0, 0.7), num(p.m_flOutlineStart1, 0.6), num(p.m_flOutlineEnd1, 0.8)] : [1000, 0, 0, -1000],
-    c8: [-toZero, ev.evalFloat(g.m_flTextureBlend, -1, 1), (zoom / 10 - Math.floor(zoom / 10)) * 10, tf('m_flDistortion', 0)],
-    c9: [Math.min(1, Math.max(0, f('m_flDesaturation', 0))), 1, 1, 1],
-    c19x: (g.m_nTextureChannels & 15) | ((g.m_nTextureBlendMode & 15) << 4),
-    c19y: g.m_nTextureType << 16,
+    c8: [-toZero, ...cb(0)],
+    c9: [Math.min(1, Math.max(0, f('m_flDesaturation', 0))), ...cb(1)],
+    c10: [0, ...cb(2)],
+    c11: [0, ...cb(3)],
+    c19x: c19x >>> 0,
+    c19y: c19y >>> 0,
     c19z: flags,
   };
   const vc = {
@@ -198,7 +233,8 @@ export function spritecardControls(cls, p, raw, ev, time = 0, sheetOf = () => fa
     const inv = ws > 0 ? 1 / ws : 0;
     vc.c3[3] = inv;
     vc.c3[2] = (f('m_flTextureVOffset', 0) + f('m_flTextureVScrollRate', 0) * time) * ws;
-    if (num(p.m_flRadiusTaper, 1) !== 1) unsupported.push('m_flRadiusTaper');
+    if (num(p.m_flRadiusTaper, 1) !== 1 && cls === 'C_OP_RenderRopes') unsupported.push('m_flRadiusTaper');
+    // UNSETTLED: no dumped trail combo names a V clamp, so it is C++ side (the rope's V range) and not read yet
     if (p.m_bClampV) unsupported.push('m_bClampV');
   }
   return {
@@ -206,8 +242,29 @@ export function spritecardControls(cls, p, raw, ev, time = 0, sheetOf = () => fa
     texture: g.m_hTexture ? normalizeRef(g.m_hTexture) : null,
     clampUVs: !!tc.m_bClampUVs,
     colorBlendType: enumIndex('colorBlend', p.m_nColorBlendType ?? 0),
+    layers, feather, refract, motion,
+    refractTaps: refract ? refractTaps(num(p.m_nRefractBlurRadius, 0), p.m_nRefractBlurType ?? 'BLURFILTER_GAUSSIAN') : [],
     unsupported,
   };
+}
+
+/**
+ * The refraction blur taps (PSR FilterTaps_t c6: xy pixel offset, z weight, at most 25). UNSETTLED: the C++ side that
+ * fills them is not read; a radius-r box or gaussian (sigma r / 2) over a grid of at most 5 x 5 taps, weights summing
+ * to 1. Radius 0 is one centre tap.
+ */
+export function refractTaps(radius, type) {
+  const r = Math.max(0, Math.floor(radius));
+  if (!r) return [[0, 0, 1]];
+  const n = Math.min(2, r), step = r / n, sigma = r / 2, gauss = type !== 'BLURFILTER_BOX' && type !== 1;
+  const taps = [];
+  for (let y = -n; y <= n; y++) for (let x = -n; x <= n; x++) {
+    const dx = x * step, dy = y * step;
+    taps.push([dx, dy, gauss ? Math.exp(-(dx * dx + dy * dy) / (2 * sigma * sigma)) : 1]);
+  }
+  const sum = taps.reduce((s, t) => s + t[2], 0);
+  for (const t of taps) t[2] /= sum;
+  return taps;
 }
 
 /** A resource reference as the catalog keys it (EffectAssetCodec.Normalize). */

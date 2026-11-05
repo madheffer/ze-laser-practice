@@ -1,11 +1,11 @@
 import * as THREE from 'three';
-import { createSpritecardMaterial, applyControls, whiteTexture } from './spritecard.js';
+import { createSpritecardMaterial, applyControls, bindTextures, whiteTexture } from './spritecard.js';
 import { spritecardControls, makeInputs } from './controls.js';
 import { colorBlend, srgbToLinear } from './barn.js';
 import { ropeSide, screenSizeLimit, sheetSample, vec } from './basis.js';
 
 // C_OP_RenderTrails: every particle is its OWN streak, from its position back along its motion (the spritecard trail
-// combo, S_DRAW_AS_TRAIL, RE §6). Ropes join particles into one strip (ropes.js); trails never do.
+// combo, S_DRAW_AS_TRAIL, RE Â§6). Ropes join particles into one strip (ropes.js); trails never do.
 //
 // Length (C_OP_RenderTrails vertex setup, particles.dll FUN_1802d6190 / FUN_1802d4990): the motion is
 // position - attribute m_nPrevPntSource; when that is the previous position (2) and !m_bIgnoreDT it is divided by the
@@ -42,8 +42,7 @@ export class TrailRenderer {
     const ev = makeInputs(col);
     const ctl = spritecardControls(cls, p, raw, ev, col.time || 0);
     applyControls(this.material, ctl);
-    const tex = ctl.texture ? this.assets.texture(ctl.texture, ctl.clampUVs) : null;
-    this.material.uniforms.uBase.value = tex || whiteTexture();
+    bindTextures(this.material, ctl, this.assets);
     const sheet = ctl.texture ? this.assets.sheet(ctl.texture) : null;
     const n = col.count || 0;
     if (!n) { this.mesh.visible = false; return ctl; }

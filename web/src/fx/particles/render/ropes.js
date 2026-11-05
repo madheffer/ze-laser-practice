@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { createSpritecardMaterial, applyControls, whiteTexture } from './spritecard.js';
+import { createSpritecardMaterial, applyControls, bindTextures, whiteTexture } from './spritecard.js';
 import { spritecardControls, makeInputs } from './controls.js';
 import { colorBlend, srgbToLinear, smoothstep } from './barn.js';
 import { catmullRom, catmullRomTangent, ropeSide, ropeV, screenSizeLimit, vec } from './basis.js';
@@ -36,8 +36,7 @@ export class RopeRenderer {
     const ev = makeInputs(col);
     const ctl = spritecardControls(cls, p, raw, ev, col.time || 0);
     applyControls(this.material, ctl);
-    const tex = ctl.texture ? this.assets.texture(ctl.texture, ctl.clampUVs) : null;
-    this.material.uniforms.uBase.value = tex || whiteTexture();
+    bindTextures(this.material, ctl, this.assets);
     if (ctl.texture && this.assets.sheet(ctl.texture)) ctx.report?.('sprite sheet on a rope (sampled as the whole texture)');
     const n = col.count || 0;
     const closed = !!p.m_bClosedLoop && n > 2;

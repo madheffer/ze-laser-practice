@@ -111,6 +111,7 @@ export const ported_snapshot = {
       for (let k = 0; k < n; k++) pos.set(P[k], 3 * k);
       setCpSnapshot(c, cpIndex(fn.m_nCPSnapshot), makeSnapshot(n, { [A.POSITION]: pos, [A.RADIUS]: B, [A.ALPHA2]: C, [A.SCRATCH]: D }));
     },
+    restart(fn, c, st) { st.next = 1.17549435e-38; st.pool = -1; },
   },
 
   // particles.dll 63babcbf: C_INIT_InitFromCPSnapshot (vtable 0x1804eaf38) slot 34 0x18015bfd0, class init slot 6
