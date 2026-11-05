@@ -241,7 +241,7 @@ export function finish(result) {
 
   let rec = null;
   if (scenario && (result === 'win' || run.endless)) {
-    rec = submitRun(map, stage, run.mode, { time: t, hits: run.hits, humans: settings.humans, bossHp: settings.bossHp });
+    rec = submitRun(map, stage, run.mode, { time: t, hits: run.hits, humans: rule('humans'), bossHp: settings.bossHp });
   }
   // the run's replay (app/replay-record.js): kept for "Watch replay" and sent with the run (app/activity.js)
   const replay = run.rec?.finish() || null;

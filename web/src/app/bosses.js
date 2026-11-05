@@ -4,7 +4,7 @@
 // counts bullets (OnHealthChanged -> Subtract 1) scales exactly like one that counts health.
 import { S, G } from './state.js';
 import { fireSound } from './weapon-sounds.js';
-import { rule } from './rules.js';
+import { rule, players } from './rules.js';
 import { rayHullEntry } from '../world/collision.js';
 import { angleForward, foldPitch } from '../world/entities/index.js';
 import { stripPrefix } from '../lib/names.js';
@@ -87,9 +87,10 @@ export function bossFire(dt, silent = false) {
   const how = silent ? 'replay' : 'team';
   const targets = silent ? bossTargets(scenario.fastForwardBosses) : bossTargets().filter(({ e }) => bossVisible(e));
   if (!targets.length) return;
-  // you are one of the humans: the team is the other (humans - 1); your own shots come from your gun
+  // the simulated team: the humans the boss is scaled for that aren't real players (solo: humans - 1, you shoot with
+  // your gun; a round's players shoot their own). None when the boss is scaled to the lobby
   // scenario.shooters: only that many of them are on it (a mini boss a few humans meet, not the whole server)
-  const all = silent ? rule('humans') : Math.max(0, rule('humans') - 1);
+  const all = silent ? rule('humans') : Math.max(0, rule('humans') - players());
   const team = Number.isFinite(scenario?.shooters) ? Math.min(all, Math.max(0, scenario.shooters)) : all;
   const scale = 100 / Math.max(1, rule('bossHp'));
   let guard = 0;

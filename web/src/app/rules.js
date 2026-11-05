@@ -5,13 +5,19 @@
 // A replay (app/replay.js) plays by the rules it was recorded with (lib/replay-codec.js cleanMeta), cheats off.
 import { S } from './state.js';
 import { settings } from './settings.js';
-import { RULE_DEFAULTS } from '../lib/room-rules.js';
+import { RULE_DEFAULTS, bossHumans } from '../lib/room-rules.js';
 
+// humans: the count the boss HP is for (lib/room-rules.js bossHumans). A round's comes resolved from the server and a
+// replay's was recorded resolved; solo it is you alone unless "Boss HP for N humans" is on
 export function rule(key) {
   if (S.mp && Object.hasOwn(RULE_DEFAULTS, key)) return S.mp.rules[key];
   if (S.replay) return Object.hasOwn(S.replay.meta.rules, key) ? S.replay.meta.rules[key] : (Object.hasOwn(RULE_DEFAULTS, key) ? RULE_DEFAULTS[key] : settings[key]);
+  if (key === 'humans') return bossHumans(settings, 1);
   return settings[key];
 }
+
+// the real players in this run: a round's roster, else you
+export const players = () => (S.mp ? Math.max(1, S.mp.players?.size || 1) : 1);
 
 // a round runs on the server's clock: no slow motion
 export const timescale = () => (S.mp ? 1 : S.replay ? S.replay.speed : settings.timescale);

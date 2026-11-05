@@ -8,7 +8,7 @@
 //   - it decides the end and who did best (end): the survivors win when the stage clears (the last one alive plays
 //     on alone), fewest hits is the best run; all down, whoever lasted longest.
 // Players only ever talk to the server, so nobody learns anyone else's address.
-import { cleanText, healHolders } from '../src/lib/room-rules.js';
+import { cleanText, healHolders, bossHumans } from '../src/lib/room-rules.js';
 import { TICK, COUNTDOWN } from '../src/world/run-engine.js'; // COUNTDOWN: s a round's run waits before the stage starts
 import { PlayerCheck, MAX_PING } from './coop-check.js';
 
@@ -37,6 +37,9 @@ export class Round {
     this.io = io;
     this.r = Math.floor(Math.random() * 0x7ffffffe) + 1;
     this.seed = Math.floor(Math.random() * 0xfffe) + 1;
+    // the boss HP's humans, fixed for the round from who starts it (lib/room-rules.js bossHumans): every client and
+    // every server copy runs the map at this count, and a death doesn't lower it
+    rules = { ...rules, humans: bossHumans(rules, room.members.length) };
     this.map = map; this.stage = stage; this.mode = mode; this.kind = kind; this.rules = rules;
     this.t0 = null; // set by go(): until then the round is loading and its clock stands at 0
     this.ready = new Set();
@@ -210,7 +213,8 @@ export class Round {
     const mult = Math.max(1, Math.round(100 / Math.max(1, this.rules.bossHp)));
     if (m.team === true) {
       if (c.id !== this.leader) return; // only the leader carries the team's fire
-      const perSec = TEAM_HITS_PER_HUMAN * Math.max(0, this.rules.humans - 1) * mult;
+      // the simulated team: the humans the boss is scaled for that aren't players in the round
+      const perSec = TEAM_HITS_PER_HUMAN * Math.max(0, this.rules.humans - this.players.size) * mult;
       const b = p.budget, now = Date.now();
       if (now - b.at > 1000) { b.at = now; b.n = 0; }
       for (const h of hits) {

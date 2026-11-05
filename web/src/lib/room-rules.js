@@ -14,9 +14,12 @@ export const ROOM_KINDS = ['coop'];
 export const ROOM_MAX = 8;
 export const CHEATS = ['god', 'hitboxes', 'autoBhop'];
 
-// A ZE server's defaults: the map's boss HP for 20 humans, the team shooting, no fall damage, no cheats.
+// The defaults: the map's boss HP for who is playing, no team fire, no fall damage, no cheats.
+// fixedHumans: off = boss HP scales as the map scales it on a server, once per human who is there (solo: 1; a
+// round: everyone in it at the start, never fewer as they die: the map adds HP when the boss starts and never takes
+// it back); on = it is for `humans` of them, and the ones who aren't real players are the simulated team
 export const RULE_DEFAULTS = Object.freeze({
-  humans: 20, bossHp: 100, autoFire: false, perfectTeam: false, fallDamage: false,
+  humans: 20, fixedHumans: false, bossHp: 100, autoFire: false, perfectTeam: false, fallDamage: false,
   god: false, hitboxes: false, autoBhop: false,
   // who carries the map's heal item (world/items.js usableHeals): 'none', 'random' (one player, from the round's
   // seed) or a player's id (an aura the group gathers round, so ONE human holds it, as on a server), or 'all'
@@ -72,6 +75,11 @@ export function healHolders(heal, ids, seed = 0) {
   if (heal === 'random') return [[...ids].sort((a, b) => a - b)[Math.abs(seed | 0) % ids.length]];
   return typeof heal === 'number' && ids.includes(heal) ? [heal] : [];
 }
+
+// how many humans the boss HP is for, with `players` real ones in the run (see fixedHumans above)
+export const bossHumans = (rules, players = 1) => (rules?.fixedHumans ? Math.max(players, rules.humans) : Math.max(1, players));
+// the room's chip / summary for it
+export const humansLabel = (rules) => (rules?.fixedHumans ? `Boss HP for ${rules.humans} humans` : 'Boss HP for the lobby');
 
 export const cheatsOn = (rules) => CHEATS.filter((k) => rules?.[k] === true);
 export const CHEAT_LABELS = { god: 'God mode', hitboxes: 'Laser hitboxes', autoBhop: 'Auto bunnyhop' };

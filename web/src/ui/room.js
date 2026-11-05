@@ -9,7 +9,7 @@
 // ui/settings-panel.js) open in a sheet over it. Names and room text come from the server: textContent only.
 import './room.css';
 import { S, G } from '../app/state.js';
-import { cheatsOn, CHEAT_LABELS } from '../lib/room-rules.js';
+import { cheatsOn, CHEAT_LABELS, humansLabel } from '../lib/room-rules.js';
 import { SettingsPanel } from './settings-panel.js';
 import { settings } from '../app/settings.js';
 import { $ } from '../lib/dom.js';
@@ -209,7 +209,7 @@ export class RoomScreen {
     // rules
     const r = s.rules;
     const chips = [
-      [`${r.humans} humans`], [`Boss HP ${r.bossHp}%`], [r.autoFire ? (r.perfectTeam ? 'Perfect team' : 'Team fires') : 'No team fire'],
+      [humansLabel(r)], [`Boss HP ${r.bossHp}%`], [r.autoFire ? (r.perfectTeam ? 'Perfect team' : 'Team fires') : 'No team fire'],
       [r.fallDamage ? 'Fall damage' : 'No fall damage'], [`Up to ${s.max} players`],
       ...(!this.hasHeal() ? [] : r.heal === 'all' ? [['Heal: everyone their own']] : r.heal === 'random' ? [['Heal: a random player']]
         : typeof r.heal === 'number' ? [[`Heal: ${net.member(r.heal)?.name || 'nobody (left)'}`]] : []),

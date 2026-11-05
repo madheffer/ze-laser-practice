@@ -8,7 +8,7 @@
 import './lobby.css';
 import { loadJson, saveJson } from '../lib/storage.js';
 import { ROOM_CODE } from '../net/coop-client.js';
-import { cleanSettings, cleanText, cheatsOn, CHEAT_LABELS, SETTINGS_DEFAULTS, RULE_DEFAULTS } from '../lib/room-rules.js';
+import { cleanSettings, cleanText, cheatsOn, CHEAT_LABELS, humansLabel, SETTINGS_DEFAULTS, RULE_DEFAULTS } from '../lib/room-rules.js';
 import { RoomBrowser } from './lobby-browse.js';
 
 const KEY = 'lasers.coop'; // { name, room: last room settings you created }
@@ -171,7 +171,7 @@ export class Lobby {
     }));
     const r = s.rules;
     const chips = [
-      [`${r.humans} humans`], [`Boss HP ${r.bossHp}%`], [r.autoFire ? (r.perfectTeam ? 'Perfect team' : 'Team fires') : 'No team fire'],
+      [humansLabel(r)], [`Boss HP ${r.bossHp}%`], [r.autoFire ? (r.perfectTeam ? 'Perfect team' : 'Team fires') : 'No team fire'],
       [r.fallDamage ? 'Fall damage' : 'No fall damage'],
       ...(!this.hasHeal() ? [] : r.heal === 'all' ? [['Heal: everyone their own']] : r.heal === 'random' ? [['Heal: a random player']]
         : typeof r.heal === 'number' ? [[`Heal: ${net.member(r.heal)?.name || 'nobody (left)'}`]] : []),

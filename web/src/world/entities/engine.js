@@ -282,8 +282,11 @@ export class EntityEngine {
   fireOutput(e, output, activator, param) {
     const low = output.toLowerCase();
     // Boss HP in ZE maps grows per human who touches an "add HP" trigger. You are one player standing in
-    // for `humans` of them, so those adds repeat once per simulated human.
-    const fromTouch = activator === this.playerEnt && (low === 'onstarttouch' || low === 'ontrigger' || low === 'onstarttouchall');
+    // for `humans` of them, so those adds repeat once per simulated human. Only OnStartTouch fires per toucher
+    // (CBaseTrigger::StartTouch, trigger_once too until it is removed): OnStartTouchAll is the first toucher only,
+    // OnTrigger once per `wait` (trigger_once: once), and a relay's OnTrigger once per Trigger. Repeating those
+    // multiplied counters a server bumps once (deadcore's level_counter, neochrome's door counters, gris' laser picks).
+    const fromTouch = activator === this.playerEnt && low === 'onstarttouch';
     for (let i = 0; i < e.io.length; i++) {
       const c = e.io[i];
       if (c.output.toLowerCase() !== low) continue;

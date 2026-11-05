@@ -3,7 +3,8 @@
 // sens: CS2's own `sensitivity` (yaw degrees per raw mouse count = sensitivity x m_yaw); copy it from your CS2
 //   config. m_yaw is CS2's default 0.022 (M_YAW); the FOV is CS2's fixed 90 (FOV). Raw input (no OS
 //   acceleration) is requested from the browser so 1 count is 1 count.
-// humans: how many humans you stand in for (boss HP adds and team damage scale with it)
+// fixedHumans / humans: off = boss HP for you alone (the map's own scaling); on = for `humans` of them, the others
+//   being the simulated team (lib/room-rules.js bossHumans; app/rules.js rule('humans') is the count a run uses)
 // bossHp: % of that boss HP to actually fight through; autoFire: the other humans shoot the boss
 // sfx / music: game sound and CS2's `snd_musicvolume`, 0-1 each
 // thirdPerson / tpDist: CS2Fixes' third person (cs2f_thirdperson_distance_default 65, _min 15, _max 150)
@@ -17,7 +18,7 @@ export const FOV = 90; // CS2's horizontal FOV at 4:3, fixed
 
 export const DEFAULTS = {
   sens: 2.0, autoBhop: false, god: false, hitboxes: false, timescale: 1,
-  humans: 20, bossHp: 100, autoFire: false, fallDamage: false, fullscreen: true,
+  humans: 20, fixedHumans: false, bossHp: 100, autoFire: false, fallDamage: false, fullscreen: true,
   healItem: false, // hold the map's heal item (EntWatch / map data: mist's Cleansing Aura, westersand's Heal Magick), E to use it
   sfx: 0.5, music: 0.5,
   perfectTeam: false, // true = the other humans never stop shooting (the old fast kill)
@@ -110,6 +111,10 @@ export function bindSettings(onChange) {
   };
   bind('#sens', 'sens'); bind('#bhop', 'autoBhop');
   bind('#god', 'god'); bind('#hitboxes', 'hitboxes'); bind('#humans', 'humans'); bind('#bosshp', 'bossHp');
+  bind('#fixedhumans', 'fixedHumans');
+  // the humans slider only counts with "Boss HP for a full server" on (lib/room-rules.js bossHumans)
+  const syncHumans = () => { const h = $('#humans'); if (h) h.disabled = !settings.fixedHumans; };
+  syncHumans(); $('#fixedhumans')?.addEventListener('input', syncHumans);
   bind('#autofire', 'autoFire'); bind('#falldmg', 'fallDamage');
   bind('#fullscreen', 'fullscreen'); bind('#perfectteam', 'perfectTeam');
   bind('#thirdperson', 'thirdPerson'); bind('#touchcrouch', 'touchCrouch'); bind('#minimap', 'minimap'); bind('#perfmeter', 'perfMeter');

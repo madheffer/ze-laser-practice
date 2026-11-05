@@ -37,7 +37,7 @@ function check(label, hint, value) {
   span.append(label);
   if (hint) span.append(' ', text('small', '', hint));
   wrap.append(input, span);
-  return { el: wrap, get value() { return input.checked; } };
+  return { el: wrap, input, get value() { return input.checked; } };
 }
 
 function range(label, min, max, step, value, fmt = (v) => String(v)) {
@@ -50,7 +50,7 @@ function range(label, min, max, step, value, fmt = (v) => String(v)) {
   input.addEventListener('input', show);
   show();
   wrap.append(label, ' ', out, input);
-  return { el: wrap, get value() { return Number(input.value); } };
+  return { el: wrap, input, get value() { return Number(input.value); } };
 }
 
 // settings: the starting values; mode: 'create' | 'edit'; owner name for the placeholder; players: [{ id, name }] in
@@ -89,7 +89,10 @@ export function roomForm(settings, { mode, ownerName, members = 1, players = [],
   // ---- bosses + damage
   const bosses = el('fieldset', 'card');
   bosses.append(text('legend', '', 'Bosses & damage'));
+  const fixed = check('Boss HP for a full server', 'off = scaled to the players in the round, as the map does', r.fixedHumans);
   const humans = range('Humans alive', 1, 64, 1, r.humans);
+  const syncFixed = () => { humans.input.disabled = !fixed.value; };
+  fixed.input.addEventListener('change', syncFixed); syncFixed();
   const bossHp = range('Boss HP', 5, 100, 5, Math.max(5, r.bossHp), (v) => `${v}%`);
   const autoFire = check('Team shoots the boss', 'only while it is in sight', r.autoFire);
   const perfect = check('Perfect team', 'everyone fires nonstop (a fast kill)', r.perfectTeam);
@@ -108,7 +111,7 @@ export function roomForm(settings, { mode, ownerName, members = 1, players = [],
   syncHeal();
   healLabel.append('Heal item', heal);
   const healHint = text('small', 'rf-hint', "The map's own heal aura, E to use: everyone their own, or one player carries it and the group gathers round (random = picked each round).");
-  bosses.append(humans.el, bossHp.el, autoFire.el, perfect.el, fall.el);
+  bosses.append(fixed.el, humans.el, bossHp.el, autoFire.el, perfect.el, fall.el);
   if (healOn) bosses.append(healLabel, healHint);
 
   // ---- cheats
@@ -126,7 +129,7 @@ export function roomForm(settings, { mode, ownerName, members = 1, players = [],
   const bar = el('div', 'rf-buttons');
   const submit = el('button', 'primary', { type: 'submit' });
   submit.textContent = mode === 'create' ? 'Create room' : 'Save';
-  const reset = el('button', 'ghost', { type: 'button', title: 'A ZE server\'s defaults: 20 humans, full boss HP, team fire on, no cheats' });
+  const reset = el('button', 'ghost', { type: 'button', title: 'Boss HP for the players here, full boss HP, no team fire, no cheats' });
   reset.textContent = 'Server defaults';
   const cancel = el('button', 'ghost', { type: 'button' });
   cancel.textContent = 'Cancel';
@@ -136,7 +139,7 @@ export function roomForm(settings, { mode, ownerName, members = 1, players = [],
 
   const read = () => cleanSettings({
     name: name.value, public: vis.value === 'public', max: Number(max.value),
-    rules: { humans: humans.value, bossHp: bossHp.value, autoFire: autoFire.value, perfectTeam: perfect.value, fallDamage: fall.value,
+    rules: { humans: humans.value, fixedHumans: fixed.value, bossHp: bossHp.value, autoFire: autoFire.value, perfectTeam: perfect.value, fallDamage: fall.value,
       heal: !healOn ? r.heal : ['none', 'all', 'random'].includes(heal.value) ? heal.value : Number(heal.value), god: god.value, hitboxes: hitboxes.value, autoBhop: bhop.value },
   }, members);
   form.addEventListener('submit', (ev) => { ev.preventDefault(); onSubmit(read()); });
