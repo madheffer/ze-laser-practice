@@ -21,7 +21,7 @@ import { isMapName } from './lib/paths.js';
 import { settings, bindSettings, FOV } from './app/settings.js';
 import { installGraphics } from './ui/graphics-ui.js';
 import { rule } from './app/rules.js';
-import { startScenario, endRun } from './app/session.js';
+import { startScenario, endRun, finish } from './app/session.js';
 import { frame, step, simulate, resetClock, updateHud } from './app/loop.js';
 import { installInput, enterGame, clearKeys } from './app/input.js';
 import { onShot } from './app/bosses.js';
@@ -352,13 +352,21 @@ G.pauseScreen = new PauseScreen($('#pause'), {
     restart: () => restartRun(),
     stages: () => { G.menu.show(S.map ? 'stages' : 'maps'); G.menu.update(); },
     settings: () => { G.menu.selectTab($('#tab-settings')); G.menu.update(); },
-    home: () => G.home.show(),
+    home: () => goHome(),
     endRound: () => abortRound(),
   },
 });
 installReplays(); // replays + the Steam account (app/replay-boot.js)
 
 // the home page: every way in leads to the menu (its Home button comes back)
+// Home closes the game you were in, so Play / Settings from there open the stage list and settings, not that paused
+// run. In a round it counts as giving up (you watch the rest; the others play on), as walking away from a server does.
+function goHome() {
+  if (S.run && !S.run.done && S.mp) finish('dead');
+  else if (S.run && !S.mp) endRun();
+  G.home.show();
+  G.menu.update();
+}
 const toMenu = () => { G.home.hide(); G.menu.show(G.menu.view); };
 G.home = new Home($('#home'), {
   net, mapTitle: (name) => S.mapIndex.find((m) => m.name === name)?.title || name,
@@ -372,7 +380,7 @@ G.home = new Home($('#home'), {
     watch: (id) => G.watchReplay(id),
   },
 });
-$('#go-home').addEventListener('click', () => G.home.show());
+$('#go-home').addEventListener('click', () => goHome());
 
 // console handle for debugging and automated checks
 window.__lasers = {
