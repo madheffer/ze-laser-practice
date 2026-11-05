@@ -82,6 +82,8 @@ static class OverviewBake
                     Directory.CreateDirectory(outDir);
                     File.WriteAllBytes(SafePath.OutFile(mapDir, $"overview/{name}"), data.ToArray());
                     images[section] = name;
+                    // CS2 maps the overview over the texture's own width (texW * scale world units), not 1024
+                    if (section == "" || json["size"] == null) json["size"] = tex.Width;
                 }
                 catch (Exception ex) { log($"  radar {e.FileName}: {ex.Message}"); }
             }

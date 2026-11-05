@@ -330,7 +330,11 @@ are dimmed. If the owner leaves, the next oldest member owns the room.
 - **Item HUD** (under the minimap, as EntWatch draws it): `R` ready / seconds left / `x/y` uses, short name in its
   colour, holder. In a room the co-op side adds who holds what (`S.mp.itemRows()`).
 - **Minimap**: CS2's own radar (`lasers-bake --overview <vpk> <map folder>` -> `overview/`: `resource/overviews`
-  pos / scale / vertical sections + the `overheadmaps` images), rotating with you; bosses red, room teammates blue.
+  pos / scale / vertical sections + the `overheadmaps` images, + `size`, the source texture width), drawn as CS2's
+  round radar from client.dll + hudradar.vcss: 250 px circle, map additive over blurred #000000a0, cl_radar_scale 0.7
+  zoom (texW x scale / 4.8 / 0.7 units to the edge), rotating with you, the north arrow (`hud/direction.png`) on the
+  ring, players as CS2's CT icon (#1ed2ff dot + direction indicator, off-map arrow at the edge), bosses as its enemy
+  icon. Icons from `lasers-bake --panorama`. Settings > Video: Minimap on/off.
 - **Which maps next**: `lasers-bake --scan <workshop/content/730> scan.json` reads every local map's entity lumps and
   scores laser shapes; `node tools/library.mjs scan.json <entwatch dir>` writes [MAPS.md](MAPS.md).
 

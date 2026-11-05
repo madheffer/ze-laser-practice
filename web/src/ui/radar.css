@@ -1,7 +1,17 @@
 /* The minimap (ui/radar.js) top left like CS2's, the item HUD (ui/itemhud.js) under it; the stage title moves right of
-   the radar when there is one. Sizes in the HUD's --u (ui/hud.css). */
-.hud-radar { position: absolute; left: calc(14 * var(--u)); top: calc(14 * var(--u)); width: calc(300 * var(--u)); height: calc(300 * var(--u)); pointer-events: none; }
-.hud-radar canvas { width: 100%; height: 100%; display: block; }
+   the radar when there is one. Sizes in the HUD's --u (ui/hud.css). The radar is CS2's hudradar.vcss: a 300 px panel
+   (clipped 4 px in), the 250 px round radar centred in it on hud-blur-bg-color + world blur, a 1 px team-colour ring. */
+.hud-radar {
+  position: absolute; left: calc(14 * var(--u)); top: calc(14 * var(--u)); width: calc(300 * var(--u)); height: calc(300 * var(--u));
+  pointer-events: none; clip-path: inset(calc(4 * var(--u)));
+}
+.hud-radar canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.radar-bg, .radar-border {
+  position: absolute; left: calc(25 * var(--u)); top: calc(25 * var(--u)); width: calc(250 * var(--u)); height: calc(250 * var(--u));
+  border-radius: 50%; box-sizing: border-box;
+}
+.radar-bg { background: #000000a0; backdrop-filter: blur(calc(2 * var(--u))); }
+.radar-border { border: max(1px, calc(1 * var(--u))) solid var(--team); }
 .hud-radar[hidden] { display: none; }
 #hud.has-radar .hud-stage { left: calc(330 * var(--u)); }
 

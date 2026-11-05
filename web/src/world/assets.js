@@ -110,7 +110,7 @@ function loadGlb(loader, url, onProgress) {
   });
 }
 
-// overview.json -> { posX, posY, scale, sections: [{ min, max, src }] } (null without one). Numbers checked, image
+// overview.json -> { posX, posY, scale, size, sections: [{ min, max, src }] } (null without one). Numbers checked, image
 // names only from the fixed radar[_<suffix>].png set the bake writes.
 function radarInfo(o, url) {
   if (!o || typeof o !== 'object' || !Number.isFinite(o.pos_x) || !Number.isFinite(o.pos_y) || !(o.scale > 0)) return null;
@@ -124,5 +124,7 @@ function radarInfo(o, url) {
     .filter((s) => Number.isFinite(s.min) && Number.isFinite(s.max) && s.src);
   const base = src('') || sections[0]?.src || null;
   if (!base) return null;
-  return { posX: o.pos_x, posY: o.pos_y, scale: o.scale, base, sections };
+  // size: the source texture's width (CS2 maps the overview over texW * scale units); older bakes: 1024
+  const size = Number.isInteger(o.size) && o.size >= 16 && o.size <= 8192 ? o.size : 1024;
+  return { posX: o.pos_x, posY: o.pos_y, scale: o.scale, size, base, sections };
 }

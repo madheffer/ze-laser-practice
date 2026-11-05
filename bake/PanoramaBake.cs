@@ -6,6 +6,7 @@
 using SteamDatabase.ValvePak;
 using ValveResourceFormat;
 using ValveResourceFormat.IO;
+using ValveResourceFormat.ResourceTypes;
 using ValveResourceFormat.ValveFont;
 
 namespace Lasers.Bake;
@@ -45,6 +46,23 @@ static class PanoramaBake
         "panorama/styles/hud/hudweaponselection.vcss_c",
         "panorama/layout/hud/hudhealthbars.vxml_c",
         "panorama/styles/hud/hudhealthbars.vcss_c",
+        // the radar (ui/radar.js): layout, style, the north indicator and the player icons
+        "panorama/layout/hud/hudradar.vxml_c",
+        "panorama/styles/hud/hudradar.vcss_c",
+        "panorama/images/hud/radar/icon_direction_indicator.vsvg_c",
+        "panorama/images/hud/radar/icon-direction-indicator_png.vtex_c",
+        "panorama/images/hud/radar/icon-on-map_png.vtex_c",
+        "panorama/images/hud/radar/icon-player-indicator_png.vtex_c",
+        "panorama/images/hud/radar/icon-selected_png.vtex_c",
+        "panorama/images/hud/radar/icon-speaking-on-map_png.vtex_c",
+        "panorama/images/hud/radar/icon-ct-ghost_png.vtex_c",
+        "panorama/images/hud/radar/icon-enemy-on-map_png.vtex_c",
+        "panorama/images/hud/radar/mapoverview/icon-death.vsvg_c",
+        "panorama/images/hud/direction_png.vtex_c",
+        "panorama/images/icons/ui/map_view_angle.vsvg_c",
+        "panorama/images/icons/ui/map_view_selected.vsvg_c",
+        "panorama/images/icons/ui/map_death.vsvg_c",
+        "panorama/images/icons/ui/map_enemy_offmap.vsvg_c",
     ];
 
     public static void Run(string cs2, string outDir)
@@ -63,6 +81,17 @@ static class PanoramaBake
             {
                 using var res = new Resource { FileName = path };
                 res.Read(new MemoryStream(bytes));
+                if (res.DataBlock is Texture tex)
+                {
+                    // panorama/images/hud/radar/icon-on-map_png.vtex_c -> hud/radar/icon-on-map.png
+                    var trel = path["panorama/images/".Length..^"_png.vtex_c".Length] + ".png";
+                    using var bmp = tex.GenerateBitmap();
+                    using var img = SkiaSharp.SKImage.FromBitmap(bmp);
+                    using var png = img.Encode(SkiaSharp.SKEncodedImageFormat.Png, 100);
+                    File.WriteAllBytes(SafePath.OutFile(outDir, trel), png.ToArray());
+                    ok++;
+                    continue;
+                }
                 using var content = FileExtract.Extract(res, loader);
                 if (content.Data == null) { Console.WriteLine($"no data {path}"); continue; }
                 // panorama/images/icons/ui/health.vsvg_c -> icons/ui/health.svg
