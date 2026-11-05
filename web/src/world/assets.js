@@ -166,15 +166,19 @@ export async function loadMap(name, onProgress = () => {}, opts = {}) {
   return { name, version, manifest, entities, collision, collisionFx, hulls, bounds, animations, world, chunks, loadChunk, getModel, particles: fx, items, radar, effects, water };
 }
 
-// water.json -> { textures: { <vtex path>: url } } (null without one). File names only as the bake writes them.
+// water.json -> { textures: { <vtex path>: url }, frames: { <vtex path>: slices } } (null without one). File names only
+// as the bake writes them; frame counts 1..64 (a texture array's animation frames, stacked in its PNG)
 function waterTextures(j, url) {
   const t = j?.textures;
   if (!t || typeof t !== 'object') return null;
-  const textures = Object.create(null);
+  const textures = Object.create(null), frames = Object.create(null);
   for (const [vtex, file] of Object.entries(t)) {
     if (typeof file === 'string' && /^[a-z0-9_]{1,110}\.png$/.test(file)) textures[vtex] = url(`water/${file}`);
   }
-  return { textures };
+  for (const [vtex, n] of Object.entries(j.frames && typeof j.frames === 'object' ? j.frames : {})) {
+    if (textures[vtex] && Number.isInteger(n) && n >= 1 && n <= 64) frames[vtex] = n;
+  }
+  return { textures, frames };
 }
 
 // (the loader adds ?v=)

@@ -62,7 +62,7 @@ It builds `bake/` (Release), then runs, per map:
 
 | Step | lasers-bake | Writes (`web/public/maps/<map>/`) |
 |---|---|---|
-| `map` | `<vpk> web/public/maps` | manifest, entities, collision (+ `collision_fx*.bin`, what particle traces hit), hulls, glbs + textures (cut-out alpha put back; animated props with their sequences + `animations.json`), particles + `fx/`, sounds (the stock events the map's entities name), `shots/`, `overview/` |
+| `map` | `<vpk> web/public/maps` | manifest, entities, collision (+ `collision_fx*.bin`, what particle traces hit), hulls, glbs + textures (cut-out alpha put back; animated props with their sequences + `animations.json`), particles + `fx/`, sounds (the stock events the map's entities name), `shots/`, `overview/`, `water/` (the water shaders' textures, only for a map with CS2 water) |
 | `entwatch` | `node tools/entwatch.mjs <map>` | `entwatch.json`: GFL's EntWatch config (the map's items: the heal option, the item HUD); none if GFL has no config for the map |
 | `stripper` | `node tools/stripper.mjs <map>` | `stripper.json`: GFL's StripperCS2 edits to the map's entities (below); none if GFL doesn't strip the map |
 | `lighting` | `--lighting <vpk> <map dir>` | `lighting/`: lightmaps (raw BC6H/BC7/DXT1/BC4 blocks), probes, tonemap + LUT (`post/`), skies, reflection cubemaps. The **high** tier |
@@ -165,6 +165,7 @@ For a map that's already baked, each piece can be redone on its own (`lasers-bak
 | `--sky` | only skies + reflection cubemaps, merged into the existing `lighting.json` |
 | `--tiers` | `q/medium` + `q/low` (after `--lighting`) |
 | `--alpha` | cut-out alpha back into the glb PNGs (tree leaves, fences). The `map` step already does it |
+| `--water` | the water shaders' textures (`water/`: waves, foam, debris, animated normal frames). The `map` step already does it; `bake-map.mjs <map> --steps water` for a map baked before |
 | `--fx` | particle effects (`fx/`) |
 | `--collision` | `collision_fx.bin` + layers only (the particle trace set); takes `web/public/maps`, not the map dir |
 | `--overview` | the CS2 radar (`overview/`) |

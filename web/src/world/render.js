@@ -122,8 +122,8 @@ export class Renderer {
     scene.traverse((o) => {
       if (o.isMesh) {
         o.material = Array.isArray(o.material) ? o.material.map((m) => this.sharedMaterial(m)) : this.sharedMaterial(o.material);
-        // CS2 water (csgo_water_fancy) gets its own shader in place of the flat glTF material
-        const w = !Array.isArray(o.material) && this.water.material(o.material);
+        // CS2 water gets its own shader in place of the flat glTF material (world/water.js)
+        const w = !Array.isArray(o.material) && this.water.material(o.material, { lit: !!o.geometry?.attributes?.uv1 });
         if (w) { o.material = w; this.water.track(o); }
         // VRF names tool-texture meshes after their material; hide the editor-only ones
         const mats = Array.isArray(o.material) ? o.material : [o.material];
@@ -239,7 +239,13 @@ export class Renderer {
             group.matrix.copy(e.getWorld());
             group.updateMatrixWorld(true);
             const meshes = group.userData.probeMeshes = [];
-            inst.traverse((o) => { if (o.isMesh) { this.lighting?.applyProbes(o); meshes.push(o); } });
+            inst.traverse((o) => {
+              if (!o.isMesh) return;
+              // CS2 water on an entity's model (a moving water brush): no lightmap UVs, so the sky ambient lights it
+              const w = !Array.isArray(o.material) && this.water.material(o.material, { lit: false });
+              if (w) { o.material = w; this.water.track(o); return; }
+              this.lighting?.applyProbes(o); meshes.push(o);
+            });
           });
         }
       }

@@ -832,16 +832,9 @@ vec3 cs2CubeFace( vec3 d ) {
   return vec3( st / ma * 0.5 + 0.5, face );
 }
 vec4 cs2Vol( int i, int t ) { return texelFetch( cs2CubeVolumes, ivec2( t, i ), 0 ); }
-// the reflection: every volume around the pixel, by priority, until covered; normalised by the diffuse light
-vec3 cs2EnvSpecular( vec3 posWS, vec3 normalVS, vec3 viewVS, float roughness, float diffuseLuma ) {
-  vec3 N = normalize( ( vec4( normalVS, 0.0 ) * viewMatrix ).xyz );
-  vec3 V = normalize( ( vec4( viewVS, 0.0 ) * viewMatrix ).xyz );
-  vec3 R = reflect( -V, N );
-  // bent toward the normal as the surface roughens (GetDominantReflectionFactor)
-  float r2 = roughness * roughness, rSq = r2 * r2;
-  float s = clamp( 1.0 - rSq, 0.0, 1.0 );
-  R = normalize( mix( N, R, s * ( sqrt( s ) + rSq ) ) );
-  float lod = max( 0.0, sqrt( roughness ) * ( cs2CubeMips.x - 2.0 ) - cs2CubeMips.y );
+// every volume around the pixel, by priority, until covered: .rgb the reflection along R (world space; box parallax
+// mixed back to the plain direction by parallaxRough), .a the cubemaps' own baked luma along N
+vec4 cs2EnvGather( vec3 posWS, vec3 N, vec3 R, float parallaxRough, float lod ) {
   vec3 env = vec3( 0.0 ); float envLuma = 0.0; float total = 0.01;
   // bounded by the uniform, not a constant: a constant bound gets fully unrolled by ANGLE's D3D compiler
   for ( int k = 0; k < cs2CubeVisible; k++ ) {
@@ -859,16 +852,28 @@ vec3 cs2EnvSpecular( vec3 posWS, vec3 normalVS, vec3 viewVS, float roughness, fl
     vec3 first = ( mn.xyz - lp ) / lr, second = ( mx - lp ) / lr;
     vec3 far3 = max( first, second );
     float dist = abs( min( far3.x, min( far3.y, far3.z ) ) );
-    vec3 dir = mix( lp + lr * dist, lr, roughness );
+    vec3 dir = mix( lp + lr * dist, lr, parallaxRough );
     vec3 uvf = cs2CubeFace( dir );
     env += textureLod( cs2Cubes, vec3( uvf.xy, mn.w * 6.0 + uvf.z ), lod ).rgb * weight;
     vec4 sh = cs2Vol( i, 6 );
     envLuma += dot( vec4( N, 1.0 ), sh ) * weight;
     total += weight;
   }
-  env /= total; envLuma /= total;
+  return vec4( env, envLuma ) / total;
+}
+// the reflection, normalised by the diffuse light (view-space normal and view direction in)
+vec3 cs2EnvSpecular( vec3 posWS, vec3 normalVS, vec3 viewVS, float roughness, float diffuseLuma ) {
+  vec3 N = normalize( ( vec4( normalVS, 0.0 ) * viewMatrix ).xyz );
+  vec3 V = normalize( ( vec4( viewVS, 0.0 ) * viewMatrix ).xyz );
+  vec3 R = reflect( -V, N );
+  // bent toward the normal as the surface roughens (GetDominantReflectionFactor)
+  float r2 = roughness * roughness, rSq = r2 * r2;
+  float s = clamp( 1.0 - rSq, 0.0, 1.0 );
+  R = normalize( mix( N, R, s * ( sqrt( s ) + rSq ) ) );
+  float lod = max( 0.0, sqrt( roughness ) * ( cs2CubeMips.x - 2.0 ) - cs2CubeMips.y );
+  vec4 g = cs2EnvGather( posWS, N, R, roughness, lod );
   // CS2 v2: the cubemap is only ever darkened toward the lightmap's brightness, never brightened
-  return env * min( diffuseLuma / max( envLuma, 1e-4 ), 1.0 );
+  return g.rgb * min( diffuseLuma / max( g.a, 1e-4 ), 1.0 );
 }
 `;
 

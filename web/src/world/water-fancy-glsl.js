@@ -1,4 +1,4 @@
-// CS2's csgo_water_fancy.vfx as GLSL for three.js (world/water.js builds the material). Source of truth: CS2's own
+// CS2's csgo_water_fancy.vfx as GLSL for three.js (world/water-fancy.js builds the material). Source of truth: CS2's own
 // compiled shader, as decompiled and translated line by line by ValveResourceFormat (Renderer/Shaders/
 // water_csgo.vert.slang + water_csgo.frag.slang); names and constants are kept so the two read side by side.
 // Everything runs in Source world space (the world root carries glTF -> Source). What differs, and why:
@@ -74,6 +74,7 @@ uniform sampler2D uLightmap;
 uniform vec3 uSunColor;     // GetSunColor(): the light_environment's colour x brightness
 uniform vec3 uSunDiffuse;   // the same while the sun is runtime (directlight 2 / 3), 0 when baked into the lightmap
 uniform vec3 uSunDir;       // toward the sun
+uniform vec3 uAmbient;      // the sky's ambient (lighting.ambient): the indirect light without a lightmap
 uniform vec3 uCamDir, uCamUp;
 uniform mat4 uProjection; // the camera's (three gives the fragment stage none)
 varying vec3 vFragPosition;
@@ -83,7 +84,9 @@ varying vec3 vBitangentOut;
 varying vec4 vColorBlendValues;
 varying vec2 vLightmapUV;
 
-#define saturate(x) clamp(x, 0.0, 1.0)
+#ifndef saturate
+#define saturate(x) clamp(x, 0.0, 1.0) // three's prefix may already define it
+#endif
 float ClampToPositive( float x ) { return max( x, 0.0 ); }
 float GetLuma( vec3 c ) { return dot( c, vec3( 0.2126, 0.7152, 0.0722 ) ); }
 float SafePow( float b, float e ) { return pow( max( b, 1e-6 ), e ); }
@@ -365,8 +368,13 @@ void main() {
   float k12400 = mix( 1.0, effectiveWaterDepthForFog * 2.0, 0.75 );
   vec2 lmUv = vLightmapUV + fwidth( vLightmapUV ) * 1200.0 / distanceToFrag * cosNormAngle * -viewParallaxFactor * vec2( -1.0, 1.0 )
     * ( vec2( finalDebrisFoamHeightContrib * -2.0 ) + mix( blueNoiseZeroToOne.yy, blueNoiseZeroToOne.yx, vec2( 0.1 ) ) * 20.0 * squaredWaterOpacity ) * k12400;
+#ifdef CS2_NO_LIGHTMAP
+  // no lightmap (an entity's model, or baked lighting off): the sky's ambient, the sun unshadowed
+  vec3 DiffuseIndirect = uAmbient;
+#else
   vec4 lmTexel = texture( uLightmap, lmUv );
   vec3 DiffuseIndirect = cs2IrrRange > 0.0 ? lmTexel.rgb * lmTexel.a * cs2IrrRange : lmTexel.rgb;
+#endif
 #ifdef CS2_SHADOWS
   float sunVis = clamp( 1.0 - dot( texture( cs2Shadows, lmUv ), cs2SunMask ), 0.0, 1.0 );
 #else
@@ -396,7 +404,8 @@ void main() {
 #endif
 #if F_REFLECTION_TYPE == 2
   {
-    float stepMul = saturate( ( uCamDir.z + 0.75 ) * 4.0 ) * 0.5;
+    // CS2: x (0.5 + 0.5 * !g_bIsSkybox): the full count for world water; none looking straight down
+    float stepMul = saturate( ( uCamDir.z + 0.75 ) * 4.0 );
     int SSRStepCount = int( float( g_nSSRMaxForwardSteps ) * stepMul );
     if ( SSRStepCount > 0 ) {
       float SsrHitThickness = blueNoiseNegOneToOne * g_flSSRSampleJitter + g_flSSRMaxThickness;

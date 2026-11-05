@@ -208,6 +208,7 @@ All coordinates are Source units (inches, Z up), except the glbs, which are VRF'
 | `particles.json` | *(ours)* a summary per effect an `info_particle_system` plays: colour, emit box, radius, rate, children |
 | `world/<map>.glb` | the world node, textures beside it as PNGs capped at 1024 px |
 | `models/<path>.glb` | each entity model, placed and moved at runtime |
+| `water/water.json` + `water/*.png` | *(ours)* the CS2 water shaders' textures the glTF exporter drops or flattens (`csgo_water_fancy`: waves normal + height, foam, debris, debris normal; `csgo_water`: its animated normal, every frame stacked top to bottom, (A, G) written as (R, G)): `{ textures: { <vtex path>: <file>.png }, frames: { <vtex path>: n } }`, raw channels. Only maps with CS2 water. Only this: `lasers-bake --water <workshop.vpk> <map folder>` |
 
 ## Scenarios
 
@@ -218,7 +219,6 @@ All coordinates are Source units (inches, Z up), except the glbs, which are VRF'
   "spawn": { "origin": [2560, -3072, -2944], "yaw": 180 },
   "start": [{ "target": "[PR#]relay_atk_laser", "input": "Trigger" }],
   "winAfter": 26 }
-| `water/water.json` + `water/*.png` | *(ours)* the CS2 water shader's textures (waves normal + height, foam, debris, debris normal) the glTF exporter drops: `{ textures: { <vtex path>: <file>.png } }`, raw channels. Only maps with `csgo_water_fancy` water. Only this: `lasers-bake --water <workshop.vpk> <map folder>` |
 ```
 
 `start` inputs fire 1 s after spawn. You win either after `winAfter` seconds, or when `win: {target, input}`
@@ -518,6 +518,15 @@ Invite link and who is alive (with each player's ping). Change stage and Setting
 - **Cut-out alpha** (`AlphaBake.cs`, also `lasers-bake --alpha`): VRF 20.1's glTF exporter writes alpha-tested materials
   (tree leaves, grass, fences) as `alphaMode: MASK` with an RGB-only base colour, so they drew solid; the bake puts the
   alpha back from the vmat's `g_tColor` (VRF's RGB kept).
+- **Water** (`world/water.js` picks the shader, `WaterBake.cs` bakes the textures): both CS2 water shaders run as CS2
+  has them, every number from the vmat. `csgo_water_fancy` (`water-fancy*.js`, VRF's translation of the decompiled
+  shader): waves, refraction with depth fog and decay colour, caustics, foam and debris, cubemap + screen-space
+  reflections, the sun's glint. `csgo_water` (`water-basic*.js`, decompiled from CS2's own vcs with VRF's SPIR-V
+  reflection, defaults and parameter expressions from the same files): animated normal frames, refraction tinted and
+  fogged by the water's depth, cubemap reflection with Fresnel, a directional highlight. Water on an entity's model, or
+  with baked lighting off, takes the sky's ambient. A water shader not ported is logged and drawn flat. Not ported:
+  the player / bullet ripple buffer (`g_tWaterEffectsMap`), cubemap fog. Quality follows the preset (fancy only):
+  High as authored, Medium halves SSR and drops the blurred refraction, Low has no SSR or caustics and 2 wave octaves.
 - **Simulated ping** (0–500 ms, slider + exact number): your movement stays predicted, the map's entities (and their
   sounds) are drawn from a history that many ms behind the simulation, so you react as late as on a server at that ping.
 
@@ -528,11 +537,6 @@ web/src/
   main.js            boot + wiring only (G.play = start a stage: lock + fullscreen first, inside the click)
   lib/               shared helpers, import these instead of re-writing them:
                      dom ($, esc, replayClass), names ([PR#] names, matching), paths (map names, safe relative
-- **Water** (`world/water.js`, `world/water-glsl.js`, `WaterBake.cs`): `csgo_water_fancy` surfaces run CS2's own water
-  shader (VRF's translation of the decompiled one): waves, refraction with depth fog and decay colour, caustics, foam
-  and debris, cubemap + screen-space reflections, the sun's glint, every number from the vmat. Not ported: the
-  player / bullet ripple buffer (`g_tWaterEffectsMap`). Quality follows the preset: High as authored, Medium halves
-  SSR and drops the blurred refraction, Low has no SSR or caustics and 2 wave octaves.
                      paths, asset keys, versioned URLs), format, math (clamp, approach, bounds), storage, fetch
   app/               state, settings (sanitised, CS2 cvars), session (one attempt), loop (frames + 64-tick step),
                      input (keys, raw mouse, touch, fullscreen, keyboard lock), camera (first / third person),
