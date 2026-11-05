@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { angleVectors } from './barn.js';
 import { makeInputs } from './controls.js';
+import { applySelfIllum } from '../../../world/selfillum.js';
 
 // C_OP_RenderModels: a model per live particle (m_ModelList), posed from the particle's position, angles (pitch /
 // yaw / roll, attributes 20 / 12 / 4, radians) and radius. ze_offliner's lasers are this (offliner_laser.vpcf draws
@@ -45,6 +46,7 @@ export class ModelRenderer {
       holder.matrixAutoUpdate = false;
       holder.matrix.copy(this.effects.modelToSource || new THREE.Matrix4());
       holder.add(scene.clone(true));
+      holder.traverse((o) => { if (o.isMesh) applySelfIllum(o); }); // CS2's self-illum glow (world/selfillum.js)
       holder.updateMatrixWorld(true);
       const box = new THREE.Box3().setFromObject(holder);
       const center = box.isEmpty() ? new THREE.Vector3() : box.getCenter(new THREE.Vector3());
