@@ -37,8 +37,12 @@ export const breakable = register('func_breakable', {
 });
 // physboxes also move (classes/physics.js): asleep at spawn, woken by a thruster or Wake / EnableMotion
 // (Source physobj.h: SF_PHYSBOX_ASLEEP 4096, SF_PHYSBOX_MOTIONDISABLED 32768)
+// Spawnflag 16384 "Debris - Don't collide with the player or other debris" (CS2 game/core/base.fgd): not solid to
+// you. ze_dreamin's DONT_shoot_from_here (a debris physbox across the Final Crystal room's doorway) stopped you short
+// of the trigger that starts the blades; on a server humans walk through it
 const physbox = {
   ...breakable,
+  solid: (e) => !(num(e.kv.spawnflags) & 16384),
   spawn(e) {
     breakable.spawn(e);
     const sf = num(e.kv.spawnflags);
@@ -60,4 +64,12 @@ const brush = register('func_brush', {
     if (inp === 'toggle') { e.enabled = !e.enabled; e.visible = e.enabled; e.engine.moved(e); return true; }
   },
 });
-register('func_wall_toggle', brush);
+// func_wall_toggle: spawnflag 1 "Starts Invisible" (CS2 game/core/base.fgd; Source CFuncWallToggle::Spawn TurnOff),
+// off = invisible and non-solid. ze_dreamin's climb-top bridges (stone_walk_1/2) start off, appear at +90 s
+// (Toggle) and one goes again when a side is picked; spawned on, the +90 s Toggle hid them both
+register('func_wall_toggle', {
+  ...brush,
+  spawn(e) {
+    if (num(e.kv.spawnflags) & 1) { e.enabled = false; e.visible = false; }
+  },
+});

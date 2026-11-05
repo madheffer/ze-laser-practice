@@ -350,12 +350,12 @@
       }
     },
     {
-      "id": "l1_blades",
+      "id": "l1_finale",
       "group": "Main stages",
       "featured": true,
-      "name": "Blade room (Final Crystal)",
-      "summary": "Jump or crouch the flying blades",
-      "description": "boss_to_blade2 adds 70 hits per human to blade_hp (start 50) and teleports you in. Once the first human crosses the room (the trigger 1100 u in) a blade flies out of the crystal every 2 s at 1700 u/s: low (jump), mid (jump) or high (crouch), 999999 damage. Each human a blade kills takes 60 off the crystal. Win when it breaks.",
+      "name": "Level 1 finale",
+      "summary": "Final Crystal's blades, the rising floor, then the blades from below",
+      "description": "boss_to_blade2 adds 70 hits per human to blade_hp (start 50) and teleports you into the blade room, facing the Final Crystal. Walking in, the first human through the trigger 1100 u in starts blade_start_timer: a blade flies out of the crystal every 2 s at 1700 u/s, low (jump), mid (jump) or high (crouch), 999999 damage; each human one kills takes 60 off the crystal. When it breaks, first_win: final_floor rises 3200 u (500 u/s) 9 s after a human steps on it; at the top, blades fly up from blade_rotate below (look down) for 8.5 s, clear_trigger opens at +9.5 s, NUKE at +12 s. Win at score.",
       "spawn": {
         "origin": [
           -10070,
@@ -368,11 +368,6 @@
         {
           "target": "[PR#]boss_to_blade2",
           "input": "Enable"
-        },
-        {
-          "target": "[PR#]blade_start_timer",
-          "input": "Enable",
-          "delay": 4.5
         }
       ],
       "bosses": [
@@ -381,43 +376,6 @@
           "name": "Final Crystal",
           "counter": "[PR#]blade_hp",
           "counterMode": "hits"
-        }
-      ],
-      "win": {
-        "target": "[PR#]first_win",
-        "input": "Enable"
-      },
-      "hazards": {
-        "boss_hurt": "the crystal",
-        "boss_ice": "the ice cast",
-        "boss_hurt2": "the crystal",
-        "blade_111h": "a low crystal blade",
-        "blade_222h": "a high crystal blade",
-        "blade_333h": "a mid crystal blade",
-        "blade_rotate_hurt": "a rising blade",
-        "boss_target_hurt": "the final crystal",
-        "NUKE": "the nuke"
-      }
-    },
-    {
-      "id": "l1_elevator",
-      "group": "Main stages",
-      "name": "Rising floor escape",
-      "summary": "Ride the rising floor past spinning blades",
-      "description": "After the Final Crystal: final_floor rises 3200 u (500 u/s) 9 s after a human steps on it; at the top blades spin up out of blade_rotate for 8.5 s (999999), clear_trigger opens at +9.5 s, NUKE at +12 s.",
-      "spawn": {
-        "origin": [
-          -12992,
-          9754,
-          -2236
-        ],
-        "yaw": 180
-      },
-      "start": [
-        {
-          "target": "[PR#]blade_hp",
-          "input": "Subtract",
-          "param": "100000"
         }
       ],
       "win": {
@@ -878,16 +836,16 @@
     {
       "id": "l2_final_lasers",
       "group": "Main stages",
-      "name": "Final lasers (climb top)",
-      "summary": "Pick a side, cross the final lasers",
-      "description": "st2_final_relay +106 s, on test_laser: the first human there picks a side (finalaser_random), the other stone walk drops, and for 9 s vertical and sweeping lasers (999999) cross the top. st2_upper teleports humans to the end at +120 s; score_trigger opens at +128 s.",
+      "name": "Level 2 final lasers",
+      "summary": "Bridges up, one breaks, lasers off the other",
+      "description": "st2_final_relay +106 s, on the platform between the two stone walks (stone_walk_1 / 2: they start invisible, appear at +90 s), facing stone_walk_1. The first human on test_laser (enabled +108 s) picks a side 2 s later (finalaser_random): the other stone walk breaks, and for 9 s vertical lasers and sweeping lasers (999999) come off the walk that stays. st2_upper teleports humans to the end at +120 s; score_trigger opens at +128 s.",
       "spawn": {
         "origin": [
           12800,
           12800,
           4561
         ],
-        "yaw": 0
+        "yaw": 45
       },
       "start": [
         {
