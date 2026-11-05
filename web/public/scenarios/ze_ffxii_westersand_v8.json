@@ -220,7 +220,7 @@
       "group": "Main stages",
       "name": "Dragon – desert hall",
       "summary": "Dragon fight in the volcano hall",
-      "description": "The stage-1 dragon in the volcano hall. An attack every 7 s (fire on the left or right half, electro floor, lure, wind, heal, water) and a fire nova or meteor after every 4th. 50 + 43 HP per human per segment, 6 segments; 80 s after it lands Holy goes off, and 20 s later the hall is nuked if it still lives. You start in the hall door (its HP trigger) 4 s before it closes; anyone still in the corridor at 54 s is sent to the zombie cage.",
+      "description": "The stage-1 dragon in the volcano hall. It flies in on a random side and, still in the air, either breathes fire across both halves or blows a wind push from that side; from about 8 s after it lands, an attack every 7 s (fire on the left or right half, electro floor, lure, wind, heal, water) and a fire nova or meteor after every 4th. 50 + 43 HP per human per segment, 6 segments; 80 s after it lands Holy goes off, and 20 s later the hall is nuked if it still lives. You start in the hall door (its HP trigger) 4 s before it closes; anyone still in the corridor at 54 s is sent to the zombie cage.",
       "spawn": {
         "origin": [
           -2816,

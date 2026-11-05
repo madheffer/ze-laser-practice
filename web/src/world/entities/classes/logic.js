@@ -17,30 +17,47 @@ register('logic_relay', {
   },
 });
 
+// The cases to pick from are the OnCase01..32 outputs that have a connection *when the input arrives*
+// (server.dll's case map builder, run by PickRandom / PickRandomShuffle / ResetShuffle, walks each output's
+// connection list then): a case whose outputs come from AddOutput later counts once they're added, and one whose
+// only-once connections have all fired drops out. westersand's Boss_Attack_AirCase has no outputs of its own until
+// Boss_Attack_RandomPath adds them.
+const MAX_CASES = 32;
+const liveCases = (e) => {
+  const has = new Set();
+  for (const c of e.io) { const m = /^oncase(\d+)$/i.exec(c.output); if (m && +m[1] >= 1 && +m[1] <= MAX_CASES) has.add(+m[1]); }
+  return [...has].sort((a, b) => a - b);
+};
+const pick = (e, n) => Math.floor(e.engine.random() * n);
+
 register('logic_case', {
   spawn(e) {
-    const cases = new Set();
-    for (const c of e.io) { const m = /^oncase(\d+)$/i.exec(c.output); if (m) cases.add(+m[1]); }
-    e.state.cases = [...cases].sort((a, b) => a - b);
-    e.state.deck = [];
+    e.state.deck = []; e.state.left = 0; e.state.last = -1;
   },
   input(e, inp, p, act) {
     const fire = (n) => e.fireOutput(`OnCase${String(n).padStart(2, '0')}`, act);
     if (inp === 'pickrandom') {
-      const cs = e.state.cases;
-      if (cs.length) fire(cs[Math.floor(e.engine.random() * cs.length)]);
+      const cs = liveCases(e);
+      if (cs.length) fire(cs[pick(e, cs.length)]);
       return true;
     }
+    // server.dll: a deck of the live cases, drawn without replacement (the drawn slot takes the deck's last card).
+    // A new deck of 2+ never starts with the case the previous deck ended on: that card goes last and is left out
+    // of the first draw.
     if (inp === 'pickrandomshuffle') {
-      if (!e.state.deck.length) {
-        e.state.deck = [...e.state.cases];
-        for (let i = e.state.deck.length - 1; i > 0; i--) {
-          const j = Math.floor(e.engine.random() * (i + 1));
-          [e.state.deck[i], e.state.deck[j]] = [e.state.deck[j], e.state.deck[i]];
+      const s = e.state;
+      let range = s.left;
+      if (!s.left) {
+        s.deck = liveCases(e); s.left = range = s.deck.length;
+        if (range > 1) {
+          const i = s.deck.indexOf(s.last);
+          if (i >= 0) { range--; [s.deck[i], s.deck[range]] = [s.deck[range], s.deck[i]]; }
         }
       }
-      const n = e.state.deck.pop();
-      if (n != null) fire(n);
+      if (range <= 0) return true;
+      const i = pick(e, range), n = s.deck[i];
+      fire(n);
+      s.deck[i] = s.deck[s.left - 1]; s.left--; s.last = n;
       return true;
     }
     if (inp === 'invalue') {
@@ -51,7 +68,8 @@ register('logic_case', {
       e.fireOutput('OnDefault', act, p);
       return true;
     }
-    if (inp === 'resetshuffle') { e.state.deck = []; return true; }
+    // server.dll rebuilds a full deck here (it doesn't just empty it, so no last-case rule on its first draw)
+    if (inp === 'resetshuffle') { e.state.deck = liveCases(e); e.state.left = e.state.deck.length; return true; }
   },
 });
 
