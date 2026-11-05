@@ -1,5 +1,10 @@
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv } from 'vite';
+import { fileURLToPath } from 'node:url';
 import { coopRelayPlugin } from './server/coop-relay.js';
+
+// The run store's database (server/db/store.js): DATABASE_URL from the environment, else from web/.env
+// (gitignored). Server-side only: it is not a VITE_ variable, so it never reaches the page.
+process.env.DATABASE_URL ??= loadEnv('', fileURLToPath(new URL('.', import.meta.url)), 'DATABASE_').DATABASE_URL;
 
 // Baked maps and sounds never change under a given URL: the loader adds ?v=<version> to every one of them
 // (lib/paths.js versioned()). So the browser may keep them for a year and a reload reads them from disk

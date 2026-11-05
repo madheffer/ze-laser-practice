@@ -27,6 +27,7 @@ node_modules/
 *.log
 .env
 .env.*
+!.env.example
 .vs/
 .idea/
 .DS_Store

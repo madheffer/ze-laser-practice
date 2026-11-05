@@ -9,11 +9,13 @@
     "preview": "vite preview",
     "play": "vite build && vite preview",
     "host": "vite build && vite preview --host",
-    "coop-server": "node server/main.js",
+    "coop-server": "node --env-file-if-exists=.env server/main.js",
     "bake": "node ../tools/bake-map.mjs",
-    "index-maps": "node ../tools/index-maps.mjs"
+    "index-maps": "node ../tools/index-maps.mjs",
+    "db:migrate": "node --env-file-if-exists=.env server/db/migrate.js"
   },
   "dependencies": {
+    "pg": "8.13.1",
     "three": "0.170.0",
     "ws": "8.18.0"
   },

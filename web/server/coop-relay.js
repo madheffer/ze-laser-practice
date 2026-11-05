@@ -18,6 +18,8 @@ import { Round } from './coop-round.js';
 import { scenarioStore } from './scenarios.js';
 import { mapStore } from './map-store.js';
 import { activityFeed } from './activity.js';
+import { apiHandler } from './api.js';
+import { openStore } from './db/store.js';
 
 export const PATH = '/coop';
 const MAX_ROOMS = 300;
@@ -54,7 +56,8 @@ function uniqueName(room, name, self) {
   return name;
 }
 
-export function attachCoopRelay(httpServer, { log = () => {}, scenariosDir = path.resolve(HERE, '../public/scenarios'), mapsDir = path.resolve(HERE, '../public/maps') } = {}) {
+// store: db/store.js's run store (or a promise for one): every finished run is written there
+export function attachCoopRelay(httpServer, { log = () => {}, store = openStore({ log }), scenariosDir = path.resolve(HERE, '../public/scenarios'), mapsDir = path.resolve(HERE, '../public/maps') } = {}) {
   const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_FRAME, perMessageDeflate: false });
   const rooms = new Map(); // code -> room
   const perAddress = new Map();
@@ -66,7 +69,7 @@ export function attachCoopRelay(httpServer, { log = () => {}, scenariosDir = pat
   const io = { send, log };
   // the home page's live feed (activity.js): finished rounds and solo runs, and how busy the server is
   const feed = activityFeed({
-    send, findStage,
+    send, findStage, store, log,
     stats: () => {
       const live = [...rooms.values()].filter((r) => r.round && !r.round.ended);
       return {
@@ -244,9 +247,15 @@ export function attachCoopRelay(httpServer, { log = () => {}, scenariosDir = pat
 }
 
 // Vite plugin: the co-op server on the dev server (npm run dev) and the preview server (npm run play / host).
+// The run store opens once (DATABASE_URL from web/.env or the environment; memory without one) and also answers
+// /api/ (api.js).
 export function coopRelayPlugin() {
+  let store = null;
   const attach = (server) => {
-    if (server.httpServer) attachCoopRelay(server.httpServer, { log: (m) => server.config.logger.info(m) });
+    const log = (m) => server.config.logger.info(m);
+    store ||= openStore({ log });
+    server.middlewares.use(apiHandler(store));
+    if (server.httpServer) attachCoopRelay(server.httpServer, { log, store });
   };
   return { name: 'coop-relay', configureServer: attach, configurePreviewServer: attach };
 }

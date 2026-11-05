@@ -31,6 +31,82 @@ Baked maps are gitignored (100+ MB each). Scenarios in `web/public/scenarios/` a
 | ze_dreamin | 3415958616 (`3415958616_dir.vpk`) |
 | ze_gris_p | 3633040749 (`3633040749_dir.vpk`) |
 
+## Database (runs and leaderboards)
+
+Every finished run is stored in **PostgreSQL** (14 or newer): co-op / versus rounds the server ran and checked, and
+solo runs a player's page reported (marked `verified = false`). The leaderboards and the home page's feed are read
+from it. Without a database the dev server keeps runs in memory (gone on restart); the standalone server
+(`npm run coop-server`) refuses to start without one.
+
+### 1. Install Postgres
+
+- **Windows**: the installer from postgresql.org (keep the default port 5432), or `winget install PostgreSQL.PostgreSQL.17`.
+- **macOS**: `brew install postgresql@17 && brew services start postgresql@17`.
+- **Debian / Ubuntu**: `sudo apt install postgresql`.
+- **Docker**: `docker run -d --name lasers-db -e POSTGRES_USER=lasers -e POSTGRES_PASSWORD=change-me -e POSTGRES_DB=lasers -p 127.0.0.1:5432:5432 -v lasers-db:/var/lib/postgresql/data postgres:17`
+  (this creates the user and database: skip step 2).
+
+### 2. Make a user and a database
+
+```bash
+psql -U postgres -c "CREATE ROLE lasers LOGIN PASSWORD 'change-me'"
+psql -U postgres -c "CREATE DATABASE lasers OWNER lasers"
+```
+
+Pick a real password. The server only needs to own its own database, never a superuser.
+
+### 3. Point the server at it
+
+```bash
+cp web/.env.example web/.env      # then edit DATABASE_URL
+```
+
+`DATABASE_URL=postgres://lasers:<password>@localhost:5432/lasers` (add `?sslmode=require` when the database is on
+another machine). `web/.env` is gitignored; an environment variable of the same name wins over it.
+
+### 4. Create the tables
+
+```bash
+npm --prefix web run db:migrate
+```
+
+The servers also do this on start. Migrations are `web/server/db/migrations/NNN_name.sql`, applied once each in name
+order and recorded in `schema_migrations`; to change the schema, add a new file, never edit an applied one.
+
+### What's in it
+
+| | |
+|---|---|
+| `runs` | one row per finished run: `kind` (solo / coop / versus), `verified`, `map`, `stage_id`, `mode` (normal / endless), `result`, `time_s`, `players`, `named`, `room_name`, `cheats` (the room had a cheat rule on), `cause`, `finished_at` |
+| `run_players` | who played it: `name`, `won`, `hits`, `survived_s`, `removed` (taken out by the anti-cheat). A private room's players are never written |
+| `ranked_runs` (view) | the rows a leaderboard may rank: no cheat rules, not removed, and normal runs only when cleared |
+
+Leaderboards rank each player's best run: normal = fastest clear, then fewest hits; endless = longest survived.
+Solo names are whatever the player typed, so use `verified` if you only want rounds the server watched.
+
+### Reading the data
+
+Over HTTP (served by the dev / preview server and by `npm run coop-server`, read-only, JSON):
+
+- `GET /api/leaderboard?map=ze_mist_p&stage=throne&mode=normal&kind=solo&limit=25`
+- `GET /api/runs?limit=40` (newest first)
+
+Or straight from SQL, e.g. the fastest solo clears of a stage:
+
+```sql
+SELECT DISTINCT ON (lower(name)) name, time_s, hits, finished_at
+FROM ranked_runs WHERE map = 'ze_mist_p' AND stage_id = 'throne' AND mode = 'normal' AND kind = 'solo'
+ORDER BY lower(name), time_s, hits NULLS LAST;
+```
+
+Backups: `pg_dump -U lasers -Fc lasers > lasers.dump`, restore with `pg_restore -U lasers -d lasers lasers.dump`.
+
+### Hosting
+
+Serve the built game (`npm --prefix web run build` -> `web/dist/`) from any web server and reverse-proxy `/coop`
+(WebSocket) and `/api/` to `npm --prefix web run coop-server` (port 5810, `--port` to change) on the same origin.
+`/healthz` answers `ok`.
+
 ## The map folder (shared with lasers.cybo.dev)
 
 All coordinates are Source units (inches, Z up), except the glbs, which are VRF's glTF space (metres, Y up:
@@ -154,7 +230,7 @@ picking one loads it and shows its stages, one section per part with a jump bar 
 can't close the tab; outside fullscreen a "Leave site?" prompt catches it. Mouse look uses raw input
 (`requestPointerLock({ unadjustedMovement })`) and CS2's formula, degrees per count = `sensitivity × m_yaw`,
 so your CS2 sensitivity carries over 1:1. Movement adds CS2 stamina (`sv_stamina*` defaults) and weapon
-speed (knife 250, AK-47 215). Boss HP shows in CS2Fixes BossHUD's layout (homelab-control-plane: apps/cs2/patches/bosshud.patch):
+speed (knife 250, AK-47 215). Boss HP shows in CS2Fixes BossHUD's layout (GFL's bosshud config):
 name, coloured HP and %, a 14-block bar; a segmented boss counts `(segments - 1) × segment HP + current`.
 
 Weapons: `weapons/viewmodel.js` + `weapons/fp/` is vpkstuff's previewer engine (CS2's own AnimGraph2) with the AK-47 and
@@ -264,7 +340,7 @@ are dimmed. If the owner leaves, the next oldest member owns the room.
   logic going: `cancel` swallows the inputs that end it (the throne's `timer_finalbullet.Disable` + nuke),
   `repeat` re-fires a drill every N s, `noBossDamage` keeps a boss (and its attacks) alive. You play until you die.
 - **Records** (`app/records.js`): personal bests per map/stage/mode in this browser (fastest clear + fewest hits;
-  longest endless). Online leaderboards are on the roadmap.
+  longest endless), kept offline. Online, every run also lands in the database (see "Database") and `/api/leaderboard` ranks them.
 - **Gamma** (Settings → Video & camera, 1–2.5, default 2): CS2's `r_fullscreen_gamma`, "Screen Gamma (only in fullscreen
   modes)" in `rendersystemdx11.dll`, a hardware gamma ramp over the finished frame (CS2's default 2.2; lower is
   brighter: each channel goes to value^(gamma/2.2)). Here it is an SVG gamma filter over the game's layers (`ui/gamma.js`).

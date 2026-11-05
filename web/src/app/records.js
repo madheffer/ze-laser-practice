@@ -1,5 +1,5 @@
-// Personal bests, per map + stage + mode, kept in this browser. (Online leaderboards are on the roadmap:
-// FEATURES.md, "ZE Laser Practice". Same shape, so a server can take these over.)
+// Personal bests, per map + stage + mode, kept in this browser (works offline). Online, every run also goes to
+// the server's database (server/db/, README "Database") and /api/leaderboard ranks them.
 //
 // normal  run: best = fastest clear, also fewest hits
 // endless run: best = longest survived
