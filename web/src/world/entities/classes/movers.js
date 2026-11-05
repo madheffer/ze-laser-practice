@@ -26,6 +26,16 @@ function moveLinear(e, dt, onArrive) {
   if (s.pos === s.target) onArrive(s.target);
 }
 
+// movedir is in the mover's own space (CS2 keeps it as m_angMoveEntitySpace): CFuncMoveLinear::Spawn (cs2_server
+// FUN_180dc3320) and CBaseDoor::Spawn (FUN_180d53f10) take AngleVectors(movedir), measure the travel along it in
+// entity space, then rotate it by the entity's world rotation (FUN_1801594d0) and back into the parent's space
+// (FUN_1803e2790) = the local rotation. ze_dreamin's SETH_Ramdon*_Track2 (yaw 270, movedir yaw -90) sweeps -x.
+function moveDirs(e) {
+  const ent = angleForward(parseVec(e.kv.movedir));
+  const v = new THREE.Vector3(...ent).applyQuaternion(e.quat);
+  return { ent, parent: [v.x, v.y, v.z] };
+}
+
 function modelSizeAlong(e, dir) {
   const b = e.engine.assets.bounds[e.model];
   if (!b) return 0;
@@ -36,12 +46,12 @@ function modelSizeAlong(e, dir) {
 register('func_door', {
   solid: (e) => !(num(e.kv.spawnflags) & 8),
   spawn(e) {
-    const dir = angleForward(parseVec(e.kv.movedir));
+    const dir = moveDirs(e);
     // CS2 CBaseDoor::Spawn (cs2_server FUN_180d53f10): travel = |movedir . OBB size| - m_flLip, unclamped, and
     // position2 = position1 + movedir x travel. A lip bigger than the brush gives a negative travel: the door moves
     // backwards along movedir (ze_visualizer's dodge balls: 32 u doors with lip 3200 fly 3168 u "against" movedir).
-    const dist = modelSizeAlong(e, dir) - num(e.kv.lip);
-    linearMover(e, dir, dist, 0);
+    const dist = modelSizeAlong(e, dir.ent) - num(e.kv.lip);
+    linearMover(e, dir.parent, dist, 0);
     if (num(e.kv.spawnpos) === 1 || (num(e.kv.spawnflags) & 1)) { e.state.pos = e.state.target = 1; e.pos.copy(e.state.p2); }
   },
   input(e, inp, p, act) {
@@ -145,8 +155,11 @@ function linearTo(e, target, act) {
 register('func_movelinear', {
   solid: (e) => !(num(e.kv.spawnflags) & 8),
   spawn(e) {
-    const dir = angleForward(parseVec(e.kv.movedir));
-    linearMover(e, dir, num(e.kv.movedistance, 100), num(e.kv.startposition));
+    const dir = moveDirs(e);
+    // FUN_180dc3320: a movedistance <= 0 is |movedir . OBB size| - lip
+    let dist = num(e.kv.movedistance, 100);
+    if (dist <= 0) dist = modelSizeAlong(e, dir.ent) - num(e.kv.lip);
+    linearMover(e, dir.parent, dist, num(e.kv.startposition));
   },
   input(e, inp, p, act) {
     const s = e.state;
@@ -160,8 +173,10 @@ register('func_movelinear', {
   think(e, dt) {
     moveLinear(e, dt, (t) => {
       moveLinearStopSound(e);
-      if (t === 1) e.fireOutput('OnFullyOpen', e.state.activator);
-      else if (t === 0) e.fireOutput('OnFullyClosed', e.state.activator);
+      // CFuncMoveLinear::MoveDone (cs2_server FUN_180daa140) fires OnFullyOpen / OnFullyClosed with itself as the
+      // activator (FireOutput(this, this)): ze_deadcore's altars hang themselves on the ring with !activator.SetParent
+      if (t === 1) e.fireOutput('OnFullyOpen', e);
+      else if (t === 0) e.fireOutput('OnFullyClosed', e);
       e.fireOutput('OnReachedPosition', e.state.activator);
     });
   },
