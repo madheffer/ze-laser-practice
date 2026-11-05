@@ -38,6 +38,7 @@ CS2 and its workshop folder are found from Steam's library list (`node tools/ste
 | ze_gris_p | 3633040749 (baked, no stages yet) |
 | ze__hell_p | 3351648056 (the spike boss room) |
 | ze_alien_shooter | 3425735986 (the Laser Alien) |
+| ze_minecraft_sakura | 3195096311 (L-U-C-I-D-D-R-E-A-M and the ending) |
 
 ## Database (runs and leaderboards)
 
@@ -246,6 +247,7 @@ standing still. Fields we added (cybo's site ignores them):
 | `view` | `{min, max}` (Source units): the only part of the map the stage draws. World chunks outside it aren't streamed, and world meshes and entity models outside it are hidden (collision and entities stay whole). Westersand's Chaos draws its deck, the plate and Chaos instead of ~860k triangles of map |
 | `hide` | names (a trailing `*` matches a prefix) of entities the stage doesn't draw, a trainer choice. Also allowed at the file's top level, for every stage of the map. Westersand hides its floating "BOSS" HP bars (`*_Hpbar`), since the HUD has its own |
 | `scripts` | `{ "<point_script>": { "port": "bosshud", ... } }`: runs a map's CS2 JavaScript (`cs_script`) as a hand port with the map's own numbers copied from its script (`world/entities/classes/scripts.js`; a map's code is never run). `bosshud` is GFL's BossHud port: `bosses` (init input -> `start`, `max`, `perHuman`, `relay`), `adds` (repeated per simulated human like an AddHealth), `damage` (input -> HP off). Point the stage's boss `counter` at the point_script with `counterMode: "hits"`. ze_alien_shooter's Laser Alien |
+| `loseTo` | destinations (`[PR#]name`) a map teleport to which takes you out of the stage: a holding pen the map keeps the humans it took out in (ze_minecraft_sakura's `mciddreams_huamn_dst`, where every laser hit sends you). Solo that is the end of the run; in a round you play on from it, and the round is lost once every player still alive is in it (`world/run-engine.js` sentOut, `server/coop-round.js` checkEnd) |
 | `cages` | `{ "<destination>": true }` or `false`: overrides `world/entities/cages.js` for a destination its evidence gets wrong (`tools/cages.mjs`); none needed so far |
 
 ### Bosses

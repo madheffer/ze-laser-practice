@@ -10,7 +10,7 @@ import { applyPose, eventsAfter, eventsDuring } from './replay-play.js';
 import { replayView } from './replay-view.js';
 import { useItems as pressItems } from '../world/items.js';
 import { startScenario, hurtPlayer, healPlayer, finish, stageTime, landing } from './session.js';
-import { startIfDue, mapRuns, winDue } from '../world/run-engine.js';
+import { startIfDue, mapRuns, winDue, sentOut } from '../world/run-engine.js';
 import { bossHudHtml } from '../ui/hud.js';
 import { formatTime, plural } from '../lib/format.js';
 import { getRecord } from './records.js';
@@ -252,6 +252,9 @@ export function step() {
       // zombies there infect you. Solo or in a round it is a death (a round makes you a spectator: session.finish)
       // (humans only: a zombie-side player, engine.playerEnt.team 2, belongs there; team filters read the same field)
       if (ev.cage && engine.playerEnt.team === 3 && run.started && !run.done && !godMode()) { run.killedBy = 'cage'; finish('dead'); }
+      // the stage's `loseTo`: a holding pen the map sends you to (run-engine.js sentOut). Solo that is the end of the run;
+      // in a round you play on from it, and the server ends the round once everyone left is in it (coop-round.js checkEnd)
+      else if (!S.mp && sentOut(S.scenario, ev.dest) && run.started && !run.done && !godMode()) { run.killedBy = ev.dest; finish('dead'); }
     } else if (ev.type === 'push') {
       for (let i = 0; i < 3; i++) player.baseVelocity[i] += ev.dir[i] * ev.speed;
     }

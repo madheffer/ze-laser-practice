@@ -1,0 +1,119 @@
+{
+  "map": "ze_minecraft_sakura",
+  "title": "ze_minecraft_sakura",
+  "workshop": "3195096311",
+  "description": "The ending: L-U-C-I-D-D-R-E-A-M and its lasers down the road, then run the road through the ending lasers.",
+  "scenarios": [
+    {
+      "id": "luciddream",
+      "group": "Ending",
+      "full": true,
+      "featured": true,
+      "name": "L-U-C-I-D-D-R-E-A-M + ending",
+      "summary": "Shoot the boss, then outrun the lasers",
+      "description": "The map's own sequence from the boss doors (trigger_mcd's outputs, 61.5 s in). You start in the south corridor inside mciddreams_boss_hp_trigger, which adds 30 per human to math_counter_bosshp (starts at 100; GFL's BossHUD \"L-U-C-I-D-D-R-E-A-M\") as it turns on at 62 s. Leave the arena by 75 s (mciddreams_zombie_tp sweeps it to the zombie side), take the diagonal walkway (it has one-block holes) and jump the one-block gap onto the bridge (road_ending). The boss spawns at its far end at 68 s; stepping onto the bridge starts its lasers (laser_timer, 1 a second at 1100 u/s: low and mid to jump, high to duck). Every bullet on hitbox_boss takes 1 off. Its death (relay_boss_death): at +8 s mciddreams_human_tp sends everyone still near the bridge start to the holding pen, at +15 s the bridge is removed (falling off kills) and the ending lasers fly up its line for 15 s (2 a second: vertical bars to sidestep, high / low beams to duck or jump, 120). Be on the platform past the boss (mciddreams_fail_trigger) at +30 s or the humans are nuked at +31 s; win at +35 s, when mciddreams_human_tp_win takes you on. A laser hit, or being left behind, sends you to the holding pen (mciddreams_huamn_dst): solo that ends the run.",
+      "spawn": {
+        "origin": [
+          7000,
+          760,
+          10580
+        ],
+        "yaw": 180
+      },
+      "fastForward": 61.5,
+      "start": [
+        {
+          "target": "[PR#]music_mciddream",
+          "input": "StartSound",
+          "delay": 2
+        },
+        {
+          "target": "[PR#]door_mciddream",
+          "input": "Break",
+          "delay": 59
+        },
+        {
+          "target": "[PR#]cmd",
+          "input": "Command",
+          "param": "say **55sec**",
+          "delay": 4
+        },
+        {
+          "target": "[PR#]door_mciddream_0",
+          "input": "Break",
+          "delay": 13.1
+        },
+        {
+          "target": "[PR#]temp_boss",
+          "input": "ForceSpawn",
+          "delay": 68
+        },
+        {
+          "target": "[PR#]timer_fog",
+          "input": "Enable"
+        },
+        {
+          "target": "[PR#]fog_sakura",
+          "input": "Disable"
+        },
+        {
+          "target": "[PR#]mciddreams_push",
+          "input": "Enable"
+        },
+        {
+          "target": "[PR#]mciddreams_tp_relay",
+          "input": "FireUser1"
+        },
+        {
+          "target": "[PR#]mciddreams_boss_hp_trigger",
+          "input": "Enable",
+          "delay": 62
+        },
+        {
+          "target": "[PR#]boss_spawn_particle",
+          "input": "Start",
+          "delay": 67
+        },
+        {
+          "target": "[PR#]boss_spawn_particle",
+          "input": "Stop",
+          "delay": 69
+        },
+        {
+          "target": "[PR#]mciddreams_particle_temp",
+          "input": "ForceSpawn"
+        }
+      ],
+      "player": {
+        "health": 100
+      },
+      "bosses": [
+        {
+          "target": "[PR#]hitbox_boss",
+          "name": "L-U-C-I-D-D-R-E-A-M",
+          "counter": "[PR#]math_counter_bosshp",
+          "counterMode": "hits"
+        }
+      ],
+      "win": {
+        "target": "[PR#]mciddreams_human_tp_win",
+        "input": "Enable"
+      },
+      "lose": {
+        "target": "[PR#]nuke_human",
+        "input": "Enable"
+      },
+      "loseTo": [
+        "[PR#]mciddreams_huamn_dst"
+      ],
+      "hazards": {
+        "laser_tp": "a boss laser",
+        "laser_high_tp": "a boss laser",
+        "laser_ending_hurt1": "a vertical laser",
+        "laser_ending_hurt2": "a horizontal laser",
+        "mciddreams_huamn_dst": "the holding pen (a laser hit, or left behind)",
+        "nuke_human": "the nuke (nobody made it)"
+      }
+    }
+  ]
+}

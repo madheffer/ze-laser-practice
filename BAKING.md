@@ -25,6 +25,7 @@ make that from your own CS2 install. You need:
 | ze_neochrome | [3437506779](https://steamcommunity.com/sharedfiles/filedetails/?id=3437506779) |
 | ze__hell_p | [3351648056](https://steamcommunity.com/sharedfiles/filedetails/?id=3351648056) |
 | ze_alien_shooter | [3425735986](https://steamcommunity.com/sharedfiles/filedetails/?id=3425735986) |
+| ze_minecraft_sakura | [3195096311](https://steamcommunity.com/sharedfiles/filedetails/?id=3195096311) |
 
 (Each `web/public/scenarios/<map>.json` names its workshop id; that list is where `--scenarios` reads them.)
 

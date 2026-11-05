@@ -60,6 +60,8 @@ export class Round {
         onDeath: (cause, t) => this.kill(p, cause, t),
         onOutcome: (result) => { if (!p.cheat) this.end(result === 'win' ? 'win' : 'lose'); },
         onCheat: (kind) => { p.cheat = kind; this.kill(p, '', p.check.stageTime, `was removed by the anti-cheat (${kind})`); },
+        // sent to the stage's holding pen (scenario loseTo): still in the round, out of the play (checkEnd)
+        onPenned: () => this.checkEnd(),
         log: (m) => io.log?.(`round ${this.r} player ${p.id}: ${m}`),
       });
     }
@@ -266,6 +268,9 @@ export class Round {
     const a = this.alive.length;
     // the last one standing plays on until they clear the stage (end('win') from their run) or go down too
     if (a === 0) this.end('wiped');
+    // everyone still alive is in the holding pen the map keeps the humans it took out (scenario loseTo): nobody can
+    // finish the stage any more, so it is lost; a stage that clears first carries the penned on with it (end('win'))
+    else if (this.alive.every((p) => p.check.penned)) this.end('lose');
   }
 
   // One mode for every room: the stage is everyone's, and everyone is up against each other on it.

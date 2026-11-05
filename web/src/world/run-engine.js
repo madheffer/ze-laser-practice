@@ -20,7 +20,7 @@ import { mapCvars } from './entities/classes/server.js';
 import { configureScripts } from './entities/classes/scripts.js';
 import { giveItems } from './items.js';
 import { installEndless } from '../app/endless.js';
-import { inputMatcher, nameKey, stripPrefix } from '../lib/names.js';
+import { inputMatcher, nameKey, nameMatches, stripPrefix } from '../lib/names.js';
 import { own } from '../lib/storage.js';
 
 export const TICK = 1 / 64;
@@ -199,6 +199,11 @@ export function startIfDue(run, t) {
 }
 // does the map tick this tick: not while a mid-map stage counts down (it waits where its replay left it)
 export const mapRuns = (run) => run.started || !run.preFired;
+
+// Did the map just send you out of the stage? `loseTo`: destinations a map teleport ends the run at (a holding pen the
+// map keeps you in while the others play on: ze_minecraft_sakura's mciddreams_huamn_dst, where a laser hit sends you).
+// Solo nobody is left to finish the stage, so it is a loss (app/loop.js, server/coop-check.js)
+export const sentOut = (scenario, dest) => !!dest && Array.isArray(scenario?.loseTo) && scenario.loseTo.some((n) => nameMatches(n, dest.name));
 
 // What killed you, in words: the scenario's own name for it, or the entity name tidied up
 // (hurt_finalbullet&0042 -> "finalbullet"). The kill feed's text, on the client and the server alike.

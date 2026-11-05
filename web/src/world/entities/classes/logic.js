@@ -121,6 +121,10 @@ register('math_counter', {
       if (fire) e.fireOutput('OutValue', act, v);
       if (hasRange && v >= s.max && prev < s.max) e.fireOutput('OnHitMax', act);
       if (hasRange && v <= s.min && prev > s.min) e.fireOutput('OnHitMin', act);
+      // leaving the limit it sat on (Source CMathCounter::UpdateOutValue): ze_minecraft_sakura's fail counter calls off
+      // the nuke with OnChangedFromMin once a human reaches the end
+      if (hasRange && v < s.max && prev === s.max) e.fireOutput('OnChangedFromMax', act);
+      if (hasRange && v > s.min && prev === s.min) e.fireOutput('OnChangedFromMin', act);
     };
     switch (inp) {
       case 'add': set(s.v + num(p)); return true;

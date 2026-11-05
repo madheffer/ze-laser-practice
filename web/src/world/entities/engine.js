@@ -11,6 +11,7 @@ import { ONE, parseVec, angleQuat, mulberry32, poseMatrix } from './math.js';
 import { addOutput, keyValue, playerInput } from './keyvalues.js';
 import { tickBurn } from './burn.js';
 import { emptyBounds, growBounds } from '../../lib/math.js';
+import { stripPrefix } from '../../lib/names.js';
 import * as triggers from './classes/triggers.js';
 import './classes/logic.js';
 import './classes/spawners.js';
@@ -298,7 +299,9 @@ export class EntityEngine {
     for (let i = 0; i < e.io.length; i++) {
       const c = e.io[i];
       if (c.output.toLowerCase() !== low) continue;
-      const p = c.param !== '' && c.param != null ? c.param : (param != null ? String(param) : '');
+      // a leading "[PR#]" is the compiler's prefab-name token, resolved at load (empty for the map's own entities): CS2
+      // reads ze_minecraft_sakura's Subtract([PR#]1) on its boss counter as 1. Names drop it on lookup anyway (lib/names.js)
+      const p = c.param !== '' && c.param != null ? stripPrefix(c.param) : (param != null ? String(param) : '');
       const inl = c.input.toLowerCase();
       // a point_script port's add (classes/scripts.js: bosshud.js' AlienNAddHealth) counts per human the same way
       const isAdd = fromTouch && (inl === 'addhealth' || inl === 'add' || (inl === 'runscriptinput' && !!this.scriptAdds?.has(p.toLowerCase())));

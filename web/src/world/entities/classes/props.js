@@ -147,7 +147,13 @@ function noReset(e, name, mode) {
   if (a.seqs ? a.index !== i : a.name.toLowerCase() !== want) propSetAnim(e, name, mode);
 }
 
+// A prop_dynamic blocks players as its "solid" keyvalue says (CS2 SolidType_t: 0 not solid, 2 bounding box, 6 VPhysics,
+// the default), with its model's physics hulls, until DisableCollision. ze_minecraft_sakura's bridge to its boss is
+// one (road_ending, solid 6), and GFL's stripper blocks off sakura's pond with invisible solid ones.
+const propSolid = (e) => num(e.kv.solid, 6) !== 0 && !e.state.noCollide;
+
 export const dynamicProp = {
+  solid: propSolid,
   // Spawn (FUN_180bbf0e0): IdleAnim, else DefaultAnim (back-compat), loops as IdleAnimationLoopMode says, else
   // AnimationLoopMode, else HoldAnimation ? USE_SEQUENCE_SETTINGS : LOOPING. StartingAnim (StartingAnimationLoopMode,
   // default NOT_LOOPING) plays first if set, else the idle animation.
@@ -181,6 +187,8 @@ export const dynamicProp = {
       // the thunk hands the float to the controller's SetPlaybackRate (vtable +0x100); the cycle carries on from where it is
       case 'setplaybackrate': { const a = e.state.anim; rebase(a, e.engine.time); a.rate = num(p, 1); wake(e); return true; }
       case 'startglowing': case 'stopglowing': case 'setglowoverride': case 'setglowrange': return true;
+      case 'disablecollision': e.state.noCollide = true; e.engine.moved(e); return true;
+      case 'enablecollision': e.state.noCollide = false; e.engine.moved(e); return true;
     }
     return false;
   },
@@ -194,6 +202,7 @@ register('prop_dynamic', dynamicProp);
 register('dynamic_prop', dynamicProp); // CDynamicPropAlias_dynamic_prop
 // prop_dynamic_override: a CDynamicProp with health (Spawn reads "health" only for it), so breakable + animation
 register('prop_dynamic_override', {
+  solid: propSolid,
   spawn(e) { breakable.spawn(e); dynamicProp.spawn(e); },
   input(e, inp, p, act) { return dynamicProp.input(e, inp, p, act) || breakable.input(e, inp, p, act); },
   think: dynamicProp.think,

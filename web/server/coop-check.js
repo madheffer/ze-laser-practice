@@ -12,7 +12,7 @@
 //     and have a clear line from the player's eye to the boss.
 //   - the stage's own win / lose (the map's win input or winAfter), instead of trusting a client.
 // Violations are counted per kind; a few within two seconds and the player is out of the round.
-import { createRunEngine, hazardName, TICK, COUNTDOWN, startIfDue, mapRuns, winDue } from '../src/world/run-engine.js';
+import { createRunEngine, hazardName, TICK, COUNTDOWN, startIfDue, mapRuns, winDue, sentOut } from '../src/world/run-engine.js';
 import { useItems } from '../src/world/items.js';
 import { CollisionWorld, makeTrace } from '../src/world/collision.js';
 import { bulletWorld, BULLET_MASK } from '../src/world/bullets.js';
@@ -47,10 +47,13 @@ export class PlayerCheck {
   // assets: map-store's; scenario: the stage's full entry (or null for free roam)
   // items: the map items this player holds from the start (a round's heal holders)
   // countdown: seconds from the spawn to the stage start (a solo replay passes the one it was recorded with)
-  constructor({ assets, scenario, mode, seed, rules, items = [], countdown = COUNTDOWN, onDeath, onOutcome, onCheat, log = () => {} }) {
+  constructor({ assets, scenario, mode, seed, rules, items = [], countdown = COUNTDOWN, onDeath, onOutcome, onCheat, onPenned = null, log = () => {} }) {
     this.scenario = scenario;
     this.rules = rules;
     this.onDeath = onDeath; this.onOutcome = onOutcome; this.onCheat = onCheat; this.log = log;
+    // a round's player the map sends to the stage's holding pen (`loseTo`) plays on from there; without a round (a solo
+    // replay being verified) the pen is the end of the run
+    this.onPenned = onPenned; this.penned = false;
     this.world = new CollisionWorld(assets.bvh);
     // shots: CS2's bullet trace on the map's layered static world (shared by every check), as the client's bosses.js
     this.shotWorld = bulletWorld(assets.fx, this.world);
@@ -186,6 +189,10 @@ export class PlayerCheck {
       else if (ev.type === 'teleport') {
         // a human the map sends into the zombie cage is out (app/loop.js does the same)
         if (ev.cage && run.started && engine.playerEnt.team === 3 && !this.rules.god) return this.die(hazardName('cage', this.scenario));
+        if (sentOut(this.scenario, ev.dest) && run.started && !this.rules.god) {
+          if (!this.onPenned) return this.die(hazardName(ev.dest, this.scenario));
+          if (!this.penned) { this.penned = true; this.onPenned(); }
+        }
         this.skipMove = true; this.expectAt = [...ev.origin];
       } else if (ev.type === 'push') this.boostFor(ev.speed);
     }
