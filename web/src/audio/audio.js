@@ -138,7 +138,11 @@ export class GameAudio {
         return;
       }
       case 'stop': {
-        for (const v of this._voicesOf(id, ev.slot)) this._stopVoice(v);
+        // csgo_mega: a stopped voice plays on while the time since the stop is under its fade curve's length; a looped
+        // one ends at once (looped_event_terminator), and a one-shot with no fade curve plays to its end. ze__hell_p's
+        // spikes stop Rod.crystal (0.95 s) as each spike arrives, 0.051 s in (CBaseDoor::DoorHitTop -> StopMovingSound):
+        // the whole sound is what the map was made with, and what plays in CS2
+        for (const v of this._voicesOf(id, ev.slot)) if (!playsOutStop(v)) this._stopVoice(v);
         this._stopChains(id, ev.slot);
         return;
       }
@@ -159,7 +163,7 @@ export class GameAudio {
       case 'volume': {
         let val = Number(ev.value);
         if (!Number.isFinite(val)) return;
-        if (val > 1) val /= 10; // ambient_generic's 0..10
+        if (ev.ent?.cls === 'ambient_generic' || val > 1) val /= 10; // ambient_generic's 0..10 (its "1" is 0.1)
         for (const v of this._voicesOf(id, ev.slot)) { v.userVolume = clamp01(val); this._update(v); }
         return;
       }
@@ -534,6 +538,9 @@ export class GameAudio {
     this._untrack(v);
   }
 }
+
+// a csgo_mega one-shot without a stop-fade curve isn't cut by a map's StopSound (see onSound 'stop')
+const playsOutStop = (v) => v.def?.type === 'csgo_mega' && !v.def.loop && !v.repeat && !v.def.fadeCurve;
 
 function safeOrigin(ent) {
   try { const o = ent.worldOrigin(); return o && o.length >= 3 ? o : null; } catch { return null; }

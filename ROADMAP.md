@@ -166,8 +166,10 @@ exact map-folder format so he can lift our maps straight into his site. See [REA
     replays it (gris's bgm1, mist's music_aguirre, neochrome's intro / music case are in no stage yet)
   - [ ] occlusion; Steam Audio (no map has baked data); the per-mode volume layers (CasualVol ...: our volume sliders); the
     death cam's phase 2 (no freeze cam here: spectating ends the fade)
-  - [ ] Rod.crystal (ze__hell_p's spikes): CS2 stops it at the spike's arrival (DoorHitTop -> StopMovingSound, 0.05 s in);
-    whether the client lets a stopped voice with an empty fade curve ring out isn't settled from soundsystem.dll
+  - [x] Rod.crystal (ze__hell_p's spikes): CS2 sends its stop as each spike arrives (DoorHitTop -> StopMovingSound, 46 u at
+    900 u/s = 0.051 s in, 22 ms of it the file's leading silence), yet the map was made around the whole 0.95 s sound and it
+    plays whole in CS2: a csgo_mega one-shot with no stop-fade curve plays to its end (loops end on stop: the stack's
+    looped_event_terminator). Maps that mean to silence one send Volume 0 first (neochrome 12x, gris's faders). Now as CS2
   - [ ] point_soundevent's Volume input: kept as ambient_generic's 0..10, not checked against CS2's input list
   - [ ] **ze_ffvii_mako_reactor_v5_p** (3513334092) — 85, 5 laser templates; Heal Materia + 7 materia
   - [ ] **ze_ffvii_mako_reactor_v6_p** (3378273414) — 80, 12 laser templates; Heal Materia + 11 materia (Mimic, Barrier, Ultima ...)
