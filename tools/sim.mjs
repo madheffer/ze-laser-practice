@@ -18,6 +18,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { EntityEngine } from '../web/src/world/entities/index.js';
+import { configureScripts } from '../web/src/world/entities/classes/scripts.js';
 import { readMapEntities } from './map-entities.mjs';
 import { normaliseHulls } from '../web/src/world/hulls.js';
 import { CollisionWorld } from '../web/src/world/collision.js';
@@ -60,14 +61,16 @@ engine.on('spawn', (e) => {
 engine.on('kill', (e) => { if (watch && (watch.test(e.name || '') || watch.test(e.cls))) say(`kill  ${label(e)}`); });
 if (watch) engine.hookInput((e, input) => { if (watch.test(e.name || '') || watch.test(e.cls)) say(`  -> ${label(e)}.${input}`); return false; });
 
-engine.spawnWorld();
-const start = [];
+let sc = null;
 if (opt('--scenario')) {
   const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../web/public/scenarios');
-  const sc = JSON.parse(fs.readFileSync(path.join(root, `${map}.json`), 'utf8')).scenarios.find((s) => s.id === opt('--scenario'));
+  sc = JSON.parse(fs.readFileSync(path.join(root, `${map}.json`), 'utf8')).scenarios.find((s) => s.id === opt('--scenario'));
   if (!sc) { console.error(`no scenario ${opt('--scenario')}`); process.exit(2); }
-  start.push(...(sc.start || []));
 }
+// the stage's point_script ports (world/entities/classes/scripts.js), before the world spawns as in run-engine.js
+configureScripts(engine, sc?.scripts);
+engine.spawnWorld();
+const start = [...(sc?.start || [])];
 for (const f of fires) {
   const m = /^(.+?)\.([A-Za-z_0-9]+)(?:\((.*)\))?(?:@([\d.]+))?$/.exec(f);
   if (!m) { console.error(`bad --fire ${f}`); process.exit(2); }

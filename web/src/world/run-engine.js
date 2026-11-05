@@ -17,6 +17,7 @@
 // ticks while mapRuns(run) (a mid-map stage stands still through its countdown).
 import { EntityEngine, parseVec } from './entities/index.js';
 import { mapCvars } from './entities/classes/server.js';
+import { configureScripts } from './entities/classes/scripts.js';
 import { giveItems } from './items.js';
 import { installEndless } from '../app/endless.js';
 import { inputMatcher, nameKey, stripPrefix } from '../lib/names.js';
@@ -43,6 +44,8 @@ export function createRunEngine({ entities, hulls, bounds, animations, soundDura
   engine.humans = humans;
   // the scenario's word on a zombie cage the map's data can't decide (world/entities/cages.js)
   if (scenario?.cages && typeof scenario.cages === 'object') engine.cageOverrides = scenario.cages;
+  // the map's point_scripts the stage runs, as ports with the map's own numbers (classes/scripts.js)
+  configureScripts(engine, scenario?.scripts);
   hooks.attach?.(engine);
   engine.spawnWorld();
 

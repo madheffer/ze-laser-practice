@@ -1,0 +1,58 @@
+{
+  "map": "ze_alien_shooter",
+  "title": "ze_alien_shooter",
+  "workshop": "3425735986",
+  "description": "The Laser Alien: after the first boss, teleport in and shoot it through a laser a second.",
+  "scenarios": [
+    {
+      "id": "laser_alien",
+      "group": "Boss",
+      "featured": true,
+      "name": "Laser Alien (boss)",
+      "summary": "Shoot it, jump and duck a laser a second",
+      "description": "Where teleportlvl1bossend puts the humans after the first boss (teleportzmypali). The first one there trips the trigger_once on the destination, and wall1 across the arena entrance drops 10 s later. Walking into trigger_hp_add_lasers starts the fight: the map's bosshud.js script (point_script script_bosshud, InitBossAlien2) gives the Alien 1 HP + 85 per human (max 20000), every bullet on physbox takes 1 off (OnHealthChanged -> Alien2Damage), and every human a jump or duck laser hits takes 55 off (Alien2DamageLaser). From +1 s laser_timer has logic_laser pick one of 4 lasers every second; each flies at you at 1250 u/s and kills (200000): template_down a thin strip 30 u up (jump), template_up 60-104 u up (duck), template_sideright floor to 62 u (crouch-jump). template_sideleft has no hurt of its own: the map's hurt_side_left is parented to a name only the template has, so it never moves and sits in front of the boss until the first left laser removes it. Win when the script fires laser_boss_dead (HP 0); it opens teleportendmaplvl1 out.",
+      "spawn": {
+        "at": "[PR#]teleportzmypali",
+        "yaw": 90
+      },
+      "start": [],
+      "player": {
+        "health": 100
+      },
+      "scripts": {
+        "[PR#]script_bosshud": {
+          "port": "bosshud",
+          "bosses": {
+            "InitBossAlien2": { "name": "Alien", "start": 1, "max": 20000, "perHuman": 85, "relay": "laser_boss_dead" }
+          },
+          "adds": ["Alien2AddHealth"],
+          "damage": { "Alien2Damage": 1, "Alien2DamageLaser": 55 }
+        }
+      },
+      "bosses": [
+        {
+          "target": "[PR#]physbox",
+          "name": "Alien",
+          "counter": "[PR#]script_bosshud",
+          "counterMode": "hits"
+        }
+      ],
+      "win": {
+        "target": "[PR#]laser_boss_dead",
+        "input": "Trigger"
+      },
+      "hazards": {
+        "hurt_down": "a low laser",
+        "hurt_up": "a high laser",
+        "hurt_side_right": "a side laser",
+        "hurt_side_left": "a side laser"
+      },
+      "music": [
+        {
+          "target": "[PR#]soundbosslvl1endmusic",
+          "input": "StartSound"
+        }
+      ]
+    }
+  ]
+}

@@ -22,6 +22,7 @@ import './classes/soundents.js';
 import './classes/physics.js';
 import './classes/server.js';
 import './classes/beams.js';
+import './classes/scripts.js';
 import { fogState } from './classes/fog.js';
 import { postState } from './classes/post.js';
 import { breakSound, hitSound } from './sound.js';
@@ -299,7 +300,8 @@ export class EntityEngine {
       if (c.output.toLowerCase() !== low) continue;
       const p = c.param !== '' && c.param != null ? c.param : (param != null ? String(param) : '');
       const inl = c.input.toLowerCase();
-      const isAdd = fromTouch && (inl === 'addhealth' || inl === 'add');
+      // a point_script port's add (classes/scripts.js: bosshud.js' AlienNAddHealth) counts per human the same way
+      const isAdd = fromTouch && (inl === 'addhealth' || inl === 'add' || (inl === 'runscriptinput' && !!this.scriptAdds?.has(p.toLowerCase())));
       if (isAdd && reTouch && !e.io.some((o) => o.output.toLowerCase() === 'onendtouch' && o.target === c.target)) {
         if (c.times > 0 && --c.times === 0) { e.io.splice(i, 1); i--; }
         continue;
