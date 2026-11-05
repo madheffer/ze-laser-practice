@@ -82,6 +82,22 @@ exact map-folder format so he can lift our maps straight into his site. See [REA
   - [ ] **ze_neochrome** (3437506779) — 110, 15 laser templates; heal: Heal
   - [ ] **ze_ffvii_mako_reactor_v5_p** (3513334092) — 85, 5 laser templates; Heal Materia + 7 materia
   - [ ] **ze_ffvii_mako_reactor_v6_p** (3378273414) — 80, 12 laser templates; Heal Materia + 11 materia (Mimic, Barrier, Ultima ...)
+    - [x] engine: jump + crouch from cs2_server (world/movement.js): sv_legacy_jump defaults to 0, so CS2 runs the
+      modern jump (CCSPlayerModernJump). Jump velocity = (sv_jump_impulse 301.993 - g x scale / 256), full impulse when
+      crouched / crouching, x the landing penalty min(1, clamp(1 + 0.0005 x landed vz, 0.2, 1) + 0.6/s on the ground);
+      no stamina (legacy only); AirMove's pre-move half gravity on the jump tick; a mid-air crouch / unduck shifts the
+      origin 9 (FinishDuck: the hull changes about its middle), not 18. Apexes: 55.83 standing, 64.83 crouch-jump,
+      57.0 from a crouch; an instant re-jump after a jump ~41-43. coop-check.js's fly check now takes the 9 u
+      mid-air duck shift out of the fall speed (it struck honest crouch-jumps). GFL's sv_legacy_jump and
+      cs2f_allow_duck_spam values aren't public: CS2's defaults (modern jump) and duck spam on are assumed
+    - [ ] engine: the modern jump's bhop window (sv_bhop_time_window 1/128 s, landed horizontal speed restored on a
+      bhop) and subtick jump timing aren't modelled; sv_timebetweenducks (0.4 s) isn't either
+    - [x] GFL's StripperCS2 edits (BAKING.md "GFL's entity edits"): `tools/stripper.mjs` (bake-map step `stripper`) ->
+      stripper.json, applied by `lib/stripper.js` on the client, the co-op server and the tools alike. ze_deadcore's B
+      ending gets runspeed 2 for 36 s (checked: 500 u/s on the lift's boost, back to 1 at +36 s), westersand's item
+      blockers go at 15 s. All 25 of GFL's configs parse. `KeyValue runspeed` = CS2Fixes' m_flVelocityModifier
+    - [ ] runspeed: how CS2's own movement applies m_flVelocityModifier (assumed Source's: a max-speed multiplier that
+      recovers only below 1) isn't confirmed from the binary
   - [ ] **ze_offliner** (3559892707) — 84, 7 laser templates; no heal (Shockwave only)
   - [ ] **ze_arcana_heart** — not in the local library (subscribe, rescan); GFL has it with a Heal item
   - each: bake (`lasers-bake <vpk>` then `--overview`), `tools/entwatch.mjs`, `tools/teleports.mjs` fall audit, stages via io-graph / sim

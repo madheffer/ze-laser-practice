@@ -8,6 +8,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { isMapName, isStageId } from '../web/src/lib/paths.js';
 import { mapItems } from '../web/src/world/items.js';
+import { readMapEntities } from './map-entities.mjs';
 import { groupStages } from '../web/src/lib/stage-groups.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../web/public');
@@ -50,7 +51,7 @@ for (const name of fs.readdirSync(mapsDir).sort()) {
   // the map's EntWatch items (world/items.js), so the stage list's heal option needs no entity data: picking a map
   // loads only its stage list, the rest waits for a stage (web/src/main.js)
   const read = (f) => { const q = path.join(mapsDir, name, f); return fs.existsSync(q) ? JSON.parse(fs.readFileSync(q, 'utf8')) : null; };
-  const items = mapItems(read('entities.json'), read('entwatch.json'));
+  const items = mapItems(readMapEntities(path.join(mapsDir, name)), read('entwatch.json'));
   maps.push({
     name, title: file.title || m.title || name, description: file.description || '', workshop: file.workshop || '',
     scenarios: list.length, parts, version: m.version, shots, items, stageShots, stageShotsVersion,

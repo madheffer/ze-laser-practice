@@ -60,6 +60,8 @@ export function startScenario(i, mode = 'normal') {
   player.onLand = (v) => {
     G.audio.play('land', { pos: player.origin });
     // CS fall damage: safe below 580 u/s, 100 at 1024, linear between, × sv_falldamage_scale. The map's scale
+  player.landTick = -Infinity; // no landing penalty carried into a new run (world/movement.js jumpScale)
+  player.runSpeed = 1;
     // (GFL servers run none; a map sets it for an area); the "Fall damage everywhere" option forces scale 1
     const scale = rule('fallDamage') ? 1 : Math.max(0, parseFloat(run.cvars?.sv_falldamage_scale) || 0);
     if (!run.started || run.done || run.noFall || !scale || v <= 580) return;
@@ -114,6 +116,7 @@ export function startScenario(i, mode = 'normal') {
           setDamageFilter: (name) => {
             const f = engine.findOne(name);
             // filter_damage_type, negated, DMG_FALL (32): "everything but fall damage" = no fall damage
+          setRunSpeed: (r) => { player.runSpeed = r; }, // KeyValue runspeed (CS2Fixes m_flVelocityModifier)
             run.noFall = !!f && f.cls === 'filter_damage_type' && (parseInt(f.kv.damagetype, 10) & 32) && String(f.kv.negated) === '1';
           },
         };
@@ -275,7 +278,7 @@ export function finish(result) {
 }
 
 // sv_* movement cvar -> the player's override (world/movement.js); a non-number is ignored
-const MOVE_CVARS = { sv_accelerate: 'accelerate', sv_airaccelerate: 'airAccelerate', sv_friction: 'friction', sv_gravity: 'gravity', sv_stopspeed: 'stopSpeed' };
+const MOVE_CVARS = { sv_accelerate: 'accelerate', sv_airaccelerate: 'airAccelerate', sv_friction: 'friction', sv_gravity: 'gravity', sv_stopspeed: 'stopSpeed', sv_jump_impulse: 'jumpImpulse' };
 function setMoveCvar(player, name, value) {
   const key = MOVE_CVARS[name];
   const v = parseFloat(value);

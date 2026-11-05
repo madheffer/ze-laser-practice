@@ -7,7 +7,12 @@ import { makeTrace } from './collision.js';
 export const CS = {
   tick: 1 / 64,
   gravity: 800,
+  // sv_jump_impulse's default (cs2_server registration: 0x4396ff27), "sqrt(2*gravity*height)"
   jumpImpulse: 301.993378,
+  // sv_legacy_jump, "Whether or not to use the pre-2026 jump code": default 0, so CS2 runs the modern jump
+  // (CCSPlayerModernJump: a landing penalty on the next jump, no stamina). GFL's whitelist keeps it a server
+  // setting and its value isn't public, so this is CS2's default. true = the legacy jump (stamina scales jumps)
+  legacyJump: false,
   maxSpeed: 250, // knife out
   accelerate: 5.5,
   airAccelerate: 12,
@@ -33,7 +38,8 @@ export const CS = {
   groundNormalZ: 0.7,
   // stamina (sv_staminamax / sv_staminajumpcost / sv_staminalandcost / sv_staminarecoveryrate): jumping
   // and landing build stamina, and while it's above 0 your ground speed is scaled down each tick by
-  // ((max - stamina) / max) ^ (frametime / (1/70)) — the bhop/landing speed loss.
+  // ((max - stamina) / max) ^ (frametime / (1/70)) — the bhop/landing speed loss. CS2: "sv_legacy_jump only"
+  // (both costs' help text), so with the modern jump stamina never builds (legacyJump above).
   staminaMax: 80,
   staminaJumpCost: 0.08,
   staminaLandCost: 0.05,
@@ -69,6 +75,9 @@ export class Player {
     this.baseVelocity = v3(); // trigger_push etc. add here for one tick
     this.gravityScale = 1; // the player's own "gravity" keyvalue (maps set 0.1 for low-grav sections)
     this.speedScale = 1; // the "speed" keyvalue: lagged movement, scales the whole move
+    // the "runspeed" keyvalue (CS2Fixes: the pawn's m_flVelocityModifier): scales the max speed you run at. Recovers
+    // toward 1 only below 1 in Source, so a map's 2 holds until it sets 1 again
+    this.runSpeed = 1;
     this.onLand = null; // (fallSpeed) => void, for fall damage
     this.onJump = null;
     this.maxSpeed = CS.maxSpeed; // the held weapon's: knife 250, AK-47 215
@@ -76,6 +85,21 @@ export class Player {
     // session from what the map runs; anything unset is CS2's default (CS)
     this.cvars = {};
     this.stamina = 0;
+    // CCSPlayerModernJump's m_nLastLandedTick / m_flLastLandedVelocityZ: when you last landed and how fast you fell
+    this.ticks = 0;
+    this.landTick = -Infinity;
+    this.landVz = 0;
+  }
+
+  // The modern jump's strength right after a landing (cs2_server FUN_180ab23e0): clamp(1 + 0.0005 x the landing's
+  // vertical speed, 0.2, 1), plus 0.6 per second spent on the ground after the landing tick, capped at 1. Landing
+  // from a plain jump (about -300 u/s) starts at 0.85 (a jump straight away tops out near 40 u, not 57) and is back
+  // to full 0.25 s later; a long fall bottoms out at 0.2. The legacy jump scales by stamina instead.
+  jumpScale() {
+    if (CS.legacyJump) return Math.min(1, Math.max(0, 1 - this.stamina / 100));
+    if (!Number.isFinite(this.landTick)) return 1;
+    const base = Math.min(1, Math.max(0.2, 1 + 0.0005 * this.landVz));
+    return Math.min(1, base + 0.6 * (this.ticks - this.landTick - 1) * CS.tick);
   }
 
   get height() { return this.ducked ? CS.duckHeight : CS.standHeight; }
@@ -104,6 +128,7 @@ export class Player {
   tick(input, settings) {
     const dt = CS.tick * this.speedScale;
     const gravity = (this.cvars.gravity ?? CS.gravity) * this.gravityScale;
+    this.ticks++;
     const wasOnGround = this.onGround;
     const fallSpeed = -this.velocity[2];
     this.handleDuck(input, dt);
@@ -118,7 +143,7 @@ export class Player {
     let wishSpeed = 0;
     if (wl > 1e-6) {
       wx /= wl; wy /= wl;
-      wishSpeed = this.maxSpeed * Math.min(1, wl);
+      wishSpeed = this.maxSpeed * this.runSpeed * Math.min(1, wl);
       if (this.ducked && this.onGround) wishSpeed *= CS.duckFactor;
       else if (input.walk) wishSpeed *= CS.walkFactor;
     }
@@ -134,10 +159,17 @@ export class Player {
     if (this.stamina > 0) this.stamina = Math.max(0, this.stamina - CS.staminaRecovery * dt);
 
     if (this.onGround && wantJump) {
-      this.velocity[2] = CS.jumpImpulse;
+      // CS2's jump velocity (cs2_server modern FUN_180adfa70 / legacy FUN_180ab5a30, the same formula): the impulse
+      // less g x gravity scale x 0.5 x 1/128, or the full impulse when crouched or crouching; then x jumpScale()
+      const impulse = this.cvars.jumpImpulse ?? CS.jumpImpulse;
+      const vz = (this.ducked || this.duckAmount > 0 ? impulse : impulse - gravity * 0.5 * 0.0078125) * this.jumpScale();
+      // now airborne, so this tick's air move starts with its half tick of gravity, as CS2's AirMove does
+      // (cs2_server FUN_180adc860: velocity -= frametime x gravity x 0.5 before the move): the arc is then an exact
+      // parabola, apex = vz^2 / 2g (55.8 u standing, 57.0 from a crouch)
+      this.velocity[2] = vz - gravity * 0.5 * dt;
       this.onGround = false;
       this.groundEntity = null;
-      this.stamina = Math.min(CS.staminaMax, this.stamina + CS.staminaJumpCost * CS.jumpImpulse);
+      if (CS.legacyJump) this.stamina = Math.min(CS.staminaMax, this.stamina + CS.staminaJumpCost * vz);
       this.onJump?.();
     }
 
@@ -152,9 +184,9 @@ export class Player {
       this.friction(dt);
       this.accelerate(wish, wishSpeed, this.cvars.accelerate ?? CS.accelerate, dt);
       const sp = Math.hypot(this.velocity[0], this.velocity[1]);
-      if (sp > this.maxSpeed && wishSpeed > 0) {
+      if (sp > this.maxSpeed * this.runSpeed && wishSpeed > 0) {
         // Source clamps ground speed to the current max
-        const s = Math.max(wishSpeed, this.maxSpeed * (this.ducked ? CS.duckFactor : 1)) / sp;
+        const s = Math.max(wishSpeed, this.maxSpeed * this.runSpeed * (this.ducked ? CS.duckFactor : 1)) / sp;
         if (s < 1) { this.velocity[0] *= s; this.velocity[1] *= s; }
       }
       if (this.stamina > 0) {
@@ -174,7 +206,9 @@ export class Player {
 
     this.categorize();
     if (!wasOnGround && this.onGround) {
-      this.stamina = Math.min(CS.staminaMax, this.stamina + CS.staminaLandCost * Math.max(0, fallSpeed));
+      if (CS.legacyJump) this.stamina = Math.min(CS.staminaMax, this.stamina + CS.staminaLandCost * Math.max(0, fallSpeed));
+      this.landTick = this.ticks;
+      this.landVz = -fallSpeed;
       this.onLand?.(fallSpeed);
     }
     if (!this.onGround) this.velocity[2] -= gravity * 0.5 * dt;
@@ -188,9 +222,10 @@ export class Player {
       this.duckAmount = Math.min(1, this.duckAmount + dt / CS.duckTime);
       if (!this.ducked && (this.duckAmount >= 1 || !this.onGround)) {
         if (!this.onGround) {
-          // In the air the legs come up: keep the head where it is, so the feet rise by the height difference.
+          // In the air the hull shrinks about its middle: CS2's FinishDuck (cs2_server FUN_180abde20) moves the
+          // origin up by ((hull max - min) - (duck hull max - min)) x 0.5 = 9, so the feet rise 9 (not the full 18)
           this.ducked = true;
-          const up = [this.origin[0], this.origin[1], this.origin[2] + (CS.standHeight - CS.duckHeight)];
+          const up = [this.origin[0], this.origin[1], this.origin[2] + (CS.standHeight - CS.duckHeight) * 0.5];
           // only if there is room above the short hull at its new place
           const tr = this.trace(up, up);
           if (tr.startSolid) this.ducked = false;
@@ -201,11 +236,12 @@ export class Player {
       }
     } else if (this.ducked || this.duckAmount > 0) {
       if (this.ducked) {
-        // Unduck only when the tall hull fits: on the ground it grows up, in the air it grows down.
+        // Unduck only when the tall hull fits: on the ground it grows up, in the air it grows about its middle (CS2's
+        // unduck check, cs2_server FUN_180ab4190: the standing hull at the origin less 9 in the air, as it is on ground)
         const was = this.ducked;
         this.ducked = false;
         let target = this.origin;
-        if (!this.onGround) target = [this.origin[0], this.origin[1], this.origin[2] - (CS.standHeight - CS.duckHeight)];
+        if (!this.onGround) target = [this.origin[0], this.origin[1], this.origin[2] - (CS.standHeight - CS.duckHeight) * 0.5];
         const tr = this.trace(target, target);
         if (tr.startSolid) {
           if (!this.onGround) {

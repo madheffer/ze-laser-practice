@@ -5,7 +5,7 @@
 //   node tools/bake-map.mjs <workshop id | .vpk | baked map name> [more ...] [options]
 //   node tools/bake-map.mjs --all                       re-bake every map in web/public/maps (from its manifest's source)
 //
-//   --steps map,entwatch,lighting,tiers,chunks,index   only these steps (default: all six, in this order)
+//   --steps map,entwatch,stripper,lighting,tiers,chunks,index   only these steps (default: all seven, in this order)
 //   --skip-build                       use the lasers-bake already built
 //   --cs2 <game/csgo>                  CS2's game folder (default: lasers-bake finds it)
 //   --workshop <content/730>           where workshop ids are looked up (default D:/Steam/steamapps/workshop/content/730)
@@ -13,6 +13,7 @@
 // Steps:
 //   map       the full bake: entities, collision, hulls, glbs + textures (cut-out alpha), particles, sounds, shots, radar
 //   entwatch  GFL's EntWatch config -> entwatch.json (tools/entwatch.mjs): the map's items, the heal option, the item HUD
+//   stripper  GFL's StripperCS2 configs -> stripper.json (tools/stripper.mjs): the entity edits GFL's servers make to the map
 //   lighting  the map's CS2 lighting: lightmaps, probes, tonemap / LUT, skies, reflection cubemaps (high tier)
 //   tiers     medium + low quality copies (q/medium, q/low: smaller textures, PNG lightmaps any GPU can take)
 //   chunks    the world split into streamed chunks, fewer draw calls (tools/chunk-world.mjs; needs tools' npm packages)
@@ -25,7 +26,7 @@ import { isMapName } from '../web/src/lib/paths.js';
 
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const mapsDir = path.join(repo, 'web', 'public', 'maps');
-const STEPS = ['map', 'entwatch', 'lighting', 'tiers', 'chunks', 'index'];
+const STEPS = ['map', 'entwatch', 'stripper', 'lighting', 'tiers', 'chunks', 'index'];
 
 const opts = { steps: STEPS, build: true, cs2: null, workshop: 'D:/Steam/steamapps/workshop/content/730', all: false };
 const targets = [];
@@ -114,12 +115,14 @@ for (const t of targets) {
   // the folder this VPK baked to: the manifest whose source is this VPK (the map name comes from inside the VPK)
   const norm = (p) => path.resolve(p).toLowerCase();
   const baked = bakedMaps().find((m) => m.source && norm(m.source) === norm(vpk));
-  const later = opts.steps.filter((s) => s === 'entwatch' || s === 'lighting' || s === 'tiers' || s === 'chunks');
+  const later = opts.steps.filter((s) => s === 'entwatch' || s === 'stripper' || s === 'lighting' || s === 'tiers' || s === 'chunks');
   if (!later.length) continue;
   if (!baked) fail(`${t}: no map folder in ${mapsDir} came from ${vpk}; run the map step first`);
   const dir = path.join(mapsDir, baked.name);
   // a map GFL has no EntWatch config for just has no items (entwatch.mjs says so and goes on)
   if (opts.steps.includes('entwatch')) run(process.execPath, [path.join(repo, 'tools', 'entwatch.mjs'), baked.name]);
+  // likewise a map GFL doesn't strip: no stripper.json, the map's entities as they are
+  if (opts.steps.includes('stripper')) run(process.execPath, [path.join(repo, 'tools', 'stripper.mjs'), baked.name]);
   if (opts.steps.includes('lighting')) run(exe, ['--lighting', vpk, dir]);
   if (opts.steps.includes('tiers')) run(exe, ['--tiers', vpk, dir]);
   if (opts.steps.includes('chunks')) {

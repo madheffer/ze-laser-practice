@@ -18,6 +18,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { EntityEngine } from '../web/src/world/entities/index.js';
+import { readMapEntities } from './map-entities.mjs';
 import { normaliseHulls } from '../web/src/world/hulls.js';
 import { CollisionWorld } from '../web/src/world/collision.js';
 
@@ -30,7 +31,7 @@ const seconds = Number(opt('--for', 30));
 const watch = opt('--watch') ? new RegExp(opt('--watch'), 'i') : null;
 
 const map = path.basename(path.resolve(dir));
-const entities = JSON.parse(fs.readFileSync(path.join(dir, 'entities.json'), 'utf8'));
+const entities = readMapEntities(dir); // with GFL's stripper edits, as the game loads it
 const hullsFile = path.join(dir, 'hulls.json');
 const { hulls, bounds } = normaliseHulls(fs.existsSync(hullsFile) ? JSON.parse(fs.readFileSync(hullsFile, 'utf8')) : {});
 const engine = new EntityEngine(entities, { hulls, bounds }, { seed: Number(opt('--seed', 1)) });

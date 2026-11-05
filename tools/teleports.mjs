@@ -15,13 +15,14 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { EntityEngine } from '../web/src/world/entities/index.js';
+import { readMapEntities } from './map-entities.mjs';
 import { zombieCages, filterPasses } from '../web/src/world/entities/classes/triggers.js';
 import { normaliseHulls } from '../web/src/world/hulls.js';
 
 const [dir, ...rest] = process.argv.slice(2);
 if (!dir) { console.error('usage: teleports.mjs <baked map dir> [--runtime | --scenario <id|all> | --drop x,y,z [--fire t.Input(p)@d]...]'); process.exit(2); }
 const opt = (k) => (rest.includes(k) ? rest[rest.indexOf(k) + 1] : null);
-const entities = JSON.parse(fs.readFileSync(path.join(dir, 'entities.json'), 'utf8'));
+const entities = readMapEntities(dir); // with GFL's stripper edits, as the game loads it
 const hullsFile = path.join(dir, 'hulls.json');
 const { hulls, bounds } = normaliseHulls(fs.existsSync(hullsFile) ? JSON.parse(fs.readFileSync(hullsFile, 'utf8')) : {});
 const strip = (n) => String(n || '').replace(/^\[PR#\]/i, '');

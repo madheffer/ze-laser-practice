@@ -7,6 +7,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { stripPrefix, nameMatches } from '../web/src/lib/names.js';
+import { readMapEntities } from './map-entities.mjs';
 
 const [dir, pattern, ...rest] = process.argv.slice(2);
 if (!dir || !pattern) {
@@ -15,7 +16,7 @@ if (!dir || !pattern) {
 }
 const kvKeys = (rest[rest.indexOf('--kv') + 1] || '').split(',').filter(Boolean);
 const re = new RegExp(pattern, 'i');
-const { lumps } = JSON.parse(fs.readFileSync(path.join(dir, 'entities.json'), 'utf8'));
+const { lumps } = readMapEntities(dir); // with GFL's stripper edits, as the game loads it
 
 const all = [];
 for (const [lump, ents] of Object.entries(lumps)) for (const e of ents) all.push({ lump, ...e });

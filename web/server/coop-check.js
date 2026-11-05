@@ -232,8 +232,12 @@ export class PlayerCheck {
       const limit = (MAX_AXIS_SPEED + (boosted ? this.boostSpeed : 0)) * TICK + 0.5;
       for (let a = 0; a < 3; a++) if (Math.abs(d[a]) > limit) { this.strike('speed', `${(Math.abs(d[a]) / TICK).toFixed(0)} u/s`); break; }
     }
-    // the air: falling must decelerate at (at least half) the gravity the map set; rising needs a jump / push
-    const vz = d[2] / TICK;
+    // the air: falling must decelerate at (at least half) the gravity the map set; rising needs a jump / push.
+    // A crouch or unduck in the air moves the origin 9 u in one tick (CS2's FinishDuck / unduck: the hull changes
+    // about its middle, world/movement.js handleDuck): not a velocity, so it's taken out of the fall speed here, or
+    // every mid-air crouch read as a +576 u/s lift and three crouch-jumps in 2 s removed an honest player
+    const duckShift = this.wasAir && ducked !== this.ducked ? (ducked ? 1 : -1) * (CS.standHeight - CS.duckHeight) * 0.5 : 0;
+    const vz = (d[2] - duckShift) / TICK;
     const onGround = this.grounded(to, h);
     // a player wedged motionless against geometry in the air is stuck (CS movement can lock a falling hull in a
     // crease), not flying; a motionless hull touching nothing is hovering

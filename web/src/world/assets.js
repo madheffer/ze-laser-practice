@@ -8,6 +8,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { mapName, safeRelPath, assetKey, versioned } from '../lib/paths.js';
 import { fetchJson, fetchBuffer, fetchBufferProgress, FRESH } from '../lib/fetch.js';
+import { applyStripper } from '../lib/stripper.js';
 import { normaliseHulls } from './hulls.js';
 import { mapItems } from './items.js';
 import { MapEffects } from '../fx/effects.js';
@@ -97,7 +98,7 @@ export async function loadMap(name, onProgress = () => {}, opts = {}) {
   // optional: the static world as particle traces see it (lasers-bake collision_fx*.bin; older bakes have none),
   // fetched alongside the rest rather than after it
   const fxFiles = Promise.all([fetchBufferProgress(url('collision_fx.bin'), bytes).catch(() => null), fetchBuffer(url('collision_fx_layers.bin')).catch(() => null)]);
-  const [entities, hullsRaw, colBuf, particles, entwatch, overview, animations] = await Promise.all([
+  const [entities, hullsRaw, colBuf, particles, entwatch, overview, animations, stripper] = await Promise.all([
     fetchJson(url('entities.json')),
     fetchJson(url(manifestPath(manifest.hulls, 'hulls.json'))).catch(() => ({})),
     fetchBufferProgress(url(manifestPath(manifest.collision?.file, 'collision.bin')), bytes),
@@ -107,7 +108,11 @@ export async function loadMap(name, onProgress = () => {}, opts = {}) {
     fetchJson(url('overview/overview.json')).catch(() => null),
     // optional: prop_dynamic sequence lengths (lasers-bake --models), read by entities/classes/props.js
     manifest.animations ? fetchJson(url(manifestPath(manifest.animations, null))).catch(() => null) : null,
+    // optional: GFL's StripperCS2 edits to this map (tools/stripper.mjs), applied below as GFL's servers do
+    fetchJson(url('stripper.json')).catch(() => null),
   ]);
+  // the same edits the co-op server applies to its copy (server/map-store.js): both must hold the same entities
+  applyStripper(entities, stripper, name);
   const [fxBuf, fxLayerBuf] = await fxFiles;
   const collisionFx = fxBuf && fxLayerBuf && fxBuf.byteLength === fxLayerBuf.byteLength * 9 ? { tris: new Float32Array(fxBuf), layers: new Uint32Array(fxLayerBuf) } : null;
   const collision = new Float32Array(colBuf);

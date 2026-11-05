@@ -54,6 +54,9 @@ export function playerInput(engine, q) {
     if (k === 'origin') { engine.onTeleportPlayer?.(parseVec(v)); return; }
     if (k === 'gravity') { P?.setGravity(num(v, 1)); return; }
     if (k === 'speed') { P?.setSpeed(num(v, 1)); return; }
+    // CS2Fixes' custom keyvalue (customio.cpp AddOutputCustom_RunSpeed): the pawn's m_flVelocityModifier, a multiplier on
+    // your max run speed (GFL's stripper uses it for deadcore's B ending instead of "speed", which scales all movement)
+    if (k === 'runspeed') { P?.setRunSpeed?.(num(v, 1)); return; }
     if (k === 'max_health') { P?.setMaxHealth(num(v, 100)); return; }
     if (k === 'health') { P?.setHealth(num(v, 100)); return; }
     if (k === 'absvelocity' || k === 'basevelocity') { P?.setVelocity(parseVec(v)); return; }

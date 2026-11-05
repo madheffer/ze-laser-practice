@@ -5,6 +5,7 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { isMapName } from '../src/lib/paths.js';
+import { applyStripper } from '../src/lib/stripper.js';
 import { normaliseHulls } from '../src/world/hulls.js';
 import { TriangleBVH } from '../src/world/collision.js';
 import { mapItems, usableHeals } from '../src/world/items.js';
@@ -22,7 +23,7 @@ export function mapStore(dir) {
     }
     const folder = path.join(dir, map); // [a-z0-9_-] only: never leaves dir
     const p = (async () => {
-      const [entities, hullsRaw, col, entwatch, animations, fxCol, fxLayers] = await Promise.all([
+      const [entities, hullsRaw, col, entwatch, animations, fxCol, fxLayers, stripper] = await Promise.all([
         readFile(path.join(folder, 'entities.json'), 'utf8').then(JSON.parse),
         readFile(path.join(folder, 'hulls.json'), 'utf8').then(JSON.parse).catch(() => ({})),
         readFile(path.join(folder, 'collision.bin')),
@@ -32,7 +33,11 @@ export function mapStore(dir) {
         // the static world with layer bits (lasers-bake collision_fx*.bin; optional): what bullets see (world/bullets.js)
         readFile(path.join(folder, 'collision_fx.bin')).catch(() => null),
         readFile(path.join(folder, 'collision_fx_layers.bin')).catch(() => null),
+        // GFL's StripperCS2 edits to the map (tools/stripper.mjs; optional)
+        readFile(path.join(folder, 'stripper.json'), 'utf8').then(JSON.parse).catch(() => null),
       ]);
+      // the same edits the client applies (world/assets.js): the anti-cheat's copy of the map must be the player's
+      applyStripper(entities, stripper, map);
       const { hulls, bounds } = normaliseHulls(hullsRaw);
       const tris = new Float32Array(col.buffer.slice(col.byteOffset, col.byteOffset + col.byteLength));
       const fx = fxCol && fxLayers && fxCol.byteLength === fxLayers.byteLength * 9

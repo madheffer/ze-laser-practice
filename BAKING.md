@@ -20,6 +20,7 @@ It builds `bake/` (Release), then runs, per map:
 |---|---|---|
 | `map` | `<vpk> web/public/maps` | manifest, entities, collision (+ `collision_fx*.bin`, what particle traces hit), hulls, glbs + textures (cut-out alpha put back; animated props with their sequences + `animations.json`), particles + `fx/`, sounds (the stock events the map's entities name), `shots/`, `overview/` |
 | `entwatch` | `node tools/entwatch.mjs <map>` | `entwatch.json`: GFL's EntWatch config (the map's items: the heal option, the item HUD); none if GFL has no config for the map |
+| `stripper` | `node tools/stripper.mjs <map>` | `stripper.json`: GFL's StripperCS2 edits to the map's entities (below); none if GFL doesn't strip the map |
 | `lighting` | `--lighting <vpk> <map dir>` | `lighting/`: lightmaps (raw BC6H/BC7/DXT1/BC4 blocks), probes, tonemap + LUT (`post/`), skies, reflection cubemaps. The **high** tier |
 | `tiers` | `--tiers <vpk> <map dir>` | `q/medium/`, `q/low/`: smaller textures and PNG lightmaps any GPU can take |
 | `chunks` | `node tools/chunk-world.mjs <map dir>` | `world/chunk_<n>.glb` + `world/chunks.json`, and `"chunks"` in the manifest: the world streamed in pieces (below) |
@@ -30,6 +31,22 @@ isn't in a usual Steam library. Order matters: `tiers` reads `lighting/` and the
 `chunks` must run after `map` (a re-bake rewrites the manifest without `"chunks"`, so the game falls back to the whole
 world glb until `chunks` runs again). `chunks` needs the tools' npm packages (`npm --prefix tools install`; the script
 runs it the first time).
+
+## GFL's entity edits (stripper)
+
+GFL's servers run [StripperCS2](https://github.com/Source2ZE/StripperCS2), which rewrites some maps' entities as they
+load (configs: `stripper/<map>/<lump>.jsonc` in [gflze/CS2-ZE-Configs](https://github.com/gflze/CS2-ZE-Configs)).
+`tools/stripper.mjs` fetches a map's configs into `stripper.json`; `web/src/lib/stripper.js` applies them exactly as
+the plugin does (all filters, then adds, then modifies; `/regex/` values case-insensitive; an `io` replace moves the
+matched outputs to the end; duplicate top-level keys merged). Everything that loads a map's entities goes through it:
+the client (`world/assets.js`), the co-op server (`server/map-store.js`, so the anti-cheat's copy is the player's) and
+the tools (`tools/map-entities.mjs`: sim, teleports, io-graph, index-maps). A config for another world (a skybox) is
+skipped: the bake has the main world only. Re-run the step to pick up GFL's changes.
+
+Applied today: ze_deadcore's B ending (`b_escape_speedup1`: `KeyValue runspeed 2`, then `runspeed 1` 36 s later,
+instead of the map's `speed`) and ze_ffxii_westersand_v8 (the `Staff_*_Epicker` item blockers killed 15 s in, a warmup
+fix). `runspeed` is CS2Fixes' custom keyvalue (the pawn's `m_flVelocityModifier`, a max-speed multiplier,
+`world/movement.js runSpeed`); `speed` stays lagged movement (CS2Fixes scales the movement frametime).
 
 ## World streaming (chunks)
 
