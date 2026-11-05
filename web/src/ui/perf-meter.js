@@ -25,7 +25,7 @@ export class PerfMeter {
     const f = fps();
     this.fpsEl.textContent = f ? `${f} FPS` : '';
     this.fpsEl.classList.toggle('bad', f > 0 && f < SLOW_FPS);
-    this.pingEl.textContent = ms ? ` · ${ms} ms` : '';
+    this.pingEl.textContent = ms ? `${f ? ' · ' : ''}${ms} ms` : '';
     this.pingEl.classList.toggle('bad', ms > HIGH_PING);
   }
 }
