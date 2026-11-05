@@ -57,11 +57,11 @@ export function startScenario(i, mode = 'normal') {
   player.gravityScale = scenario?.player?.gravity ?? 1;
   player.speedScale = 1;
   player.stamina = 0;
+  player.landTick = -Infinity; // no landing penalty carried into a new run (world/movement.js jumpScale)
+  player.runSpeed = 1;
   player.onLand = (v) => {
     G.audio.play('land', { pos: player.origin });
     // CS fall damage: safe below 580 u/s, 100 at 1024, linear between, × sv_falldamage_scale. The map's scale
-  player.landTick = -Infinity; // no landing penalty carried into a new run (world/movement.js jumpScale)
-  player.runSpeed = 1;
     // (GFL servers run none; a map sets it for an area); the "Fall damage everywhere" option forces scale 1
     const scale = rule('fallDamage') ? 1 : Math.max(0, parseFloat(run.cvars?.sv_falldamage_scale) || 0);
     if (!run.started || run.done || run.noFall || !scale || v <= 580) return;
@@ -112,11 +112,11 @@ export function startScenario(i, mode = 'normal') {
           setMaxHealth: (v) => { run.maxHp = v; },
           setGravity: (g) => { player.gravityScale = g; },
           setSpeed: (sp) => { player.speedScale = sp; },
+          setRunSpeed: (r) => { player.runSpeed = r; }, // KeyValue runspeed (CS2Fixes m_flVelocityModifier)
           setVelocity: (v) => { player.velocity = [...v]; if (v[2] > 0) player.onGround = false; },
           setDamageFilter: (name) => {
             const f = engine.findOne(name);
             // filter_damage_type, negated, DMG_FALL (32): "everything but fall damage" = no fall damage
-          setRunSpeed: (r) => { player.runSpeed = r; }, // KeyValue runspeed (CS2Fixes m_flVelocityModifier)
             run.noFall = !!f && f.cls === 'filter_damage_type' && (parseInt(f.kv.damagetype, 10) & 32) && String(f.kv.negated) === '1';
           },
         };

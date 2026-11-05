@@ -75,13 +75,6 @@ exact map-folder format so he can lift our maps straight into his site. See [REA
       engine.tick (movers, thinks), then the one you stand on carries you, then touches. The recorded pose is still the
       tick's final one, so coop-check.js (engine.tick, then the pose vs this tick's solids, then touches) needed no
       change. Checked on :5807: l5_ending rides the train end to end (4 u spawn offset held) to the win; a14 still hits
-    - [ ] boss bar over all 16 segments: GFL's bosshud gives Blue Particle `iterator: boss_healthcount` (CS2Fixes
-      CounterIterator); app/bosses.js shows the current segment's hits only
-    - [ ] bake: the world glb referenced `default_normal_tga_b3f4ec4c_orm_3598707198.png` but VRF wrote it only beside the
-      models (same texture used by props); copied into `world/` + both tiers by hand. Find why the world export skipped it
-  - [ ] **ze_neochrome** (3437506779) — 110, 15 laser templates; heal: Heal
-  - [ ] **ze_ffvii_mako_reactor_v5_p** (3513334092) — 85, 5 laser templates; Heal Materia + 7 materia
-  - [ ] **ze_ffvii_mako_reactor_v6_p** (3378273414) — 80, 12 laser templates; Heal Materia + 11 materia (Mimic, Barrier, Ultima ...)
     - [x] engine: jump + crouch from cs2_server (world/movement.js): sv_legacy_jump defaults to 0, so CS2 runs the
       modern jump (CCSPlayerModernJump). Jump velocity = (sv_jump_impulse 301.993 - g x scale / 256), full impulse when
       crouched / crouching, x the landing penalty min(1, clamp(1 + 0.0005 x landed vz, 0.2, 1) + 0.6/s on the ground);
@@ -98,6 +91,13 @@ exact map-folder format so he can lift our maps straight into his site. See [REA
       blockers go at 15 s. All 25 of GFL's configs parse. `KeyValue runspeed` = CS2Fixes' m_flVelocityModifier
     - [ ] runspeed: how CS2's own movement applies m_flVelocityModifier (assumed Source's: a max-speed multiplier that
       recovers only below 1) isn't confirmed from the binary
+    - [ ] boss bar over all 16 segments: GFL's bosshud gives Blue Particle `iterator: boss_healthcount` (CS2Fixes
+      CounterIterator); app/bosses.js shows the current segment's hits only
+    - [ ] bake: the world glb referenced `default_normal_tga_b3f4ec4c_orm_3598707198.png` but VRF wrote it only beside the
+      models (same texture used by props); copied into `world/` + both tiers by hand. Find why the world export skipped it
+  - [ ] **ze_neochrome** (3437506779) — 110, 15 laser templates; heal: Heal
+  - [ ] **ze_ffvii_mako_reactor_v5_p** (3513334092) — 85, 5 laser templates; Heal Materia + 7 materia
+  - [ ] **ze_ffvii_mako_reactor_v6_p** (3378273414) — 80, 12 laser templates; Heal Materia + 11 materia (Mimic, Barrier, Ultima ...)
   - [ ] **ze_offliner** (3559892707) — 84, 7 laser templates; no heal (Shockwave only)
   - [ ] **ze_arcana_heart** — not in the local library (subscribe, rescan); GFL has it with a Heal item
   - each: bake (`lasers-bake <vpk>` then `--overview`), `tools/entwatch.mjs`, `tools/teleports.mjs` fall audit, stages via io-graph / sim
