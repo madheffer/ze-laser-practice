@@ -18,6 +18,7 @@ namespace Lasers.Bake;
 static class ParticleBake
 {
     const int MaxSystems = 4000, MaxTextures = 2000, MaxSide = 1024, MaxDecodePixels = 8192 * 8192;
+    public const string ErrorSystem = "particles/error/error.vpcf";
 
     // lasers-bake --fx <workshop.vpk> <map folder>: only fx/, for a map already baked (its entities.json names the effects)
     public static int Run(string vpk, string mapDir, string? cs2)
@@ -46,6 +47,13 @@ static class ParticleBake
         var missing = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
         Write(loader, effects, mapDir, Console.WriteLine, missing);
         if (missing.Count > 0) Console.WriteLine($"missing: {string.Join(", ", missing.Take(20))}{(missing.Count > 20 ? " ..." : "")}");
+        // fx/ changed: a new version so browsers fetch it again (everything is fetched as ?v=<version>); other keys stay
+        var manifestPath = Path.Combine(mapDir, "manifest.json");
+        if (File.Exists(manifestPath) && JsonNode.Parse(File.ReadAllText(manifestPath)) is JsonObject manifest)
+        {
+            manifest["version"] = DateTime.UtcNow.ToString("yyyyMMddHHmmss", System.Globalization.CultureInfo.InvariantCulture);
+            File.WriteAllText(manifestPath, manifest.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
+        }
         return 0;
     }
 
@@ -54,7 +62,9 @@ static class ParticleBake
         var systems = new JsonObject();
         var textures = new JsonObject();
         var texRefs = new SortedSet<string>(StringComparer.Ordinal);
-        var queue = new Queue<string>(effects.Select(Normalize).OfType<string>());
+        // + CS2's stand-in for a system that won't load (client.dll FUN_18189aed0: "Attempted to create unknown particle
+        // system type" -> particles/error/error.vpcf), from the stock paks, so the player can draw it where CS2 would
+        var queue = new Queue<string>(effects.Select(Normalize).OfType<string>().Append(ErrorSystem));
         var seen = new HashSet<string>(StringComparer.Ordinal);
         while (queue.Count > 0 && seen.Count < MaxSystems)
         {

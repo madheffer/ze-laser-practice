@@ -63,6 +63,29 @@ export function setFxCamera(camera, lighting = null) {
 
 const norm = (p) => String(p ?? '').toLowerCase().replace(/\\/g, '/').replace(/^resource:/, '').replace(/_c$/, '');
 
+// CS2's stand-ins for what a map names but doesn't ship:
+// - a system that won't load: client.dll FUN_18189aed0 warns "Attempted to create unknown particle system type" and
+//   creates particles/error/error.vpcf instead (red sprite bursts; the bake adds it to every map's fx/)
+// - a texture that won't load: the render system binds its 2D error texture (rendersystemvulkan FUN_1800f7e20 fills
+//   slot +0x6a8, which texturebase.cpp:3673 "Falling back to error texture" returns): 32 x 32 RGBA, magenta
+//   0xffff00ff where (x ^ y) & 4, else opaque black, i.e. a 4-texel magenta / black checker
+export const ERROR_SYSTEM = 'particles/error/error.vpcf';
+let errorPixels = null;
+function errorTexture(mode) {
+  if (!errorPixels) {
+    errorPixels = new Uint8Array(32 * 32 * 4);
+    for (let y = 0; y < 32; y++) for (let x = 0; x < 32; x++) {
+      const i = (y * 32 + x) * 4, on = ((x ^ y) & 4) !== 0;
+      errorPixels[i] = on ? 255 : 0; errorPixels[i + 1] = 0; errorPixels[i + 2] = on ? 255 : 0; errorPixels[i + 3] = 255;
+    }
+  }
+  const t = new THREE.DataTexture(errorPixels, 32, 32, THREE.RGBAFormat);
+  t.colorSpace = THREE.SRGBColorSpace; t.flipY = false; t.wrapS = t.wrapT = mode;
+  t.generateMipmaps = true; t.minFilter = THREE.LinearMipmapLinearFilter; t.magFilter = THREE.LinearFilter;
+  t.needsUpdate = true;
+  return t;
+}
+
 export class MapEffects {
   // urlOf(rel) -> a versioned URL under the map folder (world/assets.js)
   static async load(urlOf, fetchJson) {
@@ -87,7 +110,11 @@ export class MapEffects {
     this._lights = [];
   }
 
-  has(effect) { return Object.hasOwn(this.index.systems, norm(effect)); }
+  // whether spawn(effect) draws something: the effect itself, or CS2's error system in its place
+  has(effect) {
+    const k = norm(effect);
+    return Object.hasOwn(this.index.systems, k) || (k !== '' && Object.hasOwn(this.index.systems, ERROR_SYSTEM));
+  }
 
   system(path) {
     const key = norm(path);
@@ -108,7 +135,14 @@ export class MapEffects {
         const walk = async (path) => {
           if (seen.has(path) || seen.size >= MAX_SYSTEMS_PER_EFFECT) return;
           seen.add(path);
-          const data = await this.system(path);
+          let data = await this.system(path);
+          if (!data && path !== ERROR_SYSTEM) {
+            // not baked (the map names a system its VPK and CS2's paks lack): CS2's error system under the same name,
+            // so the parent's child reference still finds it. For a child ref this follows the root's rule (client.dll);
+            // particles.dll's own handling of a missing child is not traced (UNSETTLED)
+            data = await this.system(ERROR_SYSTEM);
+            if (data) this.report(`system ${path} not baked; CS2's ${ERROR_SYSTEM} drawn instead`);
+          }
           if (!data) return;
           systems.push({ path, data });
           for (const c of Array.isArray(data.m_Children) ? data.m_Children : []) if (c?.m_ChildRef) await walk(norm(c.m_ChildRef));
@@ -130,7 +164,17 @@ export class MapEffects {
       texture: (path, clamp) => {
         const e = entry(path);
         const file = e && safeRelPath(e.file);
-        if (!file) { this.report(`texture ${path} not baked; drawn white`); return null; }
+        if (!file) {
+          // CS2's 2D error texture (errorTexture above), one per wrap mode
+          this.report(`texture ${path} not baked; CS2's error texture (magenta / black checker) drawn`);
+          const key = `error:${clamp ? 'clamp' : 'repeat'}`;
+          let base = this.texCache.get(key);
+          if (!base) {
+            base = { image: null, variants: new Map(), loaded: Promise.resolve(), tex: errorTexture(clamp ? THREE.ClampToEdgeWrapping : THREE.RepeatWrapping) };
+            this.texCache.set(key, base);
+          }
+          return base.tex;
+        }
         const url = this.urlOf('fx/' + file);
         let base = this.texCache.get(url);
         if (!base) {
