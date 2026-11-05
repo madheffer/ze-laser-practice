@@ -1,0 +1,660 @@
+{
+  "map": "ze_neochrome",
+  "title": "ze_neochrome",
+  "workshop": "3437506779",
+  "description": "The Blue Sphere boss and its 10 attacks, then the ending: the Purple Sphere corridor, the dodge arena and the final lasers.",
+  "scenarios": [
+    {
+      "id": "blue_sphere",
+      "group": "Blue Sphere",
+      "full": true,
+      "featured": true,
+      "name": "Blue Sphere (boss)",
+      "summary": "Ten segments, a random attack every 16 s",
+      "childrenTitle": "Single attacks",
+      "description": "Launched up by nut_p2_push1 into nut_boss_tp_human, each human is put on one of the 4 corners of the arena (nut_boss_dest_human_case) and adds 120 to nut_boss_hp (starts at 300). Every bullet on nut_boss_breakable takes 1 off. Each time it empties, nut_boss_segment (10) loses one and nut_boss_hp_scale refills it with 55 per human in the arena; GFL's BossHUD shows it as \"Blue Sphere\". From +6 s nut_boss_attack_case picks one of 10 attacks every 16 s. At +235 s nut_boss_timeup_hurt is enabled over the arena (20 every 0.5 s). Win when nut_boss_relay_end fires (the 10th segment).",
+      "spawn": {
+        "origin": [
+          3088,
+          6256,
+          690
+        ],
+        "yaw": 270
+      },
+      "start": [],
+      "player": {
+        "health": 100
+      },
+      "bosses": [
+        {
+          "target": "[PR#]nut_boss_breakable",
+          "name": "Blue Sphere",
+          "counter": "[PR#]nut_boss_hp",
+          "counterMode": "hits"
+        }
+      ],
+      "win": {
+        "target": "[PR#]nut_boss_relay_end",
+        "input": "Trigger"
+      },
+      "hazards": {
+        "nut_boss_laser_rotate_hurt1": "a rotating laser",
+        "nut_boss_laser_rotate_hurt2": "a rotating laser",
+        "nut_boss_sphere_hurt": "a falling sphere",
+        "nut_boss_ballmove_hurt": "a sphere",
+        "nut_boss_crouch_hurt": "the crouch wave",
+        "nut_boss_lasercube_hurt": "a laser cube",
+        "nut_boss_lasercube_hurt2": "a laser cube",
+        "hurt_st4_boss_lines": "a line laser",
+        "laserbeam_hurt": "a laser beam",
+        "nut_boss_timeup_hurt": "the time limit",
+        "nut_boss_fallhurt": "the fall"
+      }
+    },
+    {
+      "id": "ba_rotate",
+      "parent": "blue_sphere",
+      "name": "Rotating lasers",
+      "summary": "Two laser bars sweep the arena",
+      "description": "nut_boss_laser_rotate_maker: two rotating bars sweep the floor from +1.3 s to +10 s (nut_boss_laser_rotate_hurt1/2).",
+      "spawn": {
+        "origin": [
+          3232,
+          2424,
+          -2912
+        ],
+        "yaw": 45
+      },
+      "start": [
+        {
+          "target": "[PR#]nut_boss_rotate1",
+          "input": "Start"
+        },
+        {
+          "target": "[PR#]nut_boss_p1",
+          "input": "Start"
+        },
+        {
+          "target": "[PR#]nut_boss_p2",
+          "input": "Start"
+        },
+        {
+          "target": "[PR#]nut_boss_laser_rotate_maker",
+          "input": "ForceSpawn",
+          "delay": 1
+        }
+      ],
+      "winAfter": 12,
+      "hazards": {
+        "nut_boss_laser_rotate_hurt1": "a rotating laser",
+        "nut_boss_laser_rotate_hurt2": "a rotating laser",
+        "nut_boss_sphere_hurt": "a falling sphere",
+        "nut_boss_ballmove_hurt": "a sphere",
+        "nut_boss_crouch_hurt": "the crouch wave",
+        "nut_boss_lasercube_hurt": "a laser cube",
+        "nut_boss_lasercube_hurt2": "a laser cube",
+        "hurt_st4_boss_lines": "a line laser",
+        "laserbeam_hurt": "a laser beam",
+        "nut_boss_timeup_hurt": "the time limit",
+        "nut_boss_fallhurt": "the fall"
+      }
+    },
+    {
+      "id": "ba_push",
+      "parent": "blue_sphere",
+      "name": "Push out",
+      "summary": "Wind pushes you to the corners",
+      "description": "nut_boss_push_relay: the four nut_boss_push_trigger corners push 255 u/s outward from +1.5 s to +6.5 s. Off the edge, nut_boss_fallhurt (40) and nut_boss_falltp put you back on a corner.",
+      "spawn": {
+        "origin": [
+          3232,
+          2424,
+          -2912
+        ],
+        "yaw": 45
+      },
+      "start": [
+        {
+          "target": "[PR#]nut_boss_rotate1",
+          "input": "Start"
+        },
+        {
+          "target": "[PR#]nut_boss_p1",
+          "input": "Start"
+        },
+        {
+          "target": "[PR#]nut_boss_p2",
+          "input": "Start"
+        },
+        {
+          "target": "[PR#]nut_boss_push_relay",
+          "input": "Trigger",
+          "delay": 1
+        }
+      ],
+      "winAfter": 8.5,
+      "hazards": {
+        "nut_boss_laser_rotate_hurt1": "a rotating laser",
+        "nut_boss_laser_rotate_hurt2": "a rotating laser",
+        "nut_boss_sphere_hurt": "a falling sphere",
+        "nut_boss_ballmove_hurt": "a sphere",
+        "nut_boss_crouch_hurt": "the crouch wave",
+        "nut_boss_lasercube_hurt": "a laser cube",
+        "nut_boss_lasercube_hurt2": "a laser cube",
+        "hurt_st4_boss_lines": "a line laser",
+        "laserbeam_hurt": "a laser beam",
+        "nut_boss_timeup_hurt": "the time limit",
+        "nut_boss_fallhurt": "the fall"
+      }
+    },
+    {
+      "id": "ba_pull",
+      "parent": "blue_sphere",
+      "name": "Pull in",
+      "summary": "Wind pulls you to the centre",
+      "description": "nut_boss_pull_relay: the four nut_boss_pull_trigger corners pull 255 u/s toward the centre from +1.5 s to +6.5 s.",
+      "spawn": {
+        "origin": [
+          3232,
+          2424,
+          -2912
+        ],
+        "yaw": 45
+      },
+      "start": [
+        {
+          "target": "[PR#]nut_boss_rotate1",
+          "input": "Start"
+        },
+        {
+          "target": "[PR#]nut_boss_p1",
+          "input": "Start"
+        },
+        {
+          "target": "[PR#]nut_boss_p2",
+          "input": "Start"
+        },
+        {
+          "target": "[PR#]nut_boss_pull_relay",
+          "input": "Trigger",
+          "delay": 1
+        }
+      ],
+      "winAfter": 8.5,
+      "hazards": {
+        "nut_boss_laser_rotate_hurt1": "a rotating laser",
+        "nut_boss_laser_rotate_hurt2": "a rotating laser",
+        "nut_boss_sphere_hurt": "a falling sphere",
+        "nut_boss_ballmove_hurt": "a sphere",
+        "nut_boss_crouch_hurt": "the crouch wave",
+        "nut_boss_lasercube_hurt": "a laser cube",
+        "nut_boss_lasercube_hurt2": "a laser cube",
+        "hurt_st4_boss_lines": "a line laser",
+        "laserbeam_hurt": "a laser beam",
+        "nut_boss_timeup_hurt": "the time limit",
+        "nut_boss_fallhurt": "the fall"
+      }
+    },
+    {
+      "id": "ba_spheres",
+      "parent": "blue_sphere",
+      "name": "Sphere rain",
+      "summary": "Spheres rain from a spinning maker",
+      "description": "nut_boss_sphere_relay2: for 7 s nut_boss_sphere_maker drops a sphere every 0.04-0.09 s from a maker spun at a random speed (dodge_rotating_case, re-rolled every 0.4-0.5 s).",
+      "spawn": {
+        "origin": [
+          3232,
+          2424,
+          -2912
+        ],
+        "yaw": 45
+      },
+      "start": [
+        {
+          "target": "[PR#]nut_boss_rotate1",
+          "input": "Start"
+        },
+        {
+          "target": "[PR#]nut_boss_p1",
+          "input": "Start"
+        },
+        {
+          "target": "[PR#]nut_boss_p2",
+          "input": "Start"
+        },
+        {
+          "target": "[PR#]nut_boss_sphere_relay2",
+          "input": "Trigger",
+          "delay": 1
+        }
+      ],
+      "winAfter": 11,
+      "hazards": {
+        "nut_boss_laser_rotate_hurt1": "a rotating laser",
+        "nut_boss_laser_rotate_hurt2": "a rotating laser",
+        "nut_boss_sphere_hurt": "a falling sphere",
+        "nut_boss_ballmove_hurt": "a sphere",
+        "nut_boss_crouch_hurt": "the crouch wave",
+        "nut_boss_lasercube_hurt": "a laser cube",
+        "nut_boss_lasercube_hurt2": "a laser cube",
+        "hurt_st4_boss_lines": "a line laser",
+        "laserbeam_hurt": "a laser beam",
+        "nut_boss_timeup_hurt": "the time limit",
+        "nut_boss_fallhurt": "the fall"
+      }
+    },
+    {
+      "id": "ba_ballmove",
+      "parent": "blue_sphere",
+      "name": "Sphere tracks",
+      "summary": "Rings of spheres sweep across",
+      "description": "nut_boss_ballmove_relay2: for 8.5 s a ring of 16 spheres is spawned every 1-1.4 s on nut_boss_laser_rotate2, which turns at 100 and reverses at random.",
+      "spawn": {
+        "origin": [
+          3232,
+          2424,
+          -2912
+        ],
+        "yaw": 45
+      },
+      "start": [
+        {
+          "target": "[PR#]nut_boss_rotate1",
+          "input": "Start"
+        },
+        {
+          "target": "[PR#]nut_boss_p1",
+          "input": "Start"
+        },
+        {
+          "target": "[PR#]nut_boss_p2",
+          "input": "Start"
+        },
+        {
+          "target": "[PR#]nut_boss_ballmove_relay2",
+          "input": "Trigger",
+          "delay": 1
+        }
+      ],
+      "winAfter": 12,
+      "hazards": {
+        "nut_boss_laser_rotate_hurt1": "a rotating laser",
+        "nut_boss_laser_rotate_hurt2": "a rotating laser",
+        "nut_boss_sphere_hurt": "a falling sphere",
+        "nut_boss_ballmove_hurt": "a sphere",
+        "nut_boss_crouch_hurt": "the crouch wave",
+        "nut_boss_lasercube_hurt": "a laser cube",
+        "nut_boss_lasercube_hurt2": "a laser cube",
+        "hurt_st4_boss_lines": "a line laser",
+        "laserbeam_hurt": "a laser beam",
+        "nut_boss_timeup_hurt": "the time limit",
+        "nut_boss_fallhurt": "the fall"
+      }
+    },
+    {
+      "id": "ba_crouch",
+      "parent": "blue_sphere",
+      "name": "Crouch wave",
+      "summary": "A wave at head height: crouch",
+      "description": "nut_boss_crouch_relay: nut_boss_crouch_hurt, a 16 u slab 64-80 u over the arena floor (a standing head, not a crouched one), hurts 30 (doubling) from +1.4 s to +7 s.",
+      "spawn": {
+        "origin": [
+          3232,
+          2424,
+          -2912
+        ],
+        "yaw": 45
+      },
+      "start": [
+        {
+          "target": "[PR#]nut_boss_rotate1",
+          "input": "Start"
+        },
+        {
+          "target": "[PR#]nut_boss_p1",
+          "input": "Start"
+        },
+        {
+          "target": "[PR#]nut_boss_p2",
+          "input": "Start"
+        },
+        {
+          "target": "[PR#]nut_boss_crouch_relay",
+          "input": "Trigger",
+          "delay": 1
+        }
+      ],
+      "winAfter": 9,
+      "hazards": {
+        "nut_boss_laser_rotate_hurt1": "a rotating laser",
+        "nut_boss_laser_rotate_hurt2": "a rotating laser",
+        "nut_boss_sphere_hurt": "a falling sphere",
+        "nut_boss_ballmove_hurt": "a sphere",
+        "nut_boss_crouch_hurt": "the crouch wave",
+        "nut_boss_lasercube_hurt": "a laser cube",
+        "nut_boss_lasercube_hurt2": "a laser cube",
+        "hurt_st4_boss_lines": "a line laser",
+        "laserbeam_hurt": "a laser beam",
+        "nut_boss_timeup_hurt": "the time limit",
+        "nut_boss_fallhurt": "the fall"
+      }
+    },
+    {
+      "id": "ba_cubes",
+      "parent": "blue_sphere",
+      "name": "Laser cubes",
+      "summary": "Two laser cubes spin around you",
+      "description": "nut_boss_lasercube_relay2: two laser cubes (nut_boss_lasercube_maker / _maker2) at either end of the arena, twice (+0 s and +1.2 s), hurt 25 from +1.3 s until they go at +9 s.",
+      "spawn": {
+        "origin": [
+          3232,
+          2424,
+          -2912
+        ],
+        "yaw": 45
+      },
+      "start": [
+        {
+          "target": "[PR#]nut_boss_rotate1",
+          "input": "Start"
+        },
+        {
+          "target": "[PR#]nut_boss_p1",
+          "input": "Start"
+        },
+        {
+          "target": "[PR#]nut_boss_p2",
+          "input": "Start"
+        },
+        {
+          "target": "[PR#]nut_boss_lasercube_relay2",
+          "input": "Trigger",
+          "delay": 1
+        }
+      ],
+      "winAfter": 11,
+      "hazards": {
+        "nut_boss_laser_rotate_hurt1": "a rotating laser",
+        "nut_boss_laser_rotate_hurt2": "a rotating laser",
+        "nut_boss_sphere_hurt": "a falling sphere",
+        "nut_boss_ballmove_hurt": "a sphere",
+        "nut_boss_crouch_hurt": "the crouch wave",
+        "nut_boss_lasercube_hurt": "a laser cube",
+        "nut_boss_lasercube_hurt2": "a laser cube",
+        "hurt_st4_boss_lines": "a line laser",
+        "laserbeam_hurt": "a laser beam",
+        "nut_boss_timeup_hurt": "the time limit",
+        "nut_boss_fallhurt": "the fall"
+      }
+    },
+    {
+      "id": "ba_lines",
+      "parent": "blue_sphere",
+      "name": "Line lasers",
+      "summary": "Lines fan out from the sphere",
+      "description": "nut_boss_lines_relay2: for 9 s timer_st4_boss_lines fires a line laser out of the sphere every 0.1 s at one of 48 angles (case_st4_boss_lines_c).",
+      "spawn": {
+        "origin": [
+          3232,
+          2424,
+          -2912
+        ],
+        "yaw": 45
+      },
+      "start": [
+        {
+          "target": "[PR#]nut_boss_rotate1",
+          "input": "Start"
+        },
+        {
+          "target": "[PR#]nut_boss_p1",
+          "input": "Start"
+        },
+        {
+          "target": "[PR#]nut_boss_p2",
+          "input": "Start"
+        },
+        {
+          "target": "[PR#]nut_boss_lines_relay2",
+          "input": "Trigger",
+          "delay": 1
+        }
+      ],
+      "winAfter": 13,
+      "hazards": {
+        "nut_boss_laser_rotate_hurt1": "a rotating laser",
+        "nut_boss_laser_rotate_hurt2": "a rotating laser",
+        "nut_boss_sphere_hurt": "a falling sphere",
+        "nut_boss_ballmove_hurt": "a sphere",
+        "nut_boss_crouch_hurt": "the crouch wave",
+        "nut_boss_lasercube_hurt": "a laser cube",
+        "nut_boss_lasercube_hurt2": "a laser cube",
+        "hurt_st4_boss_lines": "a line laser",
+        "laserbeam_hurt": "a laser beam",
+        "nut_boss_timeup_hurt": "the time limit",
+        "nut_boss_fallhurt": "the fall"
+      }
+    },
+    {
+      "id": "ba_beams",
+      "parent": "blue_sphere",
+      "name": "Laser beams",
+      "summary": "Seven beam waves in 5 s",
+      "description": "nut_boss_laserbeam_relay2: nut_boss_laserbeam_case spawns one of two beam sets 7 times between +0 and +5.1 s.",
+      "spawn": {
+        "origin": [
+          3232,
+          2424,
+          -2912
+        ],
+        "yaw": 45
+      },
+      "start": [
+        {
+          "target": "[PR#]nut_boss_rotate1",
+          "input": "Start"
+        },
+        {
+          "target": "[PR#]nut_boss_p1",
+          "input": "Start"
+        },
+        {
+          "target": "[PR#]nut_boss_p2",
+          "input": "Start"
+        },
+        {
+          "target": "[PR#]nut_boss_laserbeam_relay2",
+          "input": "Trigger",
+          "delay": 1
+        }
+      ],
+      "winAfter": 10,
+      "hazards": {
+        "nut_boss_laser_rotate_hurt1": "a rotating laser",
+        "nut_boss_laser_rotate_hurt2": "a rotating laser",
+        "nut_boss_sphere_hurt": "a falling sphere",
+        "nut_boss_ballmove_hurt": "a sphere",
+        "nut_boss_crouch_hurt": "the crouch wave",
+        "nut_boss_lasercube_hurt": "a laser cube",
+        "nut_boss_lasercube_hurt2": "a laser cube",
+        "hurt_st4_boss_lines": "a line laser",
+        "laserbeam_hurt": "a laser beam",
+        "nut_boss_timeup_hurt": "the time limit",
+        "nut_boss_fallhurt": "the fall"
+      }
+    },
+    {
+      "id": "ending_full",
+      "group": "Ending",
+      "full": true,
+      "name": "Ending (full)",
+      "summary": "Purple Sphere, the dodge arena, the final lasers",
+      "description": "From the corridor to the end: nut_final_push starts the Purple Sphere (55 + 75 per human hits, nut_final_sphere_counter) and its jump / duck lasers. Its death opens nut_door13 30 s later: the floor drops to the dodge arena, where the trigger at its centre runs the 4 dodge waves (balls, the big beam, lasers, meteors, double lasers). At the end nut_final_tp sends everyone to the final room: 6 lasers and the sweeping lasers, then nut_final_win_detect.",
+      "spawn": {
+        "origin": [
+          9200,
+          -1540,
+          -1696
+        ],
+        "yaw": 270
+      },
+      "start": [],
+      "player": {
+        "health": 100
+      },
+      "bosses": [
+        {
+          "target": "[PR#]nut_final_sphere_breakable",
+          "name": "Purple Sphere",
+          "counter": "[PR#]nut_final_sphere_counter",
+          "counterMode": "hits"
+        }
+      ],
+      "win": {
+        "target": "[PR#]hint_2_multi",
+        "input": "Enable"
+      },
+      "hazards": {
+        "nut_laser_1_hurt": "a sphere laser",
+        "nut_dodge_ball_hurt": "a ball",
+        "nut_dodge_circle_hurt": "a ring",
+        "nut_dodge_largebeam_hurt": "the big beam",
+        "nut_dodge_laser1_hurt": "a laser",
+        "nut_dodge_meteor1_hurt": "a meteor",
+        "nut_dodge_doublelaser1_hurt": "a double laser",
+        "nut_final_laser1_hurt": "a final laser",
+        "nut_final_vertlaser_hurt": "a sweeping laser"
+      }
+    },
+    {
+      "id": "purple_sphere",
+      "group": "Ending",
+      "name": "Purple Sphere (boss)",
+      "summary": "Shoot the sphere, jump and duck its lasers",
+      "description": "Walk through nut_final_push: nut_final_sphere_scaling adds 75 per human to nut_final_sphere_counter (starts at 55, max 1600; GFL's BossHUD \"Purple Sphere\"). The sphere spawns at +3 s at the far end of the corridor; from +3.1 s nut_laser_timer fires a laser every 0.72-1 s up the corridor at 2200 u/s, one of three heights (nut_laser_case: two to jump, one to duck). They kill, and each human they hit takes 45 off the counter. Win when it reaches 0 (nut_final_relay).",
+      "spawn": {
+        "origin": [
+          9200,
+          -1540,
+          -1696
+        ],
+        "yaw": 270
+      },
+      "start": [],
+      "player": {
+        "health": 100
+      },
+      "bosses": [
+        {
+          "target": "[PR#]nut_final_sphere_breakable",
+          "name": "Purple Sphere",
+          "counter": "[PR#]nut_final_sphere_counter",
+          "counterMode": "hits"
+        }
+      ],
+      "win": {
+        "target": "[PR#]nut_final_relay",
+        "input": "Trigger"
+      },
+      "hazards": {
+        "nut_laser_1_hurt": "a sphere laser",
+        "nut_dodge_ball_hurt": "a ball",
+        "nut_dodge_circle_hurt": "a ring",
+        "nut_dodge_largebeam_hurt": "the big beam",
+        "nut_dodge_laser1_hurt": "a laser",
+        "nut_dodge_meteor1_hurt": "a meteor",
+        "nut_dodge_doublelaser1_hurt": "a double laser",
+        "nut_final_laser1_hurt": "a final laser",
+        "nut_final_vertlaser_hurt": "a sweeping laser"
+      }
+    },
+    {
+      "id": "dodge_arena",
+      "group": "Ending",
+      "name": "Dodge arena",
+      "summary": "Four waves: balls, beam, lasers, meteors",
+      "description": "The trigger in the middle of the arena starts nut_dodge_relay1 2.5 s later. Wave 1 (8.5 s): balls from four spinning makers every 0.09 s and rings every 1.5 s. Wave 2 (12 s): the big beam on the centre at +2-4 s (kills), then lasers from a spinning maker. Wave 3 (18 s): meteors for 10 s, then double lasers. Wave 4 (8 s): balls again. 9.2 s after wave 4 starts, nut_final_tp takes everyone on to the final room: win there.",
+      "spawn": {
+        "origin": [
+          12560,
+          -5344,
+          -4016
+        ],
+        "yaw": 90
+      },
+      "start": [
+        {
+          "target": "[PR#]nut_final_sphere_spawn",
+          "input": "ForceSpawn"
+        },
+        {
+          "target": "[PR#]nut_final_sphere_counter",
+          "input": "SetValue",
+          "param": "0",
+          "delay": 0.1
+        }
+      ],
+      "fastForward": 31,
+      "player": {
+        "health": 100
+      },
+      "win": {
+        "target": "[PR#]nut_final_tp",
+        "input": "Enable"
+      },
+      "hazards": {
+        "nut_laser_1_hurt": "a sphere laser",
+        "nut_dodge_ball_hurt": "a ball",
+        "nut_dodge_circle_hurt": "a ring",
+        "nut_dodge_largebeam_hurt": "the big beam",
+        "nut_dodge_laser1_hurt": "a laser",
+        "nut_dodge_meteor1_hurt": "a meteor",
+        "nut_dodge_doublelaser1_hurt": "a double laser",
+        "nut_final_laser1_hurt": "a final laser",
+        "nut_final_vertlaser_hurt": "a sweeping laser"
+      }
+    },
+    {
+      "id": "final_lasers",
+      "group": "Ending",
+      "name": "Final lasers",
+      "summary": "Six jump / duck lasers, then sweepers",
+      "description": "Where nut_final_tp puts you (nut_final_dest). The trigger there runs nut_final_laser1_relay_end 1.5 s later: six lasers (nut_final_laser1_case, jump or duck) from +0.2 s to +4.2 s, and sweeping vertical lasers for 4.2 s. nut_final_win_detect is enabled at +7.5 s: win when it fires on you.",
+      "spawn": {
+        "at": "[PR#]nut_final_dest",
+        "yaw": 270
+      },
+      "start": [
+        {
+          "target": "[PR#]nut_final_sphere_spawn",
+          "input": "ForceSpawn"
+        },
+        {
+          "target": "[PR#]nut_final_sphere_counter",
+          "input": "SetValue",
+          "param": "0",
+          "delay": 0.1
+        }
+      ],
+      "fastForward": 31,
+      "player": {
+        "health": 100
+      },
+      "win": {
+        "target": "[PR#]hint_2_multi",
+        "input": "Enable"
+      },
+      "hazards": {
+        "nut_laser_1_hurt": "a sphere laser",
+        "nut_dodge_ball_hurt": "a ball",
+        "nut_dodge_circle_hurt": "a ring",
+        "nut_dodge_largebeam_hurt": "the big beam",
+        "nut_dodge_laser1_hurt": "a laser",
+        "nut_dodge_meteor1_hurt": "a meteor",
+        "nut_dodge_doublelaser1_hurt": "a double laser",
+        "nut_final_laser1_hurt": "a final laser",
+        "nut_final_vertlaser_hurt": "a sweeping laser"
+      }
+    }
+  ]
+}

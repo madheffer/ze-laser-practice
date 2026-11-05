@@ -110,7 +110,17 @@ exact map-folder format so he can lift our maps straight into his site. See [REA
       CounterIterator); app/bosses.js shows the current segment's hits only
     - [ ] bake: the world glb referenced `default_normal_tga_b3f4ec4c_orm_3598707198.png` but VRF wrote it only beside the
       models (same texture used by props); copied into `world/` + both tiers by hand. Find why the world export skipped it
-  - [ ] **ze_neochrome** (3437506779) — 110, 15 laser templates; heal: Heal
+  - [x] **ze_neochrome** (3437506779) — 110, 15 laser templates; heal: Heal
+    - [x] baked (fx, lighting + tiers, 36 chunks) and in the map picker (2026-11-06); the world glb's missing
+      `default_normal_tga_b3f4ec4c_orm_3598707198.png` copied into `world/` by hand, as for visualizer / deadcore
+    - [x] Blue Sphere (GFL BossHUD): the map's own launch into `nut_boss_tp_human` (120 per human, then 55 per human
+      per segment from `nut_boss_hp_scale`, 10 segments), a random attack every 16 s, 235 s time-up; clears in ~192 s
+      at 20 humans. A drill per attack (9; `nut_boss_zombietp_relay` only moves zombies, no drill)
+    - [x] Ending: Purple Sphere corridor (55 + 75 per human, jump / duck lasers that take 45 off per human hit), the
+      dodge arena (4 waves, ~50 s), the final lasers, and the full ending (sphere -> `nut_door13` drop -> the landing's
+      teleport to the dodge -> `nut_final_tp` -> `nut_final_win_detect`), each checked to its win on :5807
+    - [ ] Blue Sphere's bar shows the current segment only (GFL gives it `iterator: nut_boss_segment`, like
+      visualizer's Blue Particle); the stage thumbnails (`stages/*.webp`) aren't captured yet
   - [ ] **ze_ffvii_mako_reactor_v5_p** (3513334092) — 85, 5 laser templates; Heal Materia + 7 materia
   - [ ] **ze_ffvii_mako_reactor_v6_p** (3378273414) — 80, 12 laser templates; Heal Materia + 11 materia (Mimic, Barrier, Ultima ...)
   - [ ] **ze_offliner** (3559892707) — 84, 7 laser templates; no heal (Shockwave only)
