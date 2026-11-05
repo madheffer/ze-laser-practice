@@ -33,6 +33,7 @@ CS2 and its workshop folder are found from Steam's library list (`node tools/ste
 | ze_deadcore | 3351649726 |
 | ze_dreamin | 3415958616 |
 | ze_visualizer | 3261434415 |
+| ze_offliner | 3559892707 (the ending) |
 | ze_gris_p | 3633040749 (baked, no stages yet) |
 
 ## Database (runs and leaderboards)

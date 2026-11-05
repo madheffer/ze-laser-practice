@@ -1,0 +1,150 @@
+{
+  "map": "ze_offliner",
+  "title": "ze_offliner",
+  "workshop": "3559892707",
+  "description": "The ending: the Green Sphere's laser corridor, the 8 lasers after its floor breaks, and the look-up finale's falling blades and rings.",
+  "scenarios": [
+    {
+      "id": "ending_full",
+      "group": "Ending",
+      "full": true,
+      "name": "Ending (full)",
+      "summary": "Green Sphere, the 8 lasers, the look-up finale",
+      "description": "From the final door to the end: walk west through pushtoboss (each human adds 70 to end_laser_counter, which starts at 50, max 1500) and shoot the Green Sphere while its lasers come down the corridor. Its death (end_laser_counter OnHitMin) breaks the floor at +7 s, fires 8 final lasers at +12 to +18 s, opens the wall at +19.5 s to the teleport into the finale, where blades fall from the spinning maker above (+30.2 to +62 s) and rings drop (+32 to +62 s). Win when once_end_win (enabled at +66 s) fires final_nuke.",
+      "spawn": {
+        "origin": [
+          -8560,
+          4544,
+          320
+        ],
+        "yaw": 180
+      },
+      "start": [],
+      "player": {
+        "health": 100
+      },
+      "bosses": [
+        {
+          "target": "[PR#]end_laser_breakable",
+          "name": "Green Sphere",
+          "counter": "[PR#]end_laser_counter",
+          "counterMode": "hits"
+        }
+      ],
+      "win": {
+        "target": "[PR#]final_nuke",
+        "input": "Enable"
+      },
+      "cages": {
+        "[PR#]last_zm_dest": true
+      }
+    },
+    {
+      "id": "green_sphere",
+      "group": "Ending",
+      "name": "Green Sphere boss",
+      "summary": "Shoot the sphere, jump and duck its lasers",
+      "description": "Walk west through pushtoboss: add_hp_toboss adds 70 per human to end_laser_counter (starts at 50, max 1500; GFL's BossHUD shows it as \"Green Sphere\"). The sphere (end_laser_breakable) spawns at +0.5 s and takes hits from +3 s, each bullet 1 off the counter. From +1.5 s end_laser_timer fires a laser every 0.7-1.1 s from the sphere down the corridor at 1400 u/s: two low (jump), one high (duck) and two tilted 5 degrees. They kill, and each human they hit takes 40 off the counter. Win when the counter reaches 0 (end_laser_breakable.Break).",
+      "spawn": {
+        "origin": [
+          -8560,
+          4544,
+          320
+        ],
+        "yaw": 180
+      },
+      "start": [],
+      "player": {
+        "health": 100
+      },
+      "bosses": [
+        {
+          "target": "[PR#]end_laser_breakable",
+          "name": "Green Sphere",
+          "counter": "[PR#]end_laser_counter",
+          "counterMode": "hits"
+        }
+      ],
+      "win": {
+        "target": "[PR#]end_laser_breakable",
+        "input": "Break"
+      }
+    },
+    {
+      "id": "final_lasers",
+      "group": "Ending",
+      "name": "After the sphere: the 8 lasers",
+      "summary": "Cross the pillars, dodge 8 lasers",
+      "description": "Starts as the Green Sphere dies (end_laser_counter OnHitMin), on falldown_miss, where the map puts humans for this part. At +7 s ending_break drops the floor in front of you, leaving 7 pillars over a pit that kills (human-only trigger_hurt). final_laser_case fires 8 lasers at +12, 13, 14, 15, 15.7, 16.4, 17.2 and 18 s, each one of three heights (two to jump, one to duck), flying west at 1650 u/s from x -9384. At +19.5 s the wall on the sphere's platform breaks: win when you reach the teleport behind it.",
+      "spawn": {
+        "at": "[PR#]falldown_miss",
+        "yaw": 180
+      },
+      "setup": [
+        {
+          "target": "[PR#]ending_laser_bossspawn_template",
+          "input": "ForceSpawn"
+        },
+        {
+          "target": "[PR#]end_sphere_particle",
+          "input": "Start",
+          "delay": 0.05
+        }
+      ],
+      "start": [
+        {
+          "target": "[PR#]end_laser_counter",
+          "input": "SetValue",
+          "param": "0"
+        }
+      ],
+      "player": {
+        "health": 100
+      },
+      "win": {
+        "target": "[PR#]fog_controller",
+        "input": "Disable"
+      },
+      "cages": {
+        "[PR#]last_zm_dest": true
+      }
+    },
+    {
+      "id": "look_up",
+      "group": "Ending",
+      "name": "Finale: look up",
+      "summary": "Dodge the blades falling from above",
+      "description": "The arena the wall's teleport leads to (last_human_dest), 20.5 s after the sphere's death; the gradient fog is off, as the wall's teleport turns it off for every human who passes. From +24.8 s the maker above spins (very_end_rotate_cube, speed re-rolled every 0.02-0.04 s, sometimes reversed) and slides in and out on very_end_dodge_random_door. From +30.2 s it drops a blade every 0.06-0.09 s (1660 u/s, kills), from +32 s a ring falls every 2-4 s (l10, kills). Both stop at +62 s; win when once_end_win (enabled at +66 s) fires final_nuke.",
+      "spawn": {
+        "at": "[PR#]last_human_dest",
+        "yaw": 0
+      },
+      "start": [
+        {
+          "target": "[PR#]ending_laser_bossspawn_template",
+          "input": "ForceSpawn"
+        },
+        {
+          "target": "[PR#]end_laser_counter",
+          "input": "SetValue",
+          "param": "0",
+          "delay": 0.1
+        }
+      ],
+      "fastForward": 20.5,
+      "player": {
+        "health": 100
+      },
+      "win": {
+        "target": "[PR#]final_nuke",
+        "input": "Enable"
+      },
+      "setup": [
+        {
+          "target": "[PR#]fog_controller",
+          "input": "Disable"
+        }
+      ]
+    }
+  ]
+}

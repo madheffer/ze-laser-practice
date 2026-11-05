@@ -147,6 +147,8 @@ export async function loadMap(name, onProgress = () => {}, opts = {}) {
   const items = mapItems(entities, entwatch); // world/items.js: the map's EntWatch items, heals marked
   // the map's particle effects as the game has them (bake fx/), run by fx/particles; null for an older bake
   const effects = await MapEffects.load((rel) => url(rel), fetchJson);
+  // particles that draw a model (C_OP_RenderModels) take it from the map's own models
+  if (effects) { effects.getModel = getModel; effects.modelToSource = GLTF_TO_SOURCE; }
   const radar = radarInfo(overview, (rel) => url(rel));
   return { name, version, manifest, entities, collision, collisionFx, hulls, bounds, animations, world, chunks, loadChunk, getModel, particles: fx, items, radar, effects };
 }

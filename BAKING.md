@@ -21,6 +21,7 @@ make that from your own CS2 install. You need:
 | ze_ffxii_westersand_v8 | [3363745150](https://steamcommunity.com/sharedfiles/filedetails/?id=3363745150) |
 | ze_dreamin | [3415958616](https://steamcommunity.com/sharedfiles/filedetails/?id=3415958616) |
 | ze_visualizer | [3261434415](https://steamcommunity.com/sharedfiles/filedetails/?id=3261434415) |
+| ze_offliner | [3559892707](https://steamcommunity.com/sharedfiles/filedetails/?id=3559892707) |
 
 (Each `web/public/scenarios/<map>.json` names its workshop id; that list is where `--scenarios` reads them.)
 

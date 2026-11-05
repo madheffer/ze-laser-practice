@@ -328,7 +328,9 @@ sealed class Baker(string input, string outRoot, string? cs2, bool textures)
         File.WriteAllText(Path.Combine(outDir, "particles.json"), particles.ToJsonString(Json));
         Log($"particles: {particles.Count} effects");
         // 3c. fx/: the effects themselves (every system + texture) for the particle runtime (ParticleBake.cs)
-        ParticleBake.Write(loader, effects, outDir, Log, missing);
+        // + the models their C_OP_RenderModels draw (ze_offliner's lasers are models/offliner/laser.vmdl), exported below
+        //   with the entity models so the player finds them the same way (manifest renderModels, models/<path>.glb)
+        ParticleBake.Write(loader, effects, outDir, Log, missing, models);
 
         // 4. glbs: the static world, then each entity model on its own (the player places and moves them).
         var exporter = new GltfModelExporter(loader)
@@ -459,10 +461,12 @@ sealed class Baker(string input, string outRoot, string? cs2, bool textures)
                 });
             }
             var model = e.GetStringProperty("model");
-            // a model path becomes models/<path>.glb on disk and a URL in the player: only safe relative paths
+            // a model path becomes models/<path>.glb on disk and a URL in the player: only safe relative paths.
+            // Lower case: a VPK's entries are (resourcecompiler writes them so), CS2's file system is case-insensitive,
+            // and VRF's lookup isn't: ze_offliner's "Laser_Hurt2_988.vmdl" is "laser_hurt2_988.vmdl_c" in the package
             if (!string.IsNullOrEmpty(model))
             {
-                if (SafePath.Rel(model) is { } safeModel) models.Add(safeModel);
+                if (SafePath.Rel(model.ToLowerInvariant()) is { } safeModel) models.Add(safeModel);
                 else Log($"  model path refused: {SafePath.Describe(model)}");
             }
             var effect = e.GetStringProperty("effect_name");

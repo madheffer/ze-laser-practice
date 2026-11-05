@@ -57,7 +57,8 @@ static class ParticleBake
         return 0;
     }
 
-    public static void Write(GameFileLoader loader, IEnumerable<string> effects, string outDir, Action<string> log, ISet<string> missing)
+    // models: when given, gets every .vmdl the systems name (C_OP_RenderModels m_ModelList), for the caller to export
+    public static void Write(GameFileLoader loader, IEnumerable<string> effects, string outDir, Action<string> log, ISet<string> missing, ISet<string>? models = null)
     {
         var systems = new JsonObject();
         var textures = new JsonObject();
@@ -86,6 +87,7 @@ static class ParticleBake
                     if (n == null) continue;
                     if (n.EndsWith(".vpcf", StringComparison.Ordinal)) queue.Enqueue(n);
                     else if (n.EndsWith(".vtex", StringComparison.Ordinal)) texRefs.Add(n);
+                    else if (models != null && n.EndsWith(".vmdl", StringComparison.Ordinal) && SafePath.Rel(n) is { } safeModel) models.Add(safeModel);
                 }
             }
             catch (Exception ex) { log($"  particle {fx}: {ex.Message}"); }

@@ -359,9 +359,9 @@ export const ported_parents = {
   // Nothing new is simulated: every stream it reads is kept already. UNSETTLED: who reads +0x3ac / +0x3b0, and
   // the exact length rule (min / max length, m_flLengthFadeInTime) for the drawing side.
   C_OP_RenderTrails: { evidence: 'render', renderer: true },
-  // The three below are registered so they stop reporting as not implemented; drawing them is not ported (what it
-  // would need, from their fields, not their code): RenderModels a mesh per particle from m_ModelList, posed from
-  // position / radius / roll-yaw-pitch, tinted by colour and alpha; RenderProjected a projected material per
+  // The three below are registered so they stop reporting as not implemented. RenderModels is drawn by
+  // render/models.js (a map model per particle, from its fields: particles.dll's draw code is not traced); the other
+  // two are not ported (what it would need, from their fields): RenderProjected a projected material per
   // particle (m_vecProjectedMaterials) from position / radius / orientation; RenderSound a sound event per particle
   // (m_pszSoundName) for audio.js.
   C_OP_RenderModels: { evidence: 'render', renderer: true },

@@ -17,6 +17,7 @@ import { RopeRenderer } from './particles/render/ropes.js';
 import { TrailRenderer } from './particles/render/trails.js';
 import { LightRenderer } from './particles/render/lights.js';
 import { SoundRenderer } from './particles/render/sound.js';
+import { ModelRenderer } from './particles/render/models.js';
 import { liveMaterials } from './particles/render/spritecard.js';
 import { barnUniforms } from '../world/lighting.js';
 import { sceneCopyUniforms } from '../world/scenecopy.js';
@@ -106,6 +107,8 @@ export class MapEffects {
     this.reports = new Set();
     this.trace = null; // (from, dir, length, query) -> hit | null: fx/trace.js on the map collision
     this.onSound = null; // (request) -> void: C_OP_RenderSound's sound requests (render/sound.js); main.js hands them to audio.js
+    this.getModel = null; // (vmdl path) -> Promise<glTF scene> | null: C_OP_RenderModels' models (render/models.js); world/assets.js
+    this.modelToSource = null; // the matrix from those glTF scenes to Source units (world/assets.js GLTF_TO_SOURCE)
     this.instances = new Set(); // live EffectInstances, for .lights
     this._lights = [];
   }
@@ -145,6 +148,10 @@ export class MapEffects {
           }
           if (!data) return;
           systems.push({ path, data });
+          // the models it draws start loading now, not when its first particle is drawn (render/models.js)
+          for (const r of Array.isArray(data.m_Renderers) ? data.m_Renderers : []) {
+            if (r?._class === 'C_OP_RenderModels') for (const m of Array.isArray(r.m_ModelList) ? r.m_ModelList : []) if (m?.m_model) this.getModel?.(String(m.m_model));
+          }
           for (const c of Array.isArray(data.m_Children) ? data.m_Children : []) if (c?.m_ChildRef) await walk(norm(c.m_ChildRef));
         };
         await walk(root);
@@ -268,6 +275,7 @@ export class EffectInstance {
           else if (r.cls === 'C_OP_RenderTrails') rend = new TrailRenderer(fxShared, this.assets); // one streak per particle
           else if (r.cls === 'C_OP_RenderStandardLight') rend = new LightRenderer();
           else if (r.cls === 'C_OP_RenderSound') rend = new SoundRenderer((req) => this.effects.onSound?.(req));
+          else if (r.cls === 'C_OP_RenderModels') rend = new ModelRenderer(this.effects); // a map model per particle
           else { this.effects.report(`${r.cls} is not drawn`); rend = { update: () => ({ unsupported: [] }), dispose() {}, mesh: null }; }
           this.renderers.set(key, rend);
           if (rend.mesh) this.group.add(rend.mesh);
