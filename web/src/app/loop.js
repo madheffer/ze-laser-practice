@@ -91,6 +91,7 @@ export function frame(now) {
   G.renderer.showHitboxes = rule('hitboxes'); // a round's are the room's
   G.stream?.update(G.renderer.camera.position.toArray(camPos), G.renderer.lighting?.viewDistance ?? Infinity); // the world's chunks around the camera (Source units)
   G.renderer.lighting?.update(engine, G.renderer.camera); // the map's fog (its own entities + I/O), far Z, the sky
+  G.renderer.post?.update(engine); // the post_processing_volume the map's I/O has you in, fading (world/tonemap.js)
   G.renderer.updateEntities(engine ? engine.time + (live ? acc : 0) : 0);
   G.renderer.lighting?.setLights(S.map?.effects?.lights, G.renderer.camera); // particle lights, after the effects' update
   G.renderer.render();

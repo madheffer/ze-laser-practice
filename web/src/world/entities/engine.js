@@ -21,6 +21,7 @@ import './classes/physics.js';
 import './classes/server.js';
 import './classes/beams.js';
 import { fogState } from './classes/fog.js';
+import { postState } from './classes/post.js';
 import { breakSound, hitSound } from './sound.js';
 
 // Limits on what a map's data can make the engine do (a map is untrusted). Far above any real map:
@@ -374,6 +375,8 @@ export class EntityEngine {
 
   // the fog the player sees now (classes/fog.js): read by the renderer each frame
   fogState() { return fogState(this); }
+  // the post_processing_volume the player sees now and its fade (classes/post.js): read by world/tonemap.js
+  postState() { return postState(this); }
 
   // A new targetname (AddOutput targetname): move e in the name index.
   rename(e, name) {

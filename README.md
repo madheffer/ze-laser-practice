@@ -443,6 +443,10 @@ Invite link and who is alive (with each player's ping). Change stage and Setting
   `lighting/`: the lightmaps as their GPU blocks byte for byte (irradiance BC6H, directional irradiance DXT1, the sun's
   shadow mask BC7/BC4; uploaded compressed), the light probes box-filtered 4x per axis (`ProbeBake.cs`; the full grids are
   65-380 MB), and every `.vpost` (tonemap curve, bloom, 32^3 colour lookup).
+  - post_processing_volume (`world/entities/classes/post.js` + `world/tonemap.js`): CS2's FGD makes it a trigger ("while a
+    player is inside"), the master applies untouched, fadetime is the time to transition TO a volume. The map's I/O
+    turns volumes on and off; the one you touched last shows, the tone curve / exposure / lookup fading into it
+    (ze_deadcore's Insane D fades red over 20 s). A volume whose `.vpost` wasn't baked (a stock CS2 one) is skipped
   - the world (meshes with lightmap UVs, `TEXCOORD_1` x `uvScale`): irradiance shaped by the directional lightmap in tangent
     space (clamped direction, flatness boost, non-directional share), no other ambient; lights with `directlight 1` are in it
   - props and models (no lightmap): the probe volume's ambient cube (6 faces by the normal squared), sun masked by the

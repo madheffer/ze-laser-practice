@@ -5,9 +5,10 @@
   "scenarios": [
     {
       "id": "a_full",
-      "group": "Stage A",
+      "group": "Main stages",
       "full": true,
       "name": "Stage A (full)",
+      "summary": "All of Stage A: holds, cubes, train, lift",
       "description": "From the a_t1 teleport (des1) through the four holds (40/30/30/30 s) with three mini-boss cubes, the train boss and the lift. Win when a human reaches a_win_detecttrigger (a_nuke.Enable).",
       "spawn": {
         "origin": [
@@ -36,8 +37,9 @@
     },
     {
       "id": "a_boss",
-      "group": "Stage A",
+      "group": "Main stages",
       "name": "Stage A boss: block train",
+      "summary": "Ride the train, dodge the sliding blocks",
       "description": "a_boss_relay1: you ride a_boss_p1_train 14000 u west at 200 u/s (starts at +4 s, 70 s). Every 4.8 s a_boss_case1/2 slide one 570-unit block in from each side (a_boss_b1-6, 999999 damage) and pull the previous one back. Blocks are removed at +70 s.",
       "spawn": {
         "on": "[PR#]a_boss_p1",
@@ -79,9 +81,10 @@
     },
     {
       "id": "b_full",
-      "group": "Stage B",
+      "group": "Main stages",
       "full": true,
       "name": "Stage B (full)",
+      "summary": "All of Stage B: holds, cube boss, poles",
       "description": "From the b_t1 teleport through the holds, the cube boss (20 enemy4 kills or 112 s) and the pole escape. Win when a human reaches b_win_detecttrigger (b_nuke.Enable).",
       "spawn": {
         "origin": [
@@ -110,8 +113,9 @@
     },
     {
       "id": "b_boss",
-      "group": "Stage B",
+      "group": "Main stages",
       "name": "Stage B boss: enemy4 cubes",
+      "summary": "Shoot down 20 chasing cubes, dodge floor attacks",
       "description": "b_boss_relay1: three enemy4 cubes spawn at +5/6/7 s on the 2x6 grid (enemy4_maker1-12); each kill (1500 HP, no per-human scaling) spawns another and takes 1 off b_boss_counter1 (20). Cubes chase scanned humans and every 7 s stop and fire one of three floor patterns (2 s warning, 4 s of 40-damage hurt). The counter is forced to 0 at +112 s.",
       "spawn": {
         "origin": [
@@ -158,8 +162,9 @@
     },
     {
       "id": "b_escape",
-      "group": "Stage B",
+      "group": "Main stages",
       "name": "Stage B escape: lift and poles",
+      "summary": "Ride the lift, dodge the pole waves",
       "description": "b_boss_counter1 OnHitMin: the lift (b_escape_train) rises at +12 s, holds, b_escape_speedup sets speed 2 at +77 s while b_escape_pole_timer1 spawns pole waves every 1.35 s until +110 s; b_escape_push1 throws you up at +115.5 s. b_nuke at +130 s.",
       "spawn": {
         "on": "[PR#]b_escape_train",
@@ -200,9 +205,10 @@
     },
     {
       "id": "c_full",
-      "group": "Stage C",
+      "group": "Main stages",
       "full": true,
       "name": "Stage C (full)",
+      "summary": "All of Stage C: crystals, corridor, escape",
       "description": "From the c_t1 teleport: holds, 11 crystals (500 HP each) to break, the dodge corridor and the falling-block escape. Win at c_win_detecttrigger (c_nuke.Enable).",
       "spawn": {
         "origin": [
@@ -231,8 +237,9 @@
     },
     {
       "id": "c_dodge",
-      "group": "Stage C",
+      "group": "Main stages",
       "name": "Stage C boss: dodge corridor",
+      "summary": "Run the corridor through sweeping blocks",
       "description": "c_escape_relay1 +60 s puts you at des1. From +65 s c_dodge_spawntimer1 (1 s) spawns one block from each of two rows (4 + 5 makers at y -12278); each rises then sweeps +y 9756 u at 1200 u/s with a 400-damage hurt. Reach c_dodge_trigger at y -11255 to stop the spawns.",
       "spawn": {
         "origin": [
@@ -272,8 +279,9 @@
     },
     {
       "id": "c_escape",
-      "group": "Stage C",
+      "group": "Main stages",
       "name": "Stage C escape: rising platforms and blocks",
+      "summary": "Climb rising platforms through a block storm",
       "description": "c_escape_relay1 +148 s: c_escape_timer1 spawns rising platforms every 1.29 s and from +152 s c_escape_block_timer1 fires one of 24 block makers every 0.2 s (0.1 s from +186 s): 128-unit blocks, 999999 damage, moving 6700 u at 2000 u/s. Spawns stop at +201/202 s.",
       "spawn": {
         "origin": [
@@ -302,9 +310,10 @@
     },
     {
       "id": "d_way",
-      "group": "Stage D / Insane D",
+      "group": "Main stages",
       "full": true,
       "name": "Stage D: the way to the core",
+      "summary": "Descend to the core: holds, meteors, radiation",
       "description": "d_p1 lowers you 9000 u; d_relay1 then runs 210 s of holds and lifts (d_p2-d_p4, d_t2/d_t3 teleports) with four mini-boss cubes, d_meteor_detecttrigger meteors on every human and the 50-damage radiation floor (d_trigger). Ends when radiation_startrelay1 fires.",
       "spawn": {
         "at": "[PR#]des1",
@@ -328,11 +337,47 @@
       }
     },
     {
-      "id": "dex_way",
-      "group": "Stage D / Insane D",
+      "id": "redcore_full",
+      "group": "Redcore",
       "full": true,
+      "name": "Redcore (full Insane D)",
+      "summary": "Red map, 1 HP descent, insane core, escape",
+      "description": "The round after a win on D (d_win_detecttrigger OnUser1 -> level_counter 8 -> level_case OnCase09 -> stage_d_ex_relay). d_ex_relay (s_prelay1 +34.3 s) enables cc_red (deadcore.vpost, 20 s fade) and d_ex_hp_trigger.CountPlayersInZone 12 s in: every human outside the zone (all of you) is set to 90, 80 ... 1 HP over 18 s (d_ex_hp_filter). Four enemy2 cubes with 6500 HP on the way down; d_trigger_radiation's warp into the core sets 100 HP again. radiation_ex_startrelay1: the core on radiation_attackcase4 (10 segments of 300 + 56 x humans hits) and invert (deadcore_2.vpost) 12 s in; its death runs escape_relay_ex (faster lasers, meteors, the ex press). Win at d_nuke.Enable (+123 s).",
+      "spawn": {
+        "at": "[PR#]des1",
+        "yaw": 0
+      },
+      "start": [
+        {
+          "target": "[PR#]stage_d_ex_relay",
+          "input": "Trigger"
+        },
+        {
+          "target": "[PR#]s_prelay1",
+          "input": "Trigger",
+          "delay": 2.9
+        }
+      ],
+      "fastForward": 37.5,
+      "bosses": [
+        {
+          "target": "[PR#]radiation_target",
+          "name": "Radiation core",
+          "counter": "[PR#]radiation_hpcounter",
+          "counterMode": "hits"
+        }
+      ],
+      "win": {
+        "target": "[PR#]d_nuke",
+        "input": "Enable"
+      }
+    },
+    {
+      "id": "dex_way",
+      "group": "Redcore",
       "name": "Insane D: the way to the core",
-      "description": "stage_d_ex_relay: as Stage D, but 12 s after d_ex_relay d_ex_hp_trigger.CountPlayersInZone drains every human outside the zone to 1 HP over 18 s (d_ex_hp_filter: 90, 80 ... 1; game_zone_player is not implemented yet), the cubes are four enemy2 with 6500 HP and the core runs radiation_attackrelay4 (insane attacks + huge meteor).",
+      "summary": "The red descent: drained to 1 HP",
+      "description": "stage_d_ex_relay: as Stage D, but 12 s after d_ex_relay cc_red fades the map red (20 s) and d_ex_hp_trigger.CountPlayersInZone (game_zone_player) fires OnPlayerOutZone for every human outside its zone: d_ex_hp_filter (team 3) sets 90, 80 ... 1 HP over 18 s. The cubes are four enemy2 with 6500 HP. d_trigger_radiation's warp into the core sets 100 HP again. Ends when radiation_ex_startrelay1 fires.",
       "spawn": {
         "at": "[PR#]des1",
         "yaw": 0
@@ -356,9 +401,10 @@
     },
     {
       "id": "core",
-      "group": "Core",
+      "group": "Core (ending)",
       "full": true,
       "name": "Radiation core (normal)",
+      "summary": "The radiation core boss, every attack",
       "description": "10 segments of 300 + 41 x humans hits (radiation_target OnHealthChanged -> radiation_hpcounter.Subtract 1; radiation_hptrigger adds 41 per human each segment). Attacks every 8-17 s: phase 1 (attackcase1), phase 2 after 3 segments, phase 3 after 6. Damageable from +25 s; at +164 s the timeover hurt (20) is enabled.",
       "spawn": {
         "origin": [
@@ -401,9 +447,10 @@
     },
     {
       "id": "core_insane",
-      "group": "Core",
+      "group": "Redcore",
       "name": "Radiation core (Insane D)",
-      "description": "radiation_ex_startrelay1: 10 segments of 300 + 56 x humans hits (stage_d_ex_relay adds +15 per human), attacks from radiation_attackcase4 (laser2, press4, beam2, link4, ball_4, meteor4, huge meteor) every 4-15 s.",
+      "summary": "The core boss on Insane: harder attacks, faster",
+      "description": "radiation_ex_startrelay1: 10 segments of 300 + 56 x humans hits (stage_d_ex_relay adds +15 per human), attacks from radiation_attackcase4 (laser2, press4, beam2, link4, ball_4, meteor4, huge meteor) every 4-15 s. The relay enables cc_red (red) at once and invert (deadcore_2.vpost, hues turned around) 12 s in, which stays on screen through the fight.",
       "spawn": {
         "origin": [
           0,
@@ -452,6 +499,7 @@
       "group": "Core",
       "parent": "core",
       "name": "Core: altar lasers (1 wave)",
+      "summary": "Jump the sweeping altar lasers",
       "description": "8 altars (radiation_laser_temp1-8) rise and sweep a 2620-wide, 200-tall laser (300 damage, 150 per touch) while the ring turns; speed ramps 1 -> 0 over 6 s.",
       "spawn": {
         "origin": [
@@ -490,6 +538,7 @@
       "group": "Core",
       "parent": "core",
       "name": "Core: altar lasers (2 waves)",
+      "summary": "Two waves of altar lasers, both ways",
       "description": "As laser1 twice: second wave 2 s later in the other direction (radiation_laser_rotaterev).",
       "spawn": {
         "origin": [
@@ -528,6 +577,7 @@
       "group": "Core",
       "parent": "core",
       "name": "Core: press (1 layer)",
+      "summary": "Find the gap in 1 press layer",
       "description": "radiation_press1_core1 rises at 2000 u/s from +0.35 s; 1 of the 5 press patterns (radiation_press1_case1) spawn on it, their 999999-damage hurts are live from +6.95 s; it returns at 1200 u/s at +7 s.",
       "spawn": {
         "origin": [
@@ -566,6 +616,7 @@
       "group": "Core",
       "parent": "core",
       "name": "Core: press (2 layers)",
+      "summary": "Find the gap in 2 press layers",
       "description": "radiation_press1_core1 rises at 2000 u/s from +0.35 s; 2 of the 5 press patterns (radiation_press1_case1) spawn on it, their 999999-damage hurts are live from +6.95 s; it returns at 1200 u/s at +7 s.",
       "spawn": {
         "origin": [
@@ -604,6 +655,7 @@
       "group": "Core",
       "parent": "core",
       "name": "Core: press (3 layers)",
+      "summary": "Find the gap in 3 press layers",
       "description": "radiation_press1_core1 rises at 2000 u/s from +0.35 s; 3 of the 5 press patterns (radiation_press1_case1) spawn on it, their 999999-damage hurts are live from +6.95 s; it returns at 1200 u/s at +7 s.",
       "spawn": {
         "origin": [
@@ -642,6 +694,7 @@
       "group": "Core",
       "parent": "core",
       "name": "Core: press (4 layers)",
+      "summary": "Find the gap in 4 press layers",
       "description": "radiation_press1_core1 rises at 2000 u/s from +0.35 s; 4 of the 5 press patterns (radiation_press1_case1) spawn on it, their 999999-damage hurts are live from +6.95 s; it returns at 1200 u/s at +8 s.",
       "spawn": {
         "origin": [
@@ -680,6 +733,7 @@
       "group": "Core",
       "parent": "core",
       "name": "Core: beams (slow)",
+      "summary": "Dodge a slow spray of spinning beams",
       "description": "radiation_beam_timer1 spawns a beam every 0.2 s for 10 s from the spinning radiation_beam_rotate1 (440 deg/s); each beam opens left/right and travels for 2.7 s, 20 damage (10 per touch).",
       "spawn": {
         "origin": [
@@ -718,6 +772,7 @@
       "group": "Core",
       "parent": "core",
       "name": "Core: beams (fast)",
+      "summary": "Dodge a fast spray of spinning beams",
       "description": "As beam1 with radiation_beam_timer2: a beam every 0.1 s.",
       "spawn": {
         "origin": [
@@ -756,6 +811,7 @@
       "group": "Core",
       "parent": "core",
       "name": "Core: link lasers 1",
+      "summary": "Jump the slow spinning link lasers",
       "description": "radiation_link_basemove1 rises 1700 u; from +4 s two 2243-long link lasers (z +-152 around the link, 20 damage) spin (link rotate speed 0.33, base ramps to 1) until +14 s.",
       "spawn": {
         "origin": [
@@ -794,6 +850,7 @@
       "group": "Core",
       "parent": "core",
       "name": "Core: link lasers 2",
+      "summary": "Spinning link lasers, medium speed",
       "description": "radiation_link_basemove1 rises 1700 u; from +4 s two 2243-long link lasers (z +-152 around the link, 20 damage) spin (link rotate speed 0.66, base ramps to 1) until +14 s.",
       "spawn": {
         "origin": [
@@ -832,6 +889,7 @@
       "group": "Core",
       "parent": "core",
       "name": "Core: link lasers 3",
+      "summary": "Spinning link lasers, medium speed",
       "description": "radiation_link_basemove1 rises 1700 u; from +4 s two 2243-long link lasers (z +-152 around the link, 20 damage) spin (link rotate speed 0.66, base ramps to 1) until +14 s.",
       "spawn": {
         "origin": [
@@ -870,6 +928,7 @@
       "group": "Core",
       "parent": "core",
       "name": "Core: link lasers 4",
+      "summary": "Spinning link lasers, full speed",
       "description": "radiation_link_basemove1 rises 1700 u; from +4 s two 2243-long link lasers (z +-152 around the link, 20 damage) spin (link rotate speed 1, base ramps to 1) until +14 s.",
       "spawn": {
         "origin": [
@@ -908,6 +967,7 @@
       "group": "Core",
       "parent": "core",
       "name": "Core: balls (1 wave)",
+      "summary": "Dodge the balls flying out, 1 wave",
       "description": "All 16 radiation_ball_maker spawn a ball 1 time (1 s apart); each ball (100x100x140, 20 damage) flies out (func_door) and is closed back at +12 s.",
       "spawn": {
         "origin": [
@@ -946,6 +1006,7 @@
       "group": "Core",
       "parent": "core",
       "name": "Core: balls (2 waves)",
+      "summary": "Dodge the balls flying out, 2 waves",
       "description": "All 16 radiation_ball_maker spawn a ball 2 times (1 s apart); each ball (100x100x140, 20 damage) flies out (func_door) and is closed back at +12 s.",
       "spawn": {
         "origin": [
@@ -984,6 +1045,7 @@
       "group": "Core",
       "parent": "core",
       "name": "Core: balls (3 waves)",
+      "summary": "Dodge the balls flying out, 3 waves",
       "description": "All 16 radiation_ball_maker spawn a ball 3 times (1 s apart); each ball (100x100x140, 20 damage) flies out (func_door) and is closed back at +12 s.",
       "spawn": {
         "origin": [
@@ -1022,6 +1084,7 @@
       "group": "Core",
       "parent": "core",
       "name": "Core: balls (5 waves)",
+      "summary": "Dodge the balls flying out, 5 waves",
       "description": "All 16 radiation_ball_maker spawn a ball 5 times (1 s apart); each ball (100x100x140, 20 damage) flies out (func_door) and is closed back at +12 s.",
       "spawn": {
         "origin": [
@@ -1060,6 +1123,7 @@
       "group": "Core",
       "parent": "core",
       "name": "Core: meteors on you (every 3.5 s)",
+      "summary": "Keep moving: a meteor on you every 3.5 s",
       "description": "radiation_meteor_timer (3.5 s) pulses radiation_meteor_detecttrigger, which drops a meteor at each human (ForceSpawnAtEntityOrigin !activator): 3.8 s warning, then a 220x220x180 hurt for 0.1 s (100 damage, 50 per touch). Keep moving.",
       "spawn": {
         "origin": [
@@ -1098,6 +1162,7 @@
       "group": "Core",
       "parent": "core",
       "name": "Core: meteors on you (every 3 s)",
+      "summary": "Keep moving: a meteor on you every 3 s",
       "description": "radiation_meteor_timer (3 s) pulses radiation_meteor_detecttrigger, which drops a meteor at each human (ForceSpawnAtEntityOrigin !activator): 3.8 s warning, then a 220x220x180 hurt for 0.1 s (100 damage, 50 per touch). Keep moving.",
       "spawn": {
         "origin": [
@@ -1136,6 +1201,7 @@
       "group": "Core",
       "parent": "core",
       "name": "Core: meteors on you (every 2.5 s)",
+      "summary": "Keep moving: a meteor on you every 2.5 s",
       "description": "radiation_meteor_timer (2.5 s) pulses radiation_meteor_detecttrigger, which drops a meteor at each human (ForceSpawnAtEntityOrigin !activator): 3.8 s warning, then a 220x220x180 hurt for 0.1 s (100 damage, 50 per touch). Keep moving.",
       "spawn": {
         "origin": [
@@ -1174,6 +1240,7 @@
       "group": "Core",
       "parent": "core",
       "name": "Core: meteors on you (every 2 s)",
+      "summary": "Keep moving: a meteor on you every 2 s",
       "description": "radiation_meteor_timer (2 s) pulses radiation_meteor_detecttrigger, which drops a meteor at each human (ForceSpawnAtEntityOrigin !activator): 3.8 s warning, then a 220x220x180 hurt for 0.1 s (100 damage, 50 per touch). Keep moving.",
       "spawn": {
         "origin": [
@@ -1212,6 +1279,7 @@
       "group": "Core",
       "parent": "core",
       "name": "Core: guard cubes",
+      "summary": "Break the guard cubes on the platforms",
       "description": "radiation_guard_case1 picks red/green/blue: 3 s later all 8 radiation_enemyN_maker spawn that cube type on the 8 platforms (enemy1 chasers 1500 HP / enemy2 crosses 2400 HP / enemy3 slow fields 2000 HP). The next attack breaks them.",
       "spawn": {
         "origin": [
@@ -1250,6 +1318,7 @@
       "group": "Core",
       "parent": "core",
       "name": "Core: huge meteor (Insane)",
+      "summary": "Get off the two marked platforms",
       "description": "radiation_hugemeteor_case1 picks 2 of the 8 platforms: the meteor drops on each and radiation_hugemeteor_hurt_platformN (1200x1200, 66 damage) is live from +8 to +9 s. Get off the marked platforms.",
       "spawn": {
         "origin": [
@@ -1289,9 +1358,10 @@
     },
     {
       "id": "escape",
-      "group": "Core",
+      "group": "Core (ending)",
       "full": true,
       "name": "Final escape (normal)",
+      "summary": "Final escape: beams, jump lasers, the press",
       "description": "escape_common_relay: at +17 s escape_humantele puts you at (-5 -192 198). Beams (escape_beam_timer1, 7.5 s, 300 damage) from +44 s, platforms from +45 s, jump/duck lasers (escape_laser_timer1, 3.5 s, 300) from +52 s, the press at +92 s, final lasers (999999) at +108-110.6 s. d_win_detecttrigger opens at +120 s; d_nuke at +123 s.",
       "spawn": {
         "origin": [
@@ -1315,9 +1385,10 @@
     },
     {
       "id": "escape_insane",
-      "group": "Core",
+      "group": "Redcore",
       "name": "Final escape (Insane D)",
-      "description": "escape_relay_ex: lasers every 2.5 s, escape_ex_meteor_detecttrigger meteors from +21 s, escape_ex_press_relay at +92 s. d_nuke at +123 s.",
+      "summary": "Insane escape: faster lasers and meteors",
+      "description": "escape_relay_ex: lasers every 2.5 s, escape_ex_meteor_detecttrigger meteors from +21 s, escape_ex_press_relay at +92 s. cc_red and invert start on, as the core leaves them; 1 round in 6 the music case picks \"prank D\" (music_d_ex_escape_prankd: both off at +1.3 s, \"Stage - D\", \"Just kidding\", the relay turns them back on at +13 s, red on top). d_nuke (+123 s) lives in Stage D's template (d_temp), which this drill doesn't spawn, so the win is the clock.",
       "spawn": {
         "origin": [
           -5,
@@ -1327,6 +1398,15 @@
         "yaw": 90
       },
       "start": [
+        {
+          "target": "[PR#]cc_red",
+          "input": "Enable"
+        },
+        {
+          "target": "[PR#]invert",
+          "input": "Enable",
+          "delay": 0.05
+        },
         {
           "target": "[PR#]escape_relay_ex",
           "input": "FireUser1"
@@ -1344,6 +1424,7 @@
       "id": "enemy1",
       "group": "Mini bosses",
       "name": "Enemy1: chaser cube",
+      "summary": "A cube that hunts you down",
       "description": "Stage A spot 1. A 1000-u radar beam (enemy1_filtertrigger1, 400 deg/s) tags a human (context target, 5 s) and wakes it; enemy1_triggerl/r/u/d (wait 0.3) fire the matching phys_thruster (1000, mass-independent) for 1 s toward tagged humans. Touching it: 50-damage hurt (25 per touch) plus four 300 u/s pushes up-and-out. Core 1500 HP, shootable once awake.",
       "spawn": {
         "origin": [
@@ -1392,6 +1473,7 @@
       "id": "enemy2",
       "group": "Mini bosses",
       "name": "Enemy2: cross laser cube",
+      "summary": "Crouch under a spinning laser cross",
       "description": "Stage C spot 1. Wakes when a human enters its 1300x1300 box (enemy2_trigger1); 2.2 s later a 1300-long laser cross (2 x enemy2_hurt1, 40 damage, 20 per touch) spins at 50 deg/s around the core, 59 u above the floor: crouch under it. Core 2400 HP (6500 in Insane D).",
       "spawn": {
         "origin": [
@@ -1440,6 +1522,7 @@
       "id": "enemy2_insane",
       "group": "Mini bosses",
       "name": "Enemy2 (Insane D): 6500 HP",
+      "summary": "The cross-laser cube with 6500 HP",
       "description": "As enemy2 with d_ex_enemy_relay's SetHealth(6500).",
       "spawn": {
         "origin": [
@@ -1494,6 +1577,7 @@
       "id": "enemy3",
       "group": "Mini bosses",
       "name": "Enemy3: slow field cube",
+      "summary": "Kill the cube inside its slowing field",
       "description": "Stage B spot 1. Wakes on its 1200x1200 box (enemy3_trigger1); from +2 s enemy3_timer1 pulses enemy3_slow1 (1200x1200x112) every 0.2 s: each touch sets speed 0.1, back to 1 over 2.6 s, so inside the field you crawl. Core 2000 HP.",
       "spawn": {
         "origin": [
@@ -1542,6 +1626,7 @@
       "id": "enemy4",
       "group": "Mini bosses",
       "name": "Enemy4: attack cube (Stage B boss)",
+      "summary": "A chasing cube with floor attacks",
       "description": "One enemy4 at enemy4_maker1. Shootable at once (1500 HP). Radar tags humans; four thrusters (1100) chase. Every 7 s (enemy4_attack_timer1) it stops (DisableMotion) and one of 3 floor patterns (650x650) telegraphs for 2 s, then hurts for 4 s (40 damage, 20 per touch).",
       "spawn": {
         "origin": [
