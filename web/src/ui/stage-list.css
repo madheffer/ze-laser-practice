@@ -5,6 +5,10 @@
 /* ---- the picked map's header: title, what it is, the part chips, the heal option */
 .map-head { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
 .map-title { margin: 0; font: 700 24px/1.1 'Stratum2', 'Segoe UI', sans-serif; letter-spacing: 0.04em; text-transform: uppercase; }
+.map-title-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 14px; }
+/* the map's leaderboard (ui/rankings.js) */
+.sl-boards { min-height: 32px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--sel-border); background: var(--sel-bg); color: var(--text); font-family: inherit; font-size: 12.5px; font-weight: 650; cursor: pointer; }
+.sl-boards:hover { border-color: #5d738a; color: #fff; }
 .map-sub { margin: 0; font-size: 13px; color: var(--dim); max-width: 90ch; }
 
 .sl-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; font: 600 12.5px 'Segoe UI', sans-serif; } /* buttons inherit it (a screen may set button { font: inherit }) */

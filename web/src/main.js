@@ -39,6 +39,7 @@ import { Killfeed } from './ui/killfeed.js';
 import { installChat } from './app/chat.js';
 import { Lobby } from './ui/lobby.js';
 import { Home } from './ui/home.js';
+import { Rankings } from './ui/rankings.js';
 import { RoomScreen } from './ui/room.js';
 import { PauseScreen } from './ui/pause.js';
 import { LoadingScreen } from './ui/loading.js';
@@ -375,8 +376,14 @@ function goHome() {
   G.menu.update();
 }
 const toMenu = () => { G.home.hide(); G.menu.show(G.menu.view); };
+// leaderboards + profiles (ui/rankings.js): over the home page or the menu; Play opens a map's stage list
+G.rankings = new Rankings({
+  maps: () => S.mapIndex,
+  onWatch: (id) => G.watchReplay(id),
+  onPlay: (name) => { G.home.hide(); G.menu.show('maps'); openMap(name); },
+});
 G.home = new Home($('#home'), {
-  net, mapTitle: (name) => S.mapIndex.find((m) => m.name === name)?.title || name,
+  net, rankings: G.rankings, mapTitle: (name) => S.mapIndex.find((m) => m.name === name)?.title || name,
   on: {
     play: () => { G.home.hide(); showMaps(); },
     find: () => { toMenu(); G.lobby.go('browse'); },

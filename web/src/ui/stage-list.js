@@ -3,7 +3,7 @@
 // lib/stage-groups.js: Main stages, the ending, special modes, Mini bosses; free roam last), each a grid of compact cards (ui/stage-card.js): about five a row on a desktop, two on a
 // phone. A boss's single attacks fold into a drawer under its part's grid. Arrow keys move between cards.
 import './stage-list.css';
-import { S } from '../app/state.js';
+import { S, G } from '../app/state.js';
 import { $ } from '../lib/dom.js';
 import { groupStages } from '../lib/stage-groups.js';
 import { settings, saveSettings } from '../app/settings.js';
@@ -40,7 +40,12 @@ export function renderStageList(info, onPick) {
 
   const title = el('h2', 'map-title', {}, displayName(info.title || S.map.name));
   const sub = el('p', 'map-sub', {}, info.description || S.map.name);
-  head.replaceChildren(title, sub);
+  // this map's leaderboard (ui/rankings.js), beside its title
+  const boards = el('button', 'sl-boards', { type: 'button', title: 'Who holds the records on this map' }, 'Leaderboard');
+  boards.addEventListener('click', () => G.rankings?.showMap(map));
+  const row = el('div', 'map-title-row');
+  row.append(title, boards);
+  head.replaceChildren(row, sub);
   if (parts.length > 2) head.append(chips(parts, sections));
   const heal = healToggle();
   if (heal) head.append(heal);

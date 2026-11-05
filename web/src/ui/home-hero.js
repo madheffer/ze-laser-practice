@@ -15,10 +15,16 @@ const RESUME_MS = 2500; // after a touch / wheel / focus leaves
 function el(tag, cls, t) { const e = document.createElement(tag); if (cls) e.className = cls; if (t != null) e.textContent = t; return e; }
 const reducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+// a map's screenshot URLs (its index.json entry), in its own order
+const shotUrlsOf = (m) => (isMapName(m?.name) && Array.isArray(m.shots) ? m.shots.filter((f) => typeof f === 'string' && SHOT.test(f)) : [])
+  .map((f) => versioned(`maps/${m.name}/shots/${f}`, m.version));
+
+// a map's first screenshot URL, or null (the leaderboards' and profiles' map art, ui/rank-bits.js)
+export const mapShot = (m) => shotUrlsOf(m)[0] ?? null;
+
 // every (map, screenshot) pair, maps interleaved so one map's shots don't all sit together
 export function shotsOf(maps) {
-  const per = maps.filter((m) => isMapName(m.name)).map((m) => (Array.isArray(m.shots) ? m.shots.filter((f) => typeof f === 'string' && SHOT.test(f)) : [])
-    .map((f) => ({ map: m, url: versioned(`maps/${m.name}/shots/${f}`, m.version) })));
+  const per = maps.filter((m) => isMapName(m.name)).map((m) => shotUrlsOf(m).map((url) => ({ map: m, url })));
   const out = [];
   for (let i = 0; per.some((l) => i < l.length); i++) for (const l of per) if (l[i]) out.push(l[i]);
   return out;

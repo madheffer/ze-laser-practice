@@ -11,7 +11,6 @@ import { Backdrop, Strip, shotsOf } from './home-hero.js';
 import { HomeFeed } from './home-feed.js';
 import { account, onAccount, signOut } from '../app/account.js';
 import { steamButton } from './steam-button.js';
-import { Profile } from './profile.js';
 
 function el(tag, cls, t) { const e = document.createElement(tag); if (cls) e.className = cls; if (t != null) e.textContent = t; return e; }
 
@@ -20,17 +19,19 @@ const ICON = { // constant SVG, never data
   play: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z" fill="currentColor"/></svg>',
   find: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6" fill="none" stroke="currentColor" stroke-width="2"/><path d="M15 15l5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
   make: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>',
+  trophy: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h10v5a5 5 0 0 1-10 0V4zM7 6H4v1.5A3.5 3.5 0 0 0 7.5 11M17 6h3v1.5a3.5 3.5 0 0 1-3.5 3.5M12 14v3M8.5 20h7M9.5 17h5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
 };
 
 export class Home {
-  // net: CoopClient; mapTitle(name); on: { play(), find(), make(), join(code), map(name), settings(), watch(replay id) }
-  constructor(root, { net, mapTitle, on }) {
+  // net: CoopClient; mapTitle(name); rankings: ui/rankings.js's (leaderboards + profiles);
+  // on: { play(), find(), make(), join(code), map(name), settings(), watch(replay id) }
+  constructor(root, { net, mapTitle, rankings, on }) {
+    this.rankings = rankings;
     this.root = root;
     this.on = on;
     this.mapTitle = mapTitle;
     this.feed = new HomeFeed({ net, mapTitle, onStats: (s) => this.stats(s), onWatch: (id) => on.watch(id), onPlayer: (id) => this.showPlayer(id) });
     this.build();
-    this.profile = new Profile(root, { mapTitle, onWatch: (id) => on.watch(id) });
     onAccount(() => this.renderAccount());
   }
 
@@ -55,7 +56,14 @@ export class Home {
     // Steam: sign in (a link: Steam's own page, then back here), or who you are + sign out
     this.accountBox = el('div', 'home-account');
     const navEnd = el('div', 'home-nav-end');
-    navEnd.append(this.pill, this.accountBox, settings);
+    // the leaderboards, per map (ui/rankings.js)
+    const boards = el('button', 'home-link home-boards');
+    boards.type = 'button';
+    boards.title = 'Leaderboards';
+    boards.innerHTML = ICON.trophy; // a constant
+    boards.append(el('span', null, 'Leaderboards'));
+    boards.addEventListener('click', () => this.rankings.showMap(null));
+    navEnd.append(this.pill, boards, this.accountBox, settings);
     this.renderAccount();
     nav.append(brand, navEnd);
 
@@ -133,12 +141,12 @@ export class Home {
       const out = el('button', 'home-link', 'Sign out');
       out.type = 'button';
       out.addEventListener('click', () => signOut());
-      // you: opens your profile (ui/profile.js)
+      // you: opens your profile (ui/rankings.js)
       const who = el('button', 'home-who');
       who.type = 'button';
       who.title = 'Your profile';
       who.append(el('span', 'home-user', account.user.name));
-      who.addEventListener('click', () => this.profile.show(account.user.steamId));
+      who.addEventListener('click', () => this.rankings.showPlayer(account.user.steamId));
       // their Steam avatar (app/account.js checked the URL: Steam's CDN only); none without the server's Steam API key
       if (account.user.avatar) {
         const img = el('img', 'home-avatar');
@@ -176,7 +184,7 @@ export class Home {
   // a player's profile, over the home page (a ?player=<SteamID64> link, a name in the feed, your account)
   showPlayer(steamId) {
     if (!this.open) this.show();
-    this.profile.show(steamId);
+    this.rankings.showPlayer(steamId);
   }
 
   show() {
@@ -192,7 +200,7 @@ export class Home {
 
   hide() {
     if (this.root.hidden) return;
-    this.profile.close();
+    this.rankings.close(); // a run (yours, or a round starting) takes over from a profile or a board too
     this.root.hidden = true;
     document.body.classList.remove('at-home');
     document.getElementById('menu')?.removeAttribute('inert');

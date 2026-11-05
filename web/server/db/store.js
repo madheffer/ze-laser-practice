@@ -3,18 +3,25 @@
 //
 //   addRun(run) -> id                       a finished run (shape below), already cleaned by the caller
 //   recentRuns(limit)                       the feed's runs (listed), newest first, for the home page after a restart
-//   leaderboard({ map, stage, mode, kind, limit })   each player's best ranked run (rules: migrations/001_runs.sql,
-//                                           the ranked_runs view), best first; a player is their SteamID when
-//                                           signed in, else their name
+//   leaderboard({ map, stage, mode, kind, limit, player })   one stage's board (db/boards.js): each Steam account's
+//                                           best ranked run (rules: the ranked_runs view, migrations/001-003), best
+//                                           first -> { rows: [{ rank, name, avatar, time, hits, at, verified, steam,
+//                                           steamId, replay: id when public | null }], total (players on it),
+//                                           me: player's row (a SteamID) when it is below the top `limit` | null }
+//   mapBoard({ map, kind, sort, limit, player })   a whole map: { stages: [{ stageId, stageName, mode, players,
+//                                           top: { steamId, name, avatar, time, hits, at } }] (every board's record),
+//                                           rows: [{ rank, steamId, name, avatar, cleared, records, podiums, wins }]
+//                                           (sort: boards.js MAP_SORTS), total, me } (me as leaderboard's)
 //   upsertPlayer({ steamId, name, avatar }) on every Steam sign-in: the account (created the first time)
 //   player(steamId)                         -> { steamId, name, avatar, createdAt, seenAt } | null
 //   playerRuns(steamId, limit)              a signed-in player's run history, newest first
 //   profile(steamId)                        their public profile, from listed runs only (never a private room's:
 //                                           those have no people; wins without cheat rules; cleared = distinct
 //                                           stages with a ranked clear): { totals: { runs, wins, cleared, solo, coop,
-//                                           versus }, best: [{ map, stageId, stageName, mode, kind, time, hits, at,
-//                                           verified }] (ranked rules, one per map/stage/mode/kind, byStage),
-//                                           recent: [{ id, kind, map, stageName, mode, result, time, won, hits,
+//                                           versus, records, podiums }, best: [{ map, stageId, stageName, mode, kind,
+//                                           time, hits, at, verified, place, of }] (ranked rules, one per
+//                                           map/stage/mode/kind, byStage; place / of: where they stand on that public
+//                                           board and how many are on it), maps: boards.js profileMaps, recent: [{ id, kind, map, stageName, mode, result, time, won, hits,
 //                                           survived, at, replay: id when public | null, views }] newest first }
 //   getReplay(id)                           a run's replay: { runId, owner, public, meta, data (gzip), run } or null
 //   shareReplay(id, owner, on) -> bool      the owner shares (keeps) or unshares one of their replays
@@ -32,6 +39,9 @@
 // Replays (migrations/002_players_replays.sql): a signed-in player keeps their newest REPLAYS_KEPT plus every one
 // they shared from their history (pinned, at most PINNED_MAX); a guest's (shared to the feed) last GUEST_DAYS days, and
 // only the newest GUEST_KEPT of those.
+import { better, boardsOf, boardKey, mapStanding, byStanding, profileMaps } from './boards.js';
+
+export { better };
 export const BOARD_MAX = 100;
 export const REPLAYS_KEPT = 200;
 export const GUEST_DAYS = 14;
@@ -49,11 +59,12 @@ function ranked(run, p) {
   return run.result === 'win' && p.won ? run.time : null;
 }
 
-// best first: endless = longest survived; normal = fastest, then fewest hits; ties go to whoever did it first
-export function better(mode, a, b) {
-  if (a.time !== b.time) return mode === 'endless' ? b.time - a.time : a.time - b.time;
-  if (mode !== 'endless' && (a.hits ?? Infinity) !== (b.hits ?? Infinity)) return (a.hits ?? Infinity) - (b.hits ?? Infinity);
-  return a.at - b.at;
+// a board's top `limit` and the player's own row below it (store.js leaderboard / mapBoard: { rows, total, me })
+// list: ranked rows (rank, steamId), at least the top `limit` and the player's; total: players on the whole board
+export function topAndMe(list, limit, player, total = list.length) {
+  const rows = list.filter((r) => r.rank <= limit);
+  const mine = player ? list.find((r) => r.steamId === player) : null;
+  return { rows, total, me: mine && mine.rank > limit ? mine : null };
 }
 
 // a profile's best times: by map, then stage, then normal before endless, solo before co-op before versus
@@ -72,6 +83,20 @@ export function memoryStore() {
   const players = new Map();
   let nextId = 1;
   const byId = (id) => runs.find((r) => r.id === id);
+  // the ranked_runs view's rows (boards.js shape) that pass keep(row)
+  const rankedRows = (keep) => {
+    const out = [];
+    for (const run of runs) for (const p of run.people) {
+      const time = ranked(run, p);
+      if (time == null) continue;
+      const r = { map: run.map, stageId: run.stageId, stageName: run.stageName, mode: run.mode, kind: run.kind, steamId: p.steamId,
+        name: p.name, time, hits: p.hits, at: run.finishedAt, verified: run.verified, runId: run.id };
+      if (keep(r)) out.push(r);
+    }
+    return out;
+  };
+  // a player as boards show them: their Steam name and avatar now (the name they ran under without an account row)
+  const who = (r) => { const a = players.get(r.steamId); return { name: a?.name || r.name, avatar: a?.avatar || '' }; };
 
   function prune(owner) {
     const mine = [...replays.entries()].filter(([, r]) => r.owner === owner);
@@ -105,20 +130,21 @@ export function memoryStore() {
       return runs.filter((r) => r.listed).slice(-limit).reverse()
         .map((r) => ({ ...r, replay: replays.get(r.id)?.public ? r.id : null, views: replays.get(r.id)?.views ?? 0 }));
     },
-    async leaderboard({ map, stage, mode, kind, limit }) {
-      const best = new Map(); // player key -> row
-      for (const run of runs) {
-        if (run.map !== map || run.stageId !== stage || run.mode !== mode || run.kind !== kind) continue;
-        for (const p of run.people) {
-          const time = ranked(run, p);
-          if (time == null) continue;
-          const row = { name: p.name, time, hits: p.hits, at: run.finishedAt, verified: run.verified, steam: !!p.steamId, steamId: p.steamId || null };
-          const key = playerKey(p);
-          const prev = best.get(key);
-          if (!prev || better(mode, row, prev) < 0) best.set(key, row);
-        }
-      }
-      return [...best.values()].sort((a, b) => better(mode, a, b)).slice(0, limit).map((r, i) => ({ rank: i + 1, ...r }));
+    async leaderboard({ map, stage, mode, kind, limit, player = null }) {
+      const list = boardsOf(rankedRows((r) => r.map === map && r.stageId === stage && r.mode === mode && r.kind === kind))
+        .get(boardKey(map, stage, mode, kind)) || [];
+      const rows = list.map((r) => ({ rank: r.place, ...who(r), time: r.time, hits: r.hits, at: r.at, verified: r.verified, steam: true,
+        steamId: r.steamId, replay: replays.get(r.runId)?.public ? r.runId : null }));
+      return topAndMe(rows, limit, player);
+    },
+    async mapBoard({ map, kind, sort, limit, player = null }) {
+      const rows = rankedRows((r) => r.map === map && r.kind === kind);
+      const { stages, players: people } = mapStanding(boardsOf(rows), rows);
+      const list = people.map((p) => ({ ...p, ...who(p) })).sort(byStanding(sort)).map((p, i) => ({ rank: i + 1, ...p }));
+      return {
+        stages: stages.map((s) => ({ ...s, top: { steamId: s.top.steamId, ...who(s.top), time: s.top.time, hits: s.top.hits, at: s.top.at } })),
+        ...topAndMe(list, limit, player),
+      };
     },
     async upsertPlayer({ steamId, name, avatar = '' }) {
       const prev = players.get(steamId);
@@ -131,26 +157,42 @@ export function memoryStore() {
         const p = run.listed && run.people.find((x) => x.steamId === steamId);
         if (p) mine.push([run, p]);
       }
-      const totals = { runs: mine.length, wins: 0, cleared: 0, solo: 0, coop: 0, versus: 0 };
-      const cleared = new Set(), best = new Map();
+      const totals = { runs: mine.length, wins: 0, cleared: 0, solo: 0, coop: 0, versus: 0, records: 0, podiums: 0 };
+      const cleared = new Set(), best = new Map(), perMap = new Map();
       for (const [run, p] of mine) {
         totals[run.kind]++;
-        if (run.result === 'win' && p.won && !run.cheats) totals.wins++;
+        let m = perMap.get(run.map);
+        if (!m) perMap.set(run.map, (m = { map: run.map, runs: 0, wins: 0, cleared: new Set() }));
+        m.runs++;
+        if (run.result === 'win' && p.won && !run.cheats) { totals.wins++; m.wins++; }
         const time = ranked(run, p);
         if (time == null) continue;
-        if (run.mode === 'normal') cleared.add(`${run.map}\n${run.stageId}`);
+        if (run.mode === 'normal') { cleared.add(`${run.map}\n${run.stageId}`); m.cleared.add(run.stageId); }
         const row = { map: run.map, stageId: run.stageId, stageName: run.stageName, mode: run.mode, kind: run.kind, time, hits: p.hits, at: run.finishedAt, verified: run.verified };
-        const key = `${run.map}\n${run.stageId}\n${run.mode}\n${run.kind}`;
+        const key = boardKey(run.map, run.stageId, run.mode, run.kind);
         const prev = best.get(key);
         if (!prev || better(run.mode, row, prev) < 0) best.set(key, row);
       }
       totals.cleared = cleared.size;
+      // where they stand on every public board they're on (from all their ranked runs, as the boards are)
+      const boards = boardsOf(rankedRows((r) => true));
+      const placements = [];
+      for (const [k, list] of boards) {
+        const mineRow = list.find((r) => r.steamId === steamId);
+        if (!mineRow) continue;
+        placements.push({ map: mineRow.map, place: mineRow.place });
+        const b = best.get(k);
+        if (b) { b.place = mineRow.place; b.of = list.length; }
+        if (mineRow.place === 1) totals.records++;
+        if (mineRow.place <= 3) totals.podiums++;
+      }
+      const maps = profileMaps([...perMap.values()].map((m) => ({ ...m, cleared: m.cleared.size })), placements);
       const recent = mine.slice(-PROFILE_RECENT).reverse().map(([run, p]) => {
         const rp = replays.get(run.id);
         return { id: run.id, kind: run.kind, map: run.map, stageName: run.stageName, mode: run.mode, result: run.result, time: run.time,
           won: p.won, hits: p.hits, survived: p.survived, at: run.finishedAt, replay: rp?.public ? run.id : null, views: rp?.public ? rp.views : 0 };
       });
-      return { totals, best: [...best.values()].sort(byStage).slice(0, PROFILE_BEST), recent };
+      return { totals, best: [...best.values()].sort(byStage).slice(0, PROFILE_BEST), maps, recent };
     },
     async playerRuns(steamId, limit) {
       const out = [];

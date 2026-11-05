@@ -250,6 +250,13 @@
 .home-account { display: flex; align-items: center; gap: 8px; }
 .home-avatar { width: 28px; height: 28px; border-radius: 6px; flex: none; object-fit: cover; background: #1a222c; box-shadow: 0 0 0 1px var(--line); }
 .home-user { font-size: 13px; font-weight: 600; color: var(--text); max-width: 16ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* the links into ui/rankings.js: your account (your profile), a signed-in player's name in the feed (theirs) */
+.home-who { display: inline-flex; align-items: center; gap: 8px; min-height: var(--tap); padding: 0 8px; border: 0; border-radius: 8px; background: transparent; }
+.home-who:hover { background: rgba(255, 255, 255, 0.05); }
+.hf-who-link { padding: 0; border: 0; background: none; font-weight: 650; color: var(--text); cursor: pointer; text-decoration: underline; text-decoration-color: rgba(255, 255, 255, 0.2); text-underline-offset: 3px; }
+.hf-who-link:hover { text-decoration-color: currentColor; }
+.home-boards svg { width: 16px; height: 16px; margin-right: 6px; vertical-align: -3px; }
+@media (max-width: 559px) { .home-boards span { display: none; } .home-boards svg { margin-right: 0; } }
 
 /* tabs: an underlined strip under the title, the whole width */
 .hf-head { padding-bottom: 6px; }

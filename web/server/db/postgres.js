@@ -4,7 +4,8 @@
 import pg from 'pg';
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
-import { REPLAYS_KEPT, GUEST_DAYS, GUEST_KEPT, PINNED_MAX, PROFILE_RECENT, PROFILE_BEST, byStage } from './store.js';
+import { REPLAYS_KEPT, GUEST_DAYS, GUEST_KEPT, PINNED_MAX, PROFILE_RECENT, PROFILE_BEST, byStage, topAndMe } from './store.js';
+import { byStanding, boardKey, profileMaps } from './boards.js';
 import { fileURLToPath } from 'node:url';
 
 const MIGRATIONS = path.join(path.dirname(fileURLToPath(import.meta.url)), 'migrations');
@@ -44,8 +45,19 @@ const runOut = (r, people) => ({
   cause: r.cause, finishedAt: r.finished_at.getTime(), listed: r.listed, people,
 });
 
-// a player, once: COALESCE(steam_id, name) for DISTINCT ON (store.js playerKey)
-const PLAYER_KEY = "COALESCE('steam:' || steam_id, 'name:' || lower(name))";
+// ORDER for rows of both modes at once (boards.js better(): endless = longest; normal = fastest, then fewest hits)
+const EITHER_ORDER = "CASE WHEN mode = 'endless' THEN -time_s ELSE time_s END, CASE WHEN mode = 'endless' THEN NULL ELSE hits END ASC NULLS LAST, finished_at";
+
+// every board of one map ($1) and kind ($2): each player's best per stage / mode, placed on its board (1 = the record),
+// with how many are on it. Only Steam accounts are in ranked_runs (migrations/003), so a player is their steam_id.
+const PLACED = `WITH best AS (
+    SELECT DISTINCT ON (stage_id, mode, steam_id) run_id, stage_id, stage_name, mode, steam_id, name, time_s, hits, finished_at
+    FROM ranked_runs WHERE map = $1 AND kind = $2
+    ORDER BY stage_id, mode, steam_id, ${EITHER_ORDER}
+  ), placed AS (
+    SELECT best.*, row_number() OVER (PARTITION BY stage_id, mode ORDER BY ${EITHER_ORDER})::int AS place,
+           count(*) OVER (PARTITION BY stage_id, mode)::int AS total FROM best
+  )`;
 
 export async function postgresStore(url, log) {
   const pool = new pg.Pool({ connectionString: url, max: 5, idleTimeoutMillis: 30000, connectionTimeoutMillis: 5000 });
@@ -123,17 +135,52 @@ export async function postgresStore(url, log) {
       return rows.map((r) => ({ ...runOut(r, byRun.get(r.id) || []), replay: r.has_public_replay ? Number(r.id) : null, views: r.replay_views ?? 0 }));
     },
 
-    async leaderboard({ map, stage, mode, kind, limit }) {
+    // store.js leaderboard(): the top `limit`, plus the player's own row wherever it is, in one read
+    async leaderboard({ map, stage, mode, kind, limit, player = null }) {
       const order = ORDER[mode]; // only ever one of the two constants above: never text from a request
-      if (!order) return [];
+      if (!order) return { rows: [], total: 0, me: null };
       const { rows } = await pool.query(
-        `SELECT name, time_s, hits, finished_at, verified, steam_id FROM (
-           SELECT DISTINCT ON (${PLAYER_KEY}) name, time_s, hits, finished_at, verified, steam_id
+        `WITH best AS (
+           SELECT DISTINCT ON (steam_id) run_id, name, time_s, hits, finished_at, verified, steam_id
            FROM ranked_runs WHERE map = $1 AND stage_id = $2 AND mode = $3 AND kind = $4
-           ORDER BY ${PLAYER_KEY}, ${order}
-         ) best ORDER BY ${order} LIMIT $5`,
-        [map, stage, mode, kind, limit]);
-      return rows.map((r, i) => ({ rank: i + 1, name: r.name, time: r.time_s, hits: r.hits, at: r.finished_at.getTime(), verified: r.verified, steam: !!r.steam_id, steamId: r.steam_id || null }));
+           ORDER BY steam_id, ${order}
+         ), placed AS (
+           SELECT best.*, row_number() OVER (ORDER BY ${order})::int AS place, count(*) OVER ()::int AS total FROM best
+         )
+         SELECT placed.*, pl.name AS steam_name, pl.avatar, rp.run_id AS replay_id FROM placed
+         LEFT JOIN players pl ON pl.steam_id = placed.steam_id
+         LEFT JOIN replays rp ON rp.run_id = placed.run_id AND rp.public
+         WHERE placed.place <= $5 OR placed.steam_id = $6 ORDER BY placed.place`,
+        [map, stage, mode, kind, limit, player]);
+      const list = rows.map((r) => ({ rank: r.place, name: r.steam_name || r.name, avatar: r.avatar || '', time: r.time_s, hits: r.hits,
+        at: r.finished_at.getTime(), verified: r.verified, steam: true, steamId: r.steam_id, replay: r.replay_id != null ? Number(r.replay_id) : null }));
+      return topAndMe(list, limit, player, rows[0]?.total ?? 0);
+    },
+
+    // store.js mapBoard(): every board of one map and kind, placed (PLACED), then its records and its players' standing
+    async mapBoard({ map, kind, sort, limit, player = null }) {
+      const [{ rows: tops }, { rows: people }] = await Promise.all([
+        pool.query(
+          `${PLACED} SELECT placed.*, pl.name AS steam_name, pl.avatar FROM placed
+           LEFT JOIN players pl ON pl.steam_id = placed.steam_id WHERE placed.place = 1`, [map, kind]),
+        pool.query(
+          `${PLACED}, wins AS (
+             SELECT steam_id, count(*)::int AS wins FROM ranked_runs WHERE map = $1 AND kind = $2 AND mode = 'normal' GROUP BY steam_id
+           )
+           SELECT s.steam_id, s.cleared, s.records, s.podiums, COALESCE(w.wins, 0) AS wins, COALESCE(pl.name, s.name) AS name, pl.avatar
+           FROM (SELECT steam_id, max(name) AS name, count(*) FILTER (WHERE mode = 'normal')::int AS cleared,
+                        count(*) FILTER (WHERE place = 1)::int AS records, count(*) FILTER (WHERE place <= 3)::int AS podiums
+                 FROM placed GROUP BY steam_id) s
+           LEFT JOIN wins w ON w.steam_id = s.steam_id LEFT JOIN players pl ON pl.steam_id = s.steam_id`, [map, kind]),
+      ]);
+      // a map has a few hundred boards and players at most: ordered here, by the same rule as the memory store
+      const list = people.map((p) => ({ steamId: p.steam_id, name: p.name, avatar: p.avatar || '', cleared: p.cleared, records: p.records,
+        podiums: p.podiums, wins: p.wins })).sort(byStanding(sort)).map((p, i) => ({ rank: i + 1, ...p }));
+      return {
+        stages: tops.map((t) => ({ stageId: t.stage_id, stageName: t.stage_name, mode: t.mode, players: t.total,
+          top: { steamId: t.steam_id, name: t.steam_name || t.name, avatar: t.avatar || '', time: t.time_s, hits: t.hits, at: t.finished_at.getTime() } })),
+        ...topAndMe(list, limit, player),
+      };
     },
 
     async upsertPlayer({ steamId, name, avatar = '' }) {
@@ -151,7 +198,7 @@ export async function postgresStore(url, log) {
 
     // store.js profile(): listed runs only, three reads on the run_players_steam index
     async profile(steamId) {
-      const [{ rows: [t] }, { rows: best }, { rows: recent }] = await Promise.all([
+      const [{ rows: [t] }, { rows: best }, { rows: recent }, { rows: perMap }, { rows: placed }] = await Promise.all([
         pool.query(
           `SELECT count(*)::int AS runs,
                   count(*) FILTER (WHERE r.result = 'win' AND p.won AND NOT r.cheats)::int AS wins,
@@ -175,11 +222,35 @@ export async function postgresStore(url, log) {
                   rp.run_id AS replay_id, rp.views AS replay_views
            FROM run_players p JOIN runs r ON r.id = p.run_id LEFT JOIN replays rp ON rp.run_id = r.id AND rp.public
            WHERE p.steam_id = $1 AND r.listed ORDER BY r.id DESC LIMIT $2`, [steamId, PROFILE_RECENT]),
+        // per map, as the totals above
+        pool.query(
+          `SELECT r.map, count(*)::int AS runs,
+                  count(*) FILTER (WHERE r.result = 'win' AND p.won AND NOT r.cheats)::int AS wins,
+                  count(DISTINCT r.stage_id) FILTER (WHERE r.mode = 'normal' AND r.result = 'win' AND p.won
+                    AND NOT r.cheats AND p.removed = '')::int AS cleared
+           FROM run_players p JOIN runs r ON r.id = p.run_id WHERE p.steam_id = $1 AND r.listed GROUP BY r.map`, [steamId]),
+        // where they stand on every public board they're on: those boards' players placed as PLACED does
+        pool.query(
+          `WITH mine AS (SELECT DISTINCT map, stage_id, mode, kind FROM ranked_runs WHERE steam_id = $1),
+           best AS (
+             SELECT DISTINCT ON (map, stage_id, mode, kind, rr.steam_id) map, stage_id, mode, kind, rr.steam_id, rr.time_s, rr.hits, rr.finished_at
+             FROM ranked_runs rr JOIN mine USING (map, stage_id, mode, kind)
+             ORDER BY map, stage_id, mode, kind, rr.steam_id, ${EITHER_ORDER}
+           ), placed AS (
+             SELECT best.*, row_number() OVER (PARTITION BY map, stage_id, mode, kind ORDER BY ${EITHER_ORDER})::int AS place,
+                    count(*) OVER (PARTITION BY map, stage_id, mode, kind)::int AS total FROM best
+           )
+           SELECT map, stage_id, mode, kind, place, total FROM placed WHERE steam_id = $1`, [steamId]),
       ]);
+      const where = new Map(placed.map((p) => [boardKey(p.map, p.stage_id, p.mode, p.kind), p]));
       return {
-        totals: t,
-        best: best.map((r) => ({ map: r.map, stageId: r.stage_id, stageName: r.stage_name, mode: r.mode, kind: r.kind, time: r.time_s,
-          hits: r.hits, at: r.finished_at.getTime(), verified: r.verified })).sort(byStage).slice(0, PROFILE_BEST),
+        totals: { ...t, records: placed.filter((p) => p.place === 1).length, podiums: placed.filter((p) => p.place <= 3).length },
+        best: best.map((r) => {
+          const p = where.get(boardKey(r.map, r.stage_id, r.mode, r.kind));
+          return { map: r.map, stageId: r.stage_id, stageName: r.stage_name, mode: r.mode, kind: r.kind, time: r.time_s,
+            hits: r.hits, at: r.finished_at.getTime(), verified: r.verified, place: p?.place, of: p?.total };
+        }).sort(byStage).slice(0, PROFILE_BEST),
+        maps: profileMaps(perMap, placed.map((p) => ({ map: p.map, place: p.place }))),
         recent: recent.map((r) => ({ id: Number(r.id), kind: r.kind, map: r.map, stageName: r.stage_name, mode: r.mode, result: r.result,
           time: r.time_s, won: r.won, hits: r.hits, survived: r.survived_s, at: r.finished_at.getTime(),
           replay: r.replay_id != null ? Number(r.replay_id) : null, views: r.replay_views ?? 0 })),

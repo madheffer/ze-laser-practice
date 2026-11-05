@@ -1,178 +1,193 @@
-// A player's public profile (GET /api/players/<SteamID64>, server/players-http.js), over the home page: their Steam
-// name and avatar, since when they play here, their totals, their best time on every stage and their latest runs,
-// each with its replay when it is public. Opened from your account in the home page's top bar and from a signed-in
-// player's name in the live feed; ?player=<SteamID64> opens it from a link.
-//
-// Everything in it came from the server (names from Steam, stage names from scenarios): it is cleaned here and only
-// ever reaches the DOM as text. The avatar is used only when it is a Steam CDN URL (lib/steam.js).
-import './profile.css';
-import { fetchJson } from '../lib/fetch.js';
-import { cleanText } from '../lib/room-rules.js';
-import { isMapName } from '../lib/paths.js';
-import { isSteamId, isAvatarUrl } from '../lib/steam.js';
+// A player's public profile (ui/rankings.js's "player" view; GET /api/players/<SteamID64>, server/players-http.js):
+// their Steam name and avatar, since when they play here, then their numbers (wins, stages cleared, records held,
+// top 3 finishes, runs) and two tabs:
+//   Maps    one card per map they played, most wins first: wins, stages cleared of the map's stages, records and
+//           best placing; open one for its stages, each with their best time and where it places them (#2 of 14),
+//           a stage opening its board with them highlighted, and the map's whole leaderboard
+//   Recent  their latest listed runs, with Watch when the replay is public
+// Opened from your account on the home page, a name on a board or in the live feed, or ?player=<SteamID64>.
+// Everything came from the server and is cleaned in ui/board-data.js; it reaches the DOM only as text.
+import { el, button, KIND, isMe, avatar, place, tabs, skeleton, emptyState, mapArt, meter, shortDate } from './rank-bits.js';
+import { profile } from './board-data.js';
 import { formatTime, plural, thousands, ago } from '../lib/format.js';
-import { displayName } from './maps.js';
+import { mapShot } from './home-hero.js';
+import { mapTitle } from './board.js';
 import { playButton, viewsBadge } from './replay-buttons.js';
 import { RESULT } from './home-history.js';
 
-function el(tag, cls, t) { const e = document.createElement(tag); if (cls) e.className = cls; if (t != null) e.textContent = t; return e; }
+const CHEVRON = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4.5L12 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
-const KIND = { solo: 'Solo', coop: 'Online', versus: 'Versus' }; // 'versus': runs from before the one multiplayer mode
-const count = (v) => (Number.isInteger(v) && v >= 0 ? v : 0);
-const num = (v) => (Number.isFinite(v) && v >= 0 ? v : null);
-const kindOf = (v) => (KIND[v] ? v : 'solo');
-
-// the server's answer, cleaned -> { player, totals, best, recent } or null
-function cleanProfile(j, steamId) {
-  const p = j?.player;
-  if (!p || p.steamId !== steamId) return null;
-  const t = j.totals || {};
-  return {
-    player: { steamId, name: cleanText(p.name, 32) || 'Steam player', avatar: isAvatarUrl(p.avatar) ? p.avatar : '', since: num(p.since) },
-    totals: { runs: count(t.runs), wins: count(t.wins), cleared: count(t.cleared), solo: count(t.solo), coop: count(t.coop), versus: count(t.versus) },
-    best: (Array.isArray(j.best) ? j.best : []).slice(0, 200).filter((b) => b && isMapName(b.map) && num(b.time) != null).map((b) => ({
-      map: b.map, stage: cleanText(b.stageName, 60) || 'a stage', endless: b.mode === 'endless', kind: kindOf(b.kind),
-      time: b.time, hits: Number.isInteger(b.hits) ? b.hits : null, at: num(b.at),
-    })),
-    recent: (Array.isArray(j.recent) ? j.recent : []).slice(0, 50).filter((r) => r && Number.isInteger(r.id)).map((r) => ({
-      map: isMapName(r.map) ? r.map : '', stage: cleanText(r.stageName, 60) || 'a stage', kind: kindOf(r.kind),
-      result: RESULT[r.result] ? r.result : 'lose', time: num(r.time), hits: Number.isInteger(r.hits) ? r.hits : null, at: num(r.at),
-      replay: Number.isInteger(r.replay) && r.replay > 0 ? r.replay : null, views: count(r.views),
-    })),
-  };
-}
-
-export class Profile {
-  // parent: where the panel lives (the home page's root); mapTitle(name); onWatch(replay id)
-  constructor(parent, { mapTitle, onWatch }) {
-    this.mapTitle = mapTitle;
-    this.onWatch = onWatch;
-    this.root = el('div', 'pf');
-    this.root.hidden = true;
-    this.root.addEventListener('click', (ev) => { if (ev.target === this.root) this.close(); });
-    this.root.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') { ev.stopPropagation(); this.close(); } });
-    this.card = el('section', 'pf-card');
-    this.card.setAttribute('role', 'dialog');
-    this.card.setAttribute('aria-modal', 'true');
-    this.card.setAttribute('aria-labelledby', 'pf-name');
-    this.root.append(this.card);
-    parent.append(this.root);
+export class ProfileView {
+  // args: { steamId, tab }
+  constructor(body, args, nav) {
+    this.nav = nav;
+    this.alive = true;
+    this.steamId = args.steamId;
+    this.tab = args.tab === 'recent' ? 'recent' : 'maps';
+    this.openMaps = new Set(args.openMaps || []);
+    this.root = el('div', 'rk-profile');
+    body.append(this.root);
+    nav.title('Profile');
+    this.load();
   }
 
-  get open() { return !this.root.hidden; }
+  dispose() { this.alive = false; }
 
-  async show(steamId) {
-    if (!isSteamId(steamId)) return;
-    this.steamId = steamId;
-    if (!this.open) this.back = document.activeElement;
-    this.root.hidden = false;
-    this.setLink(steamId);
-    this.render(null, 'Loading…');
+  async load() {
+    this.root.replaceChildren(this.headSkeleton(), skeleton(5));
     let p = null, msg = 'This player isn’t here.';
-    try { p = cleanProfile(await fetchJson(`/api/players/${steamId}`, { cache: 'no-store' }), steamId); }
-    catch (e) { if (!/: 404$/.test(e.message)) msg = 'Profiles need the server, and it isn’t reachable right now.'; }
-    if (this.steamId === steamId && this.open) this.render(p, msg);
+    try { p = await profile(this.steamId); } catch (e) { if (!/: 404$/.test(e.message)) msg = 'Profiles need the server, and it isn’t reachable right now.'; }
+    if (!this.alive) return;
+    if (!p) { this.root.replaceChildren(emptyState(msg, button('rk-btn', 'Try again', () => this.load()))); return; }
+    this.p = p;
+    this.nav.title(isMe(this.steamId) ? 'Your profile' : p.player.name);
+    if (!this.openMaps.size && p.maps[0]) this.openMaps.add(p.maps[0].map);
+    this.tabs = tabs('Profile', [['maps', 'Maps', p.maps.length], ['recent', 'Recent runs', p.recent.length]], this.tab, (t) => { this.tab = t; this.nav.replace({ tab: t }); this.draw(); });
+    this.panel = el('div', 'rk-tabpanel');
+    this.panel.setAttribute('role', 'tabpanel');
+    this.root.replaceChildren(this.head(p.player), this.numbers(p.totals), this.tabs.root, this.panel);
+    this.draw();
   }
 
-  close() {
-    if (!this.open) return;
-    this.root.hidden = true;
-    this.steamId = null;
-    this.setLink(null);
-    this.back?.focus?.({ preventScroll: true });
+  headSkeleton() {
+    const h = el('header', 'rk-phead loading');
+    h.append(el('span', 'rk-av rk-skel-av'), el('div', 'rk-skel-lines'));
+    return h;
   }
 
-  // ?player=<id> while it's open, so the address bar is a link to it
-  setLink(steamId) {
-    const url = new URL(location.href);
-    if (steamId) url.searchParams.set('player', steamId); else url.searchParams.delete('player');
-    history.replaceState(history.state, '', url);
-  }
-
-  render(p, msg) {
-    const close = el('button', 'pf-close', '×');
-    close.type = 'button';
-    close.setAttribute('aria-label', 'Close profile');
-    close.addEventListener('click', () => this.close());
-    if (!p) {
-      const h = el('h2', 'pf-name', 'Player');
-      h.id = 'pf-name';
-      this.card.replaceChildren(close, h, el('p', 'pf-note', msg));
-      close.focus({ preventScroll: true });
-      return;
-    }
-    this.card.replaceChildren(close, this.head(p), this.numbers(p.totals), this.bestList(p.best), this.recentList(p.recent));
-    close.focus({ preventScroll: true });
-  }
-
-  head({ player }) {
-    const head = el('header', 'pf-head');
-    const pic = el('div', 'pf-pic');
-    if (player.avatar) {
-      const img = el('img');
-      img.src = player.avatar; img.alt = ''; img.width = img.height = 72; img.referrerPolicy = 'no-referrer'; img.decoding = 'async';
-      img.addEventListener('error', () => img.remove());
-      pic.append(img);
-    }
-    const who = el('div', 'pf-who');
-    const h = el('h2', 'pf-name', player.name);
-    h.id = 'pf-name';
-    const since = player.since ? `Playing since ${new Date(player.since).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}` : '';
-    const copy = el('button', 'home-link pf-copy', 'Copy link');
-    copy.type = 'button';
-    copy.addEventListener('click', () => {
+  head(player) {
+    const head = el('header', 'rk-phead');
+    head.append(avatar(player.avatar, player.name, 88));
+    const who = el('div', 'rk-pwho');
+    const h = el('h3', 'rk-pname-big', player.name);
+    if (isMe(player.steamId)) h.append(el('span', 'rk-you', 'You'));
+    const since = player.since ? `Playing since ${new Date(player.since).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}` : 'Steam player';
+    const acts = el('div', 'rk-pacts');
+    const copy = button('rk-btn small', 'Copy link', () => {
       navigator.clipboard?.writeText(`${location.origin}/?player=${player.steamId}`)
         .then(() => { copy.textContent = 'Copied'; setTimeout(() => { copy.textContent = 'Copy link'; }, 1400); }, () => {});
     });
-    who.append(h, el('p', 'pf-since', since || 'Steam player'), copy);
-    head.append(pic, who);
+    const steam = el('a', 'rk-btn small ghost', 'Steam profile');
+    steam.href = `https://steamcommunity.com/profiles/${player.steamId}`; // a checked SteamID64 (ui/board-data.js)
+    steam.target = '_blank';
+    steam.rel = 'noopener noreferrer';
+    acts.append(copy, steam);
+    who.append(h, el('p', 'rk-since', since), acts);
+    head.append(who);
     return head;
   }
 
   numbers(t) {
-    const dl = el('dl', 'home-stats pf-stats');
-    const split = [['solo', 'solo'], ['coop', 'online'], ['versus', 'versus']].filter(([k]) => t[k]).map(([k, w]) => `${thousands(t[k])} ${w}`).join(' · ');
-    for (const [n, label, sub] of [[t.runs, t.runs === 1 ? 'run' : 'runs', split], [t.wins, t.wins === 1 ? 'clear' : 'clears'], [t.cleared, 'stages cleared']]) {
-      const d = el('div');
-      d.append(el('dt', null, label), el('dd', null, thousands(n)));
-      if (sub) d.append(el('span', 'pf-sub', sub));
-      dl.append(d);
+    const box = el('dl', 'rk-tiles');
+    const split = [['solo', KIND.solo], ['coop', KIND.coop], ['versus', KIND.versus]].filter(([k]) => t[k]).map(([k, w]) => `${thousands(t[k])} ${w.toLowerCase()}`).join(' · ');
+    for (const [n, label, sub, cls] of [
+      [t.wins, t.wins === 1 ? 'Win' : 'Wins', 'stage clears', 'win'],
+      [t.cleared, 'Stages cleared', 'ranked, all maps'],
+      [t.records, t.records === 1 ? 'Record' : 'Records', 'boards held at #1', 'gold'],
+      [t.podiums, 'Top 3', 'board finishes'],
+      [t.runs, t.runs === 1 ? 'Run' : 'Runs', split || 'finished'],
+    ]) {
+      const d = el('div', `rk-tile${cls ? ` ${cls}` : ''}`);
+      d.append(el('dt', null, label), el('dd', null, thousands(n)), el('span', 'rk-tile-sub', sub));
+      box.append(d);
     }
-    return dl;
-  }
-
-  // best times, by map
-  bestList(best) {
-    const box = el('section', 'pf-section');
-    box.append(el('h3', 'pf-h', 'Best times'));
-    if (!best.length) { box.append(el('p', 'pf-note', 'No ranked clears yet.')); return box; }
-    const list = el('div', 'pf-best');
-    let map = null;
-    for (const b of best) {
-      if (b.map !== map) { map = b.map; list.append(el('h4', 'pf-map', displayName(this.mapTitle(map)))); }
-      const row = el('div', 'pf-brow');
-      const tags = [b.endless ? 'Endless' : '', b.kind !== 'solo' ? KIND[b.kind] : ''].filter(Boolean).join(' · ');
-      const name = el('span', 'pf-stage', b.stage);
-      if (tags) name.append(el('span', 'pf-tag', tags));
-      row.append(name, el('span', 'pf-hits', b.hits != null && !b.endless ? plural(b.hits, 'hit') : ''), el('span', 'hf-stat', formatTime(b.time)));
-      list.append(row);
-    }
-    box.append(list);
     return box;
   }
 
+  draw() {
+    this.panel.replaceChildren(this.tab === 'recent' ? this.recentList(this.p.recent) : this.mapList(this.p));
+  }
+
+  // ---- Maps
+  mapList(p) {
+    if (!p.maps.length) return emptyState(isMe(this.steamId) ? 'No runs yet. Clear a stage and your maps show up here.' : 'No shared runs yet.');
+    const best = new Map(); // map -> its best rows
+    for (const b of p.best) { if (!best.has(b.map)) best.set(b.map, []); best.get(b.map).push(b); }
+    const list = el('div', 'rk-pmaps');
+    for (const m of p.maps) list.append(this.mapCard(m, best.get(m.map) || []));
+    return list;
+  }
+
+  mapCard(m, rows) {
+    const info = this.nav.mapInfo(m.map);
+    const stages = info?.scenarios || 0;
+    const card = el('section', 'rk-pmap');
+    const id = `rk-pm-${m.map}`;
+    const head = button('rk-pmap-head', null, () => toggle());
+    head.setAttribute('aria-controls', id);
+    head.append(mapArt(mapShot(info), m.map, 'rk-pmap-art'));
+    const title = el('span', 'rk-pmap-title');
+    title.append(el('b', null, mapTitle(info, m.map)));
+    const cleared = el('span', 'rk-pmap-cleared');
+    cleared.append(`${m.cleared}${stages ? ` / ${stages}` : ''} stages cleared`);
+    if (stages) cleared.append(meter(m.cleared, stages, `${m.cleared} of ${stages} stages cleared`));
+    title.append(cleared);
+    const stats = el('span', 'rk-pmap-stats');
+    const stat = (n, label, cls = '') => { const s = el('span', `rk-stat ${cls}`); s.append(el('b', null, n), el('small', null, label)); return s; };
+    stats.append(stat(thousands(m.wins), m.wins === 1 ? 'win' : 'wins', 'win'));
+    stats.append(stat(m.records ? String(m.records) : '–', m.records === 1 ? 'record' : 'records', m.records ? 'gold' : ''));
+    stats.append(stat(m.bestPlace ? `#${m.bestPlace}` : '–', 'best'));
+    const chev = el('span', 'rk-chev down');
+    chev.innerHTML = CHEVRON; // a constant
+    head.append(title, stats, chev);
+
+    const body = el('div', 'rk-pmap-body');
+    body.id = id;
+    const toggle = (open = !this.openMaps.has(m.map)) => {
+      if (open) this.openMaps.add(m.map); else this.openMaps.delete(m.map);
+      head.setAttribute('aria-expanded', String(open));
+      card.classList.toggle('open', open);
+      body.hidden = !open;
+      if (open && !body.childElementCount) body.append(...this.mapBody(m, rows));
+      this.nav.replace({ openMaps: [...this.openMaps] });
+    };
+    card.append(head, body);
+    toggle(this.openMaps.has(m.map));
+    return card;
+  }
+
+  mapBody(m, rows) {
+    const out = [];
+    if (rows.length) {
+      const list = el('div', 'rk-pbest');
+      for (const b of rows) list.append(this.bestRow(b));
+      out.push(list);
+    } else {
+      out.push(el('p', 'rk-note', 'No ranked clears on this map yet.'));
+    }
+    const foot = el('div', 'rk-pmap-foot');
+    foot.append(button('rk-btn small', 'Map leaderboard', () => this.nav.map(m.map, { highlight: this.steamId })));
+    out.push(foot);
+    return out;
+  }
+
+  bestRow(b) {
+    const row = button('rk-pbrow', null, () => this.nav.stage(b.map, b.stageId, { mode: b.mode, kind: b.kind === 'coop' ? 'coop' : 'solo', highlight: this.steamId }));
+    row.title = `${b.stage}: the stage’s leaderboard`;
+    const name = el('span', 'rk-pb-name');
+    name.append(el('b', null, b.stage));
+    const tags = [b.mode === 'endless' ? 'Endless' : '', b.kind !== 'solo' ? KIND[b.kind] : ''].filter(Boolean);
+    for (const t of tags) name.append(el('span', 'rk-tag', t));
+    const where = el('span', 'rk-pb-place');
+    where.append(place(b.place), el('small', null, b.of ? `of ${thousands(b.of)}` : ''));
+    const time = el('span', 'rk-time');
+    time.append(el('b', null, `${b.mode === 'endless' ? '∞ ' : ''}${formatTime(b.time)}`));
+    if (b.mode !== 'endless' && b.hits != null) time.append(el('small', null, plural(b.hits, 'hit')));
+    row.append(where, name, time, el('span', 'rk-pb-when', b.at != null ? shortDate(b.at) : ''));
+    return row;
+  }
+
+  // ---- Recent runs
   recentList(recent) {
-    const box = el('section', 'pf-section');
-    box.append(el('h3', 'pf-h', 'Latest runs'));
-    if (!recent.length) { box.append(el('p', 'pf-note', 'No shared runs yet.')); return box; }
-    const ol = el('ol', 'hf-list pf-list');
+    if (!recent.length) return emptyState('No shared runs yet.');
+    const ol = el('ol', 'hf-list rk-recent');
     for (const r of recent) {
       const li = el('li', `hf-row hh-row tone-${r.result === 'win' ? 'win' : r.result === 'over' ? 'endless' : 'lose'}`);
       const body = el('div', 'hf-body');
       const line = el('p', 'hf-line');
       line.append(el('b', 'hf-what', r.stage), ` · ${RESULT[r.result]}${r.kind !== 'solo' ? ` · ${KIND[r.kind]}` : ''}`);
       const meta = el('p', 'hf-meta');
-      meta.append(el('span', null, [r.map ? displayName(this.mapTitle(r.map)) : '', r.hits != null ? plural(r.hits, 'hit') : ''].filter(Boolean).join(' · ')));
+      meta.append(el('span', null, [r.map ? mapTitle(this.nav.mapInfo(r.map), r.map) : '', r.hits != null ? plural(r.hits, 'hit') : ''].filter(Boolean).join(' · ')));
       body.append(line, meta);
       const side = el('div', 'hf-side');
       if (r.time != null) side.append(el('span', 'hf-stat', formatTime(r.time)));
@@ -180,7 +195,7 @@ export class Profile {
       const act = el('div', 'hf-act');
       if (r.replay) {
         meta.append(viewsBadge(r.views));
-        const watch = () => { this.close(); this.onWatch(r.replay); };
+        const watch = () => this.nav.watch(r.replay);
         act.append(playButton(`Watch the run on ${r.stage}`, watch));
         li.classList.add('has-replay');
         li.addEventListener('click', watch);
@@ -188,7 +203,6 @@ export class Profile {
       li.append(el('span', 'hf-icon hh-dot'), body, side, act);
       ol.append(li);
     }
-    box.append(ol);
-    return box;
+    return ol;
   }
 }

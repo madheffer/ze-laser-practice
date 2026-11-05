@@ -92,13 +92,23 @@ order and recorded in `schema_migrations`; to change the schema, add a new file,
 | `replays` | a solo run's replay (see "Replays"): `owner`, `public`, `pinned`, `views`, `meta` (seed, rules, stage), `data` (gzip) |
 
 Leaderboards rank each player's best run: normal = fastest clear, then fewest hits; endless = longest survived.
-Solo names are whatever the player typed, so use `verified` if you only want rounds the server watched.
+Only Steam accounts are ranked; use `verified` if you only want runs the server checked.
+
+Every map has its own leaderboard (in the game: **Leaderboards** on the home page, or beside a map's title in the
+stage list). It ranks the map's players by **stages cleared** (stages with a ranked clear), **records** (stage
+boards they hold #1 on, normal and endless), or **wins** (ranked clears), with top 3 finishes breaking ties, and
+lists every stage's record holder; a stage opens its own board. A profile shows each map a player played: wins,
+stages cleared of the map's stages, records and best place, and where each of their best times places them.
+`server/db/boards.js` holds the rules, shared by both stores.
 
 ### Reading the data
 
 Over HTTP (served by the dev / preview server and by `npm run coop-server`, read-only, JSON):
 
-- `GET /api/leaderboard?map=ze_mist_p&stage=throne&mode=normal&kind=solo&limit=25`
+- `GET /api/leaderboard?map=ze_mist_p&stage=throne&mode=normal&kind=solo&limit=25&player=<SteamID64>` (one stage;
+  `player` adds that player's row as `me` when it is below the top `limit`)
+- `GET /api/maps/ze_mist_p/board?kind=solo&sort=cleared|records|wins&limit=50&player=<SteamID64>` (a whole map)
+- `GET /api/players/<SteamID64>` (a public profile: totals, maps, best times with their places, latest runs)
 - `GET /api/runs?limit=40` (newest first, the feed's runs)
 - `GET /api/replays/<id>` (a shared replay; counts a view), `GET /api/me/runs` (your history, signed in)
 
