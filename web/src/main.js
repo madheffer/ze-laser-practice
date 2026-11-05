@@ -206,6 +206,7 @@ async function openMap(name, fromRound = false) {
     const info = S.mapIndex.find((m) => m.name === name) || {};
     const file = await loadScenarios(name);
     S.scenarios = Array.isArray(file.scenarios) ? file.scenarios : [];
+    S.mapHide = Array.isArray(file.hide) ? file.hide : []; // entities no stage of this map draws (renderer.setHidden)
     S.map = { name, loaded: false, items: Array.isArray(info.items) ? info.items : [] };
     G.menu.build({ title: file.title || info.title, description: file.description || info.description });
     $('#status').textContent = `${name}: pick a stage`;

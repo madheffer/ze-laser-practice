@@ -4,7 +4,9 @@ import { ConvexGeometry } from 'three/addons/geometries/ConvexGeometry.js';
 import { MapLighting } from './lighting.js';
 import { PostProcess, CS2_POST_GLSL } from './tonemap.js';
 import { GLTF_TO_SOURCE } from './assets.js';
-import { DEG, parseVec, angleForward, viewQuat, isParticleSystem } from './entities/index.js';
+import { DEG, parseVec, angleForward, viewQuat, isParticleSystem, glowControlPoints } from './entities/index.js';
+import { boxInView } from './view-box.js';
+import { nameMatches } from '../lib/names.js';
 import { assetKey } from '../lib/paths.js';
 import { setFxCamera, fxShared } from '../fx/effects.js';
 import { sceneCopyWanted } from '../fx/particles/render/spritecard.js';
@@ -97,6 +99,7 @@ export class Renderer {
   // water: the map's baked water textures (loadMap's map.water; null for an older bake)
   setWorld(scene, water = null) {
     this.worldRoot.clear();
+    this.viewBox = null; // a stage sets its own (setViewBox)
     this.water.setMap(water);
     this.worldMaterials = new Map(); // a streamed world's materials by name: one per vmat across every chunk
     if (scene) this.addWorldChunk(scene);
@@ -134,6 +137,39 @@ export class Renderer {
     // in the world root first, so the probe volumes are matched in Source units (the root's glTF -> Source)
     this.worldRoot.add(scene);
     this.lighting.applyToWorld(scene); // the map's CS2 lightmap shading (world/lighting.js; nothing without a bake)
+    if (this.viewBox) { this.worldRoot.updateMatrixWorld(true); scene.traverse((o) => this.fitView(o)); }
+  }
+
+  // The stage's view box (world/view-box.js, null for the whole map): world meshes and entity models outside it are
+  // not drawn. World meshes are placed once, so they are sorted here; entities move, so updateEntities checks them.
+  setViewBox(box) {
+    this.viewBox = box;
+    this.worldRoot.updateMatrixWorld(true);
+    this.worldRoot.traverse((o) => this.fitView(o));
+  }
+
+  fitView(o) {
+    if (!o.isMesh) return;
+    if (o.userData.drawn === undefined) o.userData.drawn = o.visible; // editor-only meshes stay hidden
+    let local = o.geometry.boundingBox;
+    if (o.isInstancedMesh) { if (!o.boundingBox) o.computeBoundingBox(); local = o.boundingBox; }
+    else if (!local) { o.geometry.computeBoundingBox(); local = o.geometry.boundingBox; }
+    o.visible = o.userData.drawn && boxInView(this.viewBox, local, o.matrixWorld);
+  }
+
+  // an entity's visual reaches into the view box: its meshes' bounds in its own space, measured again whenever a
+  // model arrives (they load after the entity spawns), placed where the entity is now
+  entityInView(g) {
+    if (!this.viewBox) return true;
+    const u = g.userData;
+    let n = 0;
+    g.traverse((o) => { if (o.isMesh || o.isLine) n++; });
+    if (!u.viewLocal || u.viewMeshes !== n) {
+      g.updateMatrixWorld(true);
+      u.viewLocal = new THREE.Box3().setFromObject(g, true).applyMatrix4(g.matrixWorld.clone().invert());
+      u.viewMeshes = n;
+    }
+    return boxInView(this.viewBox, u.viewLocal, g.matrix);
   }
 
   clearEntities() {
@@ -151,7 +187,12 @@ export class Renderer {
     return p;
   }
 
+  // names (a trailing * matches a prefix) whose entities get no visual this stage: the scenario file's `hide`, a
+  // trainer choice such as westersand's floating boss HP bars (the HUD has its own)
+  setHidden(names) { this.hidden = Array.isArray(names) ? names.filter((n) => typeof n === 'string' && n) : []; }
+
   async addEntity(e, map) {
+    if (this.hidden?.length && e.name && this.hidden.some((n) => nameMatches(n, e.name))) return;
     const kv = e.kv;
     const group = new THREE.Group();
     group.matrixAutoUpdate = false;
@@ -412,6 +453,8 @@ export class Renderer {
         const t = e.engine.findOne(name);
         if (t) cps[i] = cpFrom(t);
       }
+      const glow = glowControlPoints(e); // env_particle_glow: its tint and scales as CP 16 / 17
+      if (glow) { cps[16] = glow[16]; cps[17] = glow[17]; }
       inst.update(dt, { cps, active: !!(e.alive && e.state.active), camPos });
       inst.group.visible = e.visible !== false;
     }
@@ -443,6 +486,7 @@ export class Renderer {
         g.visible = !!s && s.vis;
         if (!s) continue;
         g.matrix.copy(s.m);
+        if (g.visible) g.visible = this.entityInView(g);
         g.matrixWorldNeedsUpdate = true;
         for (const c of g.children) {
           const k = c.userData.kind;
@@ -455,7 +499,7 @@ export class Renderer {
       g.matrix.copy(e.getWorld());
       g.matrixWorldNeedsUpdate = true;
       const on = e.alive && e.visible;
-      g.visible = on;
+      g.visible = on && this.entityInView(g);
       for (const c of g.children) {
         const k = c.userData.kind;
         if (k === 'fx') c.visible = !!e.state.active;

@@ -242,6 +242,8 @@ standing still. Fields we added (cybo's site ignores them):
 | `setup` | inputs fired the moment you are placed (after any fast-forward): puts the map where its own sequence would be for a stage that starts past the relays that do it. ze_deadcore's drills move `des2` (its catch-all fall destination) to where the map keeps it for that part, so a fall puts you back where a human would land |
 | `music` | the map's own inputs that start the track a stage begins in the middle of (a level template, a boss track), fired with `start`, once (endless re-fires start but not this). westersand's level music lives in its level templates (`Easy_Temp`, `Tomb_Temp_Init`, `Epic_Temp`) |
 | `player.name` | the targetname the map gives a human before this point (westersand's spawn room names everyone `None`); name filters test it |
+| `view` | `{min, max}` (Source units): the only part of the map the stage draws. World chunks outside it aren't streamed, and world meshes and entity models outside it are hidden (collision and entities stay whole). Westersand's Chaos draws its deck, the plate and Chaos instead of ~860k triangles of map |
+| `hide` | names (a trailing `*` matches a prefix) of entities the stage doesn't draw, a trainer choice. Also allowed at the file's top level, for every stage of the map. Westersand hides its floating "BOSS" HP bars (`*_Hpbar`), since the HUD has its own |
 | `cages` | `{ "<destination>": true }` or `false`: overrides `world/entities/cages.js` for a destination its evidence gets wrong (`tools/cages.mjs`); none needed so far |
 
 ### Bosses

@@ -10,7 +10,9 @@
 //      Mode 'area' stops at 1 (slow PCs); 'all' loads everything.
 // A stage waits only for what its first frames can show (gate): the always-loaded chunks and the area's chunks
 // within GATE_RADIUS and the view distance (the far plane / opaque fog, `see`); the rest streams in while it plays.
-// Chunks stay once loaded.
+// Chunks stay once loaded. A stage's view box (world/view-box.js, setView) leaves out every chunk outside it.
+
+import { inView } from './view-box.js';
 
 // the farthest a stage waits for (units, ~150 m): what fills a first view; past it (or past where the fog turns
 // opaque) the world streams in while the stage plays, nearest first. Scenery only: collision is whole from the start.
@@ -31,6 +33,7 @@ export class WorldStream {
     this.disposed = false;
     this.dirty = true;
     this.waiters = [];
+    this.view = null; // the stage's view box: chunks outside it are neither loaded nor waited for
   }
 
   // distance from a point to a chunk's box (0 inside)
@@ -40,12 +43,16 @@ export class WorldStream {
     return Math.sqrt(s);
   }
 
+  seen(c) { return inView(this.view, c.min, c.max); }
   // the area a stage needs
-  wanted(c, p) { return this.mode === 'all' || c.always || WorldStream.dist(c, p) <= this.radius; }
+  wanted(c, p) { return this.seen(c) && (this.mode === 'all' || c.always || WorldStream.dist(c, p) <= this.radius); }
   // what a stage waits for at p: the area, no farther than can be seen
-  gate(c, p) { return c.always || WorldStream.dist(c, p) <= Math.min(this.radius, this.see, GATE_RADIUS); }
+  gate(c, p) { return this.seen(c) && (c.always || WorldStream.dist(c, p) <= Math.min(this.radius, this.see, GATE_RADIUS)); }
   // visible from p, after the area
-  extra(c, p) { return this.mode === 'auto' && WorldStream.dist(c, p) <= this.see; }
+  extra(c, p) { return this.seen(c) && this.mode === 'auto' && WorldStream.dist(c, p) <= this.see; }
+
+  // box: a THREE.Box3 (Source units) or null for the whole map
+  setView(box) { this.view = box; this.dirty = true; }
 
   // mode: 'auto' | 'area' | 'all'
   setMode(mode) { if (mode !== this.mode) { this.mode = mode; this.dirty = true; } }

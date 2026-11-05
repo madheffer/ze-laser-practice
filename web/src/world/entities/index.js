@@ -2,4 +2,4 @@
 export { EntityEngine } from './engine.js';
 export { Entity, stripName } from './entity.js';
 export { angleQuat, angleForward, viewQuat, foldPitch, parseVec, DEG } from './math.js';
-export { isParticleSystem } from './classes/fx.js';
+export { isParticleSystem, glowControlPoints } from './classes/fx.js';

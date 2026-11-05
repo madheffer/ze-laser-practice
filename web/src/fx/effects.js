@@ -27,6 +27,7 @@ import { safeRelPath } from '../lib/paths.js';
 let expanded = null;
 const loadDefaults = () => (expanded ? Promise.resolve() : import('./particles/defaults.js').then((m) => { expanded ||= expandDefaults(m.default); }));
 const MAX_SYSTEMS_PER_EFFECT = 64;
+const OVERLAY_ORDER = 1e6; // GameOverlay-layer particles draw after every other transparent object
 
 // one set of view uniforms for every effect's materials: render.js sets the camera each frame. The barn lights and the
 // fog are the world's own uniform objects (world/lighting.js barnUniforms / fogUniforms, bound by setFxCamera): CS2
@@ -249,13 +250,20 @@ export class EffectInstance {
 
   // cps: [{ position, forward, left, up }] by control point index (any may be missing)
   update(dt, { cps = [], active = true, camPos = [0, 0, 0] } = {}) {
-    if (active !== this.active) {
+    // A start plays from this frame on; a stop came at the end of the time this frame covers, so that time still runs
+    // with emission on (a fresh instance that was never on stops before its first step). Westersand's Chaos_Tesla gets
+    // Stop 0.5 s after Start, the frame its beams restart (tesla_beam_mainc C_OP_RestartAfterDuration 0.5) and fire
+    // the bolts seen in game; stopping first dropped them, leaving only the first bolts, drawn at the map's origin
+    // (their CPs 5 / 6 are aimed only once the root has a particle).
+    const stopping = !active && this.active && this.time > 0;
+    if (active !== this.active && !stopping) {
       if (active) { this.sys.restart(); } else this.sys.stopEmission();
       this.active = active;
     }
     cps.forEach((cp, i) => { if (cp) this.sys.setControlPoint(i, cp); });
     this.time += dt;
     this.sys.step(dt);
+    if (stopping) { this.sys.stopEmission(); this.active = false; }
     for (const m of this.sys.reports.splice(0)) this.effects.report(m);
     const cols = this.sys.collections || [];
     this.lights.length = 0;
@@ -288,8 +296,14 @@ export class EffectInstance {
           return;
         }
         if (!rend.mesh) return;
-        rend.mesh.renderOrder = order++;
+        // CS2's GameOverlay layer (m_bOnlyRenderInEffecsGameOverlay; client.dll builds a "GameOverlay Particles" layer):
+        // drawn after the scene, over it. Westersand's Chaos_Tesla lightning (tesla_beam_p1c) is one: in game its bolts
+        // show across Chaos's body although they start inside it. UNSETTLED: the layer's own pass is not traced; no depth
+        // test, after everything else, is read from that footage.
+        const overlay = !!(r.p?.m_bOnlyRenderInEffecsGameOverlay ?? raw.m_bOnlyRenderInEffecsGameOverlay);
+        rend.mesh.renderOrder = (overlay ? OVERLAY_ORDER : 0) + order++;
         const ctl = rend.update(col, r.p, raw, { camPos, report: (m) => this.effects.report(m) }, r.cls);
+        if (rend.mesh.material) rend.mesh.material.depthTest = !overlay;
         for (const u of ctl?.unsupported || []) this.effects.report(`${r.cls}: ${u}`);
       });
     }

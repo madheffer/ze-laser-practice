@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { DEG } from '../world/entities/index.js';
 import { createRunEngine, hazardName as hazardText, COUNTDOWN, legacyCountdown, freeSpawn } from '../world/run-engine.js';
 import { standsFree } from '../world/movement.js';
+import { viewBox } from '../world/view-box.js';
 import { heldItems } from './items.js';
 import { prepareStage } from './readiness.js';
 import { warmTemplates } from '../world/warm.js';
@@ -41,6 +42,11 @@ export function startScenario(i, mode = 'normal') {
   S.scenarioIndex = i;
   const scenario = S.scenario = i >= 0 ? S.scenarios[i] : null;
   const endless = mode === 'endless' && !!scenario?.endless;
+  // what of the map this stage draws (world/view-box.js): the whole map unless the scenario names a view box
+  const view = viewBox(scenario);
+  G.renderer.setViewBox(view);
+  G.stream?.setView(view);
+  G.renderer.setHidden([...(S.mapHide || []), ...(scenario?.hide || [])]); // entities this stage doesn't draw
 
   // ZE humans spawn with the knife out and an assault suit (CS2Fixes ZR: weapon_knife + item_assaultsuit when
   // cs2f_free_armor 2); scenario.player can override health/armor/gravity for a stage that starts mid-map.

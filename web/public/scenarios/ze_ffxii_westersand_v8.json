@@ -2,6 +2,7 @@
   "map": "ze_ffxii_westersand_v8",
   "title": "FFXII Westersand",
   "description": "Slayerdragon & Noctali's Final Fantasy XII escape: the desert and its volcano hall dragon, the tomb with Belias and Gabranth, and the airship with Gabranth again and the Chaos laser fight. Five stages cycle (normal, tomb, epic, god, zombie mode) with an insane difficulty on top.",
+  "hide": ["[PR#]Chaos_Hpbar", "[PR#]Boss_Hpbar", "[PR#]Belias_Hpbar", "[PR#]Judge_Hpbar", "[PR#]Ehe_Dragon_Hpbar", "[PR#]Guard_Boss_Hpbar"],
   "scenarios": [
     {
       "id": "chaos",
@@ -10,6 +11,18 @@
       "name": "Chaos – laser boss",
       "summary": "Jump or crouch Chaos's deck lasers",
       "description": "The airship finale's Chaos fight. A random laser (low, mid or high) fires down the deck every 1.2 s until Chaos dies: jump the low and mid ones, crouch the high one. 380 hits per segment at 20 humans (50 + 16.5 per human, from the map's HP trigger), 6 segments; the 25 s Holy hit takes off 9 × 125.",
+      "view": {
+        "min": [
+          3000,
+          -6700,
+          7300
+        ],
+        "max": [
+          7700,
+          -5300,
+          8900
+        ]
+      },
       "spawn": {
         "origin": [
           5900,
@@ -142,6 +155,18 @@
       "name": "Laser stream only",
       "summary": "Just the lasers: jump low, crouch high",
       "description": "Chaos's laser timer with no HP to shoot: a random low / mid / high laser every 1.2 s for 40 s.",
+      "view": {
+        "min": [
+          3000,
+          -6700,
+          7300
+        ],
+        "max": [
+          7700,
+          -5300,
+          8900
+        ]
+      },
       "spawn": {
         "origin": [
           5900,
