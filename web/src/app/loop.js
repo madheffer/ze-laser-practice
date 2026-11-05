@@ -59,6 +59,8 @@ const MAX_CATCHUP = 320; // ticks per call (5 s): a long hidden tab catches up o
 let lastSim = performance.now();
 
 const camPos = [0, 0, 0];
+const PAUSED_FRAME_MS = 100;
+let lastPausedDraw = -Infinity;
 export let lastFrameAt = 0; // app/coop.js keeps a round going when frames stop (hidden or throttled tab)
 export function frame(now) {
   requestAnimationFrame(frame);
@@ -66,6 +68,13 @@ export function frame(now) {
   syncLeaveGuard(); // the tab-close prompt only while a run is live (app/input.js)
   const { player, engine } = S;
   if (!player) return;
+  // paused solo (the menu is up, nothing moves): redrawn a few times a second, enough for a setting changed behind
+  // the menu, so a paused tab (a second tab, a test tab) stops taking the GPU from the game being played
+  if (S.paused && !S.mp && !S.replay) {
+    lastSim = now;
+    if (now - lastPausedDraw < PAUSED_FRAME_MS) return;
+    lastPausedDraw = now;
+  }
   const realDt = Math.min(0.1, (now - last) / 1000);
   last = now;
   if (S.paused && !S.mp) lastSim = now;
