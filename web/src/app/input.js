@@ -154,7 +154,13 @@ export function installInput(canvas, actions) {
     const k = settings.sens * M_YAW; // CS2: degrees per count = sensitivity * m_yaw (m_pitch = m_yaw)
     look(ev.movementX * k, ev.movementY * k);
   });
-  document.addEventListener('wheel', (ev) => { if (S.locked && ev.deltaY > 0) wheelJump = 2; }, { passive: true });
+  // Wheel down jumps. Not passive, so it can cancel the browser's default: Ctrl + wheel (crouch + jump spam, and a
+  // trackpad pinch) would zoom the page, anywhere on it, menus included; in a run the wheel never scrolls either.
+  // Keyboard zoom (Ctrl +/-) is left alone for anyone who needs it.
+  window.addEventListener('wheel', (ev) => {
+    if (S.locked && ev.deltaY > 0) wheelJump = 2;
+    if (ev.ctrlKey || S.locked) ev.preventDefault();
+  }, { passive: false, capture: true });
 
   document.addEventListener('keydown', (ev) => {
     if (G.overlay.open) return; // the end card has its own keys
