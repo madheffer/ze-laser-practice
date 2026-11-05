@@ -317,8 +317,9 @@ the stance files are vpkstuff's clip decode (lab `tools/previewer/extract-tp-cli
 Play any stage (normal or endless) with other people, on rooms our server hosts. The **Multiplayer** card on the
 Play tab has three ways in:
 
-- **Create room**: a name, **Private** (code / invite link only) or **Public** (listed under Browse rooms), the mode,
-  max players (2–8) and the rules: humans alive, boss HP %, team fire, perfect team, fall damage, and the
+- **Create room** (or **Make a lobby** on the home page): the room is made at once with your last settings and the
+  **room screen** opens. Its **Room settings** set a name, **Private** (code / invite link only) or **Public** (listed
+  under Browse rooms), the mode, max players (2–8) and the rules: humans alive, boss HP %, team fire, perfect team, fall damage, and the
   **cheats** (god mode, laser hitboxes, auto bunnyhop). Cheats start **off**. Only the room owner can turn them on,
   and the room view and the public list flag them for everyone. Your own Settings toggles (G / H / T too) do nothing
   in a round: the round plays by the room's rules (`app/rules.js`), which are never saved into your settings.
@@ -326,10 +327,17 @@ Play tab has three ways in:
   every 4 s, with a Join button. With no rooms open, it offers to create a public one.
 - **Join by code** (or an invite link, `?room=CODE`).
 
-In a room: the code and **Copy invite link**, the badges, the players (★ owner; the owner can remove someone),
-the rules as chips, **Room settings** (owner; applies from the next round) and **Leave**. The owner picks the map
-and the stage, and the round starts for everyone (a 3 s countdown so the others can click in). Guests' stage cards
-are dimmed. If the owner leaves, the next oldest member owns the room.
+**The room screen** (`ui/room.js`) is where a room waits between rounds: the room code, big, with **Copy code** and
+**Copy invite link**; the players, with empty slots waiting for more to join (the owner can remove someone); your
+name; the rules; and the map + stage picker (`ui/room-picker.js`). The owner picks a map and a stage (and Normal /
+Endless where the stage has it); everyone sees the pick (the server keeps it: `room.next`, the `pick` message). The
+owner presses **Start round** (**Start alone** while nobody has joined), everyone gets the loading screen with each
+player's progress, and the round's clock starts once all have loaded. After a round, **Back to room** returns there
+(the owner also has **Play again**). If the owner leaves, the next oldest member owns the room.
+
+**The pause screen** (`ui/pause.js`, Esc during a run): Resume, Restart, Change stage (solo) / End round (room
+owner), Settings, Leave room / Home, the stage, clock, hits and HP, and in a room the room code with Copy code /
+Invite link and who is alive. Change stage and Settings open the full menu.
 
 - **Co-op**: survive together. When someone dies, the kill feed (top right, CS2-style) says what got them, and you
   can still clear the stage alone as the last one alive. Everyone dead = team wiped (endless: whoever lasted

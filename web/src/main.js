@@ -33,6 +33,8 @@ import { ItemHud } from './ui/itemhud.js';
 import { Killfeed } from './ui/killfeed.js';
 import { Lobby } from './ui/lobby.js';
 import { Home } from './ui/home.js';
+import { RoomScreen } from './ui/room.js';
+import { PauseScreen } from './ui/pause.js';
 import { LoadingScreen } from './ui/loading.js';
 import { bootDone, bootFailed } from './ui/boot.js';
 import { stepProgress } from './app/readiness.js';
@@ -83,12 +85,13 @@ G.resume = () => { if (S.run && !S.run.done) enterGame(canvas); };
 // Start (or restart) a stage and drop straight into it: the lock + fullscreen requests go out first, inside the
 // click, then the stage is built (pointerlockchange unpauses once it lands).
 // In a room the host's pick starts the round for everyone (app/coop.js); a guest waits for it.
+// In a room, a stage picked from the menu becomes the room's next round: back to the room screen (ui/room.js), where
+// the owner starts it.
 G.play = (i, mode = 'normal') => {
   if (net.inRoom) {
     if (!net.isHost) { G.lobby.note('The host picks the stage'); return; }
-    beginStageLoading(i);
-    enterGame(canvas);
-    hostStart(i, mode);
+    if (S.map) net.pick(S.map.name, i >= 0 ? S.scenarios[i]?.id ?? null : null, mode);
+    G.room.comeBack();
     return;
   }
   S.mp = null;
@@ -147,10 +150,18 @@ G.vm.onReload = () => {
   for (const [t, s] of [[0.35, 'gun.clipout'], [1.45, 'gun.clipin'], [2.05, 'gun.boltpull']]) setTimeout(() => { if (G.vm.reloading) G.audio.play(s); }, t * 1000);
 };
 
+// Restart: solo, the same stage again; in a room, the owner restarts the round for everyone
+function restartRun() {
+  if (net.inRoom) { if (net.isHost) { enterGame(canvas); hostStart(S.scenarioIndex, S.run?.mode); } return; }
+  G.play(S.scenarioIndex, S.run?.mode);
+}
+G.hostStart = (i, mode) => { enterGame(canvas); hostStart(i, mode); }; // app/coop-end.js's Play again
+G.enterGame = () => enterGame(canvas); // ui/room.js's Start round (inside the click)
+
 G.menu = new Menu({
   onPick: (i, mode) => G.play(i, mode),
   onResume: () => G.resume(),
-  onRestart: () => G.play(S.scenarioIndex, S.run?.mode),
+  onRestart: () => restartRun(),
   onMaps: () => showMaps(),
 });
 G.maps = new MapPicker($('#maps'), { onPick: (name) => openMap(name) });
@@ -162,7 +173,7 @@ installInput(canvas, {
   lastWeapon: () => { const before = G.vm.weapon; G.vm.swapLast(); if (G.vm.weapon !== before) { G.hud.showWeapons(G.vm.weapon); G.audio.play(G.vm.weapon === 'gun' ? 'gun.deploy' : 'knife.deploy'); } },
   reload: () => G.vm.reload(),
   replayKey, // a replay's keys (app/replay.js)
-  restart: () => { if (net.inRoom) { if (net.isHost) hostStart(S.scenarioIndex, S.run?.mode); } else startScenario(S.scenarioIndex, S.run?.mode); },
+  restart: () => restartRun(),
 });
 
 // Picking a map loads only what its stage list needs (the scenario file, and the map's items from index.json for the
@@ -321,8 +332,22 @@ G.lobby = new Lobby($('#lobby'), {
   net, state: lobby, getMap: () => S.map?.name || '',
   mapTitle: (name) => S.mapIndex.find((m) => m.name === name)?.title || name,
   hasHeal: () => usableHeals(S.map?.items).length > 0,
+  onRoomScreen: () => G.room.comeBack(),
 });
 installCoop();
+// the room screen between rounds, and the pause screen during a run (with the room code in a room)
+G.room = new RoomScreen($('#room'), { net, lobby: G.lobby, hasHeal: () => usableHeals(S.map?.items).length > 0 });
+G.pauseScreen = new PauseScreen($('#pause'), {
+  net,
+  on: {
+    resume: () => G.resume(),
+    restart: () => restartRun(),
+    stages: () => { G.menu.show(S.map ? 'stages' : 'maps'); G.menu.update(); },
+    settings: () => { G.menu.selectTab($('#tab-settings')); G.menu.update(); },
+    home: () => G.home.show(),
+    endRound: () => abortRound(),
+  },
+});
 installReplays(); // replays + the Steam account (app/replay-boot.js)
 
 // the home page: every way in leads to the menu (its Home button comes back)
@@ -332,7 +357,7 @@ G.home = new Home($('#home'), {
   on: {
     play: () => { G.home.hide(); showMaps(); },
     find: () => { toMenu(); G.lobby.go('browse'); },
-    make: () => { toMenu(); G.lobby.openCreate(false); },
+    make: () => G.lobby.createNow(false), // the room screen (ui/room.js) opens once the server has made it
     join: (code) => { toMenu(); G.lobby.joinCode(code); },
     map: (name) => { G.home.hide(); G.menu.show('maps'); openMap(name); },
     settings: () => { G.home.hide(); G.menu.selectTab($('#tab-settings')); },

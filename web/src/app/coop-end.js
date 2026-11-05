@@ -1,5 +1,6 @@
 // The end card of a co-op / versus round (the server's verdict): who won, how, and a line per player (survived /
-// died at). The room owner's card has "Play again" (the server starts the next round for everyone); the others wait for it.
+// died at). The room owner's card has "Play again" (the server starts the next round for everyone); everyone has
+// "Back to room" (the room screen, where the owner picks the next stage).
 import { S, G } from './state.js';
 import { formatTime, plural } from '../lib/format.js';
 
@@ -41,10 +42,11 @@ export function showRoundEnd(round, d) {
   ]);
   stats.push(['Round time', formatTime(d.at)]);
 
-  const menu = { label: 'Menu', key: 'Escape', onClick: () => { G.overlay.hide(); G.menu.update(); } };
+  // back to the room screen (ui/room.js), where the owner picks the next stage; Play again restarts this one
+  const room = { label: 'Back to room', key: 'Escape', primary: !round.isHost, onClick: () => { G.overlay.hide(); G.room?.comeBack(); G.menu.update(); } };
   const buttons = round.isHost
-    ? [{ label: 'Play again', key: 'Enter', primary: true, onClick: () => G.play(S.scenarioIndex, round.mode) }, menu]
-    : [menu];
+    ? [{ label: 'Play again', key: 'Enter', primary: true, onClick: () => G.hostStart(S.scenarioIndex, round.mode) }, room]
+    : [room];
   G.overlay.show({
     kind,
     kicker: `${scenario?.name || 'Free roam'} · ${versus ? 'versus' : 'co-op'}${round.mode === 'endless' ? ' · endless' : ''}`,

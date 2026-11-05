@@ -15,20 +15,22 @@
 }
 
 /* ---- buttons + focus */
-#menu [hidden] { display: none !important; } /* beats the display rules below */
-#menu button, #menu select, #menu input { font: inherit; color: inherit; }
-#menu button { cursor: pointer; }
-#menu :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
-#menu .primary, #menu .ghost {
+/* .sheet: the room screen and the pause screen (ui/room.js, ui/pause.js) share these */
+:is(#menu, .sheet) [hidden] { display: none !important; } /* beats the display rules below */
+:is(#menu, .sheet) button, :is(#menu, .sheet) select, :is(#menu, .sheet) input { font: inherit; color: inherit; }
+:is(#menu, .sheet) button { cursor: pointer; }
+:is(#menu, .sheet) :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+:is(#menu, .sheet) .primary, :is(#menu, .sheet) .ghost {
   min-height: var(--tap); border-radius: 8px; padding: 0 16px; font-weight: 700; font-size: 14px;
   display: inline-flex; align-items: center; gap: 8px; white-space: nowrap;
 }
-#menu .primary { background: var(--accent); border: 1px solid #ff7a7a; color: #fff; }
-#menu .primary:hover { filter: brightness(1.1); }
-#menu .ghost { background: rgba(255, 255, 255, 0.03); border: 1px solid var(--line); }
-#menu .ghost:hover { border-color: #3b4c60; background: rgba(255, 255, 255, 0.06); }
-#menu kbd { font: 600 10px ui-monospace, Consolas, monospace; opacity: 0.75; border: 1px solid currentColor; border-radius: 3px; padding: 0 4px; }
-body.touch #menu .kb { display: none; }
+:is(#menu, .sheet) .primary { background: var(--accent); border: 1px solid #ff7a7a; color: #fff; }
+:is(#menu, .sheet) .primary:hover { filter: brightness(1.1); }
+:is(#menu, .sheet) .primary:disabled { filter: grayscale(0.8) brightness(0.7); cursor: not-allowed; }
+:is(#menu, .sheet) .ghost { background: rgba(255, 255, 255, 0.03); border: 1px solid var(--line); }
+:is(#menu, .sheet) .ghost:hover { border-color: #3b4c60; background: rgba(255, 255, 255, 0.06); }
+:is(#menu, .sheet) kbd { font: 600 10px ui-monospace, Consolas, monospace; opacity: 0.75; border: 1px solid currentColor; border-radius: 3px; padding: 0 4px; }
+body.touch :is(#menu, .sheet) .kb { display: none; }
 
 /* ---- top bar */
 .topbar {
@@ -52,7 +54,7 @@ body.touch #menu .kb { display: none; }
 .map-pick { grid-area: map; display: flex; align-items: center; gap: 10px; min-width: 0; justify-self: end; font-size: 12px; color: var(--dim); }
 .map-pick .back::before { content: ''; width: 7px; height: 7px; border: solid currentColor; border-width: 0 0 2px 2px; transform: rotate(45deg); margin-right: 2px; }
 .map-name { font: 600 12px ui-monospace, Consolas, monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-#menu select, #menu input[type=number] {
+:is(#menu, .sheet) select, :is(#menu, .sheet) input[type=number] {
   background: #0b0f14; border: 1px solid var(--line); border-radius: 7px; padding: 6px 8px; font-size: 14px;
 }
 

@@ -78,7 +78,7 @@ export function attachCoopRelay(httpServer, { log = () => {}, store = openStore(
   });
 
   const roomView = (room) => ({
-    code: room.code, owner: room.owner, settings: room.settings, map: room.map,
+    code: room.code, owner: room.owner, settings: room.settings, map: room.map, next: room.next || null,
     members: room.members.map((m) => ({ id: m.id, name: m.name })),
     round: room.round && !room.round.ended ? { r: room.round.r, stage: room.round.stage.name, ids: [...room.round.players.keys()] } : null,
   });
@@ -104,6 +104,19 @@ export function attachCoopRelay(httpServer, { log = () => {}, store = openStore(
       playing: !!(r.round && !r.round.ended), stage: r.round && !r.round.ended ? r.round.stage.name : '',
       cheats: cheatsOn(r.settings.rules),
     })).sort((a, b) => (a.playing - b.playing) || (b.players - a.players)).slice(0, 100);
+  }
+
+  // { map, stage, mode } -> room.next = { map, stage, stageName, mode, endless }, checked against the server's stage files
+  async function pickStage(c, m) {
+    const room = c.room;
+    if (!room || room.owner !== c.id || !isMapName(m.map)) return;
+    const stage = m.stage == null ? null : await findStage(m.map, String(m.stage).slice(0, 80));
+    if (c.room !== room || room.owner !== c.id) return;
+    if (m.stage != null && !stage?.id) return send(c, { t: 'error', msg: 'That stage is not on this server' });
+    const endless = !!stage?.endless;
+    room.map = m.map;
+    room.next = { map: m.map, stage: stage?.id ?? null, stageName: stage?.name || 'Free roam', mode: m.mode === 'endless' && endless ? 'endless' : 'normal', endless };
+    announce(room);
   }
 
   async function startRound(c, m) {
@@ -176,7 +189,9 @@ export function attachCoopRelay(httpServer, { log = () => {}, store = openStore(
         room.settings = cleanSettings(m.settings, room.members.length);
         announce(room); // a round in progress keeps the rules it started with
         break;
-      case 'map': if (owner && isMapName(m.map)) { room.map = m.map; announce(room); } break;
+      case 'map': if (owner && isMapName(m.map)) { room.map = m.map; if (room.next?.map !== m.map) room.next = null; announce(room); } break;
+      // the owner's pick for the next round (the room screen, ui/room.js): everyone sees it before the start
+      case 'pick': pickStage(c, m).catch(() => {}); break;
       case 'kick': {
         if (!owner || m.id === c.id) return;
         const target = room.members.find((x) => x.id === m.id);

@@ -71,6 +71,8 @@ export class CoopClient {
   setMap(map) { if (this.isHost && isMapName(map)) this.send({ t: 'map', map }); }
   kick(id) { if (this.isHost) this.send({ t: 'kick', id }); }
   start(map, stage, mode) { if (this.isHost) this.send({ t: 'start', map, stage, mode }); }
+  // the next round's stage, chosen on the room screen (everyone in the room sees it)
+  pick(map, stage, mode) { if (this.isHost && isMapName(map)) this.send({ t: 'pick', map, stage, mode }); }
   abort() { if (this.isHost) this.send({ t: 'abort' }); }
   leave() {
     if (!this.room) return;
@@ -94,7 +96,10 @@ export class CoopClient {
           ? { r: m.round.r, stage: cleanText(m.round.stage, 60), ids: Array.isArray(m.round.ids) ? m.round.ids.filter(Number.isInteger) : [] } : null;
         const prev = this.room;
         this.you = (m.you | 0) || this.you;
-        this.room = { code: m.code, owner: m.owner | 0, you: this.you, members, settings: cleanSettings(m.settings, members.length), map: isMapName(m.map) ? m.map : '', round };
+        // next: the owner's pick for the next round (the room screen): { map, stage, stageName, mode, endless } or null
+        const n = m.next && typeof m.next === 'object' && isMapName(m.next.map) ? m.next : null;
+        const next = n ? { map: n.map, stage: typeof n.stage === 'string' ? cleanText(n.stage, 80) : null, stageName: cleanText(n.stageName, 60) || 'Free roam', mode: n.mode === 'endless' ? 'endless' : 'normal', endless: n.endless === true } : null;
+        this.room = { code: m.code, owner: m.owner | 0, you: this.you, members, settings: cleanSettings(m.settings, members.length), map: isMapName(m.map) ? m.map : '', next, round };
         this.emit('room', this.room, prev);
         break;
       }

@@ -28,7 +28,10 @@ export class Menu {
     $('#resume').addEventListener('click', () => onResume());
     $('#restart').addEventListener('click', () => onRestart());
     $('#maps-back').addEventListener('click', () => onMaps());
-    this.selectTab = installTabs($('#menu .tabs'));
+    const select = installTabs($('#menu .tabs'));
+    // asking for a tab means the full menu, not the pause screen (ui/pause.js)
+    this.selectTab = (tab) => { this.mode = 'full'; select(tab); };
+    this.mode = 'pause'; // a paused run shows the pause screen until you ask for stages or settings
   }
 
   // The Play tab's view: 'maps' (the picker) or 'stages' (the loaded map's parts). Picking a view also brings
@@ -43,16 +46,21 @@ export class Menu {
     $('#menu .tab-panels').scrollTop = 0;
   }
 
-  // Show the menu when paused (and no end card is up); Resume only when there is a run to go back to. This runs
-  // on every pause / unpause, so the touch controls follow it too (syncPlayState).
+  // Show the menu when paused (and no end card or room screen is up); Resume only when there is a run to go back
+  // to. A paused run gets the pause screen (ui/pause.js) instead, until you open stages or settings from it. This
+  // runs on every pause / unpause, so the touch controls follow it too (syncPlayState).
   update() {
     const live = !!S.run && !S.run.done;
     $('#resume').hidden = !live;
     $('#restart').hidden = !S.run;
-    const show = S.paused && !G.overlay?.open;
+    // back to the pause screen once you're in again, and for every new run (loading its map opens the stage list)
+    if (!S.paused || S.run !== this.modeRun) { this.mode = 'pause'; this.modeRun = S.run; }
+    const show = S.paused && !G.overlay?.open && !G.room?.open;
+    const card = show && live && this.mode === 'pause' && !!G.pauseScreen;
+    G.pauseScreen?.show(card);
     const menu = $('#menu');
-    const opening = show && menu.classList.contains('hidden');
-    menu.classList.toggle('hidden', !show);
+    const opening = show && !card && menu.classList.contains('hidden');
+    menu.classList.toggle('hidden', !show || card);
     $('#hud').classList.toggle('hidden', !S.run);
     syncPlayState();
     if (opening && live) $('#resume').focus({ preventScroll: true });

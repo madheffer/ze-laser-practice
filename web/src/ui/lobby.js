@@ -1,14 +1,15 @@
-// The multiplayer lobby, on the Play tab over the map list and the stage list. Four views:
-//   home    your name; Create room, Browse rooms, or join by a 4-letter code (an invite link ?room=CODE fills it)
-//   create  the room settings form (ui/lobby-form.js)
+// The multiplayer lobby, on the Play tab over the map list and the stage list. Its views:
+//   home    your name; Create room (made at once with your last settings), Browse rooms, or join by a 4-letter
+//           code (an invite link ?room=CODE fills it)
 //   browse  the public room list (ui/lobby-browse.js)
-//   room    the room you're in: name, code + invite link, public/private, mode, the rules (cheats flagged), the
-//           players (owner starred; the owner can remove someone), Room settings (owner), Leave
-// In a room the owner's stage pick starts the round for everyone; the others' stage cards are dimmed.
+//   room    a strip for the room you're in (Back to room, invite link, Room settings, Leave); the room itself lives
+//           on the room screen (ui/room.js), which shows between rounds
+//   edit    the room settings form (ui/lobby-form.js), for the owner
+// In a room the owner's stage pick here becomes the room's next round; the others' stage cards are dimmed.
 import './lobby.css';
 import { loadJson, saveJson } from '../lib/storage.js';
 import { ROOM_CODE } from '../net/coop-client.js';
-import { cleanName, cleanSettings, cleanText, cheatsOn, CHEAT_LABELS, SETTINGS_DEFAULTS, RULE_DEFAULTS } from '../lib/room-rules.js';
+import { cleanSettings, cleanText, cheatsOn, CHEAT_LABELS, SETTINGS_DEFAULTS, RULE_DEFAULTS } from '../lib/room-rules.js';
 import { roomForm } from './lobby-form.js';
 import { RoomBrowser } from './lobby-browse.js';
 
@@ -26,7 +27,9 @@ const button = (label, cls, onClick, attrs = {}) => { const b = el('button', cls
 export class Lobby {
   // net: CoopClient; state: { busy }; getMap(): the map loaded now; mapTitle(name): its display title; hasHeal(): the
   // loaded map has a heal a human can carry (the Heal picker shows only then)
-  constructor(root, { net, state, getMap = () => '', mapTitle = (n) => n, hasHeal = () => false }) {
+  // onRoomScreen(): back to the room screen (ui/room.js)
+  constructor(root, { net, state, getMap = () => '', mapTitle = (n) => n, hasHeal = () => false, onRoomScreen = () => {} }) {
+    this.onRoomScreen = onRoomScreen;
     this.root = root;
     this.net = net;
     this.state = state;
@@ -78,7 +81,7 @@ export class Lobby {
     this.badges = el('span', 'room-badges');
     this.ownerBtns = el('span', 'owner-btns');
     this.ownerBtns.append(button('Room settings', 'ghost', () => this.openEdit()));
-    top.append(this.roomName, this.codeOut, this.badges, el('span', 'grow'), button('Copy invite link', 'ghost', () => this.copyLink()), this.ownerBtns, button('Leave', 'ghost', () => this.net.leave()));
+    top.append(this.roomName, this.codeOut, this.badges, el('span', 'grow'), button('Back to room', 'primary', () => this.onRoomScreen()), button('Copy invite link', 'ghost', () => this.copyLink()), this.ownerBtns, button('Leave', 'ghost', () => this.net.leave()));
     this.rules = el('ul', 'rule-chips', { 'aria-label': 'Room rules' });
     this.members = el('ul', 'members', { 'aria-label': 'Players in the room' });
     this.roomBox.append(top, this.members, this.rules);
@@ -109,21 +112,17 @@ export class Lobby {
     this.net.join(this.name, code);
   }
 
-  openCreate(isPublic) {
+  // remembered for the next room you make (localStorage)
+  rememberSettings(s) { this.lastSettings = s; saveJson(KEY, { name: this.name, room: s }); }
+
+  // Make a room at once with your last settings (the room screen, ui/room.js, takes over and changes them there)
+  createNow(isPublic = false) {
     this.saveName();
-    const start = isPublic ? { ...this.lastSettings, public: true } : this.lastSettings;
-    this.formBox.replaceChildren(roomForm(start, {
-      mode: 'create', ownerName: cleanName(this.name), heal: this.hasHeal(),
-      onSubmit: (s) => {
-        this.lastSettings = s;
-        saveJson(KEY, { name: this.name, room: s });
-        this.net.create(this.name, s, this.getMap());
-        this.go('home'); // the room view takes over once the server answers
-      },
-      onCancel: () => this.go('home'),
-    }));
-    this.go('create');
+    const s = isPublic ? { ...this.lastSettings, public: true } : this.lastSettings;
+    this.net.create(this.name, s, this.getMap());
   }
+
+  openCreate(isPublic) { this.createNow(isPublic); }
 
   openEdit() {
     const room = this.net.room;
@@ -199,6 +198,6 @@ export class Lobby {
     this.rules.replaceChildren(...chips.map(([t, cls]) => text('li', cls || '', t)));
     const kindHint = s.kind === 'versus' ? 'Versus: last one alive wins.' : 'Co-op: survive together, or clear it alone as the last one alive.';
     this.hint.textContent = state.busy ? `A round is on (${room.round?.stage || 'a stage'}): you'll be in the next one.`
-      : guest ? `${owner?.name || 'The owner'} picks the stage. ${kindHint}` : `Pick a map and a stage: everyone in the room starts it with you. ${kindHint}`;
+      : guest ? `${owner?.name || 'The owner'} picks the stage. ${kindHint}` : `A stage you pick here becomes the room's next round (Start it on the room screen). ${kindHint}`;
   }
 }
