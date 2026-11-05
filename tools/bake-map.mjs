@@ -4,11 +4,12 @@
 //
 //   node tools/bake-map.mjs <workshop id | .vpk | baked map name> [more ...] [options]
 //   node tools/bake-map.mjs --all                       re-bake every map in web/public/maps (from its manifest's source)
+//   node tools/bake-map.mjs --scenarios                 bake every map that has stages (web/public/scenarios/*.json "workshop")
 //
 //   --steps map,entwatch,stripper,lighting,tiers,chunks,index   only these steps (default: all seven, in this order)
 //   --skip-build                       use the lasers-bake already built
-//   --cs2 <game/csgo>                  CS2's game folder (default: lasers-bake finds it)
-//   --workshop <content/730>           where workshop ids are looked up (default D:/Steam/steamapps/workshop/content/730)
+//   --cs2 <game/csgo>                  CS2's game folder (default: found from Steam's libraries, tools/steam.mjs)
+//   --workshop <content/730>           where workshop ids are looked up (default: the workshop folder beside CS2)
 //
 // Steps:
 //   map       the full bake: entities, collision, hulls, glbs + textures (cut-out alpha), particles, sounds, shots, radar
@@ -23,12 +24,13 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { isMapName } from '../web/src/lib/paths.js';
+import { cs2Dir, workshopDir } from './steam.mjs';
 
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const mapsDir = path.join(repo, 'web', 'public', 'maps');
 const STEPS = ['map', 'entwatch', 'stripper', 'lighting', 'tiers', 'chunks', 'index'];
 
-const opts = { steps: STEPS, build: true, cs2: null, workshop: 'D:/Steam/steamapps/workshop/content/730', all: false };
+const opts = { steps: STEPS, build: true, cs2: null, workshop: null, all: false, scenarios: false };
 const targets = [];
 const argv = process.argv.slice(2);
 for (let i = 0; i < argv.length; i++) {
@@ -38,6 +40,7 @@ for (let i = 0; i < argv.length; i++) {
   else if (a === '--cs2') opts.cs2 = argv[++i];
   else if (a === '--workshop') opts.workshop = argv[++i];
   else if (a === '--all') opts.all = true;
+  else if (a === '--scenarios') opts.scenarios = true;
   else if (a === '-h' || a === '--help') usage(0);
   else if (a.startsWith('--')) { console.error(`unknown option ${a}`); usage(2); }
   else targets.push(a);
@@ -45,11 +48,23 @@ for (let i = 0; i < argv.length; i++) {
 const bad = opts.steps.filter((s) => !STEPS.includes(s));
 if (bad.length) { console.error(`unknown step(s): ${bad.join(', ')} (have ${STEPS.join(', ')})`); process.exit(2); }
 if (opts.all) for (const m of bakedMaps()) targets.push(m.name);
+if (opts.scenarios) targets.push(...scenarioWorkshopIds());
+opts.cs2 ??= cs2Dir();
+opts.workshop ??= workshopDir();
 if (!targets.length && !(opts.steps.length === 1 && opts.steps[0] === 'index')) usage(2);
 
 function usage(code) {
-  console.log(fs.readFileSync(fileURLToPath(import.meta.url), 'utf8').split('\n').slice(1, 18).map((l) => l.replace(/^\/\/ ?/, '')).join('\n'));
+  console.log(fs.readFileSync(fileURLToPath(import.meta.url), 'utf8').split('\n').slice(1, 19).map((l) => l.replace(/^\/\/ ?/, '')).join('\n'));
   process.exit(code);
+}
+
+// the workshop ids of the maps that have stages: each scenario file's "workshop"
+function scenarioWorkshopIds() {
+  const dir = path.join(repo, 'web', 'public', 'scenarios');
+  return fs.readdirSync(dir).filter((f) => f.endsWith('.json')).map((f) => {
+    const id = String(JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8')).workshop || '');
+    return /^\d+$/.test(id) ? id : null;
+  }).filter(Boolean);
 }
 
 // the baked maps: { name, source } from each folder's manifest.json

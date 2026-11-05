@@ -36,6 +36,8 @@ export function createRunEngine({ entities, hulls, bounds, animations, traceBox,
   // physboxes (world/entities/classes/physics.js) slide along the static world only
   if (traceBox) engine.traceBox = traceBox;
   engine.humans = humans;
+  // the scenario's word on a zombie cage the map's data can't decide (world/entities/cages.js)
+  if (scenario?.cages && typeof scenario.cages === 'object') engine.cageOverrides = scenario.cages;
   hooks.attach?.(engine);
   engine.spawnWorld();
 

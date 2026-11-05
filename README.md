@@ -13,23 +13,27 @@ tools/   io-graph.mjs + sim.mjs (scenario authoring), index-maps.mjs (rebuild ma
 
 ## Run it locally
 
+The maps aren't in the repo (Valve's and the map makers' content, 100+ MB each): you bake them from your own CS2 and
+its workshop downloads. [BAKING.md, "From a fresh checkout"](BAKING.md#from-a-fresh-checkout-you-or-your-agent) is
+the whole list (what to install, which workshop maps to subscribe to); in short:
+
 ```bash
-node ./tools/bake-map.mjs 3318738050   # build the bake, bake the map + lighting + quality tiers, rebuild the index
 npm --prefix ./web install
-npm --prefix ./web run dev      # http://localhost:5804
+node ./tools/bake-map.mjs --scenarios   # build the bake, bake every map that has stages, rebuild the index
+npm --prefix ./web run dev              # http://localhost:5804
 ```
 
-[BAKING.md](BAKING.md) has every bake step, the quality tiers and the shared assets (sounds, HUD, player).
-The bake finds CS2's `pak01_dir.vpk` for stock textures; pass `--cs2 <game/csgo>` if it's elsewhere.
-Baked maps are gitignored (100+ MB each). Scenarios in `web/public/scenarios/` are committed.
+CS2 and its workshop folder are found from Steam's library list (`node tools/steam.mjs`); `--cs2` / `--workshop` or
+`LASERS_CS2` / `LASERS_WORKSHOP` if they're elsewhere. Scenarios in `web/public/scenarios/` are committed.
 
 | Map | Workshop item |
 |---|---|
 | ze_mist_p | 3318738050 |
-| ze_ffxii_westersand_v8 | 3363745150 (split VPK: pass `3363745150_dir.vpk`) |
-| ze_deadcore | 3351649726 (`3351649726_dir.vpk`) |
-| ze_dreamin | 3415958616 (`3415958616_dir.vpk`) |
-| ze_gris_p | 3633040749 (`3633040749_dir.vpk`) |
+| ze_ffxii_westersand_v8 | 3363745150 |
+| ze_deadcore | 3351649726 |
+| ze_dreamin | 3415958616 |
+| ze_visualizer | 3261434415 |
+| ze_gris_p | 3633040749 (baked, no stages yet) |
 
 ## Database (runs and leaderboards)
 
@@ -219,6 +223,7 @@ is received. Fields we added (cybo's site ignores them):
 | `shooters` | how many of the simulated humans fire at the bosses (a trainer choice, not map data): ze_deadcore's cubes have a flat 1500–2400 HP that 20 humans would erase in a blink, so their drills use 2 |
 | `setup` | inputs fired the moment you are placed (after any fast-forward): puts the map where its own sequence would be for a stage that starts past the relays that do it. ze_deadcore's drills move `des2` (its catch-all fall destination) to where the map keeps it for that part, so a fall puts you back where a human would land |
 | `player.name` | the targetname the map gives a human before this point (westersand's spawn room names everyone `None`); name filters test it |
+| `cages` | `{ "<destination>": true }` or `false`: overrides `world/entities/cages.js` for a destination its evidence gets wrong (`tools/cages.mjs`); none needed so far |
 
 ### Bosses
 
@@ -259,11 +264,20 @@ lists every trigger_teleport with its filter and destination, and `--scenario al
 fast-forward, `setup`) and drops a player from around the spawn to show which teleport catches the fall and where it
 goes. Team splits are honoured (mist's `tp_dragonfall_ct` puts humans back on the platform, `tp_dragonfall_t` sends
 zombies to the cage). A human the map sends into a **zombie cage** dies, as on a server where the zombies there infect
-them: a destination is a cage when a zombie-only teleport aims there AND its name says so (zombie / cage / zm), see
-`zombieCages` in `world/entities/classes/triggers.js`. Run the audit on every new map.
+them (the killfeed shows the map's kill: `hazardName('cage')`). Names don't decide it, the map's wiring does
+(`world/entities/cages.js`): a destination is a cage when a zombie-only teleport aims there, no human-only one does,
+the map doesn't move it with the stage (deadcore's `des1`-`des5` are checkpoints both teams use), and it is the
+zombies' side: the map sorts players by team into it (a teleport into it shares its volume with a human-only trigger
+that moves humans elsewhere), its own logic where you land is a holding room's (a zombie-only trigger, a hurt for
+humans: westersand's `Boss_ZM_Immunity`, `Guard_Boss_Hurt_ZmJail`), or you land against bars / a floor the map takes
+away later (mist's `br_zombiecage`). At the teleport it only kills if nothing takes you on from there right then (an
+enabled teleport for players covering the spot) and the map isn't already moving you (a fall hurt's rescue queued
+the same tick: dreamin's arena, gris's stage 4 boss). `tools/cages.mjs` prints every destination with its verdict and
+evidence: run it on every new map, and give a scenario `cages` only where the evidence is wrong.
 
 ```bash
 node ./tools/teleports.mjs ./web/public/maps/ze_deadcore --scenario all
+node ./tools/cages.mjs ./web/public/maps
 node ./tools/teleports.mjs ./web/public/maps/ze_gris_p --drop -12930,5888,12500
 ```
 

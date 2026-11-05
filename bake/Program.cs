@@ -155,14 +155,56 @@ public static class Program
         return 0;
     }
 
+    // CS2's game/csgo: LASERS_CS2 if set, else the first Steam library that has CS2. Libraries come from Steam's own
+    // list, <Steam>/steamapps/libraryfolders.vdf ("path" entries), with Steam found through STEAM_DIR, the registry
+    // (HKCU\Software\Valve\Steam SteamPath) or its usual folders. tools/steam.mjs does the same for the node tools.
     internal static string? FindCs2()
     {
-        foreach (var lib in new[] { @"D:\Steam", @"C:\Program Files (x86)\Steam", @"D:\SteamLibrary", @"E:\SteamLibrary" })
+        var env = Environment.GetEnvironmentVariable("LASERS_CS2");
+        if (!string.IsNullOrEmpty(env)) return File.Exists(Path.Combine(env, "pak01_dir.vpk")) ? Path.GetFullPath(env) : null;
+        foreach (var lib in SteamLibraries())
         {
-            var p = Path.Combine(lib, @"steamapps\common\Counter-Strike Global Offensive\game\csgo");
+            var p = Path.Combine(lib, "steamapps", "common", "Counter-Strike Global Offensive", "game", "csgo");
             if (File.Exists(Path.Combine(p, "pak01_dir.vpk"))) return p;
         }
         return null;
+    }
+
+    static IEnumerable<string> SteamLibraries()
+    {
+        var roots = new List<string>();
+        var envSteam = Environment.GetEnvironmentVariable("STEAM_DIR");
+        if (!string.IsNullOrEmpty(envSteam)) roots.Add(envSteam);
+        if (OperatingSystem.IsWindows())
+        {
+            try
+            {
+                using var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\Valve\Steam");
+                if (key?.GetValue("SteamPath") is string sp) roots.Add(sp);
+            }
+            catch { /* no Steam in the registry */ }
+            roots.Add(@"C:\Program Files (x86)\Steam");
+        }
+        else
+        {
+            var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            roots.Add(Path.Combine(home, ".steam", "steam"));
+            roots.Add(Path.Combine(home, ".local", "share", "Steam"));
+            roots.Add(Path.Combine(home, "Library", "Application Support", "Steam"));
+        }
+        var seen = new HashSet<string>(OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
+        foreach (var root in roots)
+        {
+            if (!Directory.Exists(root)) continue;
+            if (seen.Add(Path.GetFullPath(root))) yield return Path.GetFullPath(root);
+            var vdf = Path.Combine(root, "steamapps", "libraryfolders.vdf");
+            if (!File.Exists(vdf)) continue;
+            foreach (System.Text.RegularExpressions.Match m in System.Text.RegularExpressions.Regex.Matches(File.ReadAllText(vdf), @"""path""\s+""([^""]+)"""))
+            {
+                var lib = m.Groups[1].Value.Replace(@"\\", @"\");
+                if (Directory.Exists(lib) && seen.Add(Path.GetFullPath(lib))) yield return Path.GetFullPath(lib);
+            }
+        }
     }
 
     // CS2's stock content packs beside <game/csgo>: csgo's own and the engine's core pack (game/core), which carries

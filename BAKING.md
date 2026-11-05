@@ -4,6 +4,47 @@ Everything under `web/public/maps|sounds|panorama|weapons|player` is generated f
 is gitignored (100+ MB a map). This page is how to make it again on a fresh checkout, and what each tool writes.
 The map folder format itself is in [README.md](README.md#the-map-folder-shared-with-laserscybodev).
 
+## From a fresh checkout (you or your agent)
+
+The repo has the code, the hand-written stages and the tools, but none of Valve's or the map makers' content: you
+make that from your own CS2 install. You need:
+
+- **CS2 through Steam** (Windows is what this is built and tested on; the tools also look in Linux / macOS Steam folders)
+- **Node 20+** and the **.NET 10 SDK** (`dotnet build bake -c Release` builds `lasers-bake`)
+- **The maps that have stages, subscribed in the Steam Workshop** (Steam downloads them into
+  `<library>/steamapps/workshop/content/730/<id>`; start CS2 once if a download doesn't begin):
+
+| Map | Workshop |
+|---|---|
+| ze_mist_p | [3318738050](https://steamcommunity.com/sharedfiles/filedetails/?id=3318738050) |
+| ze_deadcore | [3351649726](https://steamcommunity.com/sharedfiles/filedetails/?id=3351649726) |
+| ze_ffxii_westersand_v8 | [3363745150](https://steamcommunity.com/sharedfiles/filedetails/?id=3363745150) |
+| ze_dreamin | [3415958616](https://steamcommunity.com/sharedfiles/filedetails/?id=3415958616) |
+| ze_visualizer | [3261434415](https://steamcommunity.com/sharedfiles/filedetails/?id=3261434415) |
+
+(Each `web/public/scenarios/<map>.json` names its workshop id; that list is where `--scenarios` reads them.)
+
+```bash
+npm --prefix web install
+npm --prefix tools install
+node tools/steam.mjs                        # where it found CS2 and the workshop folder (from Steam's library list)
+node tools/bake-map.mjs --scenarios         # bake every map that has stages (100-300 MB each, a few minutes each)
+./bake/bin/Release/net10.0/lasers-bake --stock-sounds web/public/sounds    # knife / guns / player sounds
+./bake/bin/Release/net10.0/lasers-bake --panorama web/public/panorama      # CS2's HUD icons, fonts, chat / kill feed
+./bake/bin/Release/net10.0/lasers-bake --player web/public/player          # your third-person body
+npm --prefix web run dev                    # http://localhost:5804
+```
+
+CS2 and the workshop folder are found the way Steam lists its libraries (`<Steam>/steamapps/libraryfolders.vdf`,
+Steam itself from the registry or its usual folder). If yours is elsewhere: `LASERS_CS2=<…/game/csgo>`,
+`LASERS_WORKSHOP=<…/workshop/content/730>` or `STEAM_DIR=<Steam folder>`, or `--cs2` / `--workshop` on `bake-map.mjs`.
+The bake only reads the CS2 install and the workshop files, and writes only under the output folder it is given.
+
+Two things come from vpkstuff's weaponviewer bake, which is not part of this repo: the first-person hands and gun
+(`web/public/weapons/fp/`) and the third-person stance poses (`web/public/player/clips/`, README "Playing"). Without
+them the game plays the same (the guns' numbers, sounds and buy commands are this repo's); the hands and gun aren't
+drawn, and third person has no stance pose.
+
 ## One command
 
 ```bash

@@ -6,6 +6,7 @@ import { register } from '../registry.js';
 import { DEG, num, bool, parseVec, angleForward } from '../math.js';
 import { nameMatches } from '../../../lib/names.js';
 import { explosionSound } from '../sound.js';
+import { strandsHuman } from '../cages.js';
 
 const triggerBase = {
   input(e, inp, p, act) {
@@ -146,38 +147,8 @@ export function filterPasses(engine, fname, depth = 0) {
 }
 
 // ------------------------------------------------------------------ zombie cages
-
-// Where the map keeps zombies: a teleport destination counts as a zombie cage when the map's own wiring and its naming
-// agree, i.e. a zombie-only trigger_teleport (filter_activator_team 2) aims there, statically or through a runtime
-// "KeyValue target X", AND its name says so (zombie / cage / zm). Both, because zombies are also sent to where the
-// humans are (westersand's TD_Tomb, TD_Ship_Middle: zombie-filtered AND unfiltered teleports, ordinary names).
-// A human the map sends into a cage (mist's tp_hellarea, westersand's Teleport_Vulcano sweeping stragglers) is
-// infected there on a server: the session counts it as a death. Falls split by team (mist's tp_dragonfall_ct /
-// _t, deadcore's des2 that the map keeps moving onto the boss platform) never come here for a human.
-const CAGE_NAME = /zombie|cage|(^|[^a-z])zm([^a-z]|$)/i;
-export function zombieCages(engine) {
-  if (engine._cages) return engine._cages;
-  const all = Object.values(engine.lumps).flat();
-  const key = (n) => String(n || '').replace(/^\[PR#\]/i, '').toLowerCase();
-  const filters = new Map(all.filter((d) => /^filter_/.test(d.kv.classname)).map((d) => [key(d.kv.targetname), d.kv]));
-  const zombieOnly = (fname) => {
-    const f = filters.get(key(fname));
-    return !!f && f.classname === 'filter_activator_team' && num(f.filterteam) === 2 && !bool(f.negated);
-  };
-  const zTriggers = new Set();
-  const targets = new Set();
-  for (const d of all) {
-    if (d.kv.classname !== 'trigger_teleport' || !zombieOnly(d.kv.filtername)) continue;
-    zTriggers.add(key(d.kv.targetname));
-    if (d.kv.target) targets.add(key(d.kv.target));
-  }
-  for (const d of all) for (const c of d.io || []) {
-    const m = /^\s*target\s+(\S+)/i.exec(c.param || '');
-    if (m && /^(keyvalue|addoutput)$/i.test(c.input) && zTriggers.has(key(c.target))) targets.add(key(m[1]));
-  }
-  engine._cages = new Set([...targets].filter((t) => CAGE_NAME.test(t)));
-  return engine._cages;
-}
+// where the map keeps zombies, from its own wiring: world/entities/cages.js (tools/teleports.mjs imports it from here)
+export { zombieCages } from '../cages.js';
 
 // game_zone_player: CountPlayersInZone fires OnPlayerInZone / OnPlayerOutZone once per player (you), activator =
 // that player, then PlayersInCount / PlayersOutCount with the counts (ze_deadcore's Insane D tests who is outside)
@@ -272,9 +243,9 @@ export function updateTriggers(engine, player) {
         if (cls === 'trigger_hurt') e.state.hurtOnce = false; // a new touch counts as a new hit
         if (cls === 'trigger_teleport') {
           const dest = engine.findOne(e.kv.target);
-          // CS2 takes the first destination with that name (porter research 07 §2.2); `cage`: a zombie cage, the
-          // session makes that a death for a human
-          if (dest) events.push({ type: 'teleport', origin: dest.worldOrigin(), yaw: new THREE.Euler().setFromQuaternion(new THREE.Quaternion().setFromRotationMatrix(dest.getWorld()), 'ZYX').z / DEG, trigger: e, dest, cage: zombieCages(engine).has(dest.key) });
+          // CS2 takes the first destination with that name (porter research 07 §2.2); `cage`: a zombie cage with no
+          // way on from it right now (cages.js strandsHuman), the session makes that a death for a human
+          if (dest) events.push({ type: 'teleport', origin: dest.worldOrigin(), yaw: new THREE.Euler().setFromQuaternion(new THREE.Quaternion().setFromRotationMatrix(dest.getWorld()), 'ZYX').z / DEG, trigger: e, dest, cage: strandsHuman(engine, dest) });
         }
       } else if (!inside && was) {
         untouch(engine, e, events);
