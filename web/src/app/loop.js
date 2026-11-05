@@ -137,23 +137,31 @@ export function step() {
     teamAndEnd(run);
     return;
   }
+  // CS2's tick order (cs2_server CSource2Server::GameFrame -> the entity simulation, players first): you move first,
+  // against the movers where they stood last tick (world.dynamic from the previous tick); then every other entity
+  // simulates (movers, thinks) and the one you stand on carries you; then the physics step's touches
+  // (CPhysicsGameSystem in ServerPostEntityThink) see everyone's new positions: engine.updateTriggers below.
+  const before = player.origin;
+  let inp = IDLE;
+  if (!S.replay) {
+    // window.__lasersInput drives the player in tests: solo only (no bots in a round)
+    inp = (!S.mp && window.__lasersInput?.(run.t)) || (S.locked ? readInput() : IDLE);
+    player.maxSpeed = G.vm.weapon === 'knife' ? 250 : 215; // CS2: knife 250, AK-47 215
+    player.tick(inp, moveSettings());
+  }
   const ground = player.groundEntity && player.groundEntity.alive ? player.groundEntity : null;
   const groundBefore = ground ? ground.getWorld().clone() : null;
   if (mapRuns(run)) engine.tick(CS.tick); // a mid-map stage holds still through its countdown
   G.renderer.record(engine.time);
-  if (ground) player.ride(ground, groundBefore, ground.getWorld());
+  if (ground && !S.replay) player.ride(ground, groundBefore, ground.getWorld());
   world.dynamic = engine.solids();
-  const before = player.origin;
   if (S.replay) {
     // where the recorded player stood on this tick (app/replay-play.js); the recording's end is the replay's
     if (!applyPose(run.ticks, player)) { finish('end'); return; }
     eventsDuring(run.ticks, { hurt: hurtPlayer });
     footsteps(IDLE, before);
   } else {
-    // window.__lasersInput drives the player in tests: solo only (no bots in a round)
-    const inp = (!S.mp && window.__lasersInput?.(run.t)) || (S.locked ? readInput() : IDLE);
-    player.maxSpeed = G.vm.weapon === 'knife' ? 250 : 215; // CS2: knife 250, AK-47 215
-    player.tick(inp, moveSettings());
+    // the tick's final pose (moved, then carried): what the round's server checks against this tick's solids
     S.mp?.record(run.ticks, player); // a round's server replays your run from these (the anti-cheat)
     run.rec?.pose(run.ticks, player, G.vm.weapon === 'gun'); // your solo run's replay (app/replay-record.js)
     footsteps(inp, before);

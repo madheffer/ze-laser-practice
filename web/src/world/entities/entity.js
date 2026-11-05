@@ -83,7 +83,7 @@ export class Entity {
     this.setWorldTransform(w);
   }
 
-  // World-space convex hulls of this entity's model ({planes, min, max}[]), cached until it moves.
+  // World-space convex hulls of this entity's model ({planes, verts, edges, min, max}[]), cached until it moves.
   hulls() {
     const src = this.engine.assets.hulls[this.model];
     if (!src) return null;
@@ -98,18 +98,26 @@ export class Entity {
     for (const h of src) {
       if (!h.planes) continue;
       const planes = new Float64Array(h.planes.length);
+      const verts = new Float64Array(h.verts.length);
       const min = [Infinity, Infinity, Infinity], max = [-Infinity, -Infinity, -Infinity];
       for (let i = 0; i < h.verts.length; i += 3) {
         v.set(h.verts[i], h.verts[i + 1], h.verts[i + 2]).applyMatrix4(m);
+        verts[i] = v.x; verts[i + 1] = v.y; verts[i + 2] = v.z;
         min[0] = Math.min(min[0], v.x); min[1] = Math.min(min[1], v.y); min[2] = Math.min(min[2], v.z);
         max[0] = Math.max(max[0], v.x); max[1] = Math.max(max[1], v.y); max[2] = Math.max(max[2], v.z);
+      }
+      // edge directions turn with the entity (hulls.js hullEdges): the exact box test's extra separating axes
+      const edges = new Float64Array(h.edges?.length || 0);
+      for (let i = 0; i < edges.length; i += 3) {
+        n.set(h.edges[i], h.edges[i + 1], h.edges[i + 2]).applyMatrix3(nm).normalize();
+        edges[i] = n.x; edges[i + 1] = n.y; edges[i + 2] = n.z;
       }
       for (let i = 0; i < h.planes.length; i += 4) {
         n.set(h.planes[i], h.planes[i + 1], h.planes[i + 2]).applyMatrix3(nm).normalize();
         planes[i] = n.x; planes[i + 1] = n.y; planes[i + 2] = n.z;
         planes[i + 3] = h.planes[i + 3] + n.x * e[12] + n.y * e[13] + n.z * e[14];
       }
-      out.push({ planes, min, max, solid: h.solid, layers: h.layers ?? null });
+      out.push({ planes, verts, edges, min, max, solid: h.solid, layers: h.layers ?? null });
     }
     void stamp;
     this.placedHulls = out;

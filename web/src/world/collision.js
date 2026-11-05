@@ -335,7 +335,8 @@ export class CollisionWorld {
   }
 }
 
-// Does an AABB (centre c, half h) overlap a placed convex hull? (SAT on the hull's planes + axes.)
+// Does an AABB (centre c, half h) overlap a placed convex hull? Exact SAT: the box axes, the hull's face planes and,
+// when the hull carries verts + edges (entity.hulls(), hulls.js hullEdges), each box axis x hull edge.
 export function boxTouchesHull(c, h, hull) {
   const lo = hull.min, hi = hull.max;
   if (c[0] + h[0] < lo[0] || c[0] - h[0] > hi[0] || c[1] + h[1] < lo[1] || c[1] - h[1] > hi[1] || c[2] + h[2] < lo[2] || c[2] - h[2] > hi[2]) return false;
@@ -344,6 +345,30 @@ export function boxTouchesHull(c, h, hull) {
     const nx = P[i], ny = P[i + 1], nz = P[i + 2];
     const r = Math.abs(nx) * h[0] + Math.abs(ny) * h[1] + Math.abs(nz) * h[2];
     if (nx * c[0] + ny * c[1] + nz * c[2] - r > P[i + 3]) return false;
+  }
+  // The rest of an exact convex overlap (separating axis theorem): each box axis crossed with each hull edge. Without
+  // them a box near the edge of a hull turned on two axes "touched" it up to ~20 u outside (a tilted spinning blade).
+  // The box's own axes are the bounds test above and the hull's faces the plane loop; touching surfaces still count.
+  const E = hull.edges, V = hull.verts;
+  if (!E || !V || !E.length) return true;
+  for (let i = 0; i < E.length; i += 3) {
+    const ex = E[i], ey = E[i + 1], ez = E[i + 2];
+    for (let a = 0; a < 3; a++) {
+      // edge x unit axis a
+      let nx, ny, nz;
+      if (a === 0) { nx = 0; ny = ez; nz = -ey; } else if (a === 1) { nx = -ez; ny = 0; nz = ex; } else { nx = ey; ny = -ex; nz = 0; }
+      const L = Math.hypot(nx, ny, nz);
+      if (L < 1e-6) continue; // edge along the axis: that axis is already a box face
+      nx /= L; ny /= L; nz /= L;
+      let lo = Infinity, hi = -Infinity;
+      for (let k = 0; k < V.length; k += 3) {
+        const p = nx * V[k] + ny * V[k + 1] + nz * V[k + 2];
+        if (p < lo) lo = p;
+        if (p > hi) hi = p;
+      }
+      const cc = nx * c[0] + ny * c[1] + nz * c[2], r = Math.abs(nx) * h[0] + Math.abs(ny) * h[1] + Math.abs(nz) * h[2];
+      if (cc + r < lo || cc - r > hi) return false;
+    }
   }
   return true;
 }

@@ -24,7 +24,7 @@ export function normaliseHulls(hullsRaw) {
       }
       growBounds(all.min, all.max, min, max);
       const layers = Number.isInteger(h.layers) ? h.layers >>> 0 : null; // interaction-layer bits (bake LayersOf), null in older bakes
-      if (h.planes) out.push({ verts: h.verts, planes: h.planes, solid: h.solid !== false, layers });
+      if (h.planes) out.push({ verts: h.verts, planes: h.planes, edges: hullEdges(h.verts, h.planes), solid: h.solid !== false, layers });
       else if (v.length) out.push({ ...boxHull(min, max, h.solid !== false), layers });
     }
     if (out.length) { hulls[key] = out; bounds[key] = all; }
@@ -36,5 +36,36 @@ function boxHull(min, max, solid) {
   const verts = [];
   for (let i = 0; i < 8; i++) verts.push(i & 1 ? max[0] : min[0], i & 2 ? max[1] : min[1], i & 4 ? max[2] : min[2]);
   const planes = [1, 0, 0, max[0], -1, 0, 0, -min[0], 0, 1, 0, max[1], 0, -1, 0, -min[1], 0, 0, 1, max[2], 0, 0, -1, -min[2]];
-  return { verts, planes, solid };
+  return { verts, planes, edges: [1, 0, 0, 0, 1, 0, 0, 0, 1], solid };
+}
+
+// A convex hull's distinct edge directions (unit, flat [x,y,z,...]): two faces share an edge when at least two of the
+// hull's vertices lie on both, and that edge runs along the cross of their normals. collision.js boxTouchesHull needs
+// them for an exact box-vs-hull overlap (the box-axis x edge separating axes).
+export function hullEdges(verts, planes) {
+  const EPS = 0.01, out = [];
+  const onPlane = (p) => {
+    const idx = [];
+    for (let i = 0; i < verts.length; i += 3) {
+      if (Math.abs(planes[p] * verts[i] + planes[p + 1] * verts[i + 1] + planes[p + 2] * verts[i + 2] - planes[p + 3]) < EPS) idx.push(i);
+    }
+    return new Set(idx);
+  };
+  const sets = [];
+  for (let p = 0; p < planes.length; p += 4) sets.push(onPlane(p));
+  for (let a = 0; a < sets.length; a++) for (let b = a + 1; b < sets.length; b++) {
+    let shared = 0;
+    for (const i of sets[a]) if (sets[b].has(i) && ++shared >= 2) break;
+    if (shared < 2) continue;
+    const [ax, ay, az] = [planes[a * 4], planes[a * 4 + 1], planes[a * 4 + 2]];
+    const [bx, by, bz] = [planes[b * 4], planes[b * 4 + 1], planes[b * 4 + 2]];
+    let x = ay * bz - az * by, y = az * bx - ax * bz, z = ax * by - ay * bx;
+    const L = Math.hypot(x, y, z);
+    if (L < 1e-6) continue;
+    x /= L; y /= L; z /= L;
+    let dup = false;
+    for (let k = 0; k < out.length; k += 3) if (Math.abs(out[k] * x + out[k + 1] * y + out[k + 2] * z) > 0.9999) { dup = true; break; }
+    if (!dup) out.push(x, y, z);
+  }
+  return out;
 }

@@ -18,6 +18,9 @@ export const CS = {
   walkFactor: 0.52,
   duckFactor: 0.34,
   maxVelocity: 3500,
+  // the player's box and eyes, as CS2's server builds them: CCSGameRules::GetViewVectors (vtable slot 32; server.dll
+  // 2026-11-05 0x18092b440 returns the table its static init 0x18009a0c0 fills): hull (-16,-16,0)-(16,16,72), duck
+  // hull max (16,16,54), view (0,0,64), duck view (0,0,46)
   standHeight: 72,
   duckHeight: 54,
   halfWidth: 16,

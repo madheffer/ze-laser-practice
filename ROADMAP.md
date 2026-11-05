@@ -58,6 +58,22 @@ exact map-folder format so he can lift our maps straight into his site. See [REA
       cs2_server FUN_180d53f10): a lip bigger than the brush moves the door backwards. The old `Math.max(0, ...)`
       froze 42 of visualizer's doors (dodge balls/beams, boss attacks 2/4/9/15/16/18, item balls) and gris's
       ikura_rhombus_move; no other baked map changes
+    - [x] engine: player box and eyes confirmed from CS2's server (CCSGameRules::GetViewVectors, vtable slot 32):
+      hull (-16,-16,0)-(16,16,72), crouched (16,16,54), eyes 64 / 46, the numbers world/movement.js already used
+    - [x] engine: player-vs-trigger touch is an exact convex overlap (box axes, hull faces and box axis x hull edge):
+      the old faces-only test touched hulls turned on two axes up to ~20 u outside (validated: 0 disagreements with a
+      brute-force SAT in 120,000 samples; hulls.js hullEdges, entity.hulls() keeps verts + edges)
+    - [x] engine: CS2's tick order, traced in cs2_server: CSource2Server::GameFrame (0x180dd4970) fires
+      ServerPreEntityThink (game-system slot 0xf8), runs the entity simulation (0x1805af790: every player pawn's
+      PhysicsSimulate first, CBasePlayerPawn::PhysicsSimulate = pawn vtable +0x508, which runs the usercmds; then every
+      other entity's simulate + thinks: movers, trigger_hurt HurtThink), then ServerPostEntityThink (slot 0x100), where
+      CPhysicsGameSystem (RTTI) runs OnSimulate: the physics step that dispatches StartTouch/EndTouch with everyone's
+      new positions. Touches: same as ours (after all moves, hurt thinks on the previous tick's touch list), so trigger
+      hits land on the same tick
+    - [x] engine: app/loop.js now runs CS2's order: you move first (against the movers' last-tick solids), then
+      engine.tick (movers, thinks), then the one you stand on carries you, then touches. The recorded pose is still the
+      tick's final one, so coop-check.js (engine.tick, then the pose vs this tick's solids, then touches) needed no
+      change. Checked on :5807: l5_ending rides the train end to end (4 u spawn offset held) to the win; a14 still hits
     - [ ] boss bar over all 16 segments: GFL's bosshud gives Blue Particle `iterator: boss_healthcount` (CS2Fixes
       CounterIterator); app/bosses.js shows the current segment's hits only
     - [ ] bake: the world glb referenced `default_normal_tga_b3f4ec4c_orm_3598707198.png` but VRF wrote it only beside the
