@@ -70,7 +70,7 @@ function goFullscreen() {
 // Enter the game. Pointer lock and fullscreen both need the click's user activation, so both are requested
 // SYNCHRONOUSLY here, before any await or heavy work (awaiting fullscreen first used up the activation and the
 // lock was refused, leaving you on the Resume screen). The keyboard lock (so Ctrl+W can't close the tab and
-// Esc arrives as a tap) follows once fullscreen is in.
+// Esc arrives as a tap; the Windows key stays the OS's: LOCK_KEYS) follows once fullscreen is in.
 // On touch there is no lock to wait for: fullscreen + landscape are asked for, and the game unpauses as soon as
 // the caller has (re)built the run (G.play calls this, then startScenario, in the same click).
 export function enterGame(canvas) {
@@ -85,8 +85,24 @@ export function enterGame(canvas) {
     return;
   }
   lockPointer(canvas);
-  goFullscreen().then((fs) => { if (fs) navigator.keyboard?.lock?.().catch(() => {}); });
+  goFullscreen().then((fs) => { if (fs) navigator.keyboard?.lock?.(LOCK_KEYS).catch(() => {}); });
 }
+
+// What the keyboard lock takes in fullscreen: every key but the Windows / Cmd keys, so the Start menu still opens
+// (the way out to CS2 or another window) while Esc, Ctrl+W, Tab and the rest stay the game's. A lock with no list
+// takes those too.
+const LOCK_KEYS = [
+  ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map((c) => `Key${c}`),
+  ...'0123456789'.split('').map((d) => `Digit${d}`),
+  ...Array.from({ length: 12 }, (_, i) => `F${i + 1}`),
+  ...'0123456789'.split('').map((d) => `Numpad${d}`),
+  'NumpadAdd', 'NumpadSubtract', 'NumpadMultiply', 'NumpadDivide', 'NumpadDecimal', 'NumpadEnter', 'NumLock',
+  'Escape', 'Tab', 'CapsLock', 'ShiftLeft', 'ShiftRight', 'ControlLeft', 'ControlRight', 'AltLeft', 'AltRight',
+  'Space', 'Enter', 'Backspace', 'Delete', 'Insert', 'Home', 'End', 'PageUp', 'PageDown',
+  'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ContextMenu',
+  'Backquote', 'Minus', 'Equal', 'BracketLeft', 'BracketRight', 'Backslash', 'Semicolon', 'Quote', 'Comma', 'Period',
+  'Slash', 'IntlBackslash',
+];
 
 // Called on every pause / unpause (Menu.update): on touch, input is live exactly while a run plays, and the
 // controls show only then.

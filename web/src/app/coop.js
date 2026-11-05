@@ -6,7 +6,8 @@
 //   - boss damage goes through the server: your hits (and the team's fire, if you're the round's "leader") go up,
 //     everyone's capped hits come back and every client applies the same ones;
 //   - you send where you are ~20 times a second, when you die, and when your map says the stage is won / lost.
-// The server decides the end and who won (co-op: survivors, or the last one alive; versus: last one standing).
+// The server decides the end and who won (co-op: survivors, or the last one alive; versus: the last one standing,
+// once they have cleared the stage or gone down too).
 //
 // S.mp is the Round while you're in one (session, bosses and loop call its hooks); null solo.
 import { S, G, log } from './state.js';
@@ -16,6 +17,7 @@ import { startScenario, stageTime, finish } from './session.js';
 import { bossTargets, applyBossDamage } from './bosses.js';
 import { showRoundEnd } from './coop-end.js';
 import { isMapName } from '../lib/paths.js';
+import { TICK } from '../world/run-engine.js';
 import { lastFrameAt } from './loop.js';
 import { systemLine } from './chat.js';
 import { itemState, spendUse, usableHeals } from '../world/items.js';
@@ -24,7 +26,8 @@ import { beginRoster, applyWait, markOut, rosterGo, clearRoster, waitLine, start
 export const net = new CoopClient();
 export const lobby = { busy: false }; // busy = a round is on that you're not in (you'll be in the next one)
 
-const STATE_MS = 50; // 20 Hz
+const STATE_MS = 33; // 30 Hz: the others draw you this much less late (world/peers.js)
+const RELAY_TICKS = 8; // ticks per relayed state the server sends (server/coop-round.js)
 // the server's notes that mean the player is out of the round, not dead (server/coop-round.js onLeave / load timeout)
 const LEFT = new Set(['left the game', 'could not load in time']);
 const NOTE_COLOR = '#c5cad0'; // chat code 8, grey
@@ -51,7 +54,6 @@ class Round {
     this.players = new Map(d.roster.map((m) => [m.id, { id: m.id, name: m.name, alive: true, deadAt: null, hits: 0 }]));
     this.me = net.you;
     this.ended = false;
-    this.interpDelay = 0.1; // others are drawn this far in the past (s), between two of their states
     this.sendAt = 0; this.bossAt = 0;
     this.hitOut = new Map(); this.teamOut = new Map();
     this.ticks = []; this.tick0 = 0; // your positions since the last send: tick tick0, tick0 + 1, ...
@@ -132,7 +134,7 @@ class Round {
 
   spectateView() {
     if (this.specId == null || !this.players.get(this.specId)?.alive) this.specId = this.alive.find((p) => p.id !== this.me)?.id ?? null;
-    return this.specId == null ? null : G.peers.eye(this.specId, S.run.t - this.interpDelay);
+    return this.specId == null ? null : G.peers.eye(this.specId, S.run.t);
   }
   spectateNext() {
     const ids = this.alive.filter((p) => p.id !== this.me).map((p) => p.id);
@@ -166,7 +168,9 @@ class Round {
     if (!this.lastAliveSaid && this.players.size > 1 && alive.length === 1) {
       this.lastAliveSaid = true;
       const last = alive[0];
-      systemLine([[last.id === this.me ? ' You are the last one alive' : ` ${last.name} is the last one alive`, NOTE_COLOR]]);
+      // versus plays on: the last one standing wins once they clear the stage or outlast everyone (server/coop-round.js)
+      const goal = this.kind === 'versus' ? ': clear the stage or survive to win' : '';
+      systemLine([[last.id === this.me ? ` You are the last one alive${goal}` : ` ${last.name} is the last one alive`, NOTE_COLOR]]);
     }
   }
 
@@ -272,7 +276,12 @@ function onGame(d, at = performance.now()) {
   switch (d.t) {
     case 's':
       if (!run || !Number.isInteger(d.from) || !num(d.at, 0, 1e6) || !vec(d.o, 1e6) || !num(d.yaw, -1e4, 1e4) || !num(d.pitch, -90, 90) || !num(d.duck, 0, 1)) return;
-      G.peers.push(d.from, { t: d.at, o: d.o, yaw: d.yaw, pitch: d.pitch, duck: d.duck, hp: num(d.hp, 0, 1e6) ? d.hp : 0 });
+      {
+        // every tick of the batch (tr); an older server sends only the newest (o)
+        const tr = Array.isArray(d.tr) ? d.tr.slice(-RELAY_TICKS).filter((s) => Array.isArray(s) && s.length === 4 && vec(s.slice(0, 3), 1e6) && num(s[3], 0, 1)) : [];
+        const positions = tr.length ? tr : [[...d.o, d.duck]];
+        G.peers.pushBatch(d.from, { at: d.at, positions, yaw: d.yaw, pitch: d.pitch, hp: num(d.hp, 0, 1e6) ? d.hp : 0, tick: TICK }, run.t);
+      }
       break;
     case 'clock':
       // keep our run on the round's clock: half the gap each time, so one late frame can't jerk the world around.

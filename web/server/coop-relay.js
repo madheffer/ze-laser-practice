@@ -29,7 +29,7 @@ export const PATH = '/coop';
 const MAX_ROOMS = 300;
 const MAX_ROUNDS = 24; // rounds running at once: each player in one costs the server a copy of the map's logic
 const MAX_FRAME = 8 * 1024; // bytes
-const RATE = 80; // messages per second per connection (20 Hz state + events)
+const RATE = 80; // messages per second per connection (30 Hz state + 2 x 10 Hz hits + events)
 const PER_ADDRESS = 6; // open sockets per remote address
 const LIST_MS = 1000; // a client may ask for the public list once a second
 // failed joins (a wrong code) a minute, per connection and per address: 4-letter codes can't be guessed in bulk

@@ -382,6 +382,18 @@ G.home = new Home($('#home'), {
 });
 $('#go-home').addEventListener('click', () => goHome());
 
+// Leaving a room (Leave on the room screen, the lobby strip or the pause screen), or being removed from it, is done
+// with that room: its run ends, its end card and room screen go, and you're back at the map picker. A lost
+// connection keeps what you were doing (app/coop.js onLeft: a live run carries on solo).
+net.on('left', (why) => {
+  if (why !== 'left' && why !== 'kicked') return;
+  if (S.run) endRun();
+  G.overlay.hide();
+  G.home.hide();
+  showMaps();
+  G.menu.update();
+});
+
 // console handle for debugging and automated checks
 window.__lasers = {
   get engine() { return S.engine; }, get player() { return S.player; }, get run() { return S.run; }, get world() { return S.world; },

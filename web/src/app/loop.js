@@ -96,7 +96,8 @@ export function frame(now) {
   if (rv) { G.renderer.setView(rv.pos, rv.yaw, rv.pitch); tp = rv.body; }
   else G.renderer.setView(cameraPosition(S.world, eye, view.yaw, view.pitch, tp, settings.tpDist), view.yaw, view.pitch);
   G.body?.update({ visible: tp, origin: o, yaw: player.yaw, ducked: player.ducked, duckAmount: player.duckAmount, onGround: player.onGround });
-  G.peers?.update(S.run && S.mp ? S.run.t - S.mp.interpDelay : null, G.renderer.camera, spec?.id);
+  // your run time this frame, between ticks (as the camera is): each player is drawn their own delay behind it
+  G.peers?.update(S.run && S.mp ? S.run.t + (live ? acc : 0) : null, G.renderer.camera, spec?.id);
   G.renderer.showHitboxes = rule('hitboxes'); // a round's are the room's
   G.stream?.update(G.renderer.camera.position.toArray(camPos), G.renderer.lighting?.viewDistance ?? Infinity); // the world's chunks around the camera (Source units)
   G.renderer.lighting?.update(engine, G.renderer.camera); // the map's fog (its own entities + I/O), far Z, the sky

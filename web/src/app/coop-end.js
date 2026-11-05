@@ -15,9 +15,12 @@ export function showRoundEnd(round, d) {
   if (versus) {
     kind = d.result === 'draw' ? 'endless' : won ? 'win' : 'dead';
     title = d.result === 'draw' ? 'DRAW' : won ? 'VICTORY' : 'DEFEAT';
+    // the round runs until the last one standing clears it or goes down (server/coop-round.js checkEnd)
+    const cleared = d.stats.filter((s) => s.alive).length;
     subtitle = d.result === 'draw' ? (d.winners.length ? `${names(d.winners)} tied` : 'Nobody made it')
-      : d.reason === 'win' ? `${names(d.winners)} cleared it with the fewest hits`
-        : `${names(d.winners)} ${d.winners[0] === me ? 'were' : 'was'} the last one alive`;
+      : d.reason === 'win' ? (cleared > 1 ? `${names(d.winners)} cleared it with the fewest hits` : `${names(d.winners)} cleared it, the last one alive`)
+        : d.reason === 'last' ? `${names(d.winners)} lasted the longest`
+          : `${names(d.winners)} survived to the end`;
   } else if (d.result === 'win') {
     kind = 'win';
     const survivors = d.winners;

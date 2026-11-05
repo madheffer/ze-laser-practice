@@ -109,7 +109,7 @@ export class Radar {
       }
       // teammates in a room, where the game draws them (interpInterval behind)
       if (G.peers && S.mp) {
-        const t = S.run.t - (S.mp.interpDelay || 0);
+        const t = S.run.t; // world/peers.js applies each player's own delay
         for (const [id, peer] of G.peers.list) {
           if (peer.alive === false) continue;
           const s = G.peers.sample(id, t);

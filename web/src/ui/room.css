@@ -50,6 +50,15 @@
 .rm-you { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--dim); }
 .rm-you input { flex: 1; min-width: 0; min-height: var(--tap); background: #0b0f14; border: 1px solid var(--line); border-radius: 7px; padding: 0 10px; font-size: 14px; }
 
+/* the room's chat (ui/room-chat.js) */
+.rm-chat-log { list-style: none; margin: 0 0 10px; padding: 8px 10px; height: 150px; overflow-y: auto; scrollbar-width: thin; background: #0b0f14; border: 1px solid var(--line); border-radius: 8px; font-size: 13px; line-height: 1.45; overflow-wrap: anywhere; }
+.rm-chat-log:empty::before { content: 'No messages yet'; color: var(--dim); }
+.rm-chat-log b { color: rgb(150, 200, 250); font-weight: 600; }
+.rm-chat-log li.me b { color: #fff; }
+.rm-chat-log li.note { color: var(--dim); font-style: italic; }
+.rm-chat-form { display: flex; gap: 8px; }
+.rm-chat-form input { flex: 1; min-width: 0; min-height: var(--tap); background: #0b0f14; border: 1px solid var(--line); border-radius: 7px; padding: 0 10px; font-size: 14px; }
+
 /* ---- right column: the picker */
 .rm-main { grid-area: main; display: flex; flex-direction: column; min-height: 0; background: #10161e; border: 1px solid var(--line); border-radius: 14px; padding: 16px 16px 0; }
 .rp { display: flex; flex-direction: column; min-height: 0; flex: 1; }

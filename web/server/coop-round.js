@@ -6,7 +6,8 @@
 //   - boss damage goes through it: each hit is checked against the weapon and line of sight, the team's fire
 //     (one designated client, the "leader") is capped per human, and the sum goes back to every client;
 //   - it decides the end: co-op = the survivors win when the stage clears (alone if they're the last one alive),
-//     all dead = wiped; versus = the last one alive wins.
+//     all dead = wiped; versus = the last one alive plays on until they clear it or go down, then wins (both or more
+//     clear it: fewest hits).
 // Players only ever talk to the server, so nobody learns anyone else's address.
 import { cleanText, healHolders } from '../src/lib/room-rules.js';
 import { TICK, COUNTDOWN } from '../src/world/run-engine.js'; // COUNTDOWN: s a round's run waits before the stage starts
@@ -25,6 +26,7 @@ const WAIT_MS = 500; // the loading roster ('wait': who is ready, everyone's pro
 const CLOCK_MS = 250, BOSS_MS = 100;
 const BD_DELAY_TICKS = 3; // boss damage reaches clients about this late
 const MAX_SAMPLES = 160; // per state message (2.5 s of ticks, for a tab catching up)
+const RELAY_TICKS = 8; // a state message's ticks relayed to the others (a 30 Hz batch holds 2-3)
 const TEAM_HITS_PER_HUMAN = 12; // per second per simulated human, before the boss-HP scale (the squad lands ~7)
 
 const num = (v, lo, hi) => typeof v === 'number' && Number.isFinite(v) && v >= lo && v <= hi;
@@ -165,8 +167,13 @@ export class Round {
     p.check.feed(m.k, m.p, this.roundTick);
     if (!p.alive || this.ended) return;
     const last = p.check.pos;
+    // tr: the batch's own ticks (its last RELAY_TICKS), so the others draw every tick of the movement, not one
+    // position per batch (world/peers.js); the newest is the server copy's, the one it checked
+    const ok = (s) => Array.isArray(s) && s.length >= 4 && [s[0], s[1], s[2]].every((v) => num(v, -1e6, 1e6));
+    const tr = m.p.slice(-RELAY_TICKS, -1).filter(ok).map((s) => [s[0], s[1], s[2], s[3] ? 1 : 0]);
+    tr.push([last[0], last[1], last[2], p.check.ducked ? 1 : 0]);
     this.broadcast({
-      t: 's', from: c.id, r: this.r, at: p.check.ticks * TICK, o: last,
+      t: 's', from: c.id, r: this.r, at: p.check.ticks * TICK, o: last, tr,
       yaw: num(m.yaw, -1e4, 1e4) ? m.yaw : 0, pitch: num(m.pitch, -90, 90) ? m.pitch : 0, duck: p.check.ducked ? 1 : 0, hp: Math.max(0, Math.round(p.check.hp)),
     }, c);
   }
@@ -254,12 +261,9 @@ export class Round {
   checkEnd() {
     if (this.ended) return;
     const a = this.alive.length;
-    if (this.kind === 'versus' && this.players.size >= 2) {
-      // a player who left (or never loaded) is out, not beaten: the last one standing wins only against someone who
-      // played it out; alone after the others left, you play on until you die or win
-      const contenders = [...this.players.values()].filter((p) => !p.left).length;
-      if (a === 0 || (a === 1 && contenders >= 2)) this.end('last');
-    } else if (a === 0) this.end('wiped');
+    // versus too: the last one standing plays on until they clear the stage (end('win') from their run) or go down,
+    // and only then is it over. Everyone down: whoever lasted longest wins (end: 'last')
+    if (a === 0) this.end(this.kind === 'versus' && this.players.size >= 2 ? 'last' : 'wiped');
   }
 
   end(reason) {

@@ -1,6 +1,7 @@
 // The room screen: where a co-op / versus room waits between rounds. Everything on one page:
 //   left   the room code, big, with Copy code / Copy invite link; the players (empty slots wait for more to join;
-//          the owner can remove someone; everyone's simulated ping); your name and your own ping; the room's rules
+//          the owner can remove someone; everyone's simulated ping); your name and your own ping; the room's chat
+//          (ui/room-chat.js); the room's rules
 //   right  the map + stage picker (ui/room-picker.js): the owner picks, everyone sees the pick
 //   bottom the next round (map, stage, Normal / Endless) and Start round (owner) or who it waits for (the rest)
 // It shows whenever you are in a room and no round of yours is loading or running (and no end card is up), so
@@ -15,6 +16,7 @@ import { $ } from '../lib/dom.js';
 import { fillSlider } from './controls.js';
 import { RoomPicker } from './room-picker.js';
 import { displayName } from './maps.js';
+import { RoomChat } from './room-chat.js';
 
 function el(tag, cls, t) { const e = document.createElement(tag); if (cls) e.className = cls; if (t != null) e.textContent = t; return e; }
 function btn(label, cls, onClick, title) {
@@ -109,7 +111,8 @@ export class RoomScreen {
     rules.append(el('h2', null, 'Rules'));
     this.chips = el('ul', 'rule-chips');
     rules.append(this.chips);
-    side.append(codeCard, players, rules);
+    this.chat = new RoomChat({ net: this.net });
+    side.append(codeCard, players, this.chat.root, rules);
 
     // right: the picker
     const main = el('section', 'rm-main');
