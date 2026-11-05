@@ -116,6 +116,16 @@ static class WeaponBake
                 ["maxSpeed"] = R(N("m_flMaxSpeed")),
                 ["reload"] = R(N("m_flDisallowAttackAfterReloadStartDuration")),
                 ["price"] = (int)N("m_nPrice"),
+                // the recoil pattern's inputs (primary mode, [0]): m_flRecoilAngle / AngleVariance / Magnitude /
+                // MagnitudeVariance and m_nRecoilSeed. lib/recoil.js turns them into the kick.
+                ["recoil"] = new JsonObject
+                {
+                    ["angle"] = R(N("m_flRecoilAngle")),
+                    ["angleVariance"] = R(N("m_flRecoilAngleVariance")),
+                    ["magnitude"] = R(N("m_flRecoilMagnitude")),
+                    ["magnitudeVariance"] = R(N("m_flRecoilMagnitudeVariance")),
+                    ["seed"] = (int)N("m_nRecoilSeed"),
+                },
                 ["fireSound"] = fire,
                 ["drawSounds"] = ClipSounds(pkg, $"{clips}draw_{suffix}.vnmclip_c"),
                 ["reloadSounds"] = ClipSounds(pkg, $"{clips}reload_{suffix}.vnmclip_c"),

@@ -136,8 +136,12 @@ function attackActive() {
 export function onShot(shot) {
   const { run, engine, player } = S;
   if (!run || S.paused || run.done || run.spectating || !engine || S.replay) return;
-  run.rec?.shot(run.ticks, shot, player.yaw, player.pitch); // its replay redoes it on the same tick (app/replay-play.js)
-  shootAs(shot, player.yaw, player.pitch);
+  // it leaves along your view + the aim punch it was fired with (lib/recoil.js); a replay and the co-op server redo it
+  // from that direction, so neither needs the recoil itself
+  const p = shot.punch || [0, 0];
+  const yaw = player.yaw + p[1], pitch = Math.max(-89, Math.min(89, player.pitch + p[0]));
+  run.rec?.shot(run.ticks, shot, yaw, pitch); // its replay redoes it on the same tick (app/replay-play.js)
+  shootAs(shot, yaw, pitch);
 }
 
 // the shot itself, fired along yaw / pitch from the player's eye (a replay passes the recorded view)

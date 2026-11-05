@@ -15,6 +15,13 @@ export const CS2_GUNS = {
     "maxSpeed": 215,
     "reload": 2.4667,
     "price": 2700,
+    "recoil": {
+      "angle": 0,
+      "angleVariance": 70,
+      "magnitude": 30,
+      "magnitudeVariance": 0,
+      "seed": 223
+    },
     "fireSound": "Weapon_AK47.Single",
     "drawSounds": [
       [0, "Weapon_AK47.WeaponMove1"],
@@ -45,6 +52,13 @@ export const CS2_GUNS = {
     "maxSpeed": 225,
     "reload": 3.0667,
     "price": 2900,
+    "recoil": {
+      "angle": 0,
+      "angleVariance": 70,
+      "magnitude": 23,
+      "magnitudeVariance": 0,
+      "seed": 38965
+    },
     "fireSound": "Weapon_M4A4.Single",
     "drawSounds": [
       [0, "Weapon_M4A1.Draw"],
@@ -72,6 +86,13 @@ export const CS2_GUNS = {
     "maxSpeed": 225,
     "reload": 3.0667,
     "price": 2900,
+    "recoil": {
+      "angle": 0,
+      "angleVariance": 65,
+      "magnitude": 25,
+      "magnitudeVariance": 3,
+      "seed": 38965
+    },
     "fireSound": "Weapon_M4A1.Silenced",
     "drawSounds": [
       [0, "Weapon_M4A1.Draw"],
@@ -99,6 +120,13 @@ export const CS2_GUNS = {
     "maxSpeed": 220,
     "reload": 3.3,
     "price": 1950,
+    "recoil": {
+      "angle": 0,
+      "angleVariance": 60,
+      "magnitude": 20,
+      "magnitudeVariance": 1,
+      "seed": 39623
+    },
     "fireSound": "Weapon_FAMAS.Single",
     "drawSounds": [
       [0, "Weapon_FAMAS.Draw"],
@@ -128,6 +156,13 @@ export const CS2_GUNS = {
     "maxSpeed": 215,
     "reload": 3.0333,
     "price": 1800,
+    "recoil": {
+      "angle": 0,
+      "angleVariance": 70,
+      "magnitude": 21,
+      "magnitudeVariance": 1,
+      "seed": 51191
+    },
     "fireSound": "Weapon_GalilAR.Single",
     "drawSounds": [
       [0, "Weapon_GalilAR.Draw"],
@@ -156,6 +191,13 @@ export const CS2_GUNS = {
     "maxSpeed": 220,
     "reload": 3.2,
     "price": 3300,
+    "recoil": {
+      "angle": 0,
+      "angleVariance": 60,
+      "magnitude": 24,
+      "magnitudeVariance": 0,
+      "seed": 24204
+    },
     "fireSound": "Weapon_AUG.Single",
     "drawSounds": [
       [0, "Weapon_AUG.Draw"],
@@ -184,6 +226,13 @@ export const CS2_GUNS = {
     "maxSpeed": 210,
     "reload": 2.7667,
     "price": 3000,
+    "recoil": {
+      "angle": 0,
+      "angleVariance": 60,
+      "magnitude": 28,
+      "magnitudeVariance": 2,
+      "seed": 43500
+    },
     "fireSound": "Weapon_SG556.Single",
     "drawSounds": [
       [0, "Weapon_sg556.Draw"],
@@ -212,6 +261,13 @@ export const CS2_GUNS = {
     "maxSpeed": 200,
     "reload": 3.6667,
     "price": 4750,
+    "recoil": {
+      "angle": 0,
+      "angleVariance": 20,
+      "magnitude": 78,
+      "magnitudeVariance": 15,
+      "seed": 4100
+    },
     "fireSound": "Weapon_AWP.Single",
     "drawSounds": [
       [0, "Weapon_AWP.Draw"],
@@ -240,6 +296,13 @@ export const CS2_GUNS = {
     "maxSpeed": 230,
     "reload": 3.7,
     "price": 1700,
+    "recoil": {
+      "angle": 0,
+      "angleVariance": 20,
+      "magnitude": 33,
+      "magnitudeVariance": 15,
+      "seed": 1278
+    },
     "fireSound": "Weapon_SSG08.Single",
     "drawSounds": [
       [0, "Weapon_SSG08.Draw"],
@@ -270,6 +333,13 @@ export const CS2_GUNS = {
     "maxSpeed": 215,
     "reload": 3.0667,
     "price": 5000,
+    "recoil": {
+      "angle": 0,
+      "angleVariance": 30,
+      "magnitude": 31,
+      "magnitudeVariance": 4,
+      "seed": 19364
+    },
     "fireSound": "Weapon_scar20.Single",
     "drawSounds": [
       [0, "Weapon_scar20.Draw"],
@@ -299,6 +369,13 @@ export const CS2_GUNS = {
     "maxSpeed": 215,
     "reload": 4.6667,
     "price": 5000,
+    "recoil": {
+      "angle": 0,
+      "angleVariance": 30,
+      "magnitude": 30,
+      "magnitudeVariance": 4,
+      "seed": 29908
+    },
     "fireSound": "Weapon_G3SG1.Single",
     "drawSounds": [
       [0, "Weapon_FAMAS.Draw"],
@@ -328,6 +405,13 @@ export const CS2_GUNS = {
     "maxSpeed": 240,
     "reload": 2.4333,
     "price": 1300,
+    "recoil": {
+      "angle": 0,
+      "angleVariance": 70,
+      "magnitude": 18,
+      "magnitudeVariance": 1,
+      "seed": 36387
+    },
     "fireSound": "Weapon_bizon.Single",
     "drawSounds": [
       [0, "Weapon_bizon.Draw"],
@@ -357,6 +441,13 @@ export const CS2_GUNS = {
     "maxSpeed": 230,
     "reload": 3.3667,
     "price": 2350,
+    "recoil": {
+      "angle": 0,
+      "angleVariance": 70,
+      "magnitude": 16,
+      "magnitudeVariance": 1,
+      "seed": 6213
+    },
     "fireSound": "Weapon_P90.Single",
     "drawSounds": [
       [0, "Weapon_P90.Draw"],
@@ -386,6 +477,13 @@ export const CS2_GUNS = {
     "maxSpeed": 240,
     "reload": 2.5667,
     "price": 1050,
+    "recoil": {
+      "angle": 0,
+      "angleVariance": 70,
+      "magnitude": 18,
+      "magnitudeVariance": 1,
+      "seed": 34079
+    },
     "fireSound": "Weapon_MAC10.Single",
     "drawSounds": [
       [0.0667, "Weapon_MAC10.Draw"],
@@ -415,6 +513,13 @@ export const CS2_GUNS = {
     "maxSpeed": 240,
     "reload": 2.1333,
     "price": 1250,
+    "recoil": {
+      "angle": 0,
+      "angleVariance": 70,
+      "magnitude": 21,
+      "magnitudeVariance": 1,
+      "seed": 50729
+    },
     "fireSound": "Weapon_MP9.Single",
     "drawSounds": [
       [0, "Weapon_MP9.Draw"],
@@ -445,6 +550,13 @@ export const CS2_GUNS = {
     "maxSpeed": 220,
     "reload": 3.1667,
     "price": 1400,
+    "recoil": {
+      "angle": 0,
+      "angleVariance": 70,
+      "magnitude": 16,
+      "magnitudeVariance": 1,
+      "seed": 61649
+    },
     "fireSound": "Weapon_MP7.Single",
     "drawSounds": [
       [0, "Weapon_MP7.Draw"],
@@ -473,6 +585,13 @@ export const CS2_GUNS = {
     "maxSpeed": 235,
     "reload": 2.9667,
     "price": 1400,
+    "recoil": {
+      "angle": 0,
+      "angleVariance": 70,
+      "magnitude": 16,
+      "magnitudeVariance": 1,
+      "seed": 61649
+    },
     "fireSound": "Weapon_MP5.Single",
     "drawSounds": [
       [0, "Weapon_MP5.WeaponMove1"],
@@ -502,6 +621,13 @@ export const CS2_GUNS = {
     "maxSpeed": 230,
     "reload": 3.4667,
     "price": 1200,
+    "recoil": {
+      "angle": 0,
+      "angleVariance": 40,
+      "magnitude": 23,
+      "magnitudeVariance": 1,
+      "seed": 59299
+    },
     "fireSound": "Weapon_UMP45.Single",
     "drawSounds": [
       [0, "Weapon_UMP45.Draw"],
@@ -530,6 +656,13 @@ export const CS2_GUNS = {
     "maxSpeed": 195,
     "reload": 5.7,
     "price": 5200,
+    "recoil": {
+      "angle": 0,
+      "angleVariance": 50,
+      "magnitude": 25,
+      "magnitudeVariance": 2,
+      "seed": 50310
+    },
     "fireSound": "Weapon_M249.Single",
     "drawSounds": [
       [0, "Weapon_M249.Draw"],
@@ -560,6 +693,13 @@ export const CS2_GUNS = {
     "maxSpeed": 150,
     "reload": 5.7,
     "price": 1700,
+    "recoil": {
+      "angle": 0,
+      "angleVariance": 0,
+      "magnitude": 20,
+      "magnitudeVariance": 2,
+      "seed": 57966
+    },
     "fireSound": "Weapon_Negev.Single",
     "drawSounds": [
       [0, "Weapon_Negev.Draw"],

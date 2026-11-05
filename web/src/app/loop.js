@@ -86,7 +86,9 @@ export function frame(now) {
   const a = live ? acc / CS.tick : 1;
   const o = prevOrigin ? prevOrigin.map((v, i) => v + (player.origin[i] - v) * a) : player.origin;
   let eye = [o[0], o[1], o[2] + player.eyeHeight()];
-  let view = { yaw: player.yaw, pitch: player.pitch };
+  // CS2's CalcView: your eyes + 45% of the aim punch + the view punch (lib/recoil.js, the viewmodel's shots)
+  const punch = G.vm?.recoil ? G.vm.recoil.cameraOffset() : [0, 0];
+  let view = { yaw: player.yaw + punch[1], pitch: player.pitch + punch[0] };
   // dead in a round: watch a teammate through their eyes (app/coop.js picks who)
   const spec = S.run?.spectating ? S.mp?.spectateView() : null;
   if (spec) { eye = spec.eye; view = spec; }

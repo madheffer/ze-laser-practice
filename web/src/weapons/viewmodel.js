@@ -31,6 +31,7 @@ import { barnUniforms, patchBarns } from '../world/lighting.js';
 import { METRES_PER_INCH as IN } from './fp/three-kit.js';
 import { DEG } from '../world/entities/math.js';
 import { GUNS, KNIFE, DEFAULT_GUN } from '../lib/weapons.js';
+import { Recoil } from '../lib/recoil.js';
 
 const FP_BASE = `${import.meta.env?.BASE_URL ?? '/'}weapons/fp/`;
 
@@ -46,7 +47,6 @@ const ARMS = 'agent:ctm_sas';
 // Hand-made motion (CS2 has none of this in the graph: bob and lag are client code). Inches / degrees.
 const BOB = { lat: 0.4, vert: 0.25, cycle: 0.98, refSpeed: 250 };    // CS:GO cl_bobamt_lat / _vert / cl_bobcycle
 const LAG = { scale: 0.35, max: 2.5, decay: 9 };                      // degrees of trail per degree turned
-const KICK = { pitch: 0.55, back: 0.35, decay: 14 };                  // per bullet, on top of the gun's shoot clip
 
 export class Viewmodel {
   constructor(renderer) {
@@ -71,6 +71,7 @@ export class Viewmodel {
     this.reloading = false;
     this._reloadDone = 0;
     this.lastWeapon = 'gun';                     // what Q (lastinv) swaps back to
+    this.recoil = new Recoil();                  // CS2's aim / view punch (lib/recoil.js): shots carry it, the camera shows it
 
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(50, 1, 0.01, 200);
@@ -85,7 +86,6 @@ export class Viewmodel {
     // motion state
     this._bobPhase = 0; this._bobAmt = 0;
     this._lagYaw = 0; this._lagPitch = 0;
-    this._kick = 0;
     this._land = 0; this._landV = 0; this._airTime = 0; this._wasOnGround = true;
   }
 
@@ -158,6 +158,7 @@ export class Viewmodel {
     this._held = this._held2 = this._press = this._press2 = false;
     this._next = this._next2 = this._t + (this._deployed ? this.gun.deploy : 0);
     this._deployed = true;
+    this.recoil.index = 0;                               // m_flRecoilIndex is the weapon's: a new gun starts its pattern
     this._mountGun(name, true);
     return true;
   }
@@ -170,6 +171,7 @@ export class Viewmodel {
     this.weapon = w;
     this._deployed = true;
     this.reloading = false;                               // switching away cancels a reload
+    this.recoil.index = 0;
     this._held = this._held2 = this._press = this._press2 = false;
     // m_flDeployDuration: no attack until the draw is done (not on the very first equip at spawn).
     const lock = first ? 0 : (w === 'gun' ? this.gun : KNIFE).deploy;
@@ -207,6 +209,7 @@ export class Viewmodel {
     this.clip = this.gun.clip;
     this.reloading = false;
     this._deployed = false;
+    this.recoil.reset();
     this.lastWeapon = weapon === 'knife' ? 'gun' : 'knife';
     this.setWeapon(weapon);
   }
@@ -222,6 +225,7 @@ export class Viewmodel {
   update(dt, state = {}) {
     dt = Math.max(0, Math.min(dt || 0, 0.25));
     this._t += dt;
+    this.recoil.tick(dt, this.gun.cycle);
     this._fireGate(dt);
     this._motion(dt, state);
     const s = this.ready ? this._sources[this.weapon] : null;
@@ -256,7 +260,7 @@ export class Viewmodel {
         this.clip--;
         this._shot({ kind: 'bullet', damage: g.damage, range: g.range, gun: g.name });
         this._play(undefined);
-        this._kick = Math.min(this._kick + 1, 3);
+        this.recoil.kick(g.name);
       }
       // CS2 reloads by itself once the magazine runs dry
       if (this.clip === 0 && this._t >= this._next) this.reload();
@@ -280,11 +284,13 @@ export class Viewmodel {
 
   // A replay's recorded shot (app/loop.js): the animation only; the replay traces the shot itself.
   playShot(kind) {
-    if (kind === 'bullet') { if (this.weapon !== 'gun') return; this._play(undefined); this._kick = Math.min(this._kick + 1, 3); }
+    if (kind === 'bullet') { if (this.weapon !== 'gun') return; this._play(undefined); this.recoil.kick(this.gunName); }
     else if (this.weapon === 'knife') this._play(kind === 'stab' ? KNIFE_HEAVY : KNIFE_LIGHT);
   }
 
+  // every shot leaves along your view + the aim punch it was fired with (CS2: EyeAngles + the doubled punch)
   _shot(shot) {
+    shot.punch = this.recoil.aimPunch(false);
     try { this.onShot?.(shot); } catch (e) { console.error('[viewmodel] onShot', e); }
   }
 
@@ -299,7 +305,7 @@ export class Viewmodel {
     s.wc.fire(attackType, false);
   }
 
-  // ---- bob / lag / landing / kick (hand-made) ---------------------------------------------------------
+  // ---- bob / lag / landing (hand-made; the shot's kick is CS2's punch, lib/recoil.js) ---------------------------------------------------------
 
   _motion(dt, st) {
     if (dt <= 0) return;
@@ -322,7 +328,6 @@ export class Viewmodel {
     this._wasOnGround = onGround;
     this._landV += (-this._land * 180 - this._landV * 18) * dt;
     this._land += this._landV * dt;
-    this._kick *= Math.exp(-KICK.decay * dt);
   }
 
   // The motion is applied to the CAMERA, inverted: the graph rewrites every bone each frame, so the model
@@ -334,9 +339,8 @@ export class Viewmodel {
     const vert = Math.sin(this._bobPhase * 2) * BOB.vert * b + this._land;
     cam.translateX(-lat * IN);
     cam.translateY(-vert * IN);
-    cam.translateZ(-this._kick * KICK.back * IN);       // camera forward = model back
     cam.rotateY(-this._lagYaw * D);                       // turn right: the view leads, the gun trails left
-    cam.rotateX(-(this._lagPitch * D) - this._kick * KICK.pitch * D);
+    cam.rotateX(-(this._lagPitch * D));
   }
 
   render(aspect) {

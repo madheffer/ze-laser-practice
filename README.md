@@ -328,7 +328,10 @@ and 20 buyable guns (the PP-Bizon at spawn; `!bizon`, `!ak`, `!m4a1` ... in chat
 assets in `web/public/weapons/fp/` are copied from the weaponviewer bake (`Z:\weaponviewer\fp`: `classes/<chassis>/`
 manifest + weapon_stock.glb + clips, `graph/gun_*` + `inspects_*`; gitignored). The guns' numbers are
 `lasers-bake --weapons web/src/lib/weapons-cs2.js` (committed, generated from scripts/weapons.vdata and the viewmodel
-clips' sound events; `bake/WeaponBake.cs` lists the guns), read through `lib/weapons.js`. Sound: `lasers-bake` writes `maps/<map>/soundevents.json` + `sounds/` (the map's events plus the stock
+clips' sound events; `bake/WeaponBake.cs` lists the guns), read through `lib/weapons.js`. Recoil is CS2's
+(`lib/recoil.js`): each gun's vdata pattern kicks the aim punch, evaluated as CS2's client does it (128 Hz, x2); your
+view shows 45% of it plus the view punch, and every shot leaves along view + punch (a spray climbs past the crosshair);
+the file's header says which numbers come from client.dll and which are still CS:GO's defaults. Sound: `lasers-bake` writes `maps/<map>/soundevents.json` + `sounds/` (the map's events plus the stock
 CS2 ones its entities name: breakables, env_explosion, doors, trains, particles; `bake/SoundRefs.cs`; plus `surfaces.json`,
 CS2's surface properties for bullet impacts and prop breaks, `bake/SurfaceBake.cs`, with `collision_fx_surfaces.bin` per
 world triangle from `--collision`;
