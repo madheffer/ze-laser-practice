@@ -236,6 +236,8 @@ function stepTree(c, dt) {
     simulate(c, s);
   }
   for (const ch of c.children) {
+    // a child C_OP_EnableChildrenFromParentParticleCount keeps off (particles.dll 63babcbf 0x1802857e0: time -FLT_MAX, flag 0x40)
+    if (ch.disabled) continue;
     // A delayed child waits out m_flDelay on its parent's clock; an endcap child runs only in the
     // parent's endcap (VRF cross-check, UNSETTLED).
     if (ch.info?.m_bEndCap ? !c.endcap.active : c.time < (+ch.info?.m_flDelay || 0)) continue;

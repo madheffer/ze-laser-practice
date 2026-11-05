@@ -132,9 +132,10 @@ export class PlayerCheck {
     while (this.uses.length && this.uses[0] < this.ticks) { this.uses.shift(); if (run.items?.length && run.started) useItems(engine, run.items); }
     engine.tick(TICK);
     while (this.bd.length && this.bd[0].tick <= this.ticks) {
-      for (const [id, dmg, n] of this.bd.shift().hits) {
+      for (const [id, dmg, n, team] of this.bd.shift().hits) {
         const e = engine.ents[id - 1]?.id === id ? engine.ents[id - 1] : engine.ents.find((x) => x.id === id);
-        for (let k = 0; k < n && e?.alive; k++) engine.damage(e, dmg, engine.playerEnt);
+        const by = team === 1 ? engine.teamEnt : engine.playerEnt; // as the client's applyBossDamage
+        for (let k = 0; k < n && e?.alive; k++) engine.damage(e, dmg, by);
       }
     }
     this.world.dynamic = engine.solids();
@@ -200,11 +201,15 @@ export class PlayerCheck {
     // the air: falling must decelerate at (at least half) the gravity the map set; rising needs a jump / push
     const vz = d[2] / TICK;
     const onGround = this.grounded(to, h);
-    if (!onGround && !boosted && !teleported && this.wasAir) {
+    // a player wedged motionless against geometry in the air is stuck (CS movement can lock a falling hull in a
+    // crease), not flying; a motionless hull touching nothing is hovering
+    const wedged = !onGround && Math.abs(d[0]) + Math.abs(d[1]) + Math.abs(d[2]) < 0.01 && this.touching(to, h);
+    if (!onGround && !boosted && !teleported && !wedged && this.wasAir) {
       this.air.push(vz - this.vz);
       if (this.air.length >= AIR_WINDOW) {
         const mean = this.air.reduce((x, y) => x + y, 0) / this.air.length;
-        const expect = -CS.gravity * this.gravity * TICK;
+        const svGravity = parseFloat(this.run.cvars?.sv_gravity);
+        const expect = -(Number.isFinite(svGravity) && svGravity >= 0 ? svGravity : CS.gravity) * this.gravity * TICK;
         if (mean > expect * 0.5 && expect < -0.5) this.strike('fly', `dv ${mean.toFixed(2)} vs ${expect.toFixed(2)}`);
         this.air.length = 0;
       }
@@ -218,6 +223,17 @@ export class PlayerCheck {
     }
     this.vz = vz;
     this.wasAir = !onGround;
+  }
+
+  // does the hull touch geometry on any side (a 1 u sweep along +-x / +-y blocked at once)?
+  touching(o, h) {
+    const tr = makeTrace();
+    const c = [o[0], o[1], o[2] + h];
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      this.world.traceBox(c, [c[0] + dx, c[1] + dy, c[2]], [CS.halfWidth, CS.halfWidth, h], tr);
+      if (tr.fraction < 0.5 || tr.startSolid) return true;
+    }
+    return false;
   }
 
   grounded(o, h) {

@@ -13,7 +13,7 @@ register('point_template', {
 });
 
 register('env_entity_maker', {
-  input(e, inp, p, act) {
+  input(e, inp, p, act, caller) {
     const tpl = () => e.engine.findOne(e.kv.entitytemplate);
     if (inp === 'forcespawn') {
       const t = tpl();
@@ -21,7 +21,9 @@ register('env_entity_maker', {
       return true;
     }
     if (inp === 'forcespawnatentityorigin' || inp === 'forcespawnatentitycenter') {
-      const t = tpl(), at = e.engine.findOne(p, e, act);
+      // the parameter names the spot: !self = this maker, !caller = whoever sent the input (ze_dreamin's random
+      // position pickers), !activator = the activator, else an entity name
+      const t = tpl(), at = String(p).trim().toLowerCase() === '!self' ? e : e.engine.findOne(p, caller || e, act);
       if (t && at) {
         const m = poseMatrix(at.worldOrigin(), e.quatWorld?.() || rotationOf(e.getWorld()));
         e.engine.spawnTemplate(t, m, act, e);

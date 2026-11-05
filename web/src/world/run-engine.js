@@ -97,7 +97,7 @@ export function replayBossFire(run, scenario, dt, humans, bossHp) {
   let guard = 0;
   while (run.fireAcc >= 1 && guard++ < 400) {
     run.fireAcc -= 1;
-    for (const e of targets) if (bossHittable(e)) engine.damage(e, DAMAGE_PER_HIT, engine.playerEnt);
+    for (const e of targets) if (bossHittable(e)) engine.damage(e, DAMAGE_PER_HIT, engine.teamEnt); // the team's replay fire
   }
   if (run.fireAcc > 400) run.fireAcc = 0;
 }

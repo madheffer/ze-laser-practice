@@ -60,13 +60,14 @@ function hitBoss(e, damage, how = 'me') {
   if (!bossHittable(e)) return false;
   // in a round, boss damage goes through the server, which sends everyone's (capped) hits back to all clients
   if (S.mp && how !== 'replay') { S.mp.bossHit(e, damage, how === 'team'); return true; }
-  applyBossDamage(e, damage);
+  applyBossDamage(e, damage, how !== 'me');
   return true;
 }
 
 // Damage that lands (yours solo; in a round, the hits the server sends back).
-export function applyBossDamage(e, damage) {
-  S.engine.damage(e, damage, S.engine.playerEnt);
+export function applyBossDamage(e, damage, byTeam = false) {
+  // the team's bullets carry the team as activator (engine.teamEnt), yours carry you
+  S.engine.damage(e, damage, byTeam ? S.engine.teamEnt : S.engine.playerEnt);
 }
 
 // silent: during a fast-forward replay (shoots the scenario's fastForwardBosses, no line of sight needed)

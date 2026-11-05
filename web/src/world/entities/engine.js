@@ -73,6 +73,9 @@ export class EntityEngine {
       },
       worldOrigin() { const e = this.getWorld().elements; return [e[12], e[13], e[14]]; },
     };
+    // the simulated team, as the activator of its bullets: a human (team 3) who isn't you, so a map output aimed at
+    // !activator on a boss hit (ze_dreamin's Reflection: point_hurt !activator) lands on them, not on you
+    this.teamEnt = { name: '!team', key: '!team', cls: 'player', team: 3, alive: true, parent: null, children: new Set(), getWorld: () => new THREE.Matrix4(), worldOrigin: () => [0, 0, 0] };
     this.templateLumps = new Set();
     this.humans = 1;
     this.traceBox = null; // (start, end, halfExtents) -> trace against the static world; session.js sets it (physics.js)
@@ -140,6 +143,8 @@ export class EntityEngine {
   spawnHook(e) {
     C[e.cls]?.spawn?.(e);
     this.emit('spawn', e);
+    // CS2 entities fire OnSpawn as they spawn (ze_dreamin's template relays start every moving attack with it)
+    if (e.io.some((c) => c.output.toLowerCase() === 'onspawn')) e.fireOutput('OnSpawn', null);
   }
 
   // Spawn a point_template's lump with the template's local layout placed by matrix `at`.
@@ -210,7 +215,10 @@ export class EntityEngine {
     e.fireOutput('OnDamaged', activator);
     this.healthChanged(e, activator);
     if (s.health <= 0) {
-      if (e.cls === 'func_breakable') this.breakEntity(e, activator);
+      // breakables break at 0; so does a physbox that spawned with health (Source CPhysBox is a CBreakable:
+      // ze_dreamin's Puny Light only ends through st2_hitbox.OnBreak). ze_mist_p's dragon never gets there: the map
+      // tops it up once it drops under 1% of its spawn health
+      if (e.cls === 'func_breakable' || (s.max > 1 && /^func_physbox/.test(e.cls))) this.breakEntity(e, activator);
       else s.health = 0;
     }
   }

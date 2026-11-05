@@ -34,6 +34,7 @@ import { installActivity } from './app/activity.js';
 import { Peers } from './world/peers.js';
 import { usableHeals } from './world/items.js';
 import { applyGamma } from './ui/gamma.js';
+import { loadLightmaps } from './world/lightmaps.js';
 import { net, lobby, installCoop, hostStart, abortRound } from './app/coop.js';
 
 const canvas = $('#view');
@@ -149,6 +150,11 @@ async function openMap(name, fromRound = false) {
     abortRound(); // the host leaving a live round for another map ends it for everyone
     endRun();
     S.map = await loadMap(name, progress);
+    // the map's own CS2 lighting and post-processing (lasers-bake --lighting; the old fixed lighting without it)
+    progress('lighting');
+    const lightmaps = await loadLightmaps(`maps/${name}/`, G.renderer.renderer, log).catch((e) => { log(`lighting: ${e.message || e}`); return null; });
+    G.renderer.lighting.setMap(S.map.entities, lightmaps);
+    await G.renderer.post.setMap(`maps/${name}/`, S.map.entities, lightmaps);
     G.renderer.setWorld(S.map.world);
     G.radar.setMap(S.map.radar);
     S.world = new CollisionWorld(S.map.collision);

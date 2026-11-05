@@ -266,9 +266,24 @@ are dimmed. If the owner leaves, the next oldest member owns the room.
 - **Gamma** (Settings → Video & camera, 1–2.5, default 2): CS2's `r_fullscreen_gamma`, "Screen Gamma (only in fullscreen
   modes)" in `rendersystemdx11.dll`, a hardware gamma ramp over the finished frame (CS2's default 2.2; lower is
   brighter: each channel goes to value^(gamma/2.2)). Here it is an SVG gamma filter over the game's layers (`ui/gamma.js`).
-- **Baked lighting** (in progress): `lasers-bake --lighting <workshop.vpk> web/public/maps/<map>` writes the map's CS2
-  lightmaps to `lighting/` (irradiance BC6H, directional irradiance DXT1, the sun's shadow mask BC7/BC4) as their GPU
-  blocks byte for byte, plus `lighting.json` (lightmap versions, the UV scale for the world glb's `TEXCOORD_1`).
+- **CS2 lighting** (`world/lighting.js`, `world/lightmaps.js`, `world/tonemap.js`; the formulas are the open-source VRF
+  renderer's CS2 shading, lightmap game version 2). `lasers-bake --lighting <workshop.vpk> web/public/maps/<map>` writes
+  `lighting/`: the lightmaps as their GPU blocks byte for byte (irradiance BC6H, directional irradiance DXT1, the sun's
+  shadow mask BC7/BC4; uploaded compressed), the light probes box-filtered 4x per axis (`ProbeBake.cs`; the full grids are
+  65-380 MB), and every `.vpost` (tonemap curve, bloom, 32^3 colour lookup).
+  - the world (meshes with lightmap UVs, `TEXCOORD_1` x `uvScale`): irradiance shaped by the directional lightmap in tangent
+    space (clamped direction, flatness boost, non-directional share), no other ambient; lights with `directlight 1` are in it
+  - props and models (no lightmap): the probe volume's ambient cube (6 faces by the normal squared), sun masked by the
+    probe's baked visibility; outside every volume, the sky's ambient (`light_environment` skycolor x skyintensity)
+  - the sun (`light_environment`, `directlight` 2 / 3): colour (sRGB -> linear) x brightness x N.L, masked by its
+    `bakedshadowindex` channel; CS2's diffuse has no 1/pi, so three's numbers are scaled by pi to match
+  - the frame: CS2's tone curve (x 2.8, white point clamp, Hable-style curve from the `.vpost` or CS2's defaults), the map's
+    exposure range, sRGB, the colour lookup, then gamma
+  - not yet: fog, the skybox, env_cubemap reflections, bloom, auto exposure, per-area post volumes; a GPU without BC6H/BC7
+    (phones) keeps the old fixed lighting
+- **Cut-out alpha** (`AlphaBake.cs`, also `lasers-bake --alpha`): VRF 20.1's glTF exporter writes alpha-tested materials
+  (tree leaves, grass, fences) as `alphaMode: MASK` with an RGB-only base colour, so they drew solid; the bake puts the
+  alpha back from the vmat's `g_tColor` (VRF's RGB kept).
 - **Simulated ping** (0–500 ms, slider + exact number): your movement stays predicted, the map's entities (and their
   sounds) are drawn from a history that many ms behind the simulation, so you react as late as on a server at that ping.
 

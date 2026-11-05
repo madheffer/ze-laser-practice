@@ -1,0 +1,1898 @@
+{
+  "map": "ze_dreamin",
+  "title": "ze_dreamin",
+  "workshop": "3415958616",
+  "description": "Four levels of light and crystal bosses: the Crystal and its blade room (Fade), the Puny Light and the final laser climb (Dream), the Giant and Final Light (3), and the arena, the Light and the surf lasers (4).",
+  "scenarios": [
+    {
+      "id": "l1_full",
+      "group": "Level 1 – Fade",
+      "full": true,
+      "name": "Level 1 ending (full): Crystal → blade room → elevator",
+      "description": "From the Crystal's teleport (boss_teleport, +50 hits per human) through its 8 segments, back to the teleport place, the blade room (Final Crystal, +70 hits per human) and the rising floor out. Win when a human reaches clear_trigger (score).",
+      "spawn": {
+        "origin": [
+          -13548,
+          7510,
+          4374
+        ],
+        "yaw": 0
+      },
+      "start": [
+        {
+          "target": "[PR#]boss_teleport",
+          "input": "Enable"
+        },
+        {
+          "target": "[PR#]boss_teleport",
+          "input": "Disable",
+          "delay": 0.5
+        }
+      ],
+      "bosses": [
+        {
+          "target": "[PR#]boss_target",
+          "name": "Crystal",
+          "counter": "[PR#]HPCounter2",
+          "counterMode": "hits"
+        },
+        {
+          "target": "[PR#]boss_target2",
+          "name": "Final Crystal",
+          "counter": "[PR#]blade_hp",
+          "counterMode": "hits"
+        }
+      ],
+      "win": {
+        "target": "[PR#]score",
+        "input": "ApplyScore"
+      },
+      "lose": {
+        "target": "[PR#]st1_fail",
+        "input": "Trigger"
+      },
+      "hazards": {
+        "boss_hurt": "the crystal",
+        "boss_ice": "the ice cast",
+        "boss_hurt2": "the crystal",
+        "blade_111h": "a low crystal blade",
+        "blade_222h": "a high crystal blade",
+        "blade_333h": "a mid crystal blade",
+        "blade_rotate_hurt": "a rising blade",
+        "boss_target_hurt": "the final crystal",
+        "NUKE": "the nuke"
+      }
+    },
+    {
+      "id": "l1_crystal",
+      "group": "Level 1 – Fade",
+      "name": "Crystal (boss)",
+      "childrenTitle": "Single casts",
+      "description": "boss_teleport adds 50 hits per human to HPCounter2; boss_relay starts the fight 7 s later. The crystal chases the nearest human on thrusters (80 damage on touch) and every 10–15 s casts Gravity, Thruster, Wind or Ice. 8 segments; at +140 s st1_fail breaks the floor.",
+      "spawn": {
+        "origin": [
+          -13548,
+          7510,
+          4374
+        ],
+        "yaw": 0
+      },
+      "start": [
+        {
+          "target": "[PR#]boss_teleport",
+          "input": "Enable"
+        },
+        {
+          "target": "[PR#]boss_teleport",
+          "input": "Disable",
+          "delay": 0.5
+        }
+      ],
+      "bosses": [
+        {
+          "target": "[PR#]boss_target",
+          "name": "Crystal",
+          "counter": "[PR#]HPCounter2",
+          "counterMode": "hits"
+        }
+      ],
+      "win": {
+        "target": "[PR#]boss_gtimer",
+        "input": "Kill"
+      },
+      "lose": {
+        "target": "[PR#]st1_fail",
+        "input": "Trigger"
+      },
+      "hazards": {
+        "boss_hurt": "the crystal",
+        "boss_ice": "the ice cast",
+        "boss_hurt2": "the crystal",
+        "blade_111h": "a low crystal blade",
+        "blade_222h": "a high crystal blade",
+        "blade_333h": "a mid crystal blade",
+        "blade_rotate_hurt": "a rising blade",
+        "boss_target_hurt": "the final crystal",
+        "NUKE": "the nuke"
+      }
+    },
+    {
+      "id": "l1_cast_gravity",
+      "parent": "l1_crystal",
+      "name": "Gravity",
+      "description": "boss_g: four 200 u/s pushes on the crystal's corners pull you in toward it for 2.5 s (boss_hurt: 80 on touch).",
+      "spawn": {
+        "at": "[PR#]boss_des",
+        "yaw": 90
+      },
+      "start": [
+        {
+          "target": "[PR#]CYTrFoward",
+          "input": "Enable"
+        },
+        {
+          "target": "[PR#]CyTrLeft",
+          "input": "Enable"
+        },
+        {
+          "target": "[PR#]CyTrLeftB",
+          "input": "Enable"
+        },
+        {
+          "target": "[PR#]CYTrRightB",
+          "input": "Enable"
+        },
+        {
+          "target": "[PR#]CYTrRight",
+          "input": "Enable"
+        },
+        {
+          "target": "[PR#]SETH_BOSSFIXER",
+          "input": "Enable"
+        },
+        {
+          "target": "[PR#]boss_g",
+          "input": "Enable",
+          "delay": 3
+        },
+        {
+          "target": "[PR#]boss_g",
+          "input": "Disable",
+          "delay": 5.5
+        }
+      ],
+      "winAfter": 8,
+      "hazards": {
+        "boss_hurt": "the crystal",
+        "boss_ice": "the ice cast",
+        "boss_hurt2": "the crystal",
+        "blade_111h": "a low crystal blade",
+        "blade_222h": "a high crystal blade",
+        "blade_333h": "a mid crystal blade",
+        "blade_rotate_hurt": "a rising blade",
+        "boss_target_hurt": "the final crystal",
+        "NUKE": "the nuke"
+      }
+    },
+    {
+      "id": "l1_cast_thruster",
+      "parent": "l1_crystal",
+      "name": "Thruster",
+      "description": "boss_up: for 1 s, touching it throws you up at 700 u/s.",
+      "spawn": {
+        "at": "[PR#]boss_des",
+        "yaw": 90
+      },
+      "start": [
+        {
+          "target": "[PR#]CYTrFoward",
+          "input": "Enable"
+        },
+        {
+          "target": "[PR#]CyTrLeft",
+          "input": "Enable"
+        },
+        {
+          "target": "[PR#]CyTrLeftB",
+          "input": "Enable"
+        },
+        {
+          "target": "[PR#]CYTrRightB",
+          "input": "Enable"
+        },
+        {
+          "target": "[PR#]CYTrRight",
+          "input": "Enable"
+        },
+        {
+          "target": "[PR#]SETH_BOSSFIXER",
+          "input": "Enable"
+        },
+        {
+          "target": "[PR#]boss_up",
+          "input": "Enable",
+          "delay": 3
+        },
+        {
+          "target": "[PR#]boss_up",
+          "input": "Disable",
+          "delay": 4
+        }
+      ],
+      "winAfter": 8,
+      "hazards": {
+        "boss_hurt": "the crystal",
+        "boss_ice": "the ice cast",
+        "boss_hurt2": "the crystal",
+        "blade_111h": "a low crystal blade",
+        "blade_222h": "a high crystal blade",
+        "blade_333h": "a mid crystal blade",
+        "blade_rotate_hurt": "a rising blade",
+        "boss_target_hurt": "the final crystal",
+        "NUKE": "the nuke"
+      }
+    },
+    {
+      "id": "l1_cast_wind",
+      "parent": "l1_crystal",
+      "name": "Wind",
+      "description": "wind_random: one of two 350 u/s pushes (east or west) across the arena for 2.5 s; the floor edge is the drop.",
+      "spawn": {
+        "at": "[PR#]boss_des",
+        "yaw": 90
+      },
+      "start": [
+        {
+          "target": "[PR#]CYTrFoward",
+          "input": "Enable"
+        },
+        {
+          "target": "[PR#]CyTrLeft",
+          "input": "Enable"
+        },
+        {
+          "target": "[PR#]CyTrLeftB",
+          "input": "Enable"
+        },
+        {
+          "target": "[PR#]CYTrRightB",
+          "input": "Enable"
+        },
+        {
+          "target": "[PR#]CYTrRight",
+          "input": "Enable"
+        },
+        {
+          "target": "[PR#]SETH_BOSSFIXER",
+          "input": "Enable"
+        },
+        {
+          "target": "[PR#]wind_random",
+          "input": "PickRandom",
+          "delay": 3
+        }
+      ],
+      "winAfter": 8,
+      "hazards": {
+        "boss_hurt": "the crystal",
+        "boss_ice": "the ice cast",
+        "boss_hurt2": "the crystal",
+        "blade_111h": "a low crystal blade",
+        "blade_222h": "a high crystal blade",
+        "blade_333h": "a mid crystal blade",
+        "blade_rotate_hurt": "a rising blade",
+        "boss_target_hurt": "the final crystal",
+        "NUKE": "the nuke"
+      }
+    },
+    {
+      "id": "l1_cast_ice",
+      "parent": "l1_crystal",
+      "name": "Ice",
+      "description": "boss_ice: a 2112 x 2112 field for 1 s: 15 damage and speed 0.1 for 4 s.",
+      "spawn": {
+        "at": "[PR#]boss_des",
+        "yaw": 90
+      },
+      "start": [
+        {
+          "target": "[PR#]CYTrFoward",
+          "input": "Enable"
+        },
+        {
+          "target": "[PR#]CyTrLeft",
+          "input": "Enable"
+        },
+        {
+          "target": "[PR#]CyTrLeftB",
+          "input": "Enable"
+        },
+        {
+          "target": "[PR#]CYTrRightB",
+          "input": "Enable"
+        },
+        {
+          "target": "[PR#]CYTrRight",
+          "input": "Enable"
+        },
+        {
+          "target": "[PR#]SETH_BOSSFIXER",
+          "input": "Enable"
+        },
+        {
+          "target": "[PR#]boss_ice",
+          "input": "Enable",
+          "delay": 3
+        },
+        {
+          "target": "[PR#]boss_ice",
+          "input": "Disable",
+          "delay": 4
+        }
+      ],
+      "winAfter": 9,
+      "hazards": {
+        "boss_hurt": "the crystal",
+        "boss_ice": "the ice cast",
+        "boss_hurt2": "the crystal",
+        "blade_111h": "a low crystal blade",
+        "blade_222h": "a high crystal blade",
+        "blade_333h": "a mid crystal blade",
+        "blade_rotate_hurt": "a rising blade",
+        "boss_target_hurt": "the final crystal",
+        "NUKE": "the nuke"
+      }
+    },
+    {
+      "id": "l1_blades",
+      "group": "Level 1 – Fade",
+      "featured": true,
+      "name": "Blade room (Final Crystal)",
+      "description": "boss_to_blade2 adds 70 hits per human to blade_hp (start 50) and teleports you in. Once the first human crosses the room (the trigger 1100 u in) a blade flies out of the crystal every 2 s at 1700 u/s: low (jump), mid (jump) or high (crouch), 999999 damage. Each human a blade kills takes 60 off the crystal. Win when it breaks.",
+      "spawn": {
+        "origin": [
+          -10070,
+          6958,
+          4068
+        ],
+        "yaw": 180
+      },
+      "start": [
+        {
+          "target": "[PR#]boss_to_blade2",
+          "input": "Enable"
+        },
+        {
+          "target": "[PR#]blade_start_timer",
+          "input": "Enable",
+          "delay": 4.5
+        }
+      ],
+      "bosses": [
+        {
+          "target": "[PR#]boss_target2",
+          "name": "Final Crystal",
+          "counter": "[PR#]blade_hp",
+          "counterMode": "hits"
+        }
+      ],
+      "win": {
+        "target": "[PR#]first_win",
+        "input": "Enable"
+      },
+      "hazards": {
+        "boss_hurt": "the crystal",
+        "boss_ice": "the ice cast",
+        "boss_hurt2": "the crystal",
+        "blade_111h": "a low crystal blade",
+        "blade_222h": "a high crystal blade",
+        "blade_333h": "a mid crystal blade",
+        "blade_rotate_hurt": "a rising blade",
+        "boss_target_hurt": "the final crystal",
+        "NUKE": "the nuke"
+      }
+    },
+    {
+      "id": "l1_elevator",
+      "group": "Level 1 – Fade",
+      "name": "Rising floor escape",
+      "description": "After the Final Crystal: final_floor rises 3200 u (500 u/s) 9 s after a human steps on it; at the top blades spin up out of blade_rotate for 8.5 s (999999), clear_trigger opens at +9.5 s, NUKE at +12 s.",
+      "spawn": {
+        "origin": [
+          -12992,
+          9754,
+          -2236
+        ],
+        "yaw": 180
+      },
+      "start": [
+        {
+          "target": "[PR#]blade_hp",
+          "input": "Subtract",
+          "param": "100000"
+        }
+      ],
+      "win": {
+        "target": "[PR#]score",
+        "input": "ApplyScore"
+      },
+      "lose": {
+        "target": "[PR#]NUKE",
+        "input": "Enable"
+      },
+      "hazards": {
+        "boss_hurt": "the crystal",
+        "boss_ice": "the ice cast",
+        "boss_hurt2": "the crystal",
+        "blade_111h": "a low crystal blade",
+        "blade_222h": "a high crystal blade",
+        "blade_333h": "a mid crystal blade",
+        "blade_rotate_hurt": "a rising blade",
+        "boss_target_hurt": "the final crystal",
+        "NUKE": "the nuke"
+      }
+    },
+    {
+      "id": "l2_full",
+      "group": "Level 2 – Dream",
+      "full": true,
+      "name": "Level 2 ending (full): Puny Light → final climb",
+      "description": "From the snow elevator's teleport into the arena (+5000 HP per human on st2_hitbox, 1500 base) through the 118 s fight, then st2_final_relay's 128 s climb: stone walk at +90 s, the final lasers at +108 s, the teleport up at +120 s. Win at score_trigger.",
+      "spawn": {
+        "origin": [
+          -15424,
+          2144,
+          9184
+        ],
+        "yaw": 270
+      },
+      "start": [
+        {
+          "target": "[PR#]st2_trigger",
+          "input": "Trigger"
+        },
+        {
+          "target": "[PR#]st2_start",
+          "input": "Trigger",
+          "delay": 2
+        }
+      ],
+      "bosses": [
+        {
+          "target": "[PR#]st2_hitbox",
+          "name": "Puny Light"
+        }
+      ],
+      "win": {
+        "target": "[PR#]score",
+        "input": "ApplyScore"
+      },
+      "lose": [
+        {
+          "target": "[PR#]fail_nuke",
+          "input": "Enable"
+        },
+        {
+          "target": "[PR#]fail_nuke_2",
+          "input": "Enable"
+        }
+      ],
+      "hazards": {
+        "st2_damage": "the light",
+        "b_hurt_1": "a spread bullet",
+        "b_hurt_2": "a spread bullet",
+        "b_hurt_3": "a spread bullet",
+        "b_hurt_4": "a spread bullet",
+        "random_hurt_1": "the danger field",
+        "random_hurt_2": "the danger field",
+        "random_hurt_3": "the danger field",
+        "random_hurt_4": "the danger field",
+        "laserhurt": "an upper laser",
+        "bladehurt_1": "a laser",
+        "bladehurt_2": "a laser",
+        "bladehurt_3": "a laser",
+        "bladehurt_4": "a laser",
+        "spike_hurt": "a falling spike",
+        "fail_nuke": "the nuke (boss survived)",
+        "fail_nuke_2": "the nuke",
+        "clear_nuke": "the nuke",
+        "height_hurt": "a vertical laser",
+        "height_hurt_2": "a vertical laser",
+        "width_hurt": "a sweeping laser",
+        "width_hurt_2": "a sweeping laser",
+        "trigger_snow": "the snow"
+      }
+    },
+    {
+      "id": "l2_boss",
+      "group": "Level 2 – Dream",
+      "name": "Puny Light (boss)",
+      "childrenTitle": "Single phases",
+      "description": "st2_start: a phase every 14 s (shuffled: Spread out, Zombie way, Danger Field, For Upper, Laser, Spikes) and 118 s to break st2_hitbox (1500 + 5000 per human; grenades 100 each), else fail_nuke. 200 damage touching it.",
+      "spawn": {
+        "origin": [
+          -15424,
+          2144,
+          9184
+        ],
+        "yaw": 270
+      },
+      "start": [
+        {
+          "target": "[PR#]st2_trigger",
+          "input": "Trigger"
+        },
+        {
+          "target": "[PR#]st2_start",
+          "input": "Trigger",
+          "delay": 2
+        }
+      ],
+      "bosses": [
+        {
+          "target": "[PR#]st2_hitbox",
+          "name": "Puny Light"
+        }
+      ],
+      "win": {
+        "target": "[PR#]st2_final_relay",
+        "input": "Trigger"
+      },
+      "lose": {
+        "target": "[PR#]fail_nuke",
+        "input": "Enable"
+      },
+      "hazards": {
+        "st2_damage": "the light",
+        "b_hurt_1": "a spread bullet",
+        "b_hurt_2": "a spread bullet",
+        "b_hurt_3": "a spread bullet",
+        "b_hurt_4": "a spread bullet",
+        "random_hurt_1": "the danger field",
+        "random_hurt_2": "the danger field",
+        "random_hurt_3": "the danger field",
+        "random_hurt_4": "the danger field",
+        "laserhurt": "an upper laser",
+        "bladehurt_1": "a laser",
+        "bladehurt_2": "a laser",
+        "bladehurt_3": "a laser",
+        "bladehurt_4": "a laser",
+        "spike_hurt": "a falling spike",
+        "fail_nuke": "the nuke (boss survived)",
+        "fail_nuke_2": "the nuke",
+        "clear_nuke": "the nuke",
+        "height_hurt": "a vertical laser",
+        "height_hurt_2": "a vertical laser",
+        "width_hurt": "a sweeping laser",
+        "width_hurt_2": "a sweeping laser",
+        "trigger_snow": "the snow"
+      }
+    },
+    {
+      "id": "l2_spread",
+      "parent": "l2_boss",
+      "name": "Spread out",
+      "description": "b_timer: every 0.08 s for 12 s b_maker (on the spinning b_rotate) sends out two bullet trains (65 damage); at +7.5 s it switches to the second pattern.",
+      "spawn": {
+        "at": "[PR#]st2_boss_des",
+        "yaw": 0
+      },
+      "start": [
+        {
+          "target": "[PR#]b_timer",
+          "input": "Enable",
+          "delay": 1
+        },
+        {
+          "target": "[PR#]b_timer",
+          "input": "Disable",
+          "delay": 13
+        },
+        {
+          "target": "[PR#]b_maker",
+          "input": "KeyValues",
+          "param": "entitytemplate b_template_2",
+          "delay": 8.5
+        },
+        {
+          "target": "[PR#]b_maker",
+          "input": "KeyValues",
+          "param": "entitytemplate b_template",
+          "delay": 13.1
+        }
+      ],
+      "winAfter": 15,
+      "hazards": {
+        "st2_damage": "the light",
+        "b_hurt_1": "a spread bullet",
+        "b_hurt_2": "a spread bullet",
+        "b_hurt_3": "a spread bullet",
+        "b_hurt_4": "a spread bullet",
+        "random_hurt_1": "the danger field",
+        "random_hurt_2": "the danger field",
+        "random_hurt_3": "the danger field",
+        "random_hurt_4": "the danger field",
+        "laserhurt": "an upper laser",
+        "bladehurt_1": "a laser",
+        "bladehurt_2": "a laser",
+        "bladehurt_3": "a laser",
+        "bladehurt_4": "a laser",
+        "spike_hurt": "a falling spike",
+        "fail_nuke": "the nuke (boss survived)",
+        "fail_nuke_2": "the nuke",
+        "clear_nuke": "the nuke",
+        "height_hurt": "a vertical laser",
+        "height_hurt_2": "a vertical laser",
+        "width_hurt": "a sweeping laser",
+        "width_hurt_2": "a sweeping laser",
+        "trigger_snow": "the snow"
+      }
+    },
+    {
+      "id": "l2_field",
+      "parent": "l2_boss",
+      "name": "Danger Field",
+      "description": "random_hurt_timer: every 4 s for 12 s one arena quarter lights up, then burns (50) 1–3 s later.",
+      "spawn": {
+        "at": "[PR#]st2_boss_des",
+        "yaw": 0
+      },
+      "start": [
+        {
+          "target": "[PR#]random_hurt_timer",
+          "input": "Enable",
+          "delay": 1
+        },
+        {
+          "target": "[PR#]random_hurt_timer",
+          "input": "Disable",
+          "delay": 13
+        }
+      ],
+      "winAfter": 17,
+      "hazards": {
+        "st2_damage": "the light",
+        "b_hurt_1": "a spread bullet",
+        "b_hurt_2": "a spread bullet",
+        "b_hurt_3": "a spread bullet",
+        "b_hurt_4": "a spread bullet",
+        "random_hurt_1": "the danger field",
+        "random_hurt_2": "the danger field",
+        "random_hurt_3": "the danger field",
+        "random_hurt_4": "the danger field",
+        "laserhurt": "an upper laser",
+        "bladehurt_1": "a laser",
+        "bladehurt_2": "a laser",
+        "bladehurt_3": "a laser",
+        "bladehurt_4": "a laser",
+        "spike_hurt": "a falling spike",
+        "fail_nuke": "the nuke (boss survived)",
+        "fail_nuke_2": "the nuke",
+        "clear_nuke": "the nuke",
+        "height_hurt": "a vertical laser",
+        "height_hurt_2": "a vertical laser",
+        "width_hurt": "a sweeping laser",
+        "width_hurt_2": "a sweeping laser",
+        "trigger_snow": "the snow"
+      }
+    },
+    {
+      "id": "l2_upper",
+      "parent": "l2_boss",
+      "name": "For Upper",
+      "description": "s2_upper lifts everyone to the upper platform (boss_upper) for 2 s; at +3 s the platform breaks and six 150-damage lasers (laserhurt) sweep the levels until +9 s.",
+      "spawn": {
+        "at": "[PR#]st2_boss_des",
+        "yaw": 0
+      },
+      "start": [
+        {
+          "target": "[PR#]s2_upper",
+          "input": "Enable",
+          "delay": 1
+        },
+        {
+          "target": "[PR#]s2_upper",
+          "input": "Disable",
+          "delay": 3
+        },
+        {
+          "target": "[PR#]field_br_random",
+          "input": "PickRandom",
+          "delay": 1
+        },
+        {
+          "target": "[PR#]upper_break",
+          "input": "Break",
+          "delay": 4
+        },
+        {
+          "target": "[PR#]upper_break",
+          "input": "Kill",
+          "delay": 4.1
+        },
+        {
+          "target": "[PR#]laserhurt",
+          "input": "Enable",
+          "delay": 4
+        },
+        {
+          "target": "[PR#]laser_10_fix*",
+          "input": "Start",
+          "delay": 4
+        },
+        {
+          "target": "[PR#]laserhurt",
+          "input": "Disable",
+          "delay": 10
+        },
+        {
+          "target": "[PR#]laser_10_fix*",
+          "input": "Stop",
+          "delay": 10
+        },
+        {
+          "target": "[PR#]upper_break_sp",
+          "input": "ForceSpawn",
+          "delay": 10
+        }
+      ],
+      "winAfter": 12,
+      "hazards": {
+        "st2_damage": "the light",
+        "b_hurt_1": "a spread bullet",
+        "b_hurt_2": "a spread bullet",
+        "b_hurt_3": "a spread bullet",
+        "b_hurt_4": "a spread bullet",
+        "random_hurt_1": "the danger field",
+        "random_hurt_2": "the danger field",
+        "random_hurt_3": "the danger field",
+        "random_hurt_4": "the danger field",
+        "laserhurt": "an upper laser",
+        "bladehurt_1": "a laser",
+        "bladehurt_2": "a laser",
+        "bladehurt_3": "a laser",
+        "bladehurt_4": "a laser",
+        "spike_hurt": "a falling spike",
+        "fail_nuke": "the nuke (boss survived)",
+        "fail_nuke_2": "the nuke",
+        "clear_nuke": "the nuke",
+        "height_hurt": "a vertical laser",
+        "height_hurt_2": "a vertical laser",
+        "width_hurt": "a sweeping laser",
+        "width_hurt_2": "a sweeping laser",
+        "trigger_snow": "the snow"
+      }
+    },
+    {
+      "id": "l2_laser",
+      "parent": "l2_boss",
+      "name": "Laser",
+      "description": "bladerandom_timer: every 3.5 s for 12 s a 2176-wide laser (200 damage, 2000 u/s) sweeps in from one of the four sides.",
+      "spawn": {
+        "at": "[PR#]st2_boss_des",
+        "yaw": 0
+      },
+      "start": [
+        {
+          "target": "[PR#]bladerandom_timer",
+          "input": "Enable",
+          "delay": 1
+        },
+        {
+          "target": "[PR#]bladerandom_timer",
+          "input": "Disable",
+          "delay": 13
+        }
+      ],
+      "winAfter": 16,
+      "hazards": {
+        "st2_damage": "the light",
+        "b_hurt_1": "a spread bullet",
+        "b_hurt_2": "a spread bullet",
+        "b_hurt_3": "a spread bullet",
+        "b_hurt_4": "a spread bullet",
+        "random_hurt_1": "the danger field",
+        "random_hurt_2": "the danger field",
+        "random_hurt_3": "the danger field",
+        "random_hurt_4": "the danger field",
+        "laserhurt": "an upper laser",
+        "bladehurt_1": "a laser",
+        "bladehurt_2": "a laser",
+        "bladehurt_3": "a laser",
+        "bladehurt_4": "a laser",
+        "spike_hurt": "a falling spike",
+        "fail_nuke": "the nuke (boss survived)",
+        "fail_nuke_2": "the nuke",
+        "clear_nuke": "the nuke",
+        "height_hurt": "a vertical laser",
+        "height_hurt_2": "a vertical laser",
+        "width_hurt": "a sweeping laser",
+        "width_hurt_2": "a sweeping laser",
+        "trigger_snow": "the snow"
+      }
+    },
+    {
+      "id": "l2_spikes",
+      "parent": "l2_boss",
+      "name": "Spikes",
+      "description": "spike_timer: every 0.12 s for 12 s three spikes (100 damage) drop from the makers riding the SETH_Ramdon3 track.",
+      "spawn": {
+        "at": "[PR#]st2_boss_des",
+        "yaw": 0
+      },
+      "start": [
+        {
+          "target": "[PR#]spike_timer",
+          "input": "Enable",
+          "delay": 1
+        },
+        {
+          "target": "[PR#]spike_timer",
+          "input": "Disable",
+          "delay": 13
+        }
+      ],
+      "winAfter": 15,
+      "hazards": {
+        "st2_damage": "the light",
+        "b_hurt_1": "a spread bullet",
+        "b_hurt_2": "a spread bullet",
+        "b_hurt_3": "a spread bullet",
+        "b_hurt_4": "a spread bullet",
+        "random_hurt_1": "the danger field",
+        "random_hurt_2": "the danger field",
+        "random_hurt_3": "the danger field",
+        "random_hurt_4": "the danger field",
+        "laserhurt": "an upper laser",
+        "bladehurt_1": "a laser",
+        "bladehurt_2": "a laser",
+        "bladehurt_3": "a laser",
+        "bladehurt_4": "a laser",
+        "spike_hurt": "a falling spike",
+        "fail_nuke": "the nuke (boss survived)",
+        "fail_nuke_2": "the nuke",
+        "clear_nuke": "the nuke",
+        "height_hurt": "a vertical laser",
+        "height_hurt_2": "a vertical laser",
+        "width_hurt": "a sweeping laser",
+        "width_hurt_2": "a sweeping laser",
+        "trigger_snow": "the snow"
+      }
+    },
+    {
+      "id": "l2_final_lasers",
+      "group": "Level 2 – Dream",
+      "name": "Final lasers (climb top)",
+      "description": "st2_final_relay +106 s, on test_laser: the first human there picks a side (finalaser_random), the other stone walk drops, and for 9 s vertical and sweeping lasers (999999) cross the top. st2_upper teleports humans to the end at +120 s; score_trigger opens at +128 s.",
+      "spawn": {
+        "origin": [
+          12800,
+          12800,
+          4561
+        ],
+        "yaw": 0
+      },
+      "start": [
+        {
+          "target": "[PR#]st2_trigger",
+          "input": "Trigger"
+        },
+        {
+          "target": "[PR#]st2_final_relay",
+          "input": "Trigger"
+        }
+      ],
+      "fastForward": 106,
+      "win": {
+        "target": "[PR#]score",
+        "input": "ApplyScore"
+      },
+      "hazards": {
+        "st2_damage": "the light",
+        "b_hurt_1": "a spread bullet",
+        "b_hurt_2": "a spread bullet",
+        "b_hurt_3": "a spread bullet",
+        "b_hurt_4": "a spread bullet",
+        "random_hurt_1": "the danger field",
+        "random_hurt_2": "the danger field",
+        "random_hurt_3": "the danger field",
+        "random_hurt_4": "the danger field",
+        "laserhurt": "an upper laser",
+        "bladehurt_1": "a laser",
+        "bladehurt_2": "a laser",
+        "bladehurt_3": "a laser",
+        "bladehurt_4": "a laser",
+        "spike_hurt": "a falling spike",
+        "fail_nuke": "the nuke (boss survived)",
+        "fail_nuke_2": "the nuke",
+        "clear_nuke": "the nuke",
+        "height_hurt": "a vertical laser",
+        "height_hurt_2": "a vertical laser",
+        "width_hurt": "a sweeping laser",
+        "width_hurt_2": "a sweeping laser",
+        "trigger_snow": "the snow"
+      }
+    },
+    {
+      "id": "l3_full",
+      "group": "Level 3",
+      "full": true,
+      "name": "Level 3 ending (full): Giant Light → Final Light",
+      "description": "From st3_goto (+600 hits per human on st3_hp) through the Giant Light's 250 s (phases, totems, the defense hold at +115 s, phase 2 at +180 s), the floor out, the final run (final_relay) and the Final Light at +110 s. Win at st3_clear (+143 s).",
+      "spawn": {
+        "origin": [
+          -7744,
+          -8720,
+          -9167
+        ],
+        "yaw": 0
+      },
+      "start": [
+        {
+          "target": "[PR#]st3_trigger",
+          "input": "Trigger"
+        },
+        {
+          "target": "[PR#]st3_goto",
+          "input": "Enable"
+        }
+      ],
+      "bosses": [
+        {
+          "target": "[PR#]st3_hitbox",
+          "name": "Giant Light",
+          "counter": "[PR#]st3_hp",
+          "counterMode": "hits"
+        },
+        {
+          "target": "[PR#]final_hitbox",
+          "name": "Final Light",
+          "counter": "[PR#]final_hp",
+          "counterMode": "hits"
+        }
+      ],
+      "win": {
+        "target": "[PR#]score",
+        "input": "ApplyScore"
+      },
+      "lose": [
+        {
+          "target": "[PR#]st3_fail",
+          "input": "Enable"
+        },
+        {
+          "target": "[PR#]final_fail_1",
+          "input": "Enable"
+        }
+      ],
+      "hazards": {
+        "st3_boss_hurt": "the giant light",
+        "st3_crouch": "the crouch field",
+        "st3_ice": "the ice bar",
+        "upline_hurt": "a rising line",
+        "linelaser_hurt": "a line laser",
+        "explo_eff": "an explosion",
+        "SETH_REFLTE_HURT": "the reflection (you shot during it)",
+        "st3_fail": "the nuke (boss survived)",
+        "final_laser_h": "a light laser",
+        "final_laser_h_2": "a corridor laser",
+        "final_slow_hurt": "a light pillar",
+        "final_slow_hurt_2": "a corridor pillar",
+        "final_fail_1": "the nuke (boss survived)",
+        "st3_nuke": "the nuke",
+        "heal_tt": "the heal totem"
+      }
+    },
+    {
+      "id": "l3_giant",
+      "group": "Level 3",
+      "name": "Giant Light (boss)",
+      "childrenTitle": "Single phases",
+      "description": "st3_goto drops each human into a corner of the arena and adds 600 hits per human; st3_boss_start (+5 s). A phase every 13 s (shuffled: two Ice, Crouch, Wind, Upline, Explosions, Line lasers), a Reflection one time in eight every 15 s (shooting it then costs you 10 per hit), totems every 10–14 s. 250 s, else st3_fail.",
+      "spawn": {
+        "origin": [
+          -7744,
+          -8720,
+          -9167
+        ],
+        "yaw": 0
+      },
+      "start": [
+        {
+          "target": "[PR#]st3_trigger",
+          "input": "Trigger"
+        },
+        {
+          "target": "[PR#]st3_goto",
+          "input": "Enable"
+        }
+      ],
+      "bosses": [
+        {
+          "target": "[PR#]st3_hitbox",
+          "name": "Giant Light",
+          "counter": "[PR#]st3_hp",
+          "counterMode": "hits"
+        }
+      ],
+      "win": {
+        "target": "[PR#]st3_check_clear",
+        "input": "SetValue"
+      },
+      "lose": {
+        "target": "[PR#]st3_fail",
+        "input": "Enable"
+      },
+      "hazards": {
+        "st3_boss_hurt": "the giant light",
+        "st3_crouch": "the crouch field",
+        "st3_ice": "the ice bar",
+        "upline_hurt": "a rising line",
+        "linelaser_hurt": "a line laser",
+        "explo_eff": "an explosion",
+        "SETH_REFLTE_HURT": "the reflection (you shot during it)",
+        "st3_fail": "the nuke (boss survived)",
+        "final_laser_h": "a light laser",
+        "final_laser_h_2": "a corridor laser",
+        "final_slow_hurt": "a light pillar",
+        "final_slow_hurt_2": "a corridor pillar",
+        "final_fail_1": "the nuke (boss survived)",
+        "st3_nuke": "the nuke",
+        "heal_tt": "the heal totem"
+      }
+    },
+    {
+      "id": "l3_ice",
+      "parent": "l3_giant",
+      "name": "Ice",
+      "description": "st3_ice: the spinning ice bar (5 damage, speed 0.1 for 3 s) from +0.5 s to +8 s.",
+      "spawn": {
+        "origin": [
+          -640,
+          640,
+          -2752
+        ],
+        "yaw": 315
+      },
+      "start": [
+        {
+          "target": "[PR#]st3_ice",
+          "input": "Enable",
+          "delay": 1.5
+        },
+        {
+          "target": "[PR#]ice_p_pcf",
+          "input": "Start",
+          "delay": 1
+        },
+        {
+          "target": "[PR#]st3_ice",
+          "input": "Disable",
+          "delay": 9
+        },
+        {
+          "target": "[PR#]ice_p_pcf",
+          "input": "Stop",
+          "delay": 9
+        }
+      ],
+      "winAfter": 11,
+      "hazards": {
+        "st3_boss_hurt": "the giant light",
+        "st3_crouch": "the crouch field",
+        "st3_ice": "the ice bar",
+        "upline_hurt": "a rising line",
+        "linelaser_hurt": "a line laser",
+        "explo_eff": "an explosion",
+        "SETH_REFLTE_HURT": "the reflection (you shot during it)",
+        "st3_fail": "the nuke (boss survived)",
+        "final_laser_h": "a light laser",
+        "final_laser_h_2": "a corridor laser",
+        "final_slow_hurt": "a light pillar",
+        "final_slow_hurt_2": "a corridor pillar",
+        "final_fail_1": "the nuke (boss survived)",
+        "st3_nuke": "the nuke",
+        "heal_tt": "the heal totem"
+      }
+    },
+    {
+      "id": "l3_crouch",
+      "parent": "l3_giant",
+      "name": "Crouch field",
+      "description": "st3_crouch: a 2560 x 2560 plane of 40 damage across the arena for 8 s.",
+      "spawn": {
+        "origin": [
+          -640,
+          640,
+          -2752
+        ],
+        "yaw": 315
+      },
+      "start": [
+        {
+          "target": "[PR#]st3_crouch",
+          "input": "Enable",
+          "delay": 1
+        },
+        {
+          "target": "[PR#]crouch_pcf",
+          "input": "Start",
+          "delay": 1
+        },
+        {
+          "target": "[PR#]st3_crouch",
+          "input": "Disable",
+          "delay": 9
+        },
+        {
+          "target": "[PR#]crouch_pcf",
+          "input": "Stop",
+          "delay": 9
+        }
+      ],
+      "winAfter": 11,
+      "hazards": {
+        "st3_boss_hurt": "the giant light",
+        "st3_crouch": "the crouch field",
+        "st3_ice": "the ice bar",
+        "upline_hurt": "a rising line",
+        "linelaser_hurt": "a line laser",
+        "explo_eff": "an explosion",
+        "SETH_REFLTE_HURT": "the reflection (you shot during it)",
+        "st3_fail": "the nuke (boss survived)",
+        "final_laser_h": "a light laser",
+        "final_laser_h_2": "a corridor laser",
+        "final_slow_hurt": "a light pillar",
+        "final_slow_hurt_2": "a corridor pillar",
+        "final_fail_1": "the nuke (boss survived)",
+        "st3_nuke": "the nuke",
+        "heal_tt": "the heal totem"
+      }
+    },
+    {
+      "id": "l3_wind",
+      "parent": "l3_giant",
+      "name": "Wind",
+      "description": "st3_wind_random: one of four 320 u/s diagonal pushes for 9 s.",
+      "spawn": {
+        "origin": [
+          -640,
+          640,
+          -2752
+        ],
+        "yaw": 315
+      },
+      "start": [
+        {
+          "target": "[PR#]st3_wind_random",
+          "input": "PickRandom",
+          "delay": 1
+        },
+        {
+          "target": "[PR#]wind_p_pcf",
+          "input": "Start",
+          "delay": 1
+        },
+        {
+          "target": "[PR#]wind_p_pcf",
+          "input": "Stop",
+          "delay": 9
+        }
+      ],
+      "winAfter": 12,
+      "hazards": {
+        "st3_boss_hurt": "the giant light",
+        "st3_crouch": "the crouch field",
+        "st3_ice": "the ice bar",
+        "upline_hurt": "a rising line",
+        "linelaser_hurt": "a line laser",
+        "explo_eff": "an explosion",
+        "SETH_REFLTE_HURT": "the reflection (you shot during it)",
+        "st3_fail": "the nuke (boss survived)",
+        "final_laser_h": "a light laser",
+        "final_laser_h_2": "a corridor laser",
+        "final_slow_hurt": "a light pillar",
+        "final_slow_hurt_2": "a corridor pillar",
+        "final_fail_1": "the nuke (boss survived)",
+        "st3_nuke": "the nuke",
+        "heal_tt": "the heal totem"
+      }
+    },
+    {
+      "id": "l3_upline",
+      "parent": "l3_giant",
+      "name": "Upline",
+      "description": "upline_timer: every 0.4 s for 10 s a line (60 damage) rises 2000 u from a point riding the SETH_Ramdon2 track; upline_hurt slows you to 0.8 for 2 s.",
+      "spawn": {
+        "origin": [
+          -640,
+          640,
+          -2752
+        ],
+        "yaw": 315
+      },
+      "start": [
+        {
+          "target": "[PR#]upline_timer",
+          "input": "Enable",
+          "delay": 1
+        },
+        {
+          "target": "[PR#]upline_hurt",
+          "input": "Enable",
+          "delay": 1
+        },
+        {
+          "target": "[PR#]upline_timer",
+          "input": "Disable",
+          "delay": 11
+        },
+        {
+          "target": "[PR#]upline_hurt",
+          "input": "Disable",
+          "delay": 13
+        }
+      ],
+      "winAfter": 15,
+      "hazards": {
+        "st3_boss_hurt": "the giant light",
+        "st3_crouch": "the crouch field",
+        "st3_ice": "the ice bar",
+        "upline_hurt": "a rising line",
+        "linelaser_hurt": "a line laser",
+        "explo_eff": "an explosion",
+        "SETH_REFLTE_HURT": "the reflection (you shot during it)",
+        "st3_fail": "the nuke (boss survived)",
+        "final_laser_h": "a light laser",
+        "final_laser_h_2": "a corridor laser",
+        "final_slow_hurt": "a light pillar",
+        "final_slow_hurt_2": "a corridor pillar",
+        "final_fail_1": "the nuke (boss survived)",
+        "st3_nuke": "the nuke",
+        "heal_tt": "the heal totem"
+      }
+    },
+    {
+      "id": "l3_explo",
+      "parent": "l3_giant",
+      "name": "Explosions",
+      "description": "explo_timer: every 0.2–0.3 s for 10 s explo_maker on the spinning explo_maker_rot drops a bomb (160) that blows when shot or touched.",
+      "spawn": {
+        "origin": [
+          -640,
+          640,
+          -2752
+        ],
+        "yaw": 315
+      },
+      "start": [
+        {
+          "target": "[PR#]explo_timer",
+          "input": "Enable",
+          "delay": 1
+        },
+        {
+          "target": "[PR#]explo_timer",
+          "input": "Disable",
+          "delay": 11
+        }
+      ],
+      "winAfter": 14,
+      "hazards": {
+        "st3_boss_hurt": "the giant light",
+        "st3_crouch": "the crouch field",
+        "st3_ice": "the ice bar",
+        "upline_hurt": "a rising line",
+        "linelaser_hurt": "a line laser",
+        "explo_eff": "an explosion",
+        "SETH_REFLTE_HURT": "the reflection (you shot during it)",
+        "st3_fail": "the nuke (boss survived)",
+        "final_laser_h": "a light laser",
+        "final_laser_h_2": "a corridor laser",
+        "final_slow_hurt": "a light pillar",
+        "final_slow_hurt_2": "a corridor pillar",
+        "final_fail_1": "the nuke (boss survived)",
+        "st3_nuke": "the nuke",
+        "heal_tt": "the heal totem"
+      }
+    },
+    {
+      "id": "l3_linelaser",
+      "parent": "l3_giant",
+      "name": "Line lasers",
+      "description": "linelaser_timer: every 1 s for 10 s one of 25 grid makers sends a 2944-wide line laser (80) in one of four directions.",
+      "spawn": {
+        "origin": [
+          -640,
+          640,
+          -2752
+        ],
+        "yaw": 315
+      },
+      "start": [
+        {
+          "target": "[PR#]linelaser_timer",
+          "input": "Enable",
+          "delay": 1
+        },
+        {
+          "target": "[PR#]linelaser_timer",
+          "input": "Disable",
+          "delay": 11
+        }
+      ],
+      "winAfter": 15,
+      "hazards": {
+        "st3_boss_hurt": "the giant light",
+        "st3_crouch": "the crouch field",
+        "st3_ice": "the ice bar",
+        "upline_hurt": "a rising line",
+        "linelaser_hurt": "a line laser",
+        "explo_eff": "an explosion",
+        "SETH_REFLTE_HURT": "the reflection (you shot during it)",
+        "st3_fail": "the nuke (boss survived)",
+        "final_laser_h": "a light laser",
+        "final_laser_h_2": "a corridor laser",
+        "final_slow_hurt": "a light pillar",
+        "final_slow_hurt_2": "a corridor pillar",
+        "final_fail_1": "the nuke (boss survived)",
+        "st3_nuke": "the nuke",
+        "heal_tt": "the heal totem"
+      }
+    },
+    {
+      "id": "l3_final",
+      "group": "Level 3",
+      "name": "Final Light (boss) + corridor",
+      "description": "final_relay +109 s: the push (110–114 s) throws you into the room and adds 50 hits per human; the light takes bullets from +114 s and its lasers (3 heights, every 1–1.2 s) and pillars come at you. Dead by +128 s or final_fail_1. Then the corridor lasers (+130.5–141 s) and st3_clear at +143 s.",
+      "spawn": {
+        "origin": [
+          9120,
+          -6760,
+          769
+        ],
+        "yaw": 90
+      },
+      "start": [
+        {
+          "target": "[PR#]st3_trigger",
+          "input": "Trigger"
+        },
+        {
+          "target": "[PR#]final_relay",
+          "input": "Trigger"
+        }
+      ],
+      "fastForward": 109,
+      "bosses": [
+        {
+          "target": "[PR#]final_hitbox",
+          "name": "Final Light",
+          "counter": "[PR#]final_hp",
+          "counterMode": "hits"
+        }
+      ],
+      "win": {
+        "target": "[PR#]score",
+        "input": "ApplyScore"
+      },
+      "lose": {
+        "target": "[PR#]final_fail_1",
+        "input": "Enable"
+      },
+      "hazards": {
+        "st3_boss_hurt": "the giant light",
+        "st3_crouch": "the crouch field",
+        "st3_ice": "the ice bar",
+        "upline_hurt": "a rising line",
+        "linelaser_hurt": "a line laser",
+        "explo_eff": "an explosion",
+        "SETH_REFLTE_HURT": "the reflection (you shot during it)",
+        "st3_fail": "the nuke (boss survived)",
+        "final_laser_h": "a light laser",
+        "final_laser_h_2": "a corridor laser",
+        "final_slow_hurt": "a light pillar",
+        "final_slow_hurt_2": "a corridor pillar",
+        "final_fail_1": "the nuke (boss survived)",
+        "st3_nuke": "the nuke",
+        "heal_tt": "the heal totem"
+      }
+    },
+    {
+      "id": "l4_full",
+      "group": "Level 4",
+      "full": true,
+      "name": "Level 4 (full): arena → Light → surf",
+      "description": "rtv_relay from the arena (+50 s, 222 HP from rtv_enter_1): random attacks every 14 s until +133 s, the Light at +160 s (+100 hits per human, 24 s), then the surf with lasers to rtv_last. Win when rtv_endnuke comes on.",
+      "spawn": {
+        "at": "[PR#]rtv_des_1",
+        "yaw": 179
+      },
+      "start": [
+        {
+          "target": "[PR#]st4_trigger",
+          "input": "Trigger"
+        },
+        {
+          "target": "[PR#]rtv_relay",
+          "input": "Trigger"
+        }
+      ],
+      "fastForward": 49,
+      "player": {
+        "health": 222
+      },
+      "bosses": [
+        {
+          "target": "[PR#]rtv_linelaser_hp",
+          "name": "Light",
+          "counter": "[PR#]rtv_linelaser_count",
+          "counterMode": "hits"
+        }
+      ],
+      "win": {
+        "target": "[PR#]rtv_endnuke",
+        "input": "Enable"
+      },
+      "lose": {
+        "target": "[PR#]rtv_nuke_1",
+        "input": "Enable"
+      },
+      "hazards": {
+        "rtv_laser_hurt": "a laser pillar",
+        "rtv_th_h": "a thruster pad",
+        "rtv_ice_hurt": "the ice bar",
+        "rtv_field_1": "a danger field",
+        "rtv_field_2": "a danger field",
+        "rtv_field_3": "a danger field",
+        "rtv_field_4": "a danger field",
+        "SETH_WALKBOMB_EXPLO": "a walking bomb",
+        "sbomb_ex_1": "a bomb",
+        "sbomb_ex_2": "a bomb",
+        "sbomb_ex_3": "a bomb",
+        "rtv_first_door_hurt": "the closing door",
+        "door_ex_1": "the door blast",
+        "door_ex_2": "the door blast",
+        "door_ex_3": "the door blast",
+        "rtv_linelaser_hurt": "a light laser",
+        "rtv_slow_hurt": "a light pillar",
+        "rtv_slow_hurt_2": "a light pillar",
+        "rtv_nuke_1": "the nuke (boss survived)",
+        "rtv_surflaser_hurt": "a surf laser",
+        "rtv_endnuke": "the nuke"
+      }
+    },
+    {
+      "id": "l4_arena",
+      "group": "Level 4",
+      "name": "Arena attacks",
+      "childrenTitle": "Single attacks",
+      "description": "rtv_first_timer: every 14 s from +50 to +133 s one of five (shuffled): Lasers, Thrusters, Ice, Danger Fields, Bombs. Falling off is 200 and rtv_teleport_case puts you back in a corner.",
+      "spawn": {
+        "at": "[PR#]rtv_des_1",
+        "yaw": 179
+      },
+      "start": [
+        {
+          "target": "[PR#]st4_trigger",
+          "input": "Trigger"
+        },
+        {
+          "target": "[PR#]rtv_relay",
+          "input": "Trigger"
+        }
+      ],
+      "fastForward": 49,
+      "player": {
+        "health": 222
+      },
+      "win": {
+        "target": "[PR#]rtv_teleport_1",
+        "input": "FireUser1"
+      },
+      "hazards": {
+        "rtv_laser_hurt": "a laser pillar",
+        "rtv_th_h": "a thruster pad",
+        "rtv_ice_hurt": "the ice bar",
+        "rtv_field_1": "a danger field",
+        "rtv_field_2": "a danger field",
+        "rtv_field_3": "a danger field",
+        "rtv_field_4": "a danger field",
+        "SETH_WALKBOMB_EXPLO": "a walking bomb",
+        "sbomb_ex_1": "a bomb",
+        "sbomb_ex_2": "a bomb",
+        "sbomb_ex_3": "a bomb",
+        "rtv_first_door_hurt": "the closing door",
+        "door_ex_1": "the door blast",
+        "door_ex_2": "the door blast",
+        "door_ex_3": "the door blast",
+        "rtv_linelaser_hurt": "a light laser",
+        "rtv_slow_hurt": "a light pillar",
+        "rtv_slow_hurt_2": "a light pillar",
+        "rtv_nuke_1": "the nuke (boss survived)",
+        "rtv_surflaser_hurt": "a surf laser",
+        "rtv_endnuke": "the nuke"
+      }
+    },
+    {
+      "id": "l4_lasers",
+      "parent": "l4_arena",
+      "name": "Lasers",
+      "description": "rtv_laser_timer: every 0.1 s for 13 s a laser pillar (50, slows zombies) spawns where SETH_Ramdon_Maker is on its back-and-forth tracks and runs across.",
+      "spawn": {
+        "at": "[PR#]rtv_des_1",
+        "yaw": 179
+      },
+      "start": [
+        {
+          "target": "[PR#]rtv_laser_timer",
+          "input": "Enable",
+          "delay": 1
+        },
+        {
+          "target": "[PR#]rtv_laser_timer",
+          "input": "Disable",
+          "delay": 14
+        }
+      ],
+      "winAfter": 17,
+      "player": {
+        "health": 222
+      },
+      "hazards": {
+        "rtv_laser_hurt": "a laser pillar",
+        "rtv_th_h": "a thruster pad",
+        "rtv_ice_hurt": "the ice bar",
+        "rtv_field_1": "a danger field",
+        "rtv_field_2": "a danger field",
+        "rtv_field_3": "a danger field",
+        "rtv_field_4": "a danger field",
+        "SETH_WALKBOMB_EXPLO": "a walking bomb",
+        "sbomb_ex_1": "a bomb",
+        "sbomb_ex_2": "a bomb",
+        "sbomb_ex_3": "a bomb",
+        "rtv_first_door_hurt": "the closing door",
+        "door_ex_1": "the door blast",
+        "door_ex_2": "the door blast",
+        "door_ex_3": "the door blast",
+        "rtv_linelaser_hurt": "a light laser",
+        "rtv_slow_hurt": "a light pillar",
+        "rtv_slow_hurt_2": "a light pillar",
+        "rtv_nuke_1": "the nuke (boss survived)",
+        "rtv_surflaser_hurt": "a surf laser",
+        "rtv_endnuke": "the nuke"
+      }
+    },
+    {
+      "id": "l4_thrusters",
+      "parent": "l4_arena",
+      "name": "Thrusters",
+      "description": "rtv_th_timer: every 0.08 s for 13 s a pad (rtv_th) that throws you 400 u/s out and up.",
+      "spawn": {
+        "at": "[PR#]rtv_des_1",
+        "yaw": 179
+      },
+      "start": [
+        {
+          "target": "[PR#]rtv_th_timer",
+          "input": "Enable",
+          "delay": 1
+        },
+        {
+          "target": "[PR#]rtv_th_timer",
+          "input": "Disable",
+          "delay": 14
+        }
+      ],
+      "winAfter": 17,
+      "player": {
+        "health": 222
+      },
+      "hazards": {
+        "rtv_laser_hurt": "a laser pillar",
+        "rtv_th_h": "a thruster pad",
+        "rtv_ice_hurt": "the ice bar",
+        "rtv_field_1": "a danger field",
+        "rtv_field_2": "a danger field",
+        "rtv_field_3": "a danger field",
+        "rtv_field_4": "a danger field",
+        "SETH_WALKBOMB_EXPLO": "a walking bomb",
+        "sbomb_ex_1": "a bomb",
+        "sbomb_ex_2": "a bomb",
+        "sbomb_ex_3": "a bomb",
+        "rtv_first_door_hurt": "the closing door",
+        "door_ex_1": "the door blast",
+        "door_ex_2": "the door blast",
+        "door_ex_3": "the door blast",
+        "rtv_linelaser_hurt": "a light laser",
+        "rtv_slow_hurt": "a light pillar",
+        "rtv_slow_hurt_2": "a light pillar",
+        "rtv_nuke_1": "the nuke (boss survived)",
+        "rtv_surflaser_hurt": "a surf laser",
+        "rtv_endnuke": "the nuke"
+      }
+    },
+    {
+      "id": "l4_ice",
+      "parent": "l4_arena",
+      "name": "Ice",
+      "description": "rtv_ice_relay: the ice bar (50, speed 0.5) sweeps for 13 s, stopping at +7 s and reversing at +9 s.",
+      "spawn": {
+        "at": "[PR#]rtv_des_1",
+        "yaw": 179
+      },
+      "start": [
+        {
+          "target": "[PR#]rtv_ice_relay",
+          "input": "Trigger",
+          "delay": 1
+        }
+      ],
+      "winAfter": 16,
+      "player": {
+        "health": 222
+      },
+      "hazards": {
+        "rtv_laser_hurt": "a laser pillar",
+        "rtv_th_h": "a thruster pad",
+        "rtv_ice_hurt": "the ice bar",
+        "rtv_field_1": "a danger field",
+        "rtv_field_2": "a danger field",
+        "rtv_field_3": "a danger field",
+        "rtv_field_4": "a danger field",
+        "SETH_WALKBOMB_EXPLO": "a walking bomb",
+        "sbomb_ex_1": "a bomb",
+        "sbomb_ex_2": "a bomb",
+        "sbomb_ex_3": "a bomb",
+        "rtv_first_door_hurt": "the closing door",
+        "door_ex_1": "the door blast",
+        "door_ex_2": "the door blast",
+        "door_ex_3": "the door blast",
+        "rtv_linelaser_hurt": "a light laser",
+        "rtv_slow_hurt": "a light pillar",
+        "rtv_slow_hurt_2": "a light pillar",
+        "rtv_nuke_1": "the nuke (boss survived)",
+        "rtv_surflaser_hurt": "a surf laser",
+        "rtv_endnuke": "the nuke"
+      }
+    },
+    {
+      "id": "l4_fields",
+      "parent": "l4_arena",
+      "name": "Danger fields",
+      "description": "rtv_field_case at 0/3/6/9 s: one quarter (1024 x 1024) burns 70 for 3 s after a 1 s warning.",
+      "spawn": {
+        "at": "[PR#]rtv_des_1",
+        "yaw": 179
+      },
+      "start": [
+        {
+          "target": "[PR#]rtv_field_case",
+          "input": "PickRandomShuffle",
+          "delay": 1
+        },
+        {
+          "target": "[PR#]rtv_field_case",
+          "input": "PickRandomShuffle",
+          "delay": 4
+        },
+        {
+          "target": "[PR#]rtv_field_case",
+          "input": "PickRandomShuffle",
+          "delay": 7
+        },
+        {
+          "target": "[PR#]rtv_field_case",
+          "input": "PickRandomShuffle",
+          "delay": 10
+        }
+      ],
+      "winAfter": 15,
+      "player": {
+        "health": 222
+      },
+      "hazards": {
+        "rtv_laser_hurt": "a laser pillar",
+        "rtv_th_h": "a thruster pad",
+        "rtv_ice_hurt": "the ice bar",
+        "rtv_field_1": "a danger field",
+        "rtv_field_2": "a danger field",
+        "rtv_field_3": "a danger field",
+        "rtv_field_4": "a danger field",
+        "SETH_WALKBOMB_EXPLO": "a walking bomb",
+        "sbomb_ex_1": "a bomb",
+        "sbomb_ex_2": "a bomb",
+        "sbomb_ex_3": "a bomb",
+        "rtv_first_door_hurt": "the closing door",
+        "door_ex_1": "the door blast",
+        "door_ex_2": "the door blast",
+        "door_ex_3": "the door blast",
+        "rtv_linelaser_hurt": "a light laser",
+        "rtv_slow_hurt": "a light pillar",
+        "rtv_slow_hurt_2": "a light pillar",
+        "rtv_nuke_1": "the nuke (boss survived)",
+        "rtv_surflaser_hurt": "a surf laser",
+        "rtv_endnuke": "the nuke"
+      }
+    },
+    {
+      "id": "l4_bombs",
+      "parent": "l4_arena",
+      "name": "Bombs",
+      "description": "SETH_BOMB_MAKER x3: walking bombs (180) that pick a direction, walk and explode; their makers are removed at +13 s.",
+      "spawn": {
+        "at": "[PR#]rtv_des_1",
+        "yaw": 179
+      },
+      "start": [
+        {
+          "target": "[PR#]SETH_BOMB_MAKER",
+          "input": "ForceSpawn",
+          "delay": 1
+        },
+        {
+          "target": "[PR#]SETH_BOMB_MAKER",
+          "input": "ForceSpawn",
+          "delay": 1
+        },
+        {
+          "target": "[PR#]SETH_BOMB_MAKER",
+          "input": "ForceSpawn",
+          "delay": 1
+        },
+        {
+          "target": "[PR#]SETH_WALKBOMB_MAKER*",
+          "input": "Kill",
+          "delay": 14
+        }
+      ],
+      "winAfter": 16,
+      "player": {
+        "health": 222
+      },
+      "hazards": {
+        "rtv_laser_hurt": "a laser pillar",
+        "rtv_th_h": "a thruster pad",
+        "rtv_ice_hurt": "the ice bar",
+        "rtv_field_1": "a danger field",
+        "rtv_field_2": "a danger field",
+        "rtv_field_3": "a danger field",
+        "rtv_field_4": "a danger field",
+        "SETH_WALKBOMB_EXPLO": "a walking bomb",
+        "sbomb_ex_1": "a bomb",
+        "sbomb_ex_2": "a bomb",
+        "sbomb_ex_3": "a bomb",
+        "rtv_first_door_hurt": "the closing door",
+        "door_ex_1": "the door blast",
+        "door_ex_2": "the door blast",
+        "door_ex_3": "the door blast",
+        "rtv_linelaser_hurt": "a light laser",
+        "rtv_slow_hurt": "a light pillar",
+        "rtv_slow_hurt_2": "a light pillar",
+        "rtv_nuke_1": "the nuke (boss survived)",
+        "rtv_surflaser_hurt": "a surf laser",
+        "rtv_endnuke": "the nuke"
+      }
+    },
+    {
+      "id": "l4_light",
+      "group": "Level 4",
+      "name": "Light (boss)",
+      "description": "rtv_relay +160 s: rtv_teleport_2 lands you on the heal pad at rtv_des_3 (+300 HP, +100 hits per human on rtv_linelaser_count, start 10). For 24 s the wall-wide light fires line lasers (175) and pillars (200, half speed) every 1–1.5 s; each human they touch takes 70 off it. Dead at +185 s or rtv_nuke_1.",
+      "spawn": {
+        "at": "[PR#]rtv_des_3",
+        "yaw": 90
+      },
+      "start": [
+        {
+          "target": "[PR#]st4_trigger",
+          "input": "Trigger"
+        },
+        {
+          "target": "[PR#]rtv_relay",
+          "input": "Trigger"
+        }
+      ],
+      "fastForward": 160.05,
+      "player": {
+        "health": 222
+      },
+      "bosses": [
+        {
+          "target": "[PR#]rtv_linelaser_hp",
+          "name": "Light",
+          "counter": "[PR#]rtv_linelaser_count",
+          "counterMode": "hits"
+        }
+      ],
+      "win": {
+        "target": "[PR#]rtv_teleport_3",
+        "input": "FireUser1"
+      },
+      "lose": {
+        "target": "[PR#]rtv_nuke_1",
+        "input": "Enable"
+      },
+      "hazards": {
+        "rtv_laser_hurt": "a laser pillar",
+        "rtv_th_h": "a thruster pad",
+        "rtv_ice_hurt": "the ice bar",
+        "rtv_field_1": "a danger field",
+        "rtv_field_2": "a danger field",
+        "rtv_field_3": "a danger field",
+        "rtv_field_4": "a danger field",
+        "SETH_WALKBOMB_EXPLO": "a walking bomb",
+        "sbomb_ex_1": "a bomb",
+        "sbomb_ex_2": "a bomb",
+        "sbomb_ex_3": "a bomb",
+        "rtv_first_door_hurt": "the closing door",
+        "door_ex_1": "the door blast",
+        "door_ex_2": "the door blast",
+        "door_ex_3": "the door blast",
+        "rtv_linelaser_hurt": "a light laser",
+        "rtv_slow_hurt": "a light pillar",
+        "rtv_slow_hurt_2": "a light pillar",
+        "rtv_nuke_1": "the nuke (boss survived)",
+        "rtv_surflaser_hurt": "a surf laser",
+        "rtv_endnuke": "the nuke"
+      }
+    },
+    {
+      "id": "l4_surf",
+      "group": "Level 4",
+      "name": "Surf lasers",
+      "description": "After the Light: rtv_compare_1 sends humans to rtv_des_4 and starts rtv_surflaser_timer (every 0.8–1 s one of five heights, 999999). Ride the trigger_push (sv_airaccelerate 1000) to rtv_last; rtv_endnuke 25 s after the push.",
+      "spawn": {
+        "at": "[PR#]rtv_des_4",
+        "yaw": 90
+      },
+      "start": [
+        {
+          "target": "[PR#]st4_trigger",
+          "input": "Trigger"
+        },
+        {
+          "target": "[PR#]rtv_compare_1",
+          "input": "SetValue",
+          "param": "1"
+        },
+        {
+          "target": "[PR#]rtv_compare_1",
+          "input": "Compare",
+          "delay": 0.1
+        }
+      ],
+      "player": {
+        "health": 222
+      },
+      "win": {
+        "target": "[PR#]rtv_endnuke",
+        "input": "Enable"
+      },
+      "hazards": {
+        "rtv_laser_hurt": "a laser pillar",
+        "rtv_th_h": "a thruster pad",
+        "rtv_ice_hurt": "the ice bar",
+        "rtv_field_1": "a danger field",
+        "rtv_field_2": "a danger field",
+        "rtv_field_3": "a danger field",
+        "rtv_field_4": "a danger field",
+        "SETH_WALKBOMB_EXPLO": "a walking bomb",
+        "sbomb_ex_1": "a bomb",
+        "sbomb_ex_2": "a bomb",
+        "sbomb_ex_3": "a bomb",
+        "rtv_first_door_hurt": "the closing door",
+        "door_ex_1": "the door blast",
+        "door_ex_2": "the door blast",
+        "door_ex_3": "the door blast",
+        "rtv_linelaser_hurt": "a light laser",
+        "rtv_slow_hurt": "a light pillar",
+        "rtv_slow_hurt_2": "a light pillar",
+        "rtv_nuke_1": "the nuke (boss survived)",
+        "rtv_surflaser_hurt": "a surf laser",
+        "rtv_endnuke": "the nuke"
+      }
+    }
+  ]
+}

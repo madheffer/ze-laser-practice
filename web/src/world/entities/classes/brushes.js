@@ -21,8 +21,10 @@ const breakable = register('func_breakable', {
     const s = e.state;
     switch (inp) {
       case 'break': e.engine.breakEntity(e, act); return true;
-      case 'sethealth': s.health = num(p); e.engine.healthChanged(e, act); return true;
-      case 'addhealth': s.health += num(p); e.engine.healthChanged(e, act); return true;
+      // OnHealthChanged only on a real change (Source CBreakable::UpdateHealth): ze_dreamin's Crystal answers its own
+      // OnHealthChanged with SetHealth(999999), which looped forever when an unchanged value fired it again
+      case 'sethealth': { const v = num(p); if (v !== s.health) { s.health = v; e.engine.healthChanged(e, act); } return true; }
+      case 'addhealth': { const v = num(p); if (v) { s.health += v; e.engine.healthChanged(e, act); } return true; }
       case 'removehealth': e.engine.damage(e, num(p), act, { unfiltered: true }); return true; // the map's own: no filter
       case 'enablemotion': s.frozen = false; s.awake = true; return true;
       case 'disablemotion': s.frozen = true; return true;

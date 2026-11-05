@@ -70,6 +70,12 @@ public static class Program
             // lasers-bake --overview <workshop.vpk> <web/public/maps/<name>>: only the map's radar (OverviewBake.cs)
             return OverviewBake.Run(Path.GetFullPath(args[1]), Path.GetFullPath(args[2]));
         }
+        if (args.Length >= 3 && args[0] == "--alpha")
+        {
+            // lasers-bake --alpha <workshop.vpk> <web/public/maps/<name>> [--cs2 <game/csgo>]: put back cut-out alpha (AlphaBake.cs)
+            var ai = Array.IndexOf(args, "--cs2");
+            return AlphaBake.Run(Path.GetFullPath(args[1]), Path.GetFullPath(args[2]), ai > 0 && ai + 1 < args.Length ? args[ai + 1] : FindCs2());
+        }
         if (args.Length >= 3 && args[0] == "--lighting")
         {
             // lasers-bake --lighting <workshop.vpk> <web/public/maps/<name>>: the map's baked CS2 lighting (LightingBake.cs)
@@ -282,6 +288,8 @@ sealed class Baker(string input, string outRoot, string? cs2, bool textures)
             after += new FileInfo(png).Length;
         }
         Log($"textures: {resized} resized to <= {MaxTexture}px, {before / 1048576} MB -> {after / 1048576} MB");
+        // the cut-out alpha VRF's exporter drops (alpha-tested leaves, fences): AlphaBake.cs
+        AlphaBake.Write(loader, outDir, Log);
 
         // 5. sounds: soundevents.json (every event the map's .vsndevts_c files define) + the sounds they play.
         var soundEvents = SoundBake.Map(loader, [map, outer], outDir);

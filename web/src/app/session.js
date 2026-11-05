@@ -116,6 +116,11 @@ export function startScenario(i, mode = 'normal') {
       },
     },
   });
+  // the map's movement cvars, as it loads and live after (ze_dreamin: sv_airaccelerate 9.6, 12 later, 1000 for its
+  // surf push; westersand: sv_friction 4, sv_accelerate 5); world/movement.js falls back to CS2's for the rest
+  player.cvars = {};
+  for (const [n, v] of Object.entries(run.cvars || {})) setMoveCvar(player, n, v);
+  S.engine.on('cvar', (n, v) => setMoveCvar(player, n, v));
   // a round runs on the wall clock from here (loop.js simulate), so every client's map stays in step
   run.wall0 = performance.now();
   G.vm.reset(scenario?.weapon || 'knife');
@@ -213,4 +218,12 @@ export function finish(result) {
     stats, buttons: [retry, menu],
   });
   G.menu.update();
+}
+
+// sv_* movement cvar -> the player's override (world/movement.js); a non-number is ignored
+const MOVE_CVARS = { sv_accelerate: 'accelerate', sv_airaccelerate: 'airAccelerate', sv_friction: 'friction', sv_gravity: 'gravity', sv_stopspeed: 'stopSpeed' };
+function setMoveCvar(player, name, value) {
+  const key = MOVE_CVARS[name];
+  const v = parseFloat(value);
+  if (key && Number.isFinite(v)) player.cvars[key] = v;
 }

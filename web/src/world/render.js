@@ -1,11 +1,12 @@
 // The 3D view: the static world, entity models riding their entities, and the lasers.
 import * as THREE from 'three';
 import { ConvexGeometry } from 'three/addons/geometries/ConvexGeometry.js';
-import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { MapLighting } from './lighting.js';
+import { PostProcess, CS2_POST_GLSL } from './tonemap.js';
 import { GLTF_TO_SOURCE } from './assets.js';
 import { DEG, parseVec, angleForward } from './entities/index.js';
 import { assetKey } from '../lib/paths.js';
-import { setFxCamera } from '../fx/effects.js';
+import { setFxCamera, fxShared } from '../fx/effects.js';
 
 // an entity's world transform as a particle control point: position and its forward / left / up axes
 function cpFrom(ent) {
@@ -30,12 +31,10 @@ export class Renderer {
     this.camera = new THREE.PerspectiveCamera(73.74, 1, 4, 60000);
     this.camera.up.set(0, 0, 1);
 
-    const pmrem = new THREE.PMREMGenerator(this.renderer);
-    this.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-    this.scene.add(new THREE.HemisphereLight(0xdde8ff, 0x3a3328, 1.1));
-    const sun = new THREE.DirectionalLight(0xfff1d6, 1.6);
-    sun.position.set(0.4, 0.3, 1);
-    this.scene.add(sun);
+    // the map's own CS2 lighting (lightmaps, sun, sky ambient; the old fixed lights when a map has no bake) and its
+    // post-processing (tone curve, exposure, colour lookup), applied by the HDR blit in render()
+    this.lighting = new MapLighting(this.scene, this.renderer);
+    this.post = new PostProcess();
 
     this.worldRoot = new THREE.Group();
     this.worldRoot.matrixAutoUpdate = false;
@@ -82,6 +81,7 @@ export class Renderer {
         for (const m of mats) if (m && m.transparent === false && m.alphaTest === 0 && m.map && /grate|fence|leaf|foliage|chain/i.test(m.name)) m.alphaTest = 0.5;
       }
     });
+    this.lighting.applyToWorld(scene); // the map's CS2 lightmap shading (world/lighting.js; nothing without a bake)
     this.worldRoot.add(scene);
   }
 
@@ -320,6 +320,9 @@ export class Renderer {
     const dt = this.fxClock == null ? 0 : Math.max(0, Math.min(0.1, time - this.fxClock));
     this.fxClock = time;
     setFxCamera(this.camera);
+    // particles are lit by the map's own sky ambient (world/lighting.js, from its light_environment / probes), white without a bake
+    const amb = this.lighting?.ambient;
+    if (amb) fxShared.uAmbient.value.set(amb.r, amb.g, amb.b); else fxShared.uAmbient.value.set(1, 1, 1);
     const camPos = [this.camera.position.x, this.camera.position.y, this.camera.position.z];
     for (const [e, g] of this.visuals) {
       const inst = g.userData.fx;
@@ -421,11 +424,13 @@ export class Renderer {
     if (!this.hdr) {
       this.hdr = new THREE.WebGLRenderTarget(size.x, size.y, { type: THREE.HalfFloatType, samples: 4 });
       const mat = new THREE.ShaderMaterial({
-        uniforms: { tHdr: { value: this.hdr.texture } },
+        uniforms: { tHdr: { value: this.hdr.texture }, ...this.post.uniforms },
         vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
         fragmentShader: `// three prepends its tone-mapping functions (toneMapped material, drawn to the screen)
+// CS2's curve, then sRGB, then the map's colour lookup on the sRGB values (world/tonemap.js)
 uniform sampler2D tHdr; varying vec2 vUv;
-void main() { vec3 c = ACESFilmicToneMapping(max(texture2D(tHdr, vUv).rgb, vec3(0.0))); gl_FragColor = sRGBTransferOETF(vec4(clamp(c, 0.0, 1.0), 1.0)); }`,
+${CS2_POST_GLSL}
+void main() { vec3 c = cs2Tonemap(texture2D(tHdr, vUv).rgb); vec4 s = sRGBTransferOETF(vec4(clamp(c, 0.0, 1.0), 1.0)); s.rgb = cs2ColorCorrect(s.rgb); gl_FragColor = s; }`,
         depthTest: false, depthWrite: false, // (toneMapped stays true: three then feeds toneMappingExposure)
       });
       this.blitScene = new THREE.Scene();

@@ -184,7 +184,8 @@ function applyHits(list) {
     if (!Array.isArray(h) || !Number.isInteger(h[0]) || !num(h[1], 0, 1000) || !Number.isInteger(h[2]) || h[2] < 1) continue;
     const e = targets.get(h[0]);
     if (!e) continue;
-    for (let k = 0; k < Math.min(h[2], MAX_HITS) && e.alive; k++) applyBossDamage(e, h[1]);
+    // h[3] = 1: the simulated team's bullets (their activator is the team, not you)
+    for (let k = 0; k < Math.min(h[2], MAX_HITS) && e.alive; k++) applyBossDamage(e, h[1], h[3] === 1);
   }
 }
 

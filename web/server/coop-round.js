@@ -124,7 +124,7 @@ export class Round {
         const n = Math.min(h[2], perSec - b.n);
         if (n <= 0) break;
         b.n += n;
-        this.addDamage(h[0], h[1], n);
+        this.addDamage(h[0], h[1], n, true);
       }
       return;
     }
@@ -142,7 +142,8 @@ export class Round {
 
   onReload(c) { const p = this.players.get(c.id); if (p?.alive && !this.ended) p.check.reload(); }
 
-  addDamage(id, dmg, n) { const k = `${id}:${dmg}`; this.dmg.set(k, (this.dmg.get(k) || 0) + n); }
+  // team = the simulated team's fire: its bullets carry the team (engine.teamEnt) as activator, not a player
+  addDamage(id, dmg, n, team = false) { const k = `${id}:${dmg}:${team ? 1 : 0}`; this.dmg.set(k, (this.dmg.get(k) || 0) + n); }
 
   // ---- every 100 ms
   tick(now) {
@@ -150,7 +151,7 @@ export class Round {
     const rt = this.roundTick;
     if (now - this.bossAt >= BOSS_MS && this.dmg.size) {
       this.bossAt = now;
-      const h = [...this.dmg].map(([k, n]) => { const [id, dmg] = k.split(':').map(Number); return [id, dmg, n]; });
+      const h = [...this.dmg].map(([k, n]) => { const [id, dmg, team] = k.split(':').map(Number); return [id, dmg, n, team]; });
       this.dmg.clear();
       this.broadcast({ t: 'bd', r: this.r, h });
       for (const p of this.players.values()) p.check.queueBossDamage(rt + BD_DELAY_TICKS, h);

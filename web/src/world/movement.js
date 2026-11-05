@@ -59,6 +59,9 @@ export class Player {
     this.onLand = null; // (fallSpeed) => void, for fall damage
     this.onJump = null;
     this.maxSpeed = CS.maxSpeed; // the held weapon's: knife 250, AK-47 215
+    // the map's movement cvars (sv_accelerate, sv_airaccelerate, sv_friction, sv_gravity, sv_stopspeed), set by the
+    // session from what the map runs; anything unset is CS2's default (CS)
+    this.cvars = {};
     this.stamina = 0;
   }
 
@@ -87,7 +90,7 @@ export class Player {
   // input: { forward, side (-1..1), jump, duck, walk }, settings: { autoBhop }
   tick(input, settings) {
     const dt = CS.tick * this.speedScale;
-    const gravity = CS.gravity * this.gravityScale;
+    const gravity = (this.cvars.gravity ?? CS.gravity) * this.gravityScale;
     const wasOnGround = this.onGround;
     const fallSpeed = -this.velocity[2];
     this.handleDuck(input, dt);
@@ -134,7 +137,7 @@ export class Player {
     if (this.onGround) {
       this.velocity[2] = 0;
       this.friction(dt);
-      this.accelerate(wish, wishSpeed, CS.accelerate, dt);
+      this.accelerate(wish, wishSpeed, this.cvars.accelerate ?? CS.accelerate, dt);
       const sp = Math.hypot(this.velocity[0], this.velocity[1]);
       if (sp > this.maxSpeed && wishSpeed > 0) {
         // Source clamps ground speed to the current max
@@ -208,8 +211,8 @@ export class Player {
     const v = this.velocity;
     const speed = Math.hypot(v[0], v[1], v[2]);
     if (speed < 0.1) { v[0] = v[1] = 0; return; }
-    const control = Math.max(speed, CS.stopSpeed);
-    const drop = control * CS.friction * dt;
+    const control = Math.max(speed, this.cvars.stopSpeed ?? CS.stopSpeed);
+    const drop = control * (this.cvars.friction ?? CS.friction) * dt;
     const ns = Math.max(0, speed - drop) / speed;
     v[0] *= ns; v[1] *= ns; v[2] *= ns;
   }
@@ -227,7 +230,7 @@ export class Player {
     const cur = dot(this.velocity, wish);
     const add = capped - cur;
     if (add <= 0) return;
-    const a = Math.min(CS.airAccelerate * wishSpeed * dt, add);
+    const a = Math.min((this.cvars.airAccelerate ?? CS.airAccelerate) * wishSpeed * dt, add);
     for (let i = 0; i < 3; i++) this.velocity[i] += a * wish[i];
   }
 

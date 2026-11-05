@@ -15,12 +15,17 @@ using SteamDatabase.ValvePak;
 using ValveResourceFormat;
 using ValveResourceFormat.ResourceTypes;
 using ValveResourceFormat.Serialization.KeyValues;
+using ValveKeyValue;
 
 namespace Lasers.Bake;
 
 static class LightingBake
 {
-    static readonly string[] Lightmaps = ["irradiance", "directional_irradiance", "direct_light_shadows"];
+    // (output name, the map's lightmaps/<file>); the light probes are ProbeBake.cs (too big to ship as stored)
+    static readonly (string Out, string File)[] Lightmaps = [
+        ("irradiance", "irradiance"), ("directional_irradiance", "directional_irradiance"), ("direct_light_shadows", "direct_light_shadows"),
+    ];
+    const int MaxDepth = 4096;
     const int MaxSide = 8192;
     const long MaxBytes = 256L * 1024 * 1024;
 
@@ -89,13 +94,13 @@ static class LightingBake
 
         var textures = new JsonObject();
         long total = 0;
-        foreach (var name in Lightmaps)
+        foreach (var (name, file) in Lightmaps)
         {
-            using var res = Load(paks, $"maps/{mapName}/lightmaps/{name}.vtex_c");
+            using var res = Load(paks, $"maps/{mapName}/lightmaps/{file}.vtex_c");
             if (res?.DataBlock is not Texture tex) { log($"  lighting: no {name}"); continue; }
             var fmt = GpuFormat(tex.Format);
             if (fmt == null) { log($"  lighting: {name} is {tex.Format}, not a format the browser can upload"); continue; }
-            if (tex.Width > MaxSide || tex.Height > MaxSide || tex.Width < 4 || tex.Height < 4) { log($"  lighting: {name} {tex.Width}x{tex.Height} skipped"); continue; }
+            if (tex.Width > MaxSide || tex.Height > MaxSide || tex.Width < 4 || tex.Height < 4 || tex.Depth < 1 || tex.Depth > MaxDepth) { log($"  lighting: {name} {tex.Width}x{tex.Height} skipped"); continue; }
             var size = tex.CalculateBufferSizeForMipLevel(0);
             if (size <= 0 || (total += size) > MaxBytes) { log($"  lighting: {name} too large"); return false; }
             var data = new byte[size];
@@ -104,15 +109,78 @@ static class LightingBake
             File.WriteAllBytes(SafePath.OutFile(outDir, $"{name}.bin"), data);
             textures[name] = new JsonObject
             {
-                ["file"] = $"{name}.bin", ["format"] = fmt, ["width"] = tex.Width, ["height"] = tex.Height, ["bytes"] = size,
+                ["file"] = $"{name}.bin", ["format"] = fmt, ["width"] = tex.Width, ["height"] = tex.Height, ["depth"] = tex.Depth, ["bytes"] = size,
                 ["hdr"] = tex.IsHighDynamicRange,
             };
-            log($"  lighting: {name} {tex.Format} {tex.Width}x{tex.Height} ({size / 1024 / 1024.0:0.0} MB)");
+            log($"  lighting: {name} {tex.Format} {tex.Width}x{tex.Height}x{tex.Depth} ({size / 1024 / 1024.0:0.0} MB)");
         }
         if (!textures.ContainsKey("irradiance")) return false;
         json["textures"] = textures;
+        json["post"] = WritePost(paks, outDir, log);
+        if (ProbeBake.Write(p => Load(paks, p), mapName, mapDir, outDir, log) is { } probes) json["probes"] = probes;
         Directory.CreateDirectory(outDir);
         File.WriteAllText(SafePath.OutFile(outDir, "lighting.json"), json.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
         return true;
+    }
+
+    // Every .vpost in the map (a post_processing_volume names one): its tonemap curve, bloom and colour-correction
+    // lookup. -> post/<hash>.json (+ <hash>.lut: dim^3 RGBA8). The index maps the vpost's path (lower case, no _c)
+    // to its hash; the file name never comes from the VPK.
+    const int MaxPosts = 64, MaxLutDim = 64;
+    static JsonObject WritePost(IEnumerable<Package> paks, string outDir, Action<string> log)
+    {
+        var index = new JsonObject();
+        foreach (var pak in paks)
+        {
+            if (!pak.Entries.TryGetValue("vpost_c", out var posts)) continue;
+            foreach (var e in posts)
+            {
+                if (index.Count >= MaxPosts) break;
+                var path = e.GetFullPath().ToLowerInvariant().Replace('\\', '/');
+                var key = path.EndsWith("_c") ? path[..^2] : path;
+                if (index.ContainsKey(key)) continue;
+                try
+                {
+                    pak.ReadEntry(e, out var bytes);
+                    using var res = new Resource { FileName = path };
+                    res.Read(new MemoryStream(bytes));
+                    if (res.DataBlock is not KeyValuesOrNTRO kv) continue;
+                    var d = kv.Data;
+                    var hash = Fnv(key);
+                    var o = new JsonObject { ["path"] = key };
+                    if (d.GetBooleanProperty("m_bHasTonemapParams") && d.GetSubCollection("m_toneMapParams") is { } t)
+                    {
+                        var tm = new JsonObject();
+                        foreach (var k in new[] { "m_flExposureBias", "m_flShoulderStrength", "m_flLinearStrength", "m_flLinearAngle", "m_flToeStrength", "m_flToeNum", "m_flToeDenom", "m_flWhitePoint" })
+                            tm[k] = t.GetFloatProperty(k);
+                        o["tonemap"] = tm;
+                    }
+                    if (d.GetBooleanProperty("m_bHasBloomParams") && d.GetSubCollection("m_bloomParams") is { } b)
+                        o["bloom"] = new JsonObject { ["strength"] = b.GetFloatProperty("m_flBloomStrength"), ["threshold"] = b.GetFloatProperty("m_flBloomThreshold"), ["thresholdWidth"] = b.GetFloatProperty("m_flBloomThresholdWidth") };
+                    var dim = d.ContainsKey("m_nColorCorrectionVolumeDim") ? d.GetInt32Property("m_nColorCorrectionVolumeDim") : 0;
+                    byte[]? lut = null;
+                    foreach (var (k, v) in d.Children) if (k == "m_colorCorrectionVolumeData" && v.ValueType == KVValueType.BinaryBlob) lut = v.AsBlob().ToArray();
+                    if (dim >= 2 && dim <= MaxLutDim && lut != null && lut.Length == dim * dim * dim * 4)
+                    {
+                        Directory.CreateDirectory(Path.Combine(outDir, "post"));
+                        File.WriteAllBytes(SafePath.OutFile(outDir, $"post/{hash}.lut"), lut);
+                        o["lutDim"] = dim;
+                    }
+                    Directory.CreateDirectory(Path.Combine(outDir, "post"));
+                    File.WriteAllText(SafePath.OutFile(outDir, $"post/{hash}.json"), o.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
+                    index[key] = hash;
+                    log($"  lighting: post {key}{(o.ContainsKey("tonemap") ? " tonemap" : "")}{(o.ContainsKey("lutDim") ? $" lut {dim}" : "")}");
+                }
+                catch (Exception ex) { log($"  lighting: post {SafePath.Describe(key)}: {ex.Message}"); }
+            }
+        }
+        return index;
+    }
+
+    static string Fnv(string s)
+    {
+        uint h = 2166136261;
+        foreach (var c in s) { h ^= c; h *= 16777619; }
+        return h.ToString("x8");
     }
 }
