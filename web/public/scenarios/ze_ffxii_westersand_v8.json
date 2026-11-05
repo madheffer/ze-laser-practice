@@ -10,7 +10,7 @@
       "featured": true,
       "name": "Chaos – laser boss",
       "summary": "Jump or crouch Chaos's deck lasers",
-      "description": "The airship finale's Chaos fight. A random laser (low, mid or high) fires down the deck every 1.2 s until Chaos dies: jump the low and mid ones, crouch the high one. 380 hits per segment at 20 humans (50 + 16.5 per human, from the map's HP trigger), 6 segments; the 25 s Holy hit takes off 9 × 125.",
+      "description": "The airship finale's Chaos fight. A random laser (low, mid or high) fires down the deck every 1.2-2.5 s (Chaos_Timer, random) until Chaos dies: jump the low and mid ones, crouch the high one. 380 hits per segment at 20 humans (50 + 16.5 per human, from the map's HP trigger), 6 segments; the 25 s Holy hit takes off 9 × 125.",
       "view": {
         "min": [
           3000,
@@ -83,7 +83,10 @@
           "target": "[PR#]Chaos_Armor",
           "name": "Chaos",
           "counter": "[PR#]Boss_Health",
-          "counterMode": "hits"
+          "counterMode": "hits",
+          "iterator": "[PR#]Boss_Overlay_Counter",
+          "reverseIterator": true,
+          "backup": "[PR#]Boss_Health_Init"
         }
       ],
       "win": {
@@ -159,7 +162,7 @@
       "parent": "chaos",
       "name": "Laser stream only",
       "summary": "Just the lasers: jump low, crouch high",
-      "description": "Chaos's laser timer with no HP to shoot: a random low / mid / high laser every 1.2 s for 40 s.",
+      "description": "Chaos's laser timer with no HP to shoot: a random low / mid / high laser every 1.2-2.5 s (Chaos_Timer, random; it only stops when Chaos dies): survive 40 s.",
       "view": {
         "min": [
           3000,
@@ -315,7 +318,10 @@
           "target": "[PR#]Boss_Break",
           "name": "Dragon",
           "counter": "[PR#]Boss_Health",
-          "counterMode": "hits"
+          "counterMode": "hits",
+          "iterator": "[PR#]Boss_Overlay_Counter",
+          "reverseIterator": true,
+          "backup": "[PR#]Boss_Health_Init"
         }
       ],
       "win": {
@@ -634,7 +640,10 @@
           "target": "[PR#]Ehe_Dragon_Break",
           "name": "Dragon",
           "counter": "[PR#]Boss_Health",
-          "counterMode": "hits"
+          "counterMode": "hits",
+          "iterator": "[PR#]Boss_Overlay_Counter",
+          "reverseIterator": true,
+          "backup": "[PR#]Boss_Health_Init"
         }
       ],
       "win": {
@@ -957,7 +966,10 @@
           "target": "[PR#]Belias_Break",
           "name": "Belias",
           "counter": "[PR#]Boss_Health",
-          "counterMode": "hits"
+          "counterMode": "hits",
+          "iterator": "[PR#]Boss_Overlay_Counter",
+          "reverseIterator": true,
+          "backup": "[PR#]Boss_Health_Init"
         }
       ],
       "win": {
@@ -1723,7 +1735,10 @@
           "target": "[PR#]Judge_Armor",
           "name": "Gabranth",
           "counter": "[PR#]Boss_Health",
-          "counterMode": "hits"
+          "counterMode": "hits",
+          "iterator": "[PR#]Boss_Overlay_Counter",
+          "reverseIterator": true,
+          "backup": "[PR#]Boss_Health_Init"
         }
       ],
       "win": {
@@ -1966,7 +1981,10 @@
           "target": "[PR#]Guard_Boss_Break",
           "name": "Gabranth",
           "counter": "[PR#]Boss_Health",
-          "counterMode": "hits"
+          "counterMode": "hits",
+          "iterator": "[PR#]Boss_Overlay_Counter",
+          "reverseIterator": true,
+          "backup": "[PR#]Boss_Health_Init"
         }
       ],
       "win": {
@@ -2122,7 +2140,10 @@
           "target": "[PR#]Chaos_Armor",
           "name": "Chaos",
           "counter": "[PR#]Boss_Health",
-          "counterMode": "hits"
+          "counterMode": "hits",
+          "iterator": "[PR#]Boss_Overlay_Counter",
+          "reverseIterator": true,
+          "backup": "[PR#]Boss_Health_Init"
         }
       ],
       "win": {
@@ -2291,7 +2312,10 @@
           "target": "[PR#]Chaos_Armor",
           "name": "Chaos",
           "counter": "[PR#]Boss_Health",
-          "counterMode": "hits"
+          "counterMode": "hits",
+          "iterator": "[PR#]Boss_Overlay_Counter",
+          "reverseIterator": true,
+          "backup": "[PR#]Boss_Health_Init"
         }
       ],
       "win": {

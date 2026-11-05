@@ -192,6 +192,17 @@ export function trackSegments() {
   }
 }
 
+// A BossHUD iterator's segments left, counting this one (gflze/CS2-ZE-Configs bosshud/template.jsonc "iterator",
+// "reverseiterator"): a reversed one counts up to its max (westersand's Boss_Overlay_Counter: set to 1, +1 per
+// emptied segment, OnHitMax at 7 ends the boss), a plain one down to its min. null: no iterator entity.
+// UNSETTLED: the BossHUD plugin source is not public; this reading matches the HP the map's logic has left.
+function segmentsLeft(b) {
+  const it = S.engine.findOne(b.iterator);
+  const s = it?.state;
+  if (s?.v == null) return null;
+  return b.reverseIterator ? (s.max ?? s.v) - s.v : s.v - (s.min ?? 0);
+}
+
 // Boss HP the way CS2Fixes BossHUD computes it. A segmented boss (counter of segments + a breakable that
 // refills each segment, ze_mist's "BreakableHPBar") shows (segments left - 1) x segment HP + this segment;
 // a hit-counted boss shows the counter; a plain breakable shows its health.
@@ -202,7 +213,16 @@ export function bossStatus(b) {
   if (!e?.alive && !(c?.alive)) return null;
   let hp, peak;
   const off = b.offset || 0; // BossHUD's "offset": health below it isn't real boss HP (mist dragon: -10000)
-  if (b.counterMode === 'hits' && c?.state.v != null) hp = c.state.v;
+  const segs = b.iterator && c?.state.v != null ? segmentsLeft(b) : null;
+  if (segs != null) {
+    // BossHUD counter + iterator (+ backup): the counter is this segment, the iterator counts segments and the backup
+    // holds what the map refills the counter to (westersand's Boss_Health / Boss_Overlay_Counter / Boss_Health_Init:
+    // 6 refills of 50 + 15 per human). Shown as the HP actually left: (segments left - 1) x refill + this segment.
+    const bk = b.backup ? engine.findOne(b.backup) : null;
+    const refill = bk?.state.v ?? Math.max(c.state.v, run.bossPeak.get(b.counter) || 0);
+    if (!bk) run.bossPeak.set(b.counter, refill);
+    hp = segs <= 0 ? 0 : (segs - 1) * refill + Math.max(0, c.state.v + off); // 0 left: the iterator ended the boss
+  } else if (b.counterMode === 'hits' && c?.state.v != null) hp = c.state.v;
   else if (c?.state.v != null && e?.state.health != null) {
     // BreakableHPBar: (segments left - 1) x segment HP + this segment's (health + offset). The segment's size
     // is the most it has held (the map tops it up to the same amount every segment).

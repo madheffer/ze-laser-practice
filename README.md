@@ -239,7 +239,7 @@ standing still. Fields we added (cybo's site ignores them):
 | `fastForwardBosses` | `[{target, after}]` bosses the simulated team shoots down during that replay (from `after` s in) |
 | `spawn.at` | spawn on a named entity (an `info_teleport_destination`) instead of a fixed origin |
 | `player` | `{health, gravity}` at spawn. ze_mist_p's boss door sets 180 HP; the escape trigger sets gravity 0.1 |
-| `bosses` | `[{target, name, counter, counterMode}]` breakables/physboxes the team shoots, with a HUD bar |
+| `bosses` | `[{target, name, counter, counterMode, iterator, reverseIterator, backup}]` breakables/physboxes the team shoots, with a HUD bar; `iterator` / `backup` / `reverseIterator` are GFL BossHUD's segment counter, refill counter and direction (westersand: the HUD shows all segments' HP, not one refilling segment) |
 | `shooters` | how many of the simulated humans fire at the bosses (a trainer choice, not map data): ze_deadcore's cubes have a flat 1500–2400 HP that 20 humans would erase in a blink, so their drills use 2 |
 | `setup` | inputs fired the moment you are placed (after any fast-forward): puts the map where its own sequence would be for a stage that starts past the relays that do it. ze_deadcore's drills move `des2` (its catch-all fall destination) to where the map keeps it for that part, so a fall puts you back where a human would land |
 | `music` | the map's own inputs that start the track a stage begins in the middle of (a level template, a boss track), fired with `start`, once (endless re-fires start but not this). westersand's level music lives in its level templates (`Easy_Temp`, `Tomb_Temp_Init`, `Epic_Temp`) |
