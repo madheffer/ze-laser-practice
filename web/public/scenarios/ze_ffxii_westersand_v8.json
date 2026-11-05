@@ -62,6 +62,11 @@
           "input": "ForceSpawn"
         },
         {
+          "target": "[PR#]Chaos_Model",
+          "input": "Enable",
+          "delay": 0.1
+        },
+        {
           "target": "[PR#]Chaos_Hp_To_Boss",
           "input": "Enable",
           "delay": 0.1
@@ -192,6 +197,11 @@
         {
           "target": "[PR#]Chaos_Temp",
           "input": "ForceSpawn"
+        },
+        {
+          "target": "[PR#]Chaos_Model",
+          "input": "Enable",
+          "delay": 0.1
         },
         {
           "target": "[PR#]Chaos_Timer",
@@ -730,6 +740,11 @@
         },
         {
           "target": "[PR#]Ehe_Guard",
+          "input": "Enable",
+          "delay": 0.4
+        },
+        {
+          "target": "[PR#]Ehe_Guard",
           "input": "FireUser1",
           "delay": 0.5
         }
@@ -828,6 +843,11 @@
         {
           "target": "[PR#]Ehe_Dragon_Temp",
           "input": "ForceSpawn"
+        },
+        {
+          "target": "[PR#]Ehe_Guard",
+          "input": "Enable",
+          "delay": 0.4
         },
         {
           "target": "[PR#]Ehe_Guard",
@@ -2081,6 +2101,11 @@
           "delay": 16
         },
         {
+          "target": "[PR#]Chaos_Model",
+          "input": "Enable",
+          "delay": 16.1
+        },
+        {
           "target": "[PR#]Chaos_Hp_To_Boss",
           "input": "Enable",
           "delay": 16.1
@@ -2243,6 +2268,11 @@
           "target": "[PR#]Chaos_Temp",
           "input": "ForceSpawn",
           "delay": 16
+        },
+        {
+          "target": "[PR#]Chaos_Model",
+          "input": "Enable",
+          "delay": 16.1
         },
         {
           "target": "[PR#]Chaos_Hp_To_Boss",
