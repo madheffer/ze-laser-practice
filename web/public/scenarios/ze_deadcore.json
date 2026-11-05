@@ -114,9 +114,9 @@
     {
       "id": "b_boss",
       "group": "Main stages",
-      "name": "Stage B boss: enemy4 cubes",
+      "name": "Stage B boss: cube arena",
       "summary": "Shoot down 20 chasing cubes, dodge floor attacks",
-      "description": "b_boss_relay1: three enemy4 cubes spawn at +5/6/7 s on the 2x6 grid (enemy4_maker1-12); each kill (1500 HP, no per-human scaling) spawns another and takes 1 off b_boss_counter1 (20). Cubes chase scanned humans and every 7 s stop and fire one of three floor patterns (2 s warning, 4 s of 40-damage hurt). The counter is forced to 0 at +112 s.",
+      "description": "b_boss_relay1 (once b_p5, the bridge, has carried you over; it is removed at +4 s): three enemy4 cubes spawn at +5/6/7 s on the 2x6 grid (enemy4_maker1-12); each kill (1500 HP, no per-human scaling) spawns another and takes 1 off b_boss_counter1 (20). Cubes chase scanned humans and every 7 s stop and fire one of three floor patterns (2 s warning, 4 s of 40-damage hurt). The counter is forced to 0 at +112 s.",
       "spawn": {
         "origin": [
           -9707,

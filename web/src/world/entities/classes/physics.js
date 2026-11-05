@@ -1,5 +1,6 @@
 // A little rigid-body motion, enough for physboxes the map pushes around: phys_thruster on a func_physbox (ze_deadcore's
-// mini-boss cubes chase you this way), gravity and floor friction, sliding along the static world.
+// mini-boss cubes chase you this way), gravity and floor friction, sliding along the static world and the map's solid
+// brushes and movers (deadcore's Stage B arena: 4 of its 12 cube spawns stand on the escape lift, b_escape_move_1).
 //
 // ze_deadcore's cube: four trigger_multiple bands 900 u out (left/right/up/down, parented to the physbox, filtered to
 // the player who woke it) Activate the thruster on that side, Deactivate 1 s later; trigger_multiple re-fires every
@@ -13,6 +14,7 @@
 import * as THREE from 'three';
 import { register } from '../registry.js';
 import { num, parseVec, angleForward } from '../math.js';
+import { traceSolids, boxTouchesHull } from '../../collision.js';
 
 const GRAVITY = 800;
 const FLOOR_FRICTION = 0.8;
@@ -65,6 +67,15 @@ function thrust(box) {
   return acc;
 }
 
+// The map's solid brushes and movers this tick (a lift, a door, another cube), built once per tick for every physbox.
+function solidsNow(engine) {
+  const c = engine._physSolids;
+  if (c && c.t === engine.time) return c.list;
+  const list = engine.solids();
+  engine._physSolids = { t: engine.time, list };
+  return list;
+}
+
 // Called from func_physbox's think (brushes.js). Needs engine.traceBox (the session wires the collision world in);
 // headless (tools/sim.mjs) there is none and physboxes stay put.
 export function physboxThink(e, dt) {
@@ -88,11 +99,15 @@ export function physboxThink(e, dt) {
   const half = [(b.max[0] - b.min[0]) / 2, (b.max[1] - b.min[1]) / 2, (b.max[2] - b.min[2]) / 2];
   const off = [(b.max[0] + b.min[0]) / 2, (b.max[1] + b.min[1]) / 2, (b.max[2] + b.min[2]) / 2];
   const c = [e.pos.x + off[0], e.pos.y + off[1], e.pos.z + off[2]];
+  // itself, what rides on it, and any solid it already overlaps (packed platforms, a mover that came up into it):
+  // VPhysics pushes those apart, a stuck trace would freeze it in place
+  const inner = [half[0] - 1, half[1] - 1, half[2] - 1];
+  const skip = (x, d) => e.wouldCycle(x) || d.hulls.some((h) => boxTouchesHull(c, inner, h));
   let left = dt;
   s.onGround = false;
   for (let i = 0; i < 3 && left > 0; i++) {
     const end = [c[0] + vel.x * left, c[1] + vel.y * left, c[2] + vel.z * left];
-    const tr = e.engine.traceBox(c, end, half);
+    const tr = traceSolids(e.engine.traceBox(c, end, half), solidsNow(e.engine), c, end, half, skip);
     if (tr.startSolid) break; // spawned overlapping the world: leave it where the map put it
     c[0] = tr.endPos[0]; c[1] = tr.endPos[1]; c[2] = tr.endPos[2];
     if (tr.fraction >= 1) break;

@@ -285,6 +285,36 @@ export function clipHull(hull, h, s, e, tr, ref) {
   clipFinish(tr, ref);
 }
 
+// Clip a box sweep against entity solids ([{ hulls, min, max, ref }], EntityEngine.solids()) whose bounds meet the
+// sweep's [lo, hi]; skip(ref, solid) leaves some out.
+function clipSolids(solids, lo, hi, h, s, e, tr, mask = 0, skip = null) {
+  for (const d of solids) {
+    if (d.max[0] < lo[0] || d.min[0] > hi[0] || d.max[1] < lo[1] || d.min[1] > hi[1] || d.max[2] < lo[2] || d.min[2] > hi[2]) continue;
+    if (skip && skip(d.ref, d)) continue;
+    for (const hull of d.hulls) if (!mask || hull.layers == null || (hull.layers & mask)) clipHull(hull, h, s, e, tr, d.ref);
+  }
+}
+
+function traceEnd(tr, s, e) {
+  const f = tr.fraction;
+  tr.endPos[0] = s[0] + (e[0] - s[0]) * f;
+  tr.endPos[1] = s[1] + (e[1] - s[1]) * f;
+  tr.endPos[2] = s[2] + (e[2] - s[2]) * f;
+  return tr;
+}
+
+// Shorten a finished trace (tr, from s to e) by the entity solids it meets on the way: physboxes (classes/physics.js)
+// trace the static world, then the map's movers and brushes, so a cube lands on a lift instead of falling through it.
+export function traceSolids(tr, solids, s, e, h, skip = null) {
+  const lo = [0, 0, 0], hi = [0, 0, 0];
+  for (let a = 0; a < 3; a++) {
+    lo[a] = Math.min(s[a], e[a]) - h[a] - 1;
+    hi[a] = Math.max(s[a], e[a]) + h[a] + 1;
+  }
+  clipSolids(solids, lo, hi, h, s, e, tr, 0, skip);
+  return traceEnd(tr, s, e);
+}
+
 // ---------------------------------------------------------------- world
 
 export class CollisionWorld {
@@ -318,15 +348,8 @@ export class CollisionWorld {
     } else {
       this.bvh.query(lo, hi, L ? (t) => { if (L[t] & mask) clipTriangle(T, t * 9, h, s, e, tr); } : (t) => clipTriangle(T, t * 9, h, s, e, tr));
     }
-    for (const d of worldOnly ? [] : this.dynamic) {
-      if (d.max[0] < lo[0] || d.min[0] > hi[0] || d.max[1] < lo[1] || d.min[1] > hi[1] || d.max[2] < lo[2] || d.min[2] > hi[2]) continue;
-      for (const hull of d.hulls) if (!mask || hull.layers == null || (hull.layers & mask)) clipHull(hull, h, s, e, tr, d.ref);
-    }
-    const f = tr.fraction;
-    tr.endPos[0] = s[0] + (e[0] - s[0]) * f;
-    tr.endPos[1] = s[1] + (e[1] - s[1]) * f;
-    tr.endPos[2] = s[2] + (e[2] - s[2]) * f;
-    return tr;
+    if (!worldOnly) clipSolids(this.dynamic, lo, hi, h, s, e, tr, mask);
+    return traceEnd(tr, s, e);
   }
 
   // Ray (zero-size box) for picking / ground probes.
