@@ -23,7 +23,7 @@ for (const k of ['trigger_multiple', 'trigger_once', 'trigger_hurt', 'trigger_pu
   register(k, { trigger: true, input: triggerBase.input });
 }
 
-const TOUCH_CLASSES = ['trigger_hurt', 'trigger_multiple', 'trigger_once', 'trigger_push', 'trigger_teleport'];
+const TOUCH_CLASSES = ['trigger_hurt', 'trigger_multiple', 'trigger_once', 'trigger_push', 'trigger_teleport', 'trigger_gravity'];
 const EPS = 1e-6;
 
 // ------------------------------------------------------------------ trigger_hurt
@@ -47,14 +47,26 @@ function currentDamage(e) {
   return s.curDamage;
 }
 
-// HurtEntity: one hurt (or heal) to the player. Always counts as a hurt, like the binary's return value.
+// Your damage filter (SetDamageFilter on you): a filter_damage_type lets through damage whose type shares a bit with
+// its damagetype, the other way round when negated (Source FilterDamageType). ze_ffxii_westersand_v8 hands out
+// burn / club / shock immunity this way (Filter_Damage_*_Ignore: 8 / 128 / 256, negated). Other filter classes pass.
+export function playerTakesDamage(engine, damageType) {
+  const name = engine.playerEnt.damageFilter;
+  const f = name ? engine.findOne(name) : null;
+  if (!f || f.cls !== 'filter_damage_type') return true;
+  const hit = (num(damageType) & num(f.kv.damagetype)) !== 0;
+  return String(f.kv.negated) === '1' || String(f.kv.negated).toLowerCase() === 'true' ? !hit : hit;
+}
+
+// HurtEntity: one hurt (or heal) to the player. Always counts as a hurt, like the binary's return value; damage your
+// damage filter turns away does nothing (healing is never filtered).
 function hurtPlayer(engine, e, dmg, events) {
   const s = e.state;
   const first = !s.hurtOnce;
   s.hurtOnce = true;
   s.hurtThisCycle = true;
   if (dmg < 0) events.push({ type: 'heal', ent: e, amount: -dmg });
-  else if (dmg > 0) events.push({ type: 'hurt', ent: e, damage: dmg, first });
+  else if (dmg > 0 && playerTakesDamage(engine, e.kv.damagetype)) events.push({ type: 'hurt', ent: e, damage: dmg, first });
   e.fireOutput('OnHurtPlayer', engine.playerEnt);
   e.fireOutput('OnHurt', engine.playerEnt);
 }
@@ -95,6 +107,8 @@ export function untouch(engine, e, events = pending(engine)) {
     if (e.cls === 'trigger_hurt' && !e.state.hurtThisCycle && passesFilter(engine, e)) {
       hurtPlayer(engine, e, currentDamage(e) * 0.5, events);
     }
+    // CS2Fixes' trigger_gravity (entities.cpp, always on): leaving any one sets your gravity back to 1
+    if (e.cls === 'trigger_gravity') engine.player?.setGravity(1);
     e.fireOutput('OnEndTouch', engine.playerEnt);
   }
 }
@@ -276,6 +290,9 @@ export function updateTriggers(engine, player) {
         if (inside && s.thinkAt == null) s.thinkAt = engine.time;
         if (s.thinkAt != null && engine.time + EPS >= s.thinkAt) hurtThink(engine, e, inside, events);
       }
+      // CS2Fixes' trigger_gravity (entities.cpp TriggerGravityHandler, always on): while you touch it your gravity scale
+      // is its "gravity" key (vanilla CS2 applies a wrong scale, which is why CS2Fixes replaces the touch)
+      if (inside && cls === 'trigger_gravity' && e.kv.gravity != null) engine.player?.setGravity(parseFloat(e.kv.gravity) || 0);
       if (inside && cls === 'trigger_push') {
         const dir = angleForward(parseVec(e.kv.pushdir));
         // pushdir is in the trigger's space unless it is world-aligned; rotate by the entity

@@ -8,7 +8,8 @@ import * as THREE from 'three';
 import { C } from './registry.js';
 import { Entity, stripName } from './entity.js';
 import { ONE, parseVec, angleQuat, mulberry32, poseMatrix } from './math.js';
-import { addOutput, playerInput, splitKeyValues } from './keyvalues.js';
+import { addOutput, keyValue, playerInput } from './keyvalues.js';
+import { tickBurn } from './burn.js';
 import { emptyBounds, growBounds } from '../../lib/math.js';
 import * as triggers from './classes/triggers.js';
 import './classes/logic.js';
@@ -340,8 +341,8 @@ export class EntityEngine {
       case 'setparent': e.setParent(this.findOne(param, caller, activator)); return;
       case 'clearparent': e.setParent(null); return;
       case 'setparentattachment': case 'setparentattachmentmaintainoffset': return;
-      case 'addoutput': case 'keyvalue': this.addOutput(e, param); return;
-      case 'keyvalues': for (const kv of splitKeyValues(param)) this.addOutput(e, kv); return;
+      case 'addoutput': this.addOutput(e, param); return; // CS2's own: output>target>input>... only (keyvalues.js)
+      case 'keyvalue': case 'keyvalues': keyValue(this, e, param); return; // CS2Fixes' table (keyvalues.js)
       case 'setlocalorigin': e.pos.set(...parseVec(param)); this.moved(e); return;
       case 'setlocalangles': angleQuat(parseVec(param), e.quat); this.moved(e); return;
       case 'setabsorigin': {
@@ -433,6 +434,7 @@ export class EntityEngine {
       const th = C[e.cls]?.think;
       if (th) { try { th(e, dt); } catch (err) { this.warnOnce(`think:${e.cls}`, `${e.cls} think failed: ${err?.message || err}`); } }
     }
+    tickBurn(this); // you, on fire (CS2Fixes IgniteLifetime)
     // drop dead entities now and then
     if (this.ents.length > 4000 && this.ents.some((e) => !e.alive)) this.ents = this.ents.filter((e) => e.alive);
   }
