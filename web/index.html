@@ -68,78 +68,94 @@
         </section>
 
         <section id="panel-settings" role="tabpanel" aria-labelledby="tab-settings" hidden>
+          <!-- three columns, most-used first (Audio top left); they flow into two, then one, as the space narrows
+               (container query: the same grid also sits in the room screen's settings sheet) -->
+          <div class="settings">
           <div class="settings-grid">
-            <fieldset class="card">
-              <legend>Controls</legend>
-              <label class="field">Sensitivity <small>CS2 <code>sensitivity</code></small><input id="sens" type="number" min="0.01" max="20" step="0.01" inputmode="decimal"></label>
-              <label class="field touch-only">Touch look speed <output id="touchsens-v"></output><input id="touchsens" type="range" min="0.2" max="3" step="0.1"></label>
-              <label class="chk touch-only"><input id="touchcrouch" type="checkbox"><span>Crouch button toggles <small>Off = hold to crouch</small></span></label>
-            </fieldset>
+            <div class="settings-col">
+              <fieldset class="card">
+                <legend>Audio</legend>
+                <label class="field pair-field">Effects <small>Lasers, weapons, footsteps</small>
+                  <span class="pair"><input id="volume" type="range" min="0" max="1" step="0.01"><span class="num"><input id="volume-num" type="number" min="0" max="1" step="0.01" inputmode="decimal"></span></span>
+                </label>
+                <label class="field pair-field">Music <small>CS2 <code>snd_musicvolume</code></small>
+                  <span class="pair"><input id="musicvol" type="range" min="0" max="1" step="0.01"><span class="num"><input id="musicvol-num" type="number" min="0" max="1" step="0.01" inputmode="decimal"></span></span>
+                </label>
+              </fieldset>
 
-            <fieldset class="card">
-              <legend>Gameplay</legend>
-              <label class="field pair-field">Simulated ping <small>The map's lasers reach you this late, like on a server</small>
-                <span class="pair"><input id="ping" type="range" min="0" max="500" step="1"><span class="num"><input id="ping-num" type="number" min="0" max="500" step="1" inputmode="numeric">ms</span></span>
-              </label>
-              <label class="chk"><input id="bhop" type="checkbox"><span>Auto bunnyhop</span></label>
-              <label class="chk"><input id="falldmg" type="checkbox"><span>Fall damage everywhere <small>Off = only where the map turns it on (sv_falldamage_scale), as on GFL</small></span></label>
-              <label class="chk"><input id="god" type="checkbox"><span>God mode <kbd class="kb">G</kbd></span></label>
-              <label class="chk"><input id="hitboxes" type="checkbox"><span>Show laser hitboxes <kbd class="kb">H</kbd></span></label>
-            </fieldset>
+              <fieldset class="card">
+                <legend>Controls</legend>
+                <label class="field inline-field">Sensitivity <small>CS2 <code>sensitivity</code></small><input id="sens" type="number" min="0.01" max="20" step="0.01" inputmode="decimal"></label>
+                <label class="field touch-only">Touch look speed <output id="touchsens-v"></output><input id="touchsens" type="range" min="0.2" max="3" step="0.1"></label>
+                <label class="chk touch-only"><input id="touchcrouch" type="checkbox"><span>Crouch button toggles <small>Off = hold to crouch</small></span></label>
+              </fieldset>
 
-            <fieldset class="card">
-              <legend>Video &amp; camera</legend>
-              <label class="chk"><input id="thirdperson" type="checkbox"><span>Third person <small>CS2Fixes <code>!tp</code></small></span></label>
-              <label class="field pair-field tp-dist">Camera distance <small>CS2Fixes !tp — 15 to 150 units</small>
-                <span class="pair"><input id="tpdist" type="range" min="15" max="150" step="1"><span class="num"><input id="tpdist-num" type="number" min="15" max="150" step="1" inputmode="numeric">u</span></span>
-              </label>
-              <label class="chk"><input id="perfmeter" type="checkbox"><span>Show FPS and ping <small>Top right while playing</small></span></label>
-              <label class="chk"><input id="minimap" type="checkbox"><span>Minimap <small>CS2's radar, top left (maps with an overview)</small></span></label>
-              <label class="field pair-field">Gamma <small>CS2 <code>r_fullscreen_gamma</code>: lower is brighter (CS2's default is 2.2)</small>
-                <span class="pair"><input id="gamma" type="range" min="1" max="2.5" step="0.05"><span class="num"><input id="gamma-num" type="number" min="1" max="2.5" step="0.05" inputmode="decimal"></span></span>
-              </label>
-              <label class="field">Render resolution <output id="renderscale-v"></output><small>The biggest performance setting: lower draws fewer pixels</small><input id="renderscale" type="range" min="0.25" max="1" step="0.05"></label>
-              <label class="chk"><input id="msaa" type="checkbox"><span>Anti-aliasing <small>MSAA 4x</small></span></label>
-              <label class="chk"><input id="fog" type="checkbox"><span>Fog <small>The map's own fog</small></span></label>
-              <label class="chk"><input id="reflections" type="checkbox"><span>Reflections <small>The map's reflection cubemaps (only the ones in view are drawn)</small></span></label>
-              <label class="chk"><input id="bakedlighting" type="checkbox"><span>CS2 baked lighting <small>The map's own lightmaps, probes and sky; off = simple lighting, smaller downloads. Next map load</small></span></label>
-              <label class="field">Quality <small>Texture and lighting detail; Auto picks for your GPU. Next map load</small><select id="quality"><option value="0">Auto</option><option value="3">High</option><option value="2">Medium</option><option value="1">Low</option></select></label>
-              <label class="field">World loading <small>Auto: your area first, then what the map lets you see. Area only: less to download and draw, distant scenery may be missing. Gameplay is the same either way</small><select id="streamdistance"><option value="1">Auto</option><option value="2">Area only</option><option value="0">Whole map</option></select></label>
-              <label class="chk"><input id="fullscreen" type="checkbox"><span>Fullscreen while playing <small class="kb">Also stops Ctrl+W closing the tab</small></span></label>
-            </fieldset>
+              <fieldset class="card">
+                <legend>Display</legend>
+                <label class="field pair-field">Gamma <small>Lower is brighter (CS2 default 2.2)</small>
+                  <span class="pair"><input id="gamma" type="range" min="1" max="2.5" step="0.05"><span class="num"><input id="gamma-num" type="number" min="1" max="2.5" step="0.05" inputmode="decimal"></span></span>
+                </label>
+                <label class="chk"><input id="perfmeter" type="checkbox"><span>Show FPS and ping</span></label>
+                <label class="chk"><input id="minimap" type="checkbox"><span>Minimap <small>CS2's radar, on maps with an overview</small></span></label>
+                <label class="chk"><input id="thirdperson" type="checkbox"><span>Third person <small>CS2Fixes <code>!tp</code></small></span></label>
+                <label class="field pair-field tp-dist">Camera distance <small>15 to 150 units</small>
+                  <span class="pair"><input id="tpdist" type="range" min="15" max="150" step="1"><span class="num"><input id="tpdist-num" type="number" min="15" max="150" step="1" inputmode="numeric">u</span></span>
+                </label>
+                <label class="chk"><input id="fullscreen" type="checkbox"><span>Fullscreen while playing <small class="kb">Also stops Ctrl+W closing the tab</small></span></label>
+              </fieldset>
+            </div>
 
-            <fieldset class="card">
-              <legend>Audio</legend>
-              <label class="field pair-field">SFX <small>Lasers, weapons, footsteps</small>
-                <span class="pair"><input id="volume" type="range" min="0" max="1" step="0.01"><span class="num"><input id="volume-num" type="number" min="0" max="1" step="0.01" inputmode="decimal"></span></span>
-              </label>
-              <label class="field pair-field">Music <small>CS2 <code>snd_musicvolume</code></small>
-                <span class="pair"><input id="musicvol" type="range" min="0" max="1" step="0.01"><span class="num"><input id="musicvol-num" type="number" min="0" max="1" step="0.01" inputmode="decimal"></span></span>
-              </label>
-            </fieldset>
+            <div class="settings-col">
+              <!-- the Low / Medium / High picker goes in after this legend (ui/graphics-ui.js) -->
+              <fieldset class="card">
+                <legend>Graphics</legend>
+                <label class="field">Render resolution <output id="renderscale-v"></output><small>Biggest speed setting</small><input id="renderscale" type="range" min="0.25" max="1" step="0.05"></label>
+                <div class="card-sub">Detail</div>
+                <label class="chk"><input id="msaa" type="checkbox"><span>Anti-aliasing <small>MSAA 4x</small></span></label>
+                <label class="chk"><input id="fog" type="checkbox"><span>Fog</span></label>
+                <label class="chk"><input id="reflections" type="checkbox"><span>Reflections <small>The map's cubemaps</small></span></label>
+                <label class="chk"><input id="bakedlighting" type="checkbox"><span>Baked lighting <small>The map's lightmaps and sky. Next map load</small></span></label>
+                <label class="field inline-field">Quality <small>Textures and lighting. Next map load</small><select id="quality"><option value="0">Auto</option><option value="3">High</option><option value="2">Medium</option><option value="1">Low</option></select></label>
+                <label class="field inline-field">World loading <small>Area only: far scenery may be missing</small><select id="streamdistance"><option value="1">Auto</option><option value="2">Area only</option><option value="0">Whole map</option></select></label>
+              </fieldset>
+            </div>
 
-            <fieldset class="card">
-              <legend>Bosses</legend>
-              <label class="field">Humans alive <output id="humans-v"></output><input id="humans" type="range" min="1" max="64" step="1"></label>
-              <label class="field">Boss HP % <output id="bosshp-v"></output><input id="bosshp" type="range" min="5" max="100" step="5"></label>
-              <label class="chk"><input id="autofire" type="checkbox"><span>Team shoots the boss <small>Only while it's in sight. Your own gun counts too.</small></span></label>
-              <label class="chk"><input id="perfectteam" type="checkbox"><span>Perfect team <small>Everyone fires nonstop (a fast kill). Off = a real squad: rifles, SMGs, a few knives, dodging attacks (~2.5 min dragon).</small></span></label>
-            </fieldset>
+            <div class="settings-col">
+              <fieldset class="card">
+                <legend>Gameplay</legend>
+                <label class="field pair-field">Simulated ping <small>Lasers reach you this late</small>
+                  <span class="pair"><input id="ping" type="range" min="0" max="500" step="1"><span class="num"><input id="ping-num" type="number" min="0" max="500" step="1" inputmode="numeric">ms</span></span>
+                </label>
+                <label class="chk"><input id="bhop" type="checkbox"><span>Auto bunnyhop</span></label>
+                <label class="chk"><input id="falldmg" type="checkbox"><span>Fall damage everywhere <small>Off = only where the map turns it on, as on GFL</small></span></label>
+                <label class="chk"><input id="god" type="checkbox"><span>God mode <kbd class="kb">G</kbd></span></label>
+                <label class="chk"><input id="hitboxes" type="checkbox"><span>Show laser hitboxes <kbd class="kb">H</kbd></span></label>
+              </fieldset>
+
+              <fieldset class="card">
+                <legend>Bosses</legend>
+                <label class="field">Humans alive <output id="humans-v"></output><input id="humans" type="range" min="1" max="64" step="1"></label>
+                <label class="field">Boss HP % <output id="bosshp-v"></output><input id="bosshp" type="range" min="5" max="100" step="5"></label>
+                <label class="chk"><input id="autofire" type="checkbox"><span>Team shoots the boss <small>While it's in sight; your gun counts too</small></span></label>
+                <label class="chk"><input id="perfectteam" type="checkbox"><span>Perfect team <small>Nonstop fire. Off = a real squad (~2.5 min dragon)</small></span></label>
+              </fieldset>
+            </div>
+          </div>
 
             <fieldset class="card keys-card kb">
               <legend>Keys</legend>
               <dl class="keys">
-                <dt>WASD</dt><dd>Move</dd>
-                <dt>Space / Wheel</dt><dd>Jump</dd>
-                <dt>Ctrl / C</dt><dd>Crouch</dd>
-                <dt>Shift</dt><dd>Walk</dd>
-                <dt>Mouse 1 / 2</dt><dd>Shoot, slash / stab</dd>
-                <dt>1 / 3 / Q</dt><dd>AK-47 / knife / last weapon</dd>
-                <dt>R / F</dt><dd>Reload / inspect</dd>
-                <dt>E</dt><dd>Use your map item (the heal, when you hold it)</dd>
-                <dt>Backspace</dt><dd>Restart</dd>
-                <dt>T / H / G</dt><dd>Slow-mo / hitboxes / god</dd>
-                <dt>Esc</dt><dd>Menu</dd>
+                <div><dt>WASD</dt><dd>Move</dd></div>
+                <div><dt>Space / Wheel</dt><dd>Jump</dd></div>
+                <div><dt>Ctrl / C</dt><dd>Crouch</dd></div>
+                <div><dt>Shift</dt><dd>Walk</dd></div>
+                <div><dt>Mouse 1 / 2</dt><dd>Shoot, slash / stab</dd></div>
+                <div><dt>1 / 3 / Q</dt><dd>AK-47 / knife / last weapon</dd></div>
+                <div><dt>R / F</dt><dd>Reload / inspect</dd></div>
+                <div><dt>E</dt><dd>Use your map item (heal)</dd></div>
+                <div><dt>Backspace</dt><dd>Restart</dd></div>
+                <div><dt>T / H / G</dt><dd>Slow-mo / hitboxes / god</dd></div>
+                <div><dt>Esc</dt><dd>Menu</dd></div>
               </dl>
             </fieldset>
           </div>

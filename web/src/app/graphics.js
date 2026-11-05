@@ -1,5 +1,5 @@
 // Graphics presets: one choice (Low / Medium / High) that sets every performance knob at once.
-// The knobs themselves stay in Settings > Video; changing one by hand makes the preset 'custom'.
+// The knobs themselves stay in Settings > Graphics; changing one by hand makes the preset 'custom'.
 //
 //   graphics: 'low' | 'medium' | 'high' | 'custom'   (settings.graphics)
 //   applyPreset(name)   writes the preset's knobs into settings, saves, and returns what needs a map reload

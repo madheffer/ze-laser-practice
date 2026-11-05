@@ -1,5 +1,5 @@
 // The FPS / ping readout, top right while playing: "144 FPS", and in a room "144 FPS · 38 ms" (the measured round trip
-// to the server, net/coop-client.js rtt). Settings › Video "Show FPS and ping" (settings.perfMeter) hides it.
+// to the server, net/coop-client.js rtt). Settings › Display "Show FPS and ping" (settings.perfMeter) hides it.
 // Text only (textContent), refreshed twice a second.
 //   new PerfMeter(root, { rtt: () => ms })
 import { settings } from '../app/settings.js';

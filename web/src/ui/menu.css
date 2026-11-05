@@ -108,7 +108,23 @@ body.touch :is(#menu, .sheet) .kb { display: none; }
 /* ---- the picked map's stages: ui/stage-list.css */
 
 /* ---- settings */
-.settings-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); gap: 12px; align-items: start; }
+/* wide: three fixed columns (index.html's .settings-col). Narrower: the columns dissolve and the cards flow,
+   in priority order, through two balanced columns, then one. A container query, so the room sheet gets it right too. */
+.settings { container-type: inline-size; display: flex; flex-direction: column; gap: 12px; }
+.settings-grid { columns: 2; column-gap: 12px; }
+.settings-col { display: contents; }
+.settings-grid .card { break-inside: avoid; margin-bottom: 12px; }
+@container (min-width: 1000px) {
+  .settings-grid { columns: auto; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; align-items: start; }
+  .settings-col { display: flex; flex-direction: column; gap: 12px; }
+  .settings-grid .card { margin-bottom: 0; }
+}
+@container (max-width: 620px) { .settings-grid { columns: 1; } }
+.card-sub { margin: 8px 0 0; padding-top: 10px; border-top: 1px solid var(--line); font-size: 11px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--dim); }
+/* a label with its control on the same line (number boxes, selects) */
+.card .field.inline-field { flex-wrap: nowrap; align-items: center; }
+.card .field.inline-field > small { flex: 1; min-width: 0; }
+:is(#menu, .sheet) .card .field.inline-field > :is(input, select) { flex: none; width: 120px; margin-left: auto; }
 .card { margin: 0; min-width: 0; background: #121922; border: 1px solid var(--line); border-radius: 10px; padding: 6px 14px 12px; display: flex; flex-direction: column; gap: 4px; }
 .card legend { float: left; width: 100%; padding: 8px 0 6px; font: 600 11px 'Segoe UI', sans-serif; letter-spacing: 0.14em; text-transform: uppercase; color: var(--dim); }
 .card .field { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 8px; row-gap: 4px; font-size: 14px; padding: 6px 0; }
@@ -144,7 +160,9 @@ body.touch :is(#menu, .sheet) .kb { display: none; }
 body.touch .touch-only { display: flex !important; }
 body.touch .keys-card { display: none; }
 
-.keys { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; margin: 4px 0 0; font-size: 13px; }
+/* keys: a wide, short strip under the columns, pairs flowing across */
+.keys { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 290px), 1fr)); gap: 6px 18px; margin: 4px 0 0; font-size: 13px; }
+.keys > div { display: grid; grid-template-columns: 104px 1fr; gap: 10px; align-items: baseline; }
 .keys dt { font: 600 12px ui-monospace, Consolas, monospace; color: var(--text); white-space: nowrap; }
 .keys dd { margin: 0; color: var(--dim); }
 

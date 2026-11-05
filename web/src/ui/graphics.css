@@ -15,7 +15,11 @@
 
 /* above the map list: a quiet row, not a card */
 .gfx-play { margin: 0 0 14px; padding: 0 2px 12px; border-bottom: 1px solid var(--line); }
-.gfx-video { margin: 4px 0 12px; }
+/* in Settings: the card's own legend already says Graphics */
+.gfx-video { margin: 2px 0 8px; grid-template-columns: minmax(0, 1fr); }
+.gfx-video .gfx-label { display: none; }
+.gfx-video .gfx-note { grid-column: 1; }
+:is(#menu, .sheet) .gfx-video .gfx-seg { width: 100%; }
 
 @media (max-width: 560px) {
   .gfx { grid-template-columns: minmax(0, 1fr); }

@@ -1,5 +1,5 @@
 // The graphics preset picker (app/graphics.js): Low / Medium / High, shown in two places that stay in step: above
-// the map list (the first thing you see when picking a map) and at the top of Settings > Video, above the knobs a
+// the map list (the first thing you see when picking a map) and at the top of Settings > Graphics, above the knobs a
 // preset sets. A knob changed by hand shows Custom (no button lit).
 //
 //   installGraphics({ apply, mapLoaded }) -> { refresh, presetChanged }   apply(): main.js applySettings; mapLoaded(): a map is in (the texture
@@ -15,7 +15,7 @@ const HINT = {
   low: 'Fastest. For phones and older PCs.',
   medium: 'Quick to load and looks good.',
   high: 'Full detail. Slower to load.',
-  custom: 'Custom: changed in Settings › Video.',
+  custom: 'Custom: changed in Settings › Graphics.',
 };
 // the Video controls each preset knob is bound to (app/settings.js bindSettings)
 const CONTROLS = { renderScale: '#renderscale', msaa: '#msaa', fog: '#fog', reflections: '#reflections', bakedLighting: '#bakedlighting', quality: '#quality', streamDistance: '#streamdistance' };
@@ -56,9 +56,9 @@ export function installGraphics({ apply, mapLoaded = () => false }) {
     pickers.push(box);
     return box;
   };
-  // above the map list (Play), and the top of Settings > Video (after its legend)
+  // above the map list (Play), and the top of Settings > Graphics (after its legend)
   $('#panel-play')?.prepend(make('gfx-play'));
-  const video = [...document.querySelectorAll('#panel-settings legend')].find((l) => /video/i.test(l.textContent))?.parentElement;
+  const video = [...document.querySelectorAll('#panel-settings legend')].find((l) => /graphics/i.test(l.textContent))?.parentElement;
   if (video) video.insertBefore(make('gfx-video'), video.querySelector('legend')?.nextSibling || null);
 
   function refresh(note = '') {

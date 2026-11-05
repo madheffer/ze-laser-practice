@@ -59,13 +59,13 @@ export function installPerf({ apply, presetChanged }) {
     verdict = 'done';
     const seen = ` (${slowFps} FPS)`;
     // a preset the player picked themselves is theirs: suggest, don't change it
-    if (settings.graphics === 'low') toast(`Running slow${seen}. Close other games or lower Render resolution in Settings › Video.`, { ms: 7000, tone: 'warn' });
+    if (settings.graphics === 'low') toast(`Running slow${seen}. Close other games or lower Render resolution in Settings › Graphics.`, { ms: 7000, tone: 'warn' });
     else if (settings.graphicsChosen) toast(`Running slow${seen}. Graphics: Low would be smoother.`, { ms: 7000, tone: 'warn' });
     else {
       applyPreset('low');
       apply();
       presetChanged();
-      toast(`Running slow${seen}: switched to Low graphics. Change it in Settings › Video.`, { ms: 7000, tone: 'warn' });
+      toast(`Running slow${seen}: switched to Low graphics. Change it in Settings › Graphics.`, { ms: 7000, tone: 'warn' });
     }
   }, 500);
 }
