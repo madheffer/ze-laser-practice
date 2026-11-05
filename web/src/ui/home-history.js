@@ -60,7 +60,7 @@ export class HomeHistory {
   renderSignedOut() {
     this.list.replaceChildren();
     this.note.hidden = false;
-    this.note.replaceChildren(el('p', null, 'Sign in to keep every run you finish, with its replay, and to share them.'), steamButton({ size: 'large' }));
+    this.note.replaceChildren(el('p', null, 'Sign in through Steam to keep every run you finish with its replay, be ranked on the leaderboards and share your runs. Guest runs are not saved.'), steamButton({ size: 'large' }));
   }
 
   row(r) {

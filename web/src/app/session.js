@@ -13,7 +13,7 @@ import { rule, godMode } from './rules.js';
 import { submitRun, getRecord } from './records.js';
 import { reportSolo } from './activity.js';
 import { ReplayRecorder, keepLastRun, lastRun } from './replay-record.js';
-import { account } from './account.js';
+import { account, SIGN_IN_URL } from './account.js';
 import { formatTime, plural } from '../lib/format.js';
 
 export function endRun() {
@@ -236,7 +236,10 @@ export function finish(result) {
   const best = getRecord(map, stage, run.mode);
   const retry ={ label: 'Retry', key: 'Enter', primary: result !== 'win', onClick: () => G.play(S.scenarioIndex, run.mode) };
   const menu = { label: 'Menu', key: 'Escape', onClick: () => { G.overlay.hide(); G.menu.update(); } };
-  const watch = replay ? [{ label: 'Watch replay', key: 'w', onClick: () => G.watchLastRun() }] : [];
+  const watch = replay ? [{ label: 'Watch replay', onClick: () => G.watchLastRun() }] : []; // no key: W is a movement key (held at death it would start the replay)
+  // a guest's run isn't kept on the server: Steam's sign-in page and back, then it is sent (app/activity.js)
+  const save = !account.user && scenario && !godMode()
+    ? [{ label: 'Sign in with Steam to save', primary: result === 'win' && !scenario.endless, onClick: () => { location.href = SIGN_IN_URL; } }] : []; // no key: S is a movement key
   const stats = [
     [run.endless ? 'Survived' : result === 'win' ? 'Time' : 'Survived', formatTime(t), !!rec?.improved.time],
     ['Hits taken', String(run.hits), !!rec?.improved.hits],
@@ -248,14 +251,14 @@ export function finish(result) {
     G.overlay.show({
       kind: 'endless', kicker: `${scenario.name} · endless`, title: 'RUN OVER',
       subtitle: result === 'dead' ? `Killed by ${hazardName(run.killedBy)}` : 'Stage failed',
-      record: rec?.improved.time ? 'New personal best' : '', stats, buttons: [retry, ...watch, menu],
+      record: rec?.improved.time ? 'New personal best' : '', stats, buttons: [retry, ...save, ...watch, menu],
     }); G.menu.update();
     return;
   }
   if (result === 'win') {
     const buttons = [];
     if (scenario?.endless) buttons.push({ label: 'Endless mode', key: 'e', primary: true, onClick: () => G.play(S.scenarioIndex, 'endless') });
-    buttons.push({ ...retry, primary: !scenario?.endless }, ...watch, menu);
+    buttons.push(...save, { ...retry, primary: !scenario?.endless && !save.length }, ...watch, menu);
     G.overlay.show({
       kind: 'win', kicker: scenario?.name || '', title: 'STAGE CLEARED',
       subtitle: run.hits ? `${plural(run.hits, 'hit')} taken` : 'Clean run, no hits',
@@ -266,7 +269,7 @@ export function finish(result) {
   G.overlay.show({
     kind: 'dead', kicker: scenario?.name || 'Free roam', title: result === 'dead' ? 'YOU DIED' : 'STAGE FAILED',
     subtitle: result === 'dead' ? `Killed by ${hazardName(run.killedBy)}${run.lastHurt ? ` (${Math.round(run.lastHurt.dmg)})` : ''}` : 'The boss got away',
-    stats, buttons: [retry, ...watch, menu],
+    stats, buttons: [retry, ...save, ...watch, menu],
   });
   G.menu.update();
 }

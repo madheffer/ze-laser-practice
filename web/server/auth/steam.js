@@ -7,12 +7,15 @@
 //   4. the SteamID64 comes out of claimed_id (17 digits, anchored), the persona from GetPlayerSummaries
 // Every outbound call has a 10 s timeout so a Steam outage can't stall the server.
 //
-// STEAM_API_KEY (https://steamcommunity.com/dev/apikey) is only for the persona name; without it sign-in still works
-// and the name falls back to "Steam player" + the id's tail (vpkstuff turns sign-in off without one).
+// STEAM_API_KEY (https://steamcommunity.com/dev/apikey) is for the persona name and avatar; without it sign-in still
+// works, the name falls back to "Steam player" + the id's tail and there is no avatar (vpkstuff turns sign-in off).
 const OPENID = 'https://steamcommunity.com/openid/login';
 const SUMMARIES = 'https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/';
 const CLAIMED_ID = /^https?:\/\/steamcommunity\.com\/openid\/id\/(\d{17})$/;
 const STEAM_ID = /^\d{17}$/;
+// a Steam avatar: its CDN, a 40-hex hash, a jpg (the browser checks the same: app/account.js; the page's CSP
+// img-src allows these two hosts and no others, server/http-policy.js)
+export const AVATAR_URL = /^https:\/\/avatars\.(?:akamai\.)?steamstatic\.com\/[0-9a-f]{40}(?:_medium|_full)?\.jpg$/;
 const NONCE_TTL = 10 * 60 * 1000;
 const MAX_NONCES = 50000;
 const TIMEOUT = 10000;
@@ -100,7 +103,9 @@ export function steamOpenId({ apiKey = '', log = () => {} } = {}) {
         if (!r.ok) { log(`steam: GetPlayerSummaries HTTP ${r.status}`); return fallback; }
         const p = (await r.json())?.response?.players?.[0];
         if (!p) return fallback;
-        const avatar = typeof p.avatarmedium === 'string' && /^https:\/\/avatars\.(steamstatic|akamai\.steamstatic)\.com\//.test(p.avatarmedium) ? p.avatarmedium : '';
+        // the 184 px one (profiles; small places scale it down), else the 64 px one; Steam's CDN only
+        const cdn = (u) => typeof u === 'string' && AVATAR_URL.test(u);
+        const avatar = cdn(p.avatarfull) ? p.avatarfull : cdn(p.avatarmedium) ? p.avatarmedium : '';
         return { steamId, name: typeof p.personaname === 'string' && p.personaname.trim() ? p.personaname : fallback.name, avatar };
       } catch (e) {
         log(`steam: GetPlayerSummaries failed: ${e.message}`);

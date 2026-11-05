@@ -10,7 +10,7 @@ export const CSP = [
   "script-src 'self' 'wasm-unsafe-eval'",
   "style-src 'self'",
   "style-src-attr 'unsafe-inline'",
-  "img-src 'self' blob: data:",
+  "img-src 'self' blob: data: https://avatars.steamstatic.com https://avatars.akamai.steamstatic.com", // Steam avatars (auth/steam.js)
   "font-src 'self'",
   "connect-src 'self' blob: data:",
   "media-src 'self' blob:",

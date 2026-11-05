@@ -6,7 +6,8 @@
 //   leaderboard({ map, stage, mode, kind, limit })   each player's best ranked run (rules: migrations/001_runs.sql,
 //                                           the ranked_runs view), best first; a player is their SteamID when
 //                                           signed in, else their name
-//   upsertPlayer({ steamId, name, avatar }) on every Steam sign-in
+//   upsertPlayer({ steamId, name, avatar }) on every Steam sign-in: the account (created the first time)
+//   player(steamId)                         -> { steamId, name, avatar, createdAt, seenAt } | null
 //   playerRuns(steamId, limit)              a signed-in player's run history, newest first
 //   getReplay(id)                           a run's replay: { runId, owner, public, meta, data (gzip), run } or null
 //   shareReplay(id, owner, on) -> bool      the owner shares (keeps) or unshares one of their replays
@@ -34,7 +35,7 @@ const MEMORY_REPLAYS = 300; // replays kept by the memory store
 
 // The ranked_runs view, for the memory store: which (run, player) pairs can be ranked, and with what time.
 function ranked(run, p) {
-  if (run.cheats || p.removed) return null;
+  if (run.cheats || p.removed || !p.steamId) return null; // only Steam accounts rank (migrations/003)
   if (run.mode === 'endless') return p.survived;
   return run.result === 'win' && p.won ? run.time : null;
 }
@@ -105,7 +106,11 @@ export function memoryStore() {
       }
       return [...best.values()].sort((a, b) => better(mode, a, b)).slice(0, limit).map((r, i) => ({ rank: i + 1, ...r }));
     },
-    async upsertPlayer({ steamId, name, avatar = '' }) { players.set(steamId, { steamId, name, avatar, seenAt: Date.now() }); },
+    async upsertPlayer({ steamId, name, avatar = '' }) {
+      const prev = players.get(steamId);
+      players.set(steamId, { steamId, name, avatar, createdAt: prev?.createdAt ?? Date.now(), seenAt: Date.now() });
+    },
+    async player(steamId) { const p = players.get(steamId); return p ? { ...p } : null; },
     async playerRuns(steamId, limit) {
       const out = [];
       for (let i = runs.length - 1; i >= 0 && out.length < limit; i--) {

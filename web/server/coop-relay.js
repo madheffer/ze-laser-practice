@@ -35,10 +35,15 @@ const LIST_MS = 1000; // a client may ask for the public list once a second
 // (24^4 = 331,776 codes: over a week at 30 a minute), and friends behind one address (a LAN, a household) don't
 // lock each other out with a typo or two
 const JOIN_FAILS = 8, JOIN_FAILS_ADDR = 30, JOIN_FAIL_MS = 60_000;
-// a kick bans the connection for the room's life, and its address for a while (a reconnect is a new connection; the
-// address alone may be a whole LAN, a dorm or a phone network's shared one, so not for long). The address is the
-// real client's (http-util clientAddress: CLIENT_IP_HEADER behind a proxy), never the proxy's.
+// A kick bans the player from that room for its life by their Steam account when they are signed in (their identity:
+// a new connection, address or name doesn't get them back in). Everyone kicked also has their connection banned for
+// the room's life and their address for a while (a reconnect is a new connection; an address alone may be a whole LAN,
+// a dorm or a phone network's shared one, so not for long). The address is the real client's (http-util
+// clientAddress: CLIENT_IP_HEADER behind a proxy), never the proxy's. Account-wide bans belong in the players table.
 const KICK_ADDR_MS = 10 * 60_000;
+// a room's rounds start at most this often: each start builds the server's copy of the map's logic for every player
+// (coop-check.js), so a flood of 'start' would be a flood of that work (MAX_ROUNDS only counts the other rooms)
+const START_MS = 3000;
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ'; // no I / O (they read as 1 / 0)
 const CODE = /^[A-Z]{4}$/;
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -178,8 +183,9 @@ export function attachCoopRelay(httpServer, { log = () => {}, store = openStore(
         if (rooms.size >= MAX_ROOMS) return send(c, { t: 'error', msg: 'The server is full, try again later' });
         const code = newCode(rooms);
         if (!code) return send(c, { t: 'error', msg: 'Could not make a room code' });
-        // banned: kicked connections (the room's life); bannedAddr: their address -> until when (KICK_ADDR_MS)
-        const r = { code, members: [c], owner: c.id, settings: cleanSettings(m.settings), map: isMapName(m.map) ? m.map : '', round: null, banned: new Set(), bannedAddr: new Map() };
+        // kicked: bannedSteam their Steam accounts, banned their connections (both the room's life), bannedAddr a guest's
+        // address -> until when (KICK_ADDR_MS)
+        const r = { code, members: [c], owner: c.id, settings: cleanSettings(m.settings), map: isMapName(m.map) ? m.map : '', round: null, banned: new Set(), bannedSteam: new Set(), bannedAddr: new Map() };
         rooms.set(code, r);
         c.room = r;
         announce(r);
@@ -192,7 +198,7 @@ export function attachCoopRelay(httpServer, { log = () => {}, store = openStore(
         const r = CODE.test(code) ? rooms.get(code) : null;
         if (!r) { joinFailed(c, now); return send(c, { t: 'error', msg: `No room ${CODE.test(code) ? code : ''}`.trim() }); }
         if (r === room) return announce(r);
-        if (r.banned.has(c.id) || (r.bannedAddr.get(c.addr) || 0) > now) return send(c, { t: 'error', msg: 'You were removed from that room' });
+        if (r.banned.has(c.id) || (c.user && r.bannedSteam.has(c.user.steamId)) || (r.bannedAddr.get(c.addr) || 0) > now) return send(c, { t: 'error', msg: 'You were removed from that room' });
         if (r.members.length >= r.settings.max) return send(c, { t: 'error', msg: `Room ${code} is full` });
         leave(c);
         c.name = uniqueName(r, c.name, c);
@@ -220,10 +226,21 @@ export function attachCoopRelay(httpServer, { log = () => {}, store = openStore(
       case 'kick': {
         if (!owner || m.id === c.id) return;
         const target = room.members.find((x) => x.id === m.id);
-        if (target) { room.banned.add(target.id); if (target.addr) room.bannedAddr.set(target.addr, now + KICK_ADDR_MS); leave(target, 'kicked'); }
+        if (target) {
+          room.banned.add(target.id);
+          if (target.user) room.bannedSteam.add(target.user.steamId); // their account, wherever they connect from
+          // and their address for a while: a guest's only handle, and a signed-in player signing out to come back as one
+          if (target.addr) room.bannedAddr.set(target.addr, now + KICK_ADDR_MS);
+          leave(target, 'kicked');
+        }
         break;
       }
-      case 'start': if (round && !round.ended && !owner) return; startRound(c, m); break;
+      case 'start':
+        if (!owner) return send(c, { t: 'error', msg: 'Only the room owner picks the stage' });
+        if (now - (room.startAt || 0) < START_MS) return send(c, { t: 'error', msg: 'Wait a moment before starting again' });
+        room.startAt = now;
+        startRound(c, m);
+        break;
       case 'abort': if (owner && round && !round.ended) round.end('lose'); break;
       // a round's traffic, for the round the client is in
       case 's': if (round && m.r === round.r) round.onState(c, m); break;

@@ -2,8 +2,11 @@
 //
 //   POST /api/solo                 a finished solo run from this page: { map, stage, mode, result, time, hits, cause,
 //                                  name, share, replay?: { meta, data: base64 gzip } } -> { id, replay: id | null }
-//                                  Signed in: always stored (your history); share = also on the live feed, replay
-//                                  public. Signed out: only sent with share on (the page doesn't send it otherwise).
+//                                  Signed in through Steam only (401 otherwise, before the body is read): stored for
+//                                  your history; share = also on the live feed, replay public. Guests keep nothing on
+//                                  the server: no runs, no replays, no ranks (the page offers to sign in and sends the
+//                                  run after, app/activity.js). Limits: one run per address and per account every
+//                                  SOLO_MS, SOLO_PER_DAY a day per account, a body of at most BODY_MAX.
 //   GET  /api/replays/<id>         -> { run, meta, data: base64 gzip, views }   public replays, or your own;
 //                                  counts a view when it isn't yours (once per viewer per replay per 30 minutes)
 //   POST /api/replays/<id>/share   { on } -> { ok }   your own: shared (anyone with the link, kept) or not
@@ -19,7 +22,9 @@ import { BOARD_MAX } from './db/store.js';
 
 const BODY_MAX = 1536 * 1024; // the JSON body (base64 of <= 1 MB gzip)
 const GZIP_MAX = 1024 * 1024;
-const SOLO_MS = 4000; // one solo run per address per this long
+const SOLO_MS = 4000; // one solo run per address, and per account, per this long
+const SOLO_PER_DAY = 400; // per account: a stage takes a while, so this is only ever a script (and replays are <= 1 MB)
+const DAY_MS = 24 * 3600 * 1000;
 const SHARE_MS = 300;
 const VIEW_MS = 30 * 60 * 1000; // one view per viewer per replay per this long
 const REPLAY_PATH = /^\/api\/replays\/(\d{1,15})(\/share)?$/;
@@ -48,18 +53,28 @@ export function checkReplay(upload, { map, stageId, mode, time }) {
 // { store, sessions (auth/session.js), feed: () => activity feed | undefined, ipHeader }
 export function runRoutes({ store, sessions, feed, ipHeader = '' }) {
   const soloGate = rateGate(SOLO_MS);
+  const accountGate = rateGate(SOLO_MS);
   const shareGate = rateGate(SHARE_MS);
   const viewGate = rateGate(VIEW_MS, 50000);
+  const daily = new Map(); // steamId -> { at, n }: solo runs in the current day
+  const underDailyCap = (id, now) => {
+    if (daily.size > 50000) for (const [k, d] of daily) if (now - d.at >= DAY_MS) daily.delete(k); // old days
+    const d = daily.get(id);
+    if (!d || now - d.at >= DAY_MS) { daily.set(id, { at: now, n: 1 }); return true; }
+    return ++d.n <= SOLO_PER_DAY;
+  };
 
   async function solo(req, res) {
     if (!sameOriginWrite(req)) return json(res, 403, { error: 'cross-site' });
-    if (!soloGate(clientAddress(req, ipHeader))) return json(res, 429, { error: 'slow down' });
+    // who first, before a byte of the body: a guest's run isn't kept, so it isn't read
+    const user = sessions.user(req);
+    if (!user) return json(res, 401, { error: 'sign in through Steam to save runs' });
+    if (!soloGate(clientAddress(req, ipHeader)) || !accountGate(user.steamId)) return json(res, 429, { error: 'slow down' });
+    if (!underDailyCap(user.steamId, Date.now())) return json(res, 429, { error: 'daily limit reached' });
     let m;
     try { m = JSON.parse((await readBody(req, BODY_MAX)).toString('utf8')); } catch (e) { return json(res, e.status || 400, { error: 'bad body' }); }
     if (!m || typeof m !== 'object') return json(res, 400, { error: 'bad body' });
-    const user = sessions.user(req);
     const share = m.share === true;
-    if (!user && !share) return json(res, 200, { id: null, replay: null }); // nothing to keep it for
     const f = feed();
     if (!f) return json(res, 503, { error: 'starting' });
     const out = await f.solo(m, { user, share, checkReplay });

@@ -1,0 +1,11 @@
+/* ui/toast.js: a quiet pill at the top centre, above every screen */
+.toast {
+  position: fixed; left: 50%; top: calc(16px + var(--safe-t, 0px)); z-index: 1000; max-width: min(92vw, 520px);
+  padding: 10px 16px; border-radius: 10px; border: 1px solid var(--line); background: rgba(16, 21, 28, 0.96);
+  color: var(--text); font: 600 13px "Segoe UI", system-ui, sans-serif; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  transform: translate(-50%, -12px); opacity: 0; pointer-events: none; transition: opacity 0.2s, transform 0.2s;
+}
+.toast.on { opacity: 1; transform: translate(-50%, 0); }
+.toast[data-tone="ok"] { border-color: rgba(61, 220, 132, 0.45); }
+.toast[data-tone="warn"] { border-color: rgba(255, 179, 92, 0.55); }
+@media (prefers-reduced-motion: reduce) { .toast { transition: none; } }

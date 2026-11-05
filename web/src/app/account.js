@@ -4,7 +4,7 @@
 import { fetchJson } from '../lib/fetch.js';
 import { cleanText } from '../lib/room-rules.js';
 
-export const account = { user: null, known: false }; // user: { steamId, name }
+export const account = { user: null, known: false }; // user: { steamId, name, avatar } (avatar: '' or a Steam CDN URL)
 const listeners = new Set();
 const emit = () => { for (const f of listeners) f(account); };
 
@@ -13,12 +13,16 @@ export const onAccount = (f) => { listeners.add(f); return () => listeners.delet
 export const SIGN_IN_URL = '/api/auth/steam/login';
 
 const STEAM_ID = /^\d{17}$/;
+// a Steam avatar, as the server checks it (server/auth/steam.js AVATAR_URL); anything else is dropped
+const AVATAR_URL = /^https:\/\/avatars\.(?:akamai\.)?steamstatic\.com\/[0-9a-f]{40}(?:_medium|_full)?\.jpg$/;
 
 export async function loadAccount() {
   try {
     const j = await fetchJson('/api/auth/me', { cache: 'no-store' });
     const u = j?.user;
-    account.user = u && STEAM_ID.test(u.steamId) ? { steamId: u.steamId, name: cleanText(u.name, 32) || 'Steam player' } : null;
+    account.user = u && STEAM_ID.test(u.steamId)
+      ? { steamId: u.steamId, name: cleanText(u.name, 32) || 'Steam player', avatar: typeof u.avatar === 'string' && AVATAR_URL.test(u.avatar) ? u.avatar : '' }
+      : null;
   } catch {
     account.user = null; // no server (a static host): signed out
   }

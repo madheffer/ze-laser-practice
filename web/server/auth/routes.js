@@ -3,7 +3,7 @@
 //   GET  /api/auth/steam/login      the browser goes here (a link, not a fetch): off to Steam with a fresh state
 //   GET  /api/auth/steam/callback   Steam sends the browser back here; on success the session cookie is set and the
 //                                   page reloads at /?signin=ok (or /?signin=failed)
-//   GET  /api/auth/me               -> { user: { steamId, name } | null }
+//   GET  /api/auth/me               -> { user: { steamId, name, avatar } | null } (the account, as of its last sign-in)
 //   POST /api/auth/logout           clears the session cookie (same-origin only)
 //
 // STEAM_RETURN_HOST (e.g. https://lasers.example.com, no trailing slash): the public origin Steam returns to. Unset,
@@ -53,7 +53,10 @@ export function authRoutes({ steam, sessions, store, returnHost = '', ipHeader =
     const path = url.pathname;
     if (path === '/api/auth/me' && req.method === 'GET') {
       const u = sessions.user(req);
-      json(res, 200, { user: u ? { steamId: u.steamId, name: u.name } : null });
+      if (!u) { json(res, 200, { user: null }); return true; }
+      // the account row (name and avatar as of the last sign-in); the cookie's name when the store can't say
+      const acc = await store.player(u.steamId).catch(() => null);
+      json(res, 200, { user: { steamId: u.steamId, name: acc?.name || u.name, avatar: acc?.avatar || '' } });
       return true;
     }
     if (path === '/api/auth/logout' && req.method === 'POST') {

@@ -143,6 +143,12 @@ export async function postgresStore(url, log) {
         [steamId, name, avatar]);
     },
 
+    async player(steamId) {
+      const { rows } = await pool.query('SELECT steam_id, name, avatar, created_at, seen_at FROM players WHERE steam_id = $1', [steamId]);
+      const r = rows[0];
+      return r ? { steamId: r.steam_id, name: r.name, avatar: r.avatar, createdAt: r.created_at.getTime(), seenAt: r.seen_at.getTime() } : null;
+    },
+
     async playerRuns(steamId, limit) {
       const { rows } = await pool.query(
         `SELECT r.id, r.kind, r.map, r.stage_id, r.stage_name, r.mode, r.result, r.time_s, r.finished_at, r.cheats,
