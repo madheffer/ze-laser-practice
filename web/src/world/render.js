@@ -14,6 +14,7 @@ import { SceneCopy } from './scenecopy.js';
 import { Bloom, BLOOM_POST_GLSL } from './bloom.js';
 import { PropAnimator, cloneModel } from './anim.js';
 import { Water } from './water.js';
+import { applyUnlit } from './unlit.js';
 import { applySelfIllum, tintSelfIllum } from './selfillum.js';
 
 // an entity's world transform as a particle control point: position and its forward / left / up axes
@@ -66,6 +67,7 @@ export class Renderer {
     this.laserMat = new THREE.MeshBasicMaterial({ color: 0xff2a2a, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
     this.laserCore = new THREE.MeshBasicMaterial({ color: 0xffd0d0, transparent: true, opacity: 0.9, depthWrite: false });
     this.hitboxMat = new THREE.MeshBasicMaterial({ color: 0x30ff90, wireframe: true, transparent: true, opacity: 0.6, depthWrite: false });
+    this.unlitEntity = new WeakMap(); // an entity model's exported material -> its unlit replacement (world/unlit.js)
     this.selfIllum = new WeakMap(); // an exported material -> a copy with CS2's self-illum as emissive (world/selfillum.js)
     this.resize();
     window.addEventListener('resize', () => this.resize());
@@ -104,6 +106,7 @@ export class Renderer {
     this.viewBox = null; // a stage sets its own (setViewBox)
     this.water.setMap(water);
     this.worldMaterials = new Map(); // a streamed world's materials by name: one per vmat across every chunk
+    this.unlitMaterials = new Map(); // exported material -> its unlit replacement (world/unlit.js)
     if (scene) this.addWorldChunk(scene);
   }
 
@@ -130,7 +133,7 @@ export class Renderer {
         // CS2 water gets its own shader in place of the flat glTF material (world/water.js)
         const w = !Array.isArray(o.material) && this.water.material(o.material, { lit: !!o.geometry?.attributes?.uv1 });
         if (w) { o.material = w; this.water.track(o); }
-        else applySelfIllum(o, this.selfIllum); // CS2's self-illum shaders (world/selfillum.js)
+        else { applyUnlit(o, this.unlitMaterials); applySelfIllum(o, this.selfIllum); } // CS2's unlit / self-illum shaders (world/unlit.js, selfillum.js)
         // VRF names tool-texture meshes after their material; hide the editor-only ones
         const mats = Array.isArray(o.material) ? o.material : [o.material];
         if (mats.some((m) => /tools?(trigger|clip|nodraw|skip|invisible|playerclip|blocklight|areaportal|sky)/i.test(m?.name || ''))) o.visible = false;
@@ -268,7 +271,7 @@ export class Renderer {
             holder.matrixAutoUpdate = false;
             holder.matrix.copy(GLTF_TO_SOURCE);
             holder.add(inst);
-            inst.traverse((o) => { if (o.isMesh) applySelfIllum(o, this.selfIllum); }); // before the tint: it clones
+            inst.traverse((o) => { if (o.isMesh) { applyUnlit(o, this.unlitEntity); applySelfIllum(o, this.selfIllum); } }); // before the tint: it clones
             const rc = kv.rendercolor ? parseVec(kv.rendercolor) : null;
             if (rc && (rc[0] !== 255 || rc[1] !== 255 || rc[2] !== 255)) {
               inst.traverse((o) => {

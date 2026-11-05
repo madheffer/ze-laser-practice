@@ -12,8 +12,10 @@
 //   - distance fade (LightOmni.Frusta): full to (1 - skirt) x range, 0 at range; the runtime barn shader (as the
 //     particle lights', world/lighting.js cs2Barn) gives I = colour x smoothstep(fade) / max(d^2, 1), diffuse x N.L
 //     (x pi against three's Lambert, as the sun), specular through three's BRDF
-// Not yet: light_barn / light_rect (frustum shapes), directlight 2 (dynamic shadows: needs shadow maps), lights
-// toggled by I/O, the cone of an omni narrower than 180 (no baked map here has one), the probes' per-light shadow
+// directlight 2 ("dynamic"): nothing of it is baked; CS2 lights the world with it at runtime where the entity is now.
+// Those come from the live entities every frame (ze_alien_shooter's lasers each carry three blue omnis, spawned by
+// point_template and parented to the moving bar); they go unshadowed (CS2 gives them dynamic shadow maps).
+// Not yet: light_barn / light_rect (frustum shapes), directlight 2's shadows, lights toggled by I/O, the cone of an omni narrower than 180 (no baked map here has one), the probes' per-light shadow
 // channels, models outside every probe volume / particles / the viewmodel (they keep the particle-light set only).
 import * as THREE from 'three';
 import { parseVec, num } from './entities/math.js';
@@ -30,9 +32,9 @@ function colorTemperature(kelvin) {
   return new THREE.Color().setRGB(c(r), c(g), c(b), THREE.SRGBColorSpace);
 }
 
-// one light_omni2's runtime record, or null (not a directlight 3 omni, off, black, or a shape we don't draw)
-export function omniRecord(kv) {
-  if (kv?.classname !== 'light_omni2' || String(kv.directlight) !== '3' || String(kv.enabled ?? 'true') === 'false') return null;
+// one light_omni2's runtime record, or null (not a directlight `direct` omni, off, black, or a shape we don't draw)
+export function omniRecord(kv, direct = '3') {
+  if (kv?.classname !== 'light_omni2' || String(kv.directlight) !== direct || String(kv.enabled ?? 'true') === 'false') return null;
   const idx = parseInt(kv.bakedshadowindex ?? '-1', 10);
   const outer = Math.min(180, Math.max(1, num(kv.outer_angle, 180))), inner = Math.min(outer, Math.max(0, num(kv.inner_angle, 180)));
   if (outer < 180) return null; // a cone: not drawn yet (see the top)
@@ -63,6 +65,7 @@ export function omniRecord(kv) {
 export class MapLights {
   constructor() {
     this.list = [];
+    this.dynamic = new WeakMap(); // a live directlight 2 entity -> its record (null: not drawn)
     this.uniforms = {
       cs2MapCount: { value: 0 },
       cs2MapPos: { value: Array.from({ length: MAX_MAP_LIGHTS }, () => new THREE.Vector3()) },
@@ -86,16 +89,38 @@ export class MapLights {
     this.uniforms.cs2MapCount.value = 0;
   }
 
+  // the live directlight 2 omnis, placed where their entity is now (unshadowed: mask 0)
+  dynamicLights(engine) {
+    const out = this._dyn || (this._dyn = []);
+    out.length = 0;
+    const live = engine?.byClass?.get('light_omni2');
+    if (!live) return out;
+    for (const e of live) {
+      if (!e.alive) continue;
+      let r = this.dynamic.get(e);
+      if (r === undefined) {
+        r = omniRecord(e.kv, '2');
+        if (r) r.mask = new THREE.Vector4(0, 0, 0, 0);
+        this.dynamic.set(e, r);
+      }
+      if (!r) continue;
+      r.position.fromArray(e.worldOrigin());
+      out.push(r);
+    }
+    return out;
+  }
+
   // every frame: the lights whose sphere the camera can see, nearest first (a pixel outside a light's range gets
   // nothing from it, so only a view with more than 16 in reach drops any)
-  update(camera) {
+  update(camera, engine) {
     const u = this.uniforms;
-    if (!this.list.length) { u.cs2MapCount.value = 0; return; }
+    const dyn = this.dynamicLights(engine);
+    if (!this.list.length && !dyn.length) { u.cs2MapCount.value = 0; return; }
     camera.updateMatrixWorld();
     this._frustum.setFromProjectionMatrix(this._m.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
     const p = camera.position, pick = this._pick;
     pick.length = 0;
-    for (const l of this.list) {
+    for (const l of this.list.length ? (dyn.length ? this.list.concat(dyn) : this.list) : dyn) {
       this._s.set(l.position, l.range);
       if (!this._frustum.intersectsSphere(this._s)) continue;
       l.rank = Math.max(0, l.position.distanceTo(p) - l.range);

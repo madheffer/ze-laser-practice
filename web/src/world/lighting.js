@@ -150,7 +150,7 @@ export class MapLighting {
   update(engine, camera) {
     if (this.defaultFar == null) this.defaultFar = camera.far;
     this.cullCubes(camera);
-    this.mapLights.update(camera);
+    this.mapLights.update(camera, engine); // with the live directlight 2 omnis (maplights.js)
     const fog = this.options.fog && engine?.fogState ? engine.fogState() : { controller: null, gradient: null };
     const u = this.fogUniforms;
     const g = fog.gradient, c = fog.controller?.on ? fog.controller : null;
