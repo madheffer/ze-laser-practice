@@ -17,6 +17,7 @@ import { bossTargets, applyBossDamage } from './bosses.js';
 import { showRoundEnd } from './coop-end.js';
 import { isMapName } from '../lib/paths.js';
 import { lastFrameAt } from './loop.js';
+import { systemLine } from './chat.js';
 import { itemState, spendUse, usableHeals } from '../world/items.js';
 import { beginRoster, applyWait, markOut, rosterGo, clearRoster, waitLine, startReports, simulatedPing } from './coop-load.js';
 
@@ -24,6 +25,9 @@ export const net = new CoopClient();
 export const lobby = { busy: false }; // busy = a round is on that you're not in (you'll be in the next one)
 
 const STATE_MS = 50; // 20 Hz
+// the server's notes that mean the player is out of the round, not dead (server/coop-round.js onLeave / load timeout)
+const LEFT = new Set(['left the game', 'could not load in time']);
+const NOTE_COLOR = '#c5cad0'; // chat code 8, grey
 const BOSS_MS = 100;
 const MAX_HITS = 2000; // per boss message entry
 const MAX_SAMPLES = 100; // ticks per state message (the server takes up to 160; frames are capped at 8 KB)
@@ -144,20 +148,22 @@ class Round {
   }
 
   // the server says someone died (you too)
-  markDead(id, cause, t, note) {
+  markDead(id, _cause, t, note) {
     const p = this.players.get(id);
     if (!p || !p.alive || this.ended) return;
     p.alive = false; p.deadAt = t;
     G.peers.setAlive(id, false);
     const self = id === this.me;
     if (self && S.run && !S.run.spectating) { S.run.spectating = true; S.run.deadAt = t; }
-    if (note) G.killfeed.push({ note: `${p.name} ${note}`, self });
-    else G.killfeed.push({ victim: p.name, cause, self });
+    // CS2's feed names no cause: every death here is the map's (a trigger_hurt / the world: attacker -1), so it reads
+    // "<name> [skull] <name>" (ui/killfeed.js). Leaving or not loading is a disconnect; the server's why goes to chat.
+    if (note) systemLine([[` ${p.name} ${note}`, NOTE_COLOR]]);
+    G.killfeed.push({ victim: p.name, victimTeam: 'ct', disconnect: LEFT.has(note), self });
     const alive = this.alive;
     if (!this.lastAliveSaid && this.players.size > 1 && alive.length === 1) {
       this.lastAliveSaid = true;
       const last = alive[0];
-      G.killfeed.push({ note: last.id === this.me ? 'You are the last one alive' : `${last.name} is the last one alive`, self: last.id === this.me });
+      systemLine([[last.id === this.me ? ' You are the last one alive' : ` ${last.name} is the last one alive`, NOTE_COLOR]]);
     }
   }
 

@@ -360,7 +360,8 @@ or a click outside; in the menu it is the Settings tab. Sliders, dropdowns and f
 owner), Settings, Leave room / Home, the stage, clock, hits and HP, and in a room the room code with Copy code /
 Invite link and who is alive (with each player's ping). Change stage and Settings open the full menu.
 
-- **Co-op**: survive together. When someone dies, the kill feed (top right, CS2-style) says what got them, and you
+- **Co-op**: survive together. When someone dies, the kill feed shows it as CS2 does (top right, CS2's death notices:
+  a map death is `name [skull] name`, no cause; leaving is the disconnect icon; the server's why goes to chat), and you
   can still clear the stage alone as the last one alive. Everyone dead = team wiped (endless: whoever lasted
   longest). Dead players spectate a teammate (Mouse 1 = next).
 - **Versus**: the same stage side by side, last one alive wins. If both clear it, fewer hits wins.

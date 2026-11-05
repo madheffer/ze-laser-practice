@@ -1,23 +1,50 @@
-/* CS2's kill feed: top-right, dark translucent rows, CT names in the team blue, your own rows outlined red.
-   Sits under the menu (z-index) so it shows while you play and spectate. */
+/* CS2's death notices: huddeathnotice.vcss (+ hud.vcss #HudTopRight, csgostyles.vcss Label / .stratum-bold /
+   hud-blur-bg-color), 1080p reference px x --u like ui/hud.css. Sits under the menu (z-index) so it shows while you
+   play and spectate. Not ported: world-blur (gaussian(2,2,2) behind the rows; the gamma filter on #killfeed would make
+   a backdrop-filter see nothing) and the radial gradient image, which the .vcss keeps at opacity 0. */
+@font-face { font-family: 'Stratum2'; src: url('/panorama/fonts/stratum2-black.otf'); font-weight: 900; font-display: block; }
+
 .killfeed {
-  position: fixed; top: max(12px, var(--safe-t)); right: max(12px, var(--safe-r)); z-index: 12;
-  display: flex; flex-direction: column; align-items: flex-end; gap: 4px; pointer-events: none;
-  font: 700 14px 'Stratum2', 'Segoe UI', sans-serif;
+  --u: calc(100vh / 1080);
+  /* #HudTopRight: right, top, flow down; CSGOHudDeathNotice: margin-top 72px, padding-right 10px */
+  position: fixed; top: max(calc(72 * var(--u)), var(--safe-t)); right: max(calc(10 * var(--u)), var(--safe-r));
+  z-index: 12; pointer-events: none;
+  display: flex; flex-direction: column; align-items: flex-end; /* #VisibleNotices: flow-children down, right */
 }
+
+/* .DeathNotice: right-aligned, 3px apart; .DeathNoticeBGBorder (radius 3) over .DeathNoticeBG (hud-blur-bg-color) */
 .kf-row {
-  display: flex; align-items: center; gap: 8px; padding: 4px 10px; border-radius: 3px;
-  background: rgba(0, 0, 0, 0.55); color: #fff; text-shadow: 0 1px 2px #000;
-  transition: opacity 0.4s; animation: kf-in 0.2s ease-out;
+  margin-top: calc(3 * var(--u)); border-radius: calc(3 * var(--u));
+  background: #000000a0;
+  transition: opacity 1s ease-out, transform 0.2s ease-out; /* DeathNoticeFadeOutTime; position .2s ease-out */
 }
-.kf-row.self { box-shadow: inset 0 0 0 2px #e0291f; background: rgba(40, 0, 0, 0.6); }
+.kf-row.kf-snap { transition: opacity 1s ease-out; }
+.kf-row.available { opacity: 0; transition-duration: 0.2s; }
 .kf-row.out { opacity: 0; }
-@keyframes kf-in { from { transform: translateX(20px); opacity: 0; } to { transform: none; opacity: 1; } }
-.kf-cause { color: #c9c9c9; font-weight: 600; }
-.kf-victim { color: #b5d4ee; } /* CS2's CT name colour */
-.kf-skull { display: inline-flex; width: 16px; height: 16px; color: #fff; }
-.kf-skull svg { width: 100%; height: 100%; }
-.kf-note { color: #ffd27a; letter-spacing: 0.04em; }
+.kf-row.victim { background: #630606d2; }                                         /* .DeathNotice_Victim */
+.kf-row.killer { background: #000000e7; box-shadow: inset 0 0 0 calc(2 * var(--u)) #e10000; } /* .DeathNotice_Killer */
+
+/* .DeathNoticeContent: flow right, padding 6 10 3 10 */
+.kf-content {
+  display: flex; align-items: center; white-space: nowrap;
+  padding: calc(6 * var(--u)) calc(10 * var(--u)) calc(3 * var(--u)) calc(10 * var(--u));
+}
+
+/* .DeathNoticeContent Label + Label.stratum-bold: Stratum2 bold 16, margins 0 2 2 2, 1px shadow, max 160 wide;
+   colour: Label's baseText unless the team class is set */
+.kf-name {
+  font: 700 calc(16 * var(--u)) / 1.2 'Stratum2', 'Arial Unicode MS', sans-serif; letter-spacing: 0;
+  color: #cccccc;
+  margin: 0 calc(2 * var(--u)) calc(2 * var(--u)) calc(2 * var(--u));
+  text-shadow: calc(1 * var(--u)) calc(1 * var(--u)) calc(1 * var(--u)) #000000;
+  max-width: calc(160 * var(--u)); max-height: calc(32 * var(--u)); overflow: hidden; text-overflow: ellipsis;
+}
+.kf-name.ct { color: #6f9ce6; } /* @define CTColor */
+.kf-name.t { color: #eabe54; }  /* @define TColor */
+.killer .kf-name { font-size: calc(15 * var(--u)); font-weight: 900; letter-spacing: calc(0.5 * var(--u)); }
+
+/* .DeathNoticeIcon: 24 tall, middle, margin -2 2 0 2 (the weapon: textureheight 24, scaling none) */
+.kf-icon { display: block; height: calc(24 * var(--u)); width: auto; margin: calc(-2 * var(--u)) calc(2 * var(--u)) 0; }
 
 /* teammates' name tags (world/peers.js positions them) */
 #nametags { position: fixed; inset: 0; pointer-events: none; z-index: 5; overflow: hidden; }

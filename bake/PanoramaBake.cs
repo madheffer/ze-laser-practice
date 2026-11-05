@@ -66,6 +66,16 @@ static class PanoramaBake
         "panorama/images/icons/ui/map_view_selected.vsvg_c",
         "panorama/images/icons/ui/map_death.vsvg_c",
         "panorama/images/icons/ui/map_enemy_offmap.vsvg_c",
+        // the kill feed (ui/killfeed.js): CS2's death notices, the no-attacker icons and the modifiers
+        "panorama/layout/hud/huddeathnotice.vxml_c",
+        "panorama/styles/hud/huddeathnotice.vcss_c",
+        "panorama/images/icons/equipment/world.vsvg_c",
+        "panorama/images/icons/equipment/worldent.vsvg_c",
+        "panorama/images/icons/equipment/trigger_hurt.vsvg_c",
+        "panorama/images/icons/equipment/disconnect.vsvg_c",
+        "panorama/images/hud/deathnotice/icon_suicide.vsvg_c",
+        "panorama/images/hud/deathnotice/icon_headshot.vsvg_c",
+        "panorama/images/hud/deathnotice/penetrate.vsvg_c",
     ];
 
     public static void Run(string cs2, string outDir)
