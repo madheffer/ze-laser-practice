@@ -112,8 +112,10 @@ exact map-folder format so he can lift our maps straight into his site. See [REA
       recovers only below 1) isn't confirmed from the binary
     - [ ] boss bar over all 16 segments: GFL's bosshud gives Blue Particle `iterator: boss_healthcount` (CS2Fixes
       CounterIterator); app/bosses.js shows the current segment's hits only
-    - [ ] bake: the world glb referenced `default_normal_tga_b3f4ec4c_orm_3598707198.png` but VRF wrote it only beside the
-      models (same texture used by props); copied into `world/` + both tiers by hand. Find why the world export skipped it
+    - [x] bake: the world glb referenced `default_normal_tga_b3f4ec4c_orm_3598707198.png` but VRF wrote it only beside the
+      models (same texture used by props); copied into `world/` + both tiers by hand. Why: VRF's exporter keeps one
+      texture cache across exports, so a shared image lands beside one glb only; the bake now copies each missing
+      image beside every glb that names it (`bake/GlbImages.cs`, 2026-11-06)
   - [x] **ze_neochrome** (3437506779) — 110, 15 laser templates; heal: Heal
     - [x] baked (fx, lighting + tiers, 36 chunks) and in the map picker (2026-11-06); the world glb's missing
       `default_normal_tga_b3f4ec4c_orm_3598707198.png` copied into `world/` by hand, as for visualizer / deadcore
@@ -125,6 +127,16 @@ exact map-folder format so he can lift our maps straight into his site. See [REA
       teleport to the dodge -> `nut_final_tp` -> `nut_final_win_detect`), each checked to its win on :5807
     - [ ] Blue Sphere's bar shows the current segment only (GFL gives it `iterator: nut_boss_segment`, like
       visualizer's Blue Particle); the stage thumbnails (`stages/*.webp`) aren't captured yet
+  - [x] **ze__hell_p** (3351648056) — the spike boss room after Room 14 (2026-11-06)
+    - [x] baked (lighting + tiers, 3 chunks); the stage replays the map's own room chain state (math_boss_counter at
+      15 -> room_maker_relay_boss) and drops you on `human_teleport` 1 s after the room spawns, as Room 14's door does;
+      cues checked on :5807: lab +7, bell +11, boss music +15, first strike +17, 16 strikes, win at boss_end_relay +60
+    - [x] engine: a mesh-only collision shape on a solid entity collides as its triangles (`world/hulls.js` meshSlabs,
+      `entity.solidHulls()`), not its bounding box: each room here is one mesh, so it was a block you couldn't stand in
+    - [ ] the boss face's `SetRenderAttribute bossX/bossY` flicker (a shader sprite-sheet offset) isn't drawn
+    - [ ] the spike's Rod.crystal is its door's moving sound, stopped on arrival 0.05 s later as Source's DoorHitTop
+      does (`entities/sound.js`); not confirmed against CS2's server.dll (its keyvalue names are hashed)
+    - [ ] the rest of the map (15 random rooms, the puro chase in room 4) has no stages yet
   - [ ] **ze_ffvii_mako_reactor_v5_p** (3513334092) — 85, 5 laser templates; Heal Materia + 7 materia
   - [ ] **ze_ffvii_mako_reactor_v6_p** (3378273414) — 80, 12 laser templates; Heal Materia + 11 materia (Mimic, Barrier, Ultima ...)
   - [ ] **ze_offliner** (3559892707) — 84, 7 laser templates; no heal (Shockwave only)

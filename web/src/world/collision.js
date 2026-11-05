@@ -291,7 +291,11 @@ function clipSolids(solids, lo, hi, h, s, e, tr, mask = 0, skip = null) {
   for (const d of solids) {
     if (d.max[0] < lo[0] || d.min[0] > hi[0] || d.max[1] < lo[1] || d.min[1] > hi[1] || d.max[2] < lo[2] || d.min[2] > hi[2]) continue;
     if (skip && skip(d.ref, d)) continue;
-    for (const hull of d.hulls) if (!mask || hull.layers == null || (hull.layers & mask)) clipHull(hull, h, s, e, tr, d.ref);
+    for (const hull of d.hulls) {
+      // a hull outside the sweep can't be hit (a mesh brush is hundreds of triangle slabs: world/hulls.js)
+      if (hull.min && (hull.max[0] < lo[0] || hull.min[0] > hi[0] || hull.max[1] < lo[1] || hull.min[1] > hi[1] || hull.max[2] < lo[2] || hull.min[2] > hi[2])) continue;
+      if (!mask || hull.layers == null || (hull.layers & mask)) clipHull(hull, h, s, e, tr, d.ref);
+    }
   }
 }
 

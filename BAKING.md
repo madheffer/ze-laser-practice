@@ -23,6 +23,7 @@ make that from your own CS2 install. You need:
 | ze_visualizer | [3261434415](https://steamcommunity.com/sharedfiles/filedetails/?id=3261434415) |
 | ze_offliner | [3559892707](https://steamcommunity.com/sharedfiles/filedetails/?id=3559892707) |
 | ze_neochrome | [3437506779](https://steamcommunity.com/sharedfiles/filedetails/?id=3437506779) |
+| ze__hell_p | [3351648056](https://steamcommunity.com/sharedfiles/filedetails/?id=3351648056) |
 
 (Each `web/public/scenarios/<map>.json` names its workshop id; that list is where `--scenarios` reads them.)
 

@@ -400,7 +400,7 @@ export class EntityEngine {
       if (!e.alive) continue;
       const h = C[e.cls];
       if (!h?.solid || !h.solid(e)) continue;
-      const hulls = e.hulls();
+      const hulls = e.solidHulls(); // mesh shapes as their triangles (entity.js)
       if (!hulls) continue;
       const solid = hulls.filter((x) => x.solid !== false);
       if (!solid.length) continue;

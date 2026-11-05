@@ -2,10 +2,10 @@
 // tools/sim.mjs in Node.
 //
 // Keys become lower case with forward slashes (lib/paths.js assetKey); the tables have no prototype, so a model
-// called "constructor" or "__proto__" is just a missing key. Mesh-only shapes become their bounding box so
-// triggers built from them still work.
+// called "constructor" or "__proto__" is just a missing key. A mesh-only shape becomes its bounding box so triggers
+// built from it still work; it keeps its triangles (`mesh`), and a solid entity collides with those (meshSlabs).
 import { assetKey } from '../lib/paths.js';
-import { emptyBounds, growBounds } from '../lib/math.js';
+import { emptyBounds, growBounds, sub3 as sub, dot3 as dot, cross3 as cross } from '../lib/math.js';
 
 export function normaliseHulls(hullsRaw) {
   const hulls = Object.create(null);
@@ -25,11 +25,53 @@ export function normaliseHulls(hullsRaw) {
       growBounds(all.min, all.max, min, max);
       const layers = Number.isInteger(h.layers) ? h.layers >>> 0 : null; // interaction-layer bits (bake LayersOf), null in older bakes
       if (h.planes) out.push({ verts: h.verts, planes: h.planes, edges: hullEdges(h.verts, h.planes), solid: h.solid !== false, layers });
-      else if (v.length) out.push({ ...boxHull(min, max, h.solid !== false), layers });
+      else if (v.length) out.push({ ...boxHull(min, max, h.solid !== false), layers, mesh: Array.isArray(h.tris) ? h.tris : null });
     }
     if (out.length) { hulls[key] = out; bounds[key] = all; }
   }
   return { hulls, bounds };
+}
+
+// What a solid entity collides with for a mesh-only shape: each triangle as a convex slab SLAB units thick, pushed
+// back behind its face (away from its normal: a mesh's faces point at the side you stand on). Its bounding box would
+// fill a hollow mesh: ze__hell_p's rooms are one mesh each, walls and floor, so each room was a block you couldn't
+// stand in. Built on first use and kept on the hull (model space), so triggers made of huge meshes (ze_deadcore's
+// presses, 85k triangles) never pay for it: they touch with the box. Degenerate triangles are skipped.
+const SLAB = 1;
+const MAX_MESH_TRIS = 20000; // a hostile hulls.json can't make the load quadratic forever
+const slabCache = new WeakMap();
+export function meshSlabs(hull) {
+  if (!hull?.mesh) return null;
+  let out = slabCache.get(hull);
+  if (!out) { out = triangleSlabs(hull.mesh).map((x) => ({ ...x, solid: hull.solid, layers: hull.layers })); slabCache.set(hull, out); }
+  return out;
+}
+function triangleSlabs(tris) {
+  const out = [];
+  const n = Math.min(Math.floor(tris.length / 9), MAX_MESH_TRIS);
+  for (let t = 0; t < n; t++) {
+    const p = tris.slice(t * 9, t * 9 + 9).map(Number);
+    if (!p.every(Number.isFinite)) continue;
+    const a = p.slice(0, 3), b = p.slice(3, 6), c = p.slice(6, 9);
+    const ab = sub(b, a), ac = sub(c, a);
+    const nrm = cross(ab, ac);
+    const len = Math.hypot(...nrm);
+    if (len < 1e-6) continue;
+    const N = nrm.map((x) => x / len);
+    const back = (q) => [q[0] - N[0] * SLAB, q[1] - N[1] * SLAB, q[2] - N[2] * SLAB];
+    const verts = [...a, ...b, ...c, ...back(a), ...back(b), ...back(c)];
+    const planes = [N[0], N[1], N[2], dot(N, a), -N[0], -N[1], -N[2], -dot(N, back(a))];
+    for (const [q, r, other] of [[a, b, c], [b, c, a], [c, a, b]]) {
+      let s = cross(sub(r, q), N);
+      const L = Math.hypot(...s);
+      if (L < 1e-9) continue;
+      s = s.map((x) => x / L);
+      if (dot(s, sub(other, q)) > 0) s = s.map((x) => -x); // outward: away from the triangle's third corner
+      planes.push(s[0], s[1], s[2], dot(s, q));
+    }
+    out.push({ verts, planes, edges: hullEdges(verts, planes) });
+  }
+  return out;
 }
 
 function boxHull(min, max, solid) {

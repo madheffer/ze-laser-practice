@@ -36,6 +36,7 @@ CS2 and its workshop folder are found from Steam's library list (`node tools/ste
 | ze_offliner | 3559892707 (the ending) |
 | ze_neochrome | 3437506779 (Blue Sphere + the ending) |
 | ze_gris_p | 3633040749 (baked, no stages yet) |
+| ze__hell_p | 3351648056 (the spike boss room) |
 
 ## Database (runs and leaderboards)
 
@@ -550,7 +551,8 @@ bake/                Program.cs (map bake), PanoramaBake.cs, SoundBake (stock + 
 ```
 
 - **collision**: Quake-style box traces (a Minkowski clip of the swept hull against each solid, stopping
-  `DIST_EPSILON` short). The static world is triangles in a BVH; moving brush entities are convex hulls.
+  `DIST_EPSILON` short). The static world is triangles in a BVH; moving brush entities are convex hulls (a mesh-only
+  shape: its box for triggers and bullets, its triangles as thin slabs for what stands on it, `world/hulls.js`).
 - **movement**: CS movement at 64 tick. Ground/air acceleration (5.5 / 12, air wish speed 30), friction 5.2,
   jump 301.99, gravity 800 × the player's own gravity keyvalue, step 18, stamina (always on), a duck that lifts the legs in the air; ducking has no spam slowdown (CS2Fixes `cs2f_allow_duck_spam` pins duck speed at 8).
 - **entities**: the I/O engine. Unknown inputs are logged once (shown in the menu), never fatal. Team and context

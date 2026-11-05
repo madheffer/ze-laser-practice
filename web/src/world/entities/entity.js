@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { bool, ONE } from './math.js';
 import { nameKey } from '../../lib/names.js';
 import { assetKey } from '../../lib/paths.js';
+import { meshSlabs } from '../hulls.js';
 
 // a target name's lookup key: no [PR#] prefix, lower case (lib/names.js)
 export const stripName = nameKey;
@@ -39,6 +40,8 @@ export class Entity {
     this.model = assetKey(this.kv.model || '');
     this.placedHulls = null;
     this.placedStamp = -1;
+    this.placedSolid = null;
+    this.placedSolidStamp = -1;
     this.visible = true;
     this.state = {};
   }
@@ -84,48 +87,63 @@ export class Entity {
   }
 
   // World-space convex hulls of this entity's model ({planes, verts, edges, min, max}[]), cached until it moves.
+  // A mesh-only shape is its bounding box here (triggers, bullets): solidHulls() is what you collide with.
   hulls() {
     const src = this.engine.assets.hulls[this.model];
     if (!src) return null;
-    const stamp = this.engine.stamp;
     if (this.placedHulls && this.placedStamp === this.engine.moveStamp(this)) return this.placedHulls;
-    const m = this.getWorld();
-    const e = m.elements;
-    const out = [];
-    const v = new THREE.Vector3();
-    const n = new THREE.Vector3();
-    const nm = new THREE.Matrix3().setFromMatrix4(m);
-    for (const h of src) {
-      if (!h.planes) continue;
-      const planes = new Float64Array(h.planes.length);
-      const verts = new Float64Array(h.verts.length);
-      const min = [Infinity, Infinity, Infinity], max = [-Infinity, -Infinity, -Infinity];
-      for (let i = 0; i < h.verts.length; i += 3) {
-        v.set(h.verts[i], h.verts[i + 1], h.verts[i + 2]).applyMatrix4(m);
-        verts[i] = v.x; verts[i + 1] = v.y; verts[i + 2] = v.z;
-        min[0] = Math.min(min[0], v.x); min[1] = Math.min(min[1], v.y); min[2] = Math.min(min[2], v.z);
-        max[0] = Math.max(max[0], v.x); max[1] = Math.max(max[1], v.y); max[2] = Math.max(max[2], v.z);
-      }
-      // edge directions turn with the entity (hulls.js hullEdges): the exact box test's extra separating axes
-      const edges = new Float64Array(h.edges?.length || 0);
-      for (let i = 0; i < edges.length; i += 3) {
-        n.set(h.edges[i], h.edges[i + 1], h.edges[i + 2]).applyMatrix3(nm).normalize();
-        edges[i] = n.x; edges[i + 1] = n.y; edges[i + 2] = n.z;
-      }
-      for (let i = 0; i < h.planes.length; i += 4) {
-        n.set(h.planes[i], h.planes[i + 1], h.planes[i + 2]).applyMatrix3(nm).normalize();
-        planes[i] = n.x; planes[i + 1] = n.y; planes[i + 2] = n.z;
-        planes[i + 3] = h.planes[i + 3] + n.x * e[12] + n.y * e[13] + n.z * e[14];
-      }
-      out.push({ planes, verts, edges, min, max, solid: h.solid, layers: h.layers ?? null });
-    }
-    void stamp;
-    this.placedHulls = out;
+    this.placedHulls = placeHulls(src, this.getWorld());
     this.placedStamp = this.engine.moveStamp(this);
-    return out;
+    return this.placedHulls;
+  }
+
+  // The hulls the player and physboxes collide with: hulls(), with each mesh-only shape's box swapped for its
+  // triangles (world/hulls.js meshSlabs), so a hollow mesh (ze__hell_p's rooms) is walls and a floor, not a block.
+  solidHulls() {
+    const src = this.engine.assets.hulls[this.model];
+    if (!src) return null;
+    if (!src.some((h) => h.mesh)) return this.hulls();
+    if (this.placedSolid && this.placedSolidStamp === this.engine.moveStamp(this)) return this.placedSolid;
+    this.placedSolid = placeHulls(src.flatMap((h) => meshSlabs(h) || [h]), this.getWorld());
+    this.placedSolidStamp = this.engine.moveStamp(this);
+    return this.placedSolid;
   }
 
   fireOutput(output, activator, param) {
     this.engine.fireOutput(this, output, activator, param);
   }
+}
+
+// Model-space hulls placed by world matrix m: verts, bounds, planes and edge directions turned and moved.
+function placeHulls(src, m) {
+  const e = m.elements;
+  const out = [];
+  const v = new THREE.Vector3();
+  const n = new THREE.Vector3();
+  const nm = new THREE.Matrix3().setFromMatrix4(m);
+  for (const h of src) {
+    if (!h.planes) continue;
+    const planes = new Float64Array(h.planes.length);
+    const verts = new Float64Array(h.verts.length);
+    const min = [Infinity, Infinity, Infinity], max = [-Infinity, -Infinity, -Infinity];
+    for (let i = 0; i < h.verts.length; i += 3) {
+      v.set(h.verts[i], h.verts[i + 1], h.verts[i + 2]).applyMatrix4(m);
+      verts[i] = v.x; verts[i + 1] = v.y; verts[i + 2] = v.z;
+      min[0] = Math.min(min[0], v.x); min[1] = Math.min(min[1], v.y); min[2] = Math.min(min[2], v.z);
+      max[0] = Math.max(max[0], v.x); max[1] = Math.max(max[1], v.y); max[2] = Math.max(max[2], v.z);
+    }
+    // edge directions turn with the entity (hulls.js hullEdges): the exact box test's extra separating axes
+    const edges = new Float64Array(h.edges?.length || 0);
+    for (let i = 0; i < edges.length; i += 3) {
+      n.set(h.edges[i], h.edges[i + 1], h.edges[i + 2]).applyMatrix3(nm).normalize();
+      edges[i] = n.x; edges[i + 1] = n.y; edges[i + 2] = n.z;
+    }
+    for (let i = 0; i < h.planes.length; i += 4) {
+      n.set(h.planes[i], h.planes[i + 1], h.planes[i + 2]).applyMatrix3(nm).normalize();
+      planes[i] = n.x; planes[i + 1] = n.y; planes[i + 2] = n.z;
+      planes[i + 3] = h.planes[i + 3] + n.x * e[12] + n.y * e[13] + n.z * e[14];
+    }
+    out.push({ planes, verts, edges, min, max, solid: h.solid, layers: h.layers ?? null });
+  }
+  return out;
 }

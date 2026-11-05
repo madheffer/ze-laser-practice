@@ -14,3 +14,8 @@ export function growBounds(min, max, lo, hi) {
   for (let a = 0; a < 3; a++) { min[a] = Math.min(min[a], lo[a]); max[a] = Math.max(max[a], hi[a]); }
 }
 export const emptyBounds = () => ({ min: [Infinity, Infinity, Infinity], max: [-Infinity, -Infinity, -Infinity] });
+
+// 3-vectors as [x, y, z] arrays.
+export const sub3 = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+export const dot3 = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+export const cross3 = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];

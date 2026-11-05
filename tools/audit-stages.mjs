@@ -21,6 +21,7 @@ import { CollisionWorld } from '../web/src/world/collision.js';
 import { createRunEngine, startIfDue, mapRuns, winDue, TICK } from '../web/src/world/run-engine.js';
 import { isParticleSystem } from '../web/src/world/entities/index.js';
 import { nameKey } from '../web/src/lib/names.js';
+import { assetKey } from '../web/src/lib/paths.js';
 
 const argv = process.argv.slice(2);
 const dir = argv[0];
@@ -34,7 +35,7 @@ const read = (f) => JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'));
 const entities = readMapEntities(dir);
 const { hulls, bounds } = normaliseHulls(fs.existsSync(path.join(dir, 'hulls.json')) ? read('hulls.json') : {});
 const manifest = read('manifest.json');
-const baked = new Set((manifest.renderModels || []).map((m) => m.toLowerCase()));
+const baked = new Set((manifest.renderModels || []).map(assetKey)); // ze__hell_p's model keys use backslashes
 const fxIndex = fs.existsSync(path.join(dir, 'fx/index.json')) ? read('fx/index.json').systems || {} : {};
 const colFile = path.join(dir, 'collision.bin');
 let world = null;
@@ -76,7 +77,7 @@ function effectProblems(name, seen = new Set()) {
     const sys = JSON.parse(fs.readFileSync(path.join(dir, 'fx', file), 'utf8'));
     for (const r of sys.m_Renderers || []) {
       if (r?._class === 'C_OP_RenderModels') for (const m of r.m_ModelList || []) {
-        if (m?.m_model && !baked.has(String(m.m_model).toLowerCase())) out.push(`model it draws not baked: ${m.m_model} (${name})`);
+        if (m?.m_model && !baked.has(assetKey(m.m_model))) out.push(`model it draws not baked: ${m.m_model} (${name})`);
       }
     }
     for (const c of sys.m_Children || []) if (c?.m_ChildRef) out.push(...effectProblems(c.m_ChildRef, seen));
@@ -91,11 +92,11 @@ function drawProblems(e) {
   const kv = e.kv;
   if (isParticleSystem(e.cls)) return effectProblems(kv.effect_name);
   if (!kv.model || e.cls.startsWith('trigger_') || INVISIBLE_RENDER.has(String(kv.rendermode)) || kv.renderamt === '0') return [];
-  const m = String(kv.model).toLowerCase();
+  const m = assetKey(kv.model);
   if (baked.has(m)) return [];
   // a prop always has a mesh; a brush entity without one is invisible in CS2 too (the bake leaves it out)
   if (e.cls.startsWith('prop_')) return [`model not baked: ${kv.model} (${e.cls})`];
-  if (!hulls[kv.model] && !hulls[m]) return [`model neither drawn nor solid: ${kv.model} (${e.cls})`];
+  if (!hulls[m]) return [`model neither drawn nor solid: ${kv.model} (${e.cls})`];
   return [];
 }
 

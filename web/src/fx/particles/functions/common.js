@@ -1,6 +1,7 @@
 // Helpers every particle function shares: vector maths, the attribute table, the random table,
 // control point writes and set methods. No three.js; runs in node for the tests.
 import { RANDOM_TABLE } from './random_table.js';
+import { sub3, dot3, cross3 } from '../../../lib/math.js';
 
 export const FLT_EPSILON = 1.1920929e-7;
 export const FLT_MAX = 3.4028234663852886e38;
@@ -25,11 +26,11 @@ export const STREAMS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16
 export const FORCE_SCALE_DEFAULT = 1;
 
 export const add = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
-export const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+export const sub = sub3;
 export const mul = (a, s) => [a[0] * s, a[1] * s, a[2] * s];
 export const mulv = (a, b) => [a[0] * b[0], a[1] * b[1], a[2] * b[2]];
-export const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-export const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+export const dot = dot3;
+export const cross = cross3;
 export const len = (a) => Math.sqrt(dot(a, a));
 export const norm = (a) => { const l = len(a); return l > 0 ? mul(a, 1 / l) : [0, 0, 0]; };
 export const lerp3 = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];

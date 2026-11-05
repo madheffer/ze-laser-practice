@@ -382,6 +382,7 @@ sealed class Baker(string input, string outRoot, string? cs2, bool textures)
             }
         }
         Log($"models: {renderModels.Count} exported");
+        GlbImages.FillMissing(outDir, Log); // a texture shared by two exports lands beside one glb only (GlbImages.cs)
 
         // Textures come out as full-size PNGs beside each glb. Cap them so a map loads in a browser:
         // 1024 px keeps the look; the glb references the file by name, so a resize in place is all it takes.
