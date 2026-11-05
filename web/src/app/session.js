@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { DEG } from '../world/entities/index.js';
 import { createRunEngine, hazardName as hazardText } from '../world/run-engine.js';
 import { heldItems } from './items.js';
+import { prepareStage } from './readiness.js';
 import { S, G, log } from './state.js';
 import { settings } from './settings.js';
 import { rule, godMode } from './rules.js';
@@ -29,6 +30,7 @@ export function fireStart() { S.run?.fireStart?.(); }
 // mode: 'normal' | 'endless'. A replay (S.replay, app/replay.js) rebuilds its run: its seed, its rules, no recording.
 export function startScenario(i, mode = 'normal') {
   const { map, player } = S;
+  if (!map?.loaded || !player) return; // a stage needs its map's world first (main.js loadStage)
   endRun();
   G.overlay.hide();
   S.scenarioIndex = i;
@@ -47,6 +49,8 @@ export function startScenario(i, mode = 'normal') {
     endlessTick: null,
     // the stage's random rolls; a replay must play on the seed it was recorded with
     seed: S.replay ? S.replay.meta.seed : (S.mp?.rules.seed || settings.seed || (Date.now() & 0xffff)),
+    // ready: the stage is loaded and drawn (app/readiness.js); go: a round's server started everyone's clock
+    ready: false, go: !S.mp, loading: 'loading',
   };
 
   player.gravityScale = scenario?.player?.gravity ?? 1;
@@ -66,7 +70,7 @@ export function startScenario(i, mode = 'normal') {
 
   // map sounds arrive with the entities they belong to: as late as the simulated ping draws them
   // During a silent fast-forward, remember what is still sounding, so it can join at the right point after.
-  const sounding = new Map(); // ent.id -> { ev, at }
+  const sounding = new Map(); // `${ent.id}:${slot}` -> { ev, at }
   createRunEngine({
     entities: map.entities, hulls: map.hulls, bounds: map.bounds, animations: map.animations,
     traceBox: (s, e, h) => S.world.traceBox(s, e, h, undefined, true),
@@ -81,8 +85,12 @@ export function startScenario(i, mode = 'normal') {
         engine.on('log', (m) => log(m));
         engine.on('sound', (ev) => {
           if (run.silent) {
-            if (ev.type === 'start') sounding.set(ev.ent.id, { ev, at: engine.time });
-            else if (ev.type === 'stop') sounding.delete(ev.ent.id);
+            const key = `${ev.ent.id}:${ev.slot ?? ''}`;
+            if (ev.type === 'start') sounding.set(key, { ev, at: engine.time });
+            else if (ev.type === 'stop') {
+              if (ev.slot != null) sounding.delete(key);
+              else for (const k of [...sounding.keys()]) if (k.startsWith(`${ev.ent.id}:`)) sounding.delete(k);
+            }
             return;
           }
           if (settings.ping > 0) setTimeout(() => { if (S.engine === engine) G.audio.onSound(ev); }, settings.ping);
@@ -130,6 +138,16 @@ export function startScenario(i, mode = 'normal') {
   S.engine.on('cvar', (n, v) => setMoveCvar(player, n, v));
   // a round runs on the wall clock from here (loop.js simulate), so every client's map stays in step
   run.wall0 = performance.now();
+  // nothing moves until the stage is loaded and drawn; a round then tells the server and waits for its go
+  prepareStage(run, (step) => { run.loading = step; }).then(() => {
+    if (S.run !== run) return;
+    run.ready = true;
+    run.loading = '';
+    if (S.mp) S.mp.sendReady();
+  });
+  // the loading screen (ui/loading.js) covers it until the clock starts; a restart on a loaded map is usually
+  // ready within a few frames, so it shows only if it isn't by then
+  G.loading?.follow(run, map.name, scenario ? scenario.id : null);
   // your solo runs on a stage are recorded for their replay (app/replay-record.js), never a round's or a replay's
   if (scenario && !S.mp && !S.replay) {
     run.rec = new ReplayRecorder({

@@ -1,10 +1,6 @@
 /* CS2's base Panorama HUD (hud.vcss, hudhealthammocenter.vcss, hudmoney.vcss, hudweaponselection.vcss;
-   team colours from csgostyles.vcss). 1080p reference px x --u. */
-@font-face { font-family: 'Stratum2'; src: url('/panorama/fonts/stratum2-regular.otf'); font-weight: 400; }
-@font-face { font-family: 'Stratum2'; src: url('/panorama/fonts/stratum2-medium.otf'); font-weight: 500; }
-@font-face { font-family: 'Stratum2'; src: url('/panorama/fonts/stratum2-bold.otf'); font-weight: 700; }
-@font-face { font-family: 'Stratum2 TF'; src: url('/panorama/fonts/stratum2_tf_bold.otf'); font-weight: 700; }
-@font-face { font-family: 'Stratum2 Mono'; src: url('/panorama/fonts/stratum2mono-bold.otf'); font-weight: 700; }
+   team colours from csgostyles.vcss). 1080p reference px x --u. The Stratum2 faces are in style.css (the boot
+   screen uses them before this file loads). */
 
 #hud {
   --u: calc(100vh / 1080);

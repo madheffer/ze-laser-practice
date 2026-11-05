@@ -13,6 +13,16 @@ import { TICK } from '../src/world/run-engine.js';
 import { PlayerCheck } from './coop-check.js';
 
 const COUNTDOWN = 3; // s: a round's run waits this long before the stage starts (app/session.js startAt)
+// The round's clock starts only when every player has loaded the stage and drawn it (their 'ready'), so a slow
+// device (a phone streaming the world) never meets the lasers on a black screen. Who holds the rest up for too long
+// is left out (tick): once at least half of the players are ready, the others get a grace period of
+// max(GRACE_MIN_MS, half the time the slowest ready player took), counted from that moment; one whose reported progress
+// ('load') hasn't moved for STALL_MS within it is dropped at once; and nobody waits past LOAD_CAP_MS from the start.
+// A dropped player is out of the round (dead, 'could not load in time') and watches once their stage is drawn.
+const LOAD_CAP_MS = 90_000;
+const GRACE_MIN_MS = 15_000;
+const STALL_MS = 10_000;
+const WAIT_MS = 500; // the loading roster ('wait': who is ready, everyone's progress) goes out at most this often
 const CLOCK_MS = 250, BOSS_MS = 100;
 const BD_DELAY_TICKS = 3; // boss damage reaches clients about this late
 const MAX_SAMPLES = 160; // per state message (2.5 s of ticks, for a tab catching up)
@@ -28,12 +38,17 @@ export class Round {
     this.r = Math.floor(Math.random() * 0x7ffffffe) + 1;
     this.seed = Math.floor(Math.random() * 0xfffe) + 1;
     this.map = map; this.stage = stage; this.mode = mode; this.kind = kind; this.rules = rules;
-    this.t0 = Date.now();
+    this.t0 = null; // set by go(): until then the round is loading and its clock stands at 0
+    this.ready = new Set();
+    this.loadT0 = Date.now();
+    this.halfAt = null; // when half of the players were first ready (the stragglers' grace starts)
+    this.waitAt = 0; this.waitDirty = false;
     this.countdown = stage.fastForward ? 0 : COUNTDOWN;
     this.dmg = new Map();
     this.clockAt = 0; this.bossAt = 0;
     this.ended = false;
-    this.players = new Map(room.members.map((c) => [c.id, { id: c.id, name: c.name, steamId: c.user?.steamId || null, alive: true, deadAt: null, cheat: '', budget: { at: 0, n: 0 } }]));
+    this.players = new Map(room.members.map((c) => [c.id, { id: c.id, name: c.name, steamId: c.user?.steamId || null, alive: true, deadAt: null, cheat: '', budget: { at: 0, n: 0 },
+      load: 0, loadAt: Date.now(), readyMs: null, left: false }])); // left: gone or never loaded (out, not beaten)
     // who starts holding the map's heal: the room's choice against who is in this round
     this.holders = assets.heals.length ? healHolders(rules.heal, [...this.players.keys()], this.seed) : [];
     for (const p of this.players.values()) {
@@ -48,7 +63,8 @@ export class Round {
     this.leader = this.pickLeader();
   }
 
-  get elapsed() { return (Date.now() - this.t0) / 1000; }
+  get elapsed() { return this.t0 == null ? 0 : (Date.now() - this.t0) / 1000; }
+  get started() { return this.t0 != null; }
   get roundTick() { return Math.floor(this.elapsed / TICK); }
   get stageTime() { return Math.max(0, this.elapsed - this.countdown); }
   get alive() { return [...this.players.values()].filter((p) => p.alive); }
@@ -72,11 +88,68 @@ export class Round {
     if (id !== this.leader) { this.leader = id; this.broadcast({ t: 'leader', r: this.r, id }); }
   }
 
+  // ---- loading: every player says when its stage is loaded and drawn; the clock starts when all have
+  onReady(c) {
+    const p = this.players.get(c.id);
+    if (this.started || this.ended || !p?.alive || this.ready.has(c.id)) return;
+    this.ready.add(c.id);
+    p.load = 1; p.readyMs = Date.now() - this.loadT0;
+    this.sendWait();
+    this.maybeGo();
+  }
+
+  // { p: 0..1 }: how far this player's load is (untrusted: a number, clamped, only ever up)
+  onLoad(c, m) {
+    const p = this.players.get(c.id);
+    if (this.started || this.ended || !p?.alive || this.ready.has(c.id)) return;
+    const v = Math.min(0.99, Math.max(0, Number(m.p)));
+    if (!Number.isFinite(v) || v <= p.load + 0.005) return;
+    p.load = v; p.loadAt = Date.now();
+    this.waitDirty = true;
+  }
+
+  // who is ready and everyone's progress (percent): the loading screens' roster
+  sendWait() {
+    this.waitAt = Date.now(); this.waitDirty = false;
+    this.broadcast({ t: 'wait', r: this.r, ready: [...this.ready], load: [...this.players.values()].map((p) => [p.id, Math.round(p.load * 100)]) });
+  }
+
+  // before go (every 100 ms): the roster, and the stragglers left out by the rule at the top
+  loadTick(now) {
+    if (this.waitDirty && now - this.waitAt >= WAIT_MS) this.sendWait();
+    const alive = this.alive;
+    const ready = alive.filter((p) => this.ready.has(p.id));
+    const late = alive.filter((p) => !this.ready.has(p.id));
+    if (!late.length) { this.maybeGo(); return; }
+    let drop = [];
+    if (now - this.loadT0 >= LOAD_CAP_MS) drop = late;
+    else if (ready.length && ready.length * 2 >= alive.length) {
+      this.halfAt ??= now;
+      const grace = Math.max(GRACE_MIN_MS, Math.max(...ready.map((p) => p.readyMs)) / 2);
+      drop = now - this.halfAt >= grace ? late : late.filter((p) => now - Math.max(p.loadAt, this.halfAt) >= STALL_MS);
+    }
+    for (const p of drop) { p.left = true; this.kill(p, '', 0, 'could not load in time'); }
+    if (drop.length) { this.sendWait(); this.maybeGo(); }
+  }
+
+  maybeGo() {
+    if (this.started || this.ended) return;
+    const waiting = [...this.players.values()].filter((p) => p.alive && !this.ready.has(p.id));
+    if (waiting.length) return;
+    this.go();
+  }
+
+  go() {
+    this.t0 = Date.now();
+    this.clockAt = 0;
+    this.broadcast({ t: 'go', r: this.r });
+  }
+
   // ---- from players
   // { k: first tick, p: [[x, y, z, ducked], ...], yaw, pitch }: checked, then the newest relayed to the others
   onState(c, m) {
     const p = this.players.get(c.id);
-    if (!p || !p.alive || this.ended || !Number.isInteger(m.k) || m.k < 1 || !Array.isArray(m.p) || !m.p.length || m.p.length > MAX_SAMPLES) return;
+    if (!p || !p.alive || this.ended || !this.started || !Number.isInteger(m.k) || m.k < 1 || !Array.isArray(m.p) || !m.p.length || m.p.length > MAX_SAMPLES) return;
     p.check.feed(m.k, m.p, this.roundTick);
     if (!p.alive || this.ended) return;
     const last = p.check.pos;
@@ -89,7 +162,7 @@ export class Round {
   // the client says it died (giving up early is allowed; the server's copy kills the cheaters who don't say)
   onDead(c, m) {
     const p = this.players.get(c.id);
-    if (!p || !p.alive || this.ended) return;
+    if (!p || !p.alive || this.ended || !this.started) return;
     p.check.alive = false;
     this.kill(p, cleanText(m.by, 40) || 'the map', p.check.stageTime);
   }
@@ -97,7 +170,9 @@ export class Round {
   onLeave(c) {
     const p = this.players.get(c.id);
     if (!p || this.ended) return;
-    if (p.alive) { p.check.alive = false; this.kill(p, '', p.check.stageTime, 'left the game'); }
+    // out of the round, not beaten: the others play on (checkEnd), and nobody waits for them to load
+    if (p.alive) { p.left = true; p.check.alive = false; this.kill(p, '', p.check.stageTime, 'left the game'); }
+    if (!this.started && !this.ended) { this.sendWait(); this.maybeGo(); }
   }
 
   kill(p, by, t, note) {
@@ -112,7 +187,7 @@ export class Round {
 
   onHit(c, m) {
     const p = this.players.get(c.id);
-    if (!p || this.ended || !Array.isArray(m.h)) return;
+    if (!p || this.ended || !this.started || !Array.isArray(m.h)) return;
     const hits = m.h.slice(0, 32).filter((h) => Array.isArray(h) && Number.isInteger(h[0]) && h[0] > 0 && num(h[1], 1, 1000) && Number.isInteger(h[2]) && h[2] > 0 && h[2] < 10000);
     const mult = Math.max(1, Math.round(100 / Math.max(1, this.rules.bossHp)));
     if (m.team === true) {
@@ -135,12 +210,12 @@ export class Round {
   // an item press: checked on the presser's copy, and shown on everyone's item HUD
   onUse(c, m) {
     const p = this.players.get(c.id);
-    if (!p?.alive || this.ended || !this.holders.includes(c.id)) return;
+    if (!p?.alive || this.ended || !this.started || !this.holders.includes(c.id)) return;
     p.check.use(m.k);
     this.broadcast({ t: 'use', r: this.r, id: c.id }, c);
   }
 
-  onReload(c) { const p = this.players.get(c.id); if (p?.alive && !this.ended) p.check.reload(); }
+  onReload(c) { const p = this.players.get(c.id); if (p?.alive && !this.ended && this.started) p.check.reload(); }
 
   // team = the simulated team's fire: its bullets carry the team (engine.teamEnt) as activator, not a player
   addDamage(id, dmg, n, team = false) { const k = `${id}:${dmg}:${team ? 1 : 0}`; this.dmg.set(k, (this.dmg.get(k) || 0) + n); }
@@ -148,6 +223,7 @@ export class Round {
   // ---- every 100 ms
   tick(now) {
     if (this.ended) return;
+    if (!this.started) { this.loadTick(Date.now()); return; } // still loading
     const rt = this.roundTick;
     if (now - this.bossAt >= BOSS_MS && this.dmg.size) {
       this.bossAt = now;
@@ -164,7 +240,12 @@ export class Round {
   checkEnd() {
     if (this.ended) return;
     const a = this.alive.length;
-    if (this.kind === 'versus' && this.players.size >= 2) { if (a <= 1) this.end('last'); } else if (a === 0) this.end('wiped');
+    if (this.kind === 'versus' && this.players.size >= 2) {
+      // a player who left (or never loaded) is out, not beaten: the last one standing wins only against someone who
+      // played it out; alone after the others left, you play on until you die or win
+      const contenders = [...this.players.values()].filter((p) => !p.left).length;
+      if (a === 0 || (a === 1 && contenders >= 2)) this.end('last');
+    } else if (a === 0) this.end('wiped');
   }
 
   end(reason) {
@@ -181,7 +262,7 @@ export class Round {
     } else if (reason === 'last' && alive.length) winners = alive;
     else if (reason === 'last' || (reason === 'wiped' && (endless || versus))) {
       // everyone is down: whoever lasted longest (within a tick = a draw); the anti-cheat's removals don't count
-      const fair = all.filter((p) => !p.cheat);
+      const fair = all.filter((p) => !p.cheat && !p.left);
       const longest = Math.max(0, ...fair.map((p) => p.deadAt ?? 0));
       winners = fair.filter((p) => (p.deadAt ?? 0) >= longest - TICK);
     } else if (reason === 'lose' && versus) winners = alive;

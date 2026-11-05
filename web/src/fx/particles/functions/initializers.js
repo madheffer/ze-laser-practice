@@ -2,12 +2,8 @@
 import { evalFloat, evalVec } from '../inputs.js';
 import {
   A, ANGLE_ATTRS, RAD, VECTOR_ATTRS, add, angleVectors, applySetMethod, attrIndex, clamp, cpPositionAt, dot, drawVarying,
-  getCp, getF, getV, len, lerp3, mul, norm, report, setF, setV, sub, toWorld, transformOf,
+  getCp, getF, getV, len, lerp3, mul, norm, randomBetween, evenIndex, report, setF, setV, sub, tableAt as T, toWorld, transformOf,
 } from './common.js';
-
-// Radical inverse in base b (Halton, RE §11 C_INIT_CreateWithinBox distribute-evenly).
-const halton = (i, b) => { let f = 1, r = 0; while (i > 0) { f /= b; r += f * (i % b); i = Math.floor(i / b); } return r; };
-const T = (c, k) => c.table[k & 0xfff];
 
 // Initializers whose output mask (vtable slot 30, a constant store in particles.dll 63babcbf) has bit 2, previous
 // position: once one has run, a later initializer sees that attribute as already initialised.
@@ -86,8 +82,8 @@ export const initializers = {
   // Previous position gets the same value when bit 2 of the pending-attribute mask is set (param_5 & 4): the
   // InitializeNewParticles loop (0x18001a8b0) passes the system's attributes and clears each initializer's slot-30
   // mask after it runs, so the box writes it unless an earlier initializer wrote it.
-  // UNSETTLED: the frame base counts particles we actually emitted (the game counts AddParticles requests, before
-  // the capacity clamp); local space uses the CP's current orientation (0x1800c1e70's orientation lerp is not
+  // The rule is common.js randomBetween (FUN_1801231d0 is the same code out of line), the index common.js evenIndex.
+  // UNSETTLED: local space uses the CP's current orientation (0x1800c1e70's orientation lerp is not
   // read); earlier initializers whose slot-30 mask is computed from their fields are taken as not writing prev.
   C_INIT_CreateWithinBox: {
     evidence: 'RE',
@@ -95,20 +91,9 @@ export const initializers = {
       const cp = getCp(c, clamp(fn.m_nControlPointNumber | 0, 0, 63));
       const rp = fn.m_randomnessParameters || {};
       if (st.writePrev === undefined) st.writePrev = !initializedBefore(c, fn, PREV_WRITERS);
-      if (st.frameTime !== c.time) { st.frameTime = c.time; st.frameBase = c.nextId - (e - s); }
       for (let i = s; i < e; i++) {
         const mn = evalVec(fn.m_vecMin, c, i, 'init'), mx = evalVec(fn.m_vecMax, c, i, 'init');
-        let r;
-        if (!rp.m_bDistributeEvenly) {
-          const b = c.rnd.counter + 2 * c.rnd.offset;
-          r = [T(c, b), T(c, b + 1), T(c, b + 2)];
-          c.rnd.counter += 3;
-        } else {
-          const seed = rp.m_nSeed < 0 ? rp.m_nSeed + c.rnd.offset : rp.m_nSeed;
-          const n = (seed + st.frameBase + (i - s)) & 0x7fffffff;
-          r = [halton(n, 2), halton(n, 3), halton(n, 5)];
-        }
-        const local = add(mn, [(mx[0] - mn[0]) * r[0], (mx[1] - mn[1]) * r[1], (mx[2] - mn[2]) * r[2]]);
+        const local = randomBetween(c, rp, mn, mx, evenIndex(c, s, i));
         const at = cpPositionAt(c, cp, c.attr[A.CREATION][i]);
         // Without m_bLocalSpace the box is world-axis aligned; with it, x forward, y left, z up.
         const p = fn.m_bLocalSpace ? add(at, toWorld(cp, local)) : add(at, local);

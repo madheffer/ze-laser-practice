@@ -4,13 +4,18 @@
 //
 // Every frame update(pos, see) asks for:
 //   1. the area: chunks within `radius` of the camera, plus the always-loaded ones (meshes wider than a chunk that
-//      can't be cut, such as props spanning cells), nearest first, a few at a time. A solo stage waits for these.
+//      can't be cut, such as props spanning cells), nearest first, a few at a time.
 //   2. then (mode 'auto') what can still be seen from there: chunks within `see`, the far plane or where the map's
 //      fog turns opaque (world/lighting.js viewDistance), one at a time so a load never stalls a frame for long.
 //      Mode 'area' stops at 1 (slow PCs); 'all' loads everything.
+// A stage waits only for what its first frames can show (gate): the always-loaded chunks and the area's chunks
+// within GATE_RADIUS and the view distance (the far plane / opaque fog, `see`); the rest streams in while it plays.
 // Chunks stay once loaded.
 
-const CONCURRENT = 4;
+// the farthest a stage waits for (units, ~150 m): what fills a first view; past it (or past where the fog turns
+// opaque) the world streams in while the stage plays, nearest first. Scenery only: collision is whole from the start.
+const GATE_RADIUS = 6000;
+const CONCURRENT = 6; // a browser's HTTP/1.1 connections per host (HTTP/2 multiplexes more; 6 keeps a frame's decode short)
 
 export class WorldStream {
   // list: chunks.json entries { file, min, max, always }; load(file) -> Promise<THREE.Object3D>; add(scene)
@@ -37,6 +42,8 @@ export class WorldStream {
 
   // the area a stage needs
   wanted(c, p) { return this.mode === 'all' || c.always || WorldStream.dist(c, p) <= this.radius; }
+  // what a stage waits for at p: the area, no farther than can be seen
+  gate(c, p) { return c.always || WorldStream.dist(c, p) <= Math.min(this.radius, this.see, GATE_RADIUS); }
   // visible from p, after the area
   extra(c, p) { return this.mode === 'auto' && WorldStream.dist(c, p) <= this.see; }
 
@@ -81,12 +88,12 @@ export class WorldStream {
   }
 
   ready(pos) {
-    return this.chunks.every((c) => c.state === 'done' || c.state === 'failed' || !this.wanted(c, pos));
+    return this.chunks.every((c) => c.state === 'done' || c.state === 'failed' || !this.gate(c, pos));
   }
 
-  // the area's chunks at pos: [loaded, total]
+  // the chunks a stage waits for at pos (gate): [loaded, total]
   progress(pos) {
-    const need = this.chunks.filter((c) => this.wanted(c, pos));
+    const need = this.chunks.filter((c) => this.gate(c, pos));
     return [need.filter((c) => c.state === 'done' || c.state === 'failed').length, need.length];
   }
 

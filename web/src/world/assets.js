@@ -7,7 +7,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { mapName, safeRelPath, assetKey, versioned } from '../lib/paths.js';
-import { fetchJson, fetchBuffer, FRESH } from '../lib/fetch.js';
+import { fetchJson, fetchBuffer, fetchBufferProgress, FRESH } from '../lib/fetch.js';
 import { normaliseHulls } from './hulls.js';
 import { mapItems } from './items.js';
 import { MapEffects } from '../fx/effects.js';
@@ -60,10 +60,22 @@ export async function loadMap(name, onProgress = () => {}, opts = {}) {
   const tier = opts.tier === 'medium' || opts.tier === 'low' ? opts.tier : '';
   const loader = glbLoader(version, base, tier ? `${base}q/${tier}/tex/` : '');
   onProgress('entities');
+  // the big files (collision, the particle-trace collision): their bytes move the loading bar, which a round's
+  // server also reads to tell a slow download from a stuck one (server/coop-round.js). The total isn't known up
+  // front (compressed responses), so the share creeps toward 100% as megabytes arrive.
+  let got = 0, shown = -1;
+  const bytes = (n) => {
+    got += n;
+    const pct = Math.min(99, Math.floor(100 * (1 - Math.exp(-got / (16 * 1024 * 1024)))));
+    if (pct !== shown) { shown = pct; onProgress(`entities ${pct}%`); }
+  };
+  // optional: the static world as particle traces see it (lasers-bake collision_fx*.bin; older bakes have none),
+  // fetched alongside the rest rather than after it
+  const fxFiles = Promise.all([fetchBufferProgress(url('collision_fx.bin'), bytes).catch(() => null), fetchBuffer(url('collision_fx_layers.bin')).catch(() => null)]);
   const [entities, hullsRaw, colBuf, particles, entwatch, overview, animations] = await Promise.all([
     fetchJson(url('entities.json')),
     fetchJson(url(manifestPath(manifest.hulls, 'hulls.json'))).catch(() => ({})),
-    fetchBuffer(url(manifestPath(manifest.collision?.file, 'collision.bin'))),
+    fetchBufferProgress(url(manifestPath(manifest.collision?.file, 'collision.bin')), bytes),
     fetchJson(url('particles.json')).catch(() => ({})),
     // optional: GFL's EntWatch items (tools/entwatch.mjs) and the map's CS2 radar (lasers-bake --overview)
     fetchJson(url('entwatch.json')).catch(() => null),
@@ -71,8 +83,7 @@ export async function loadMap(name, onProgress = () => {}, opts = {}) {
     // optional: prop_dynamic sequence lengths (lasers-bake --models), read by entities/classes/props.js
     manifest.animations ? fetchJson(url(manifestPath(manifest.animations, null))).catch(() => null) : null,
   ]);
-  // optional: the static world as particle traces see it (lasers-bake collision_fx*.bin; older bakes have none)
-  const [fxBuf, fxLayerBuf] = await Promise.all([fetchBuffer(url('collision_fx.bin')).catch(() => null), fetchBuffer(url('collision_fx_layers.bin')).catch(() => null)]);
+  const [fxBuf, fxLayerBuf] = await fxFiles;
   const collisionFx = fxBuf && fxLayerBuf && fxBuf.byteLength === fxLayerBuf.byteLength * 9 ? { tris: new Float32Array(fxBuf), layers: new Uint32Array(fxLayerBuf) } : null;
   const collision = new Float32Array(colBuf);
 

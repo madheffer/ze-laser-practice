@@ -22,6 +22,17 @@
         "web"
       ],
       "port": 5805
+    },
+    {
+      "name": "web-stable",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev:stable",
+        "--prefix",
+        "web"
+      ],
+      "port": 5807
     }
   ]
 }

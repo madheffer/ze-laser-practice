@@ -22,18 +22,25 @@ export function mapStore(dir) {
     }
     const folder = path.join(dir, map); // [a-z0-9_-] only: never leaves dir
     const p = (async () => {
-      const [entities, hullsRaw, col, entwatch, animations] = await Promise.all([
+      const [entities, hullsRaw, col, entwatch, animations, fxCol, fxLayers] = await Promise.all([
         readFile(path.join(folder, 'entities.json'), 'utf8').then(JSON.parse),
         readFile(path.join(folder, 'hulls.json'), 'utf8').then(JSON.parse).catch(() => ({})),
         readFile(path.join(folder, 'collision.bin')),
         readFile(path.join(folder, 'entwatch.json'), 'utf8').then(JSON.parse).catch(() => null), // optional
         // prop_dynamic sequence lengths, for OnAnimationDone (lasers-bake --models; optional)
         readFile(path.join(folder, 'animations.json'), 'utf8').then(JSON.parse).catch(() => null),
+        // the static world with layer bits (lasers-bake collision_fx*.bin; optional): what bullets see (world/bullets.js)
+        readFile(path.join(folder, 'collision_fx.bin')).catch(() => null),
+        readFile(path.join(folder, 'collision_fx_layers.bin')).catch(() => null),
       ]);
       const { hulls, bounds } = normaliseHulls(hullsRaw);
       const tris = new Float32Array(col.buffer.slice(col.byteOffset, col.byteOffset + col.byteLength));
+      const fx = fxCol && fxLayers && fxCol.byteLength === fxLayers.byteLength * 9
+        ? { bvh: new TriangleBVH(new Float32Array(fxCol.buffer.slice(fxCol.byteOffset, fxCol.byteOffset + fxCol.byteLength))),
+            layers: new Uint32Array(fxLayers.buffer.slice(fxLayers.byteOffset, fxLayers.byteOffset + fxLayers.byteLength)) }
+        : null;
       // the map's EntWatch items, as the browser reads them (world/items.js): a round's heal holders get its heals
-      return { map, entities, hulls, bounds, animations, bvh: new TriangleBVH(tris), heals: usableHeals(mapItems(entities, entwatch)) };
+      return { map, entities, hulls, bounds, animations, bvh: new TriangleBVH(tris), fx, heals: usableHeals(mapItems(entities, entwatch)) };
     })();
     p.catch(() => cache.delete(map));
     cache.set(map, p);

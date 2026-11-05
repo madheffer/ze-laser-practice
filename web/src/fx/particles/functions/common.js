@@ -153,17 +153,43 @@ export const outputClamp = (a) => (a === A.ALPHA || a === A.ALPHA2 ? [0, 1]
 // Integer of a ParticleAttributeIndex_t field (KV3 writes it as an int).
 export const attrIndex = (v, d = A.NONE) => (Number.isInteger(+v) ? +v : d);
 
-// A CParticleTransformInput as a control point record. PT_TYPE_CONTROL_POINT reads its CP, with
-// the identity frame when m_bUseOrientation is off; other types are reported and read CP0's
-// position with the identity frame (UNSETTLED). An int field (old files) is the CP number.
+// A CParticleTransformInput as a control point record (particles.dll 63babcbf: setup FUN_1800bad80, read
+// FUN_1800bb4d0 / FUN_1800bb230). PT_TYPE_INVALID (0) is the identity at the origin; PT_TYPE_CONTROL_POINT reads its
+// CP; m_bUseOrientation off (+0x5a) replaces the orientation with the identity (DAT_18065c790). An int field (old
+// files) is the CP number. PT_TYPE_NAMED_VALUE is reported and reads CP0 with the identity frame (UNSETTLED).
+// PT_TYPE_CONTROL_POINT_RANGE (FUN_1800bad80 case 3, FUN_1800bb230): the candidates are CPs m_nControlPoint ..
+// m_nControlPointRangeMax whose position is not FLT_MAX (DAT_1805343a4) and whose bit is clear in coll+0x150. Per
+// read, g = m_flEndCPGrowthTime ? min(time, growth) / growth : 1 (DAT_180534200 = 1). g >= 1: no candidate -> the
+// first CP, else candidates[int(n * T[c914 + c910++])]. g < 1: top = floor(g * (max(first, last) - first) + first),
+// k = int((top - first + 1) * T[c914 + c910++]) + first; k's slot among the candidates, or, absent,
+// int(n * T[c914 + c910++]); no candidate -> the first CP. UNSETTLED: the runtime keeps no FLT_MAX "unset" position
+// and no coll+0x150 mask, so a never-set CP (cp.set false, not CP0) stands for the excluded ones; the transform is
+// read at the current time (FUN_180049ae0's time argument is not followed).
+const IDENTITY = { forward: [1, 0, 0], left: [0, 1, 0], up: [0, 0, 1] };
+const TRANSFORM_TYPES = ['PT_TYPE_INVALID', 'PT_TYPE_NAMED_VALUE', 'PT_TYPE_CONTROL_POINT', 'PT_TYPE_CONTROL_POINT_RANGE'];
+const rangeCp = (coll, t) => {
+  const first = clamp(t.m_nControlPoint | 0, 0, 63), last = clamp(t.m_nControlPointRangeMax | 0, 0, 63);
+  const list = [];
+  for (let i = first; i <= last; i++) { const cp = coll.controlPoints[i]; if (cp && (cp.set || i === 0)) list.push(i); }
+  const growth = +t.m_flEndCPGrowthTime || 0;
+  const g = growth !== 0 ? Math.min(coll.time, growth) / growth : 1;
+  const draw = () => coll.table[(coll.rnd.offset + coll.rnd.counter++) & 0xfff];
+  if (g >= 1) return list.length ? list[Math.trunc(list.length * draw())] : first;
+  const top = Math.floor(clamp(g, 0, 1) * (Math.max(first, last) - first) + first);
+  const k = Math.trunc((top - first + 1) * draw()) + first;
+  let slot = list.indexOf(k);
+  if (slot < 0) slot = Math.trunc(list.length * draw());
+  return list.length ? list[slot] : first;
+};
 export const transformOf = (coll, t) => {
   if (typeof t === 'number') return getCp(coll, t | 0);
-  const type = t?.m_nType ?? 'PT_TYPE_CONTROL_POINT';
-  const cp = getCp(coll, type === 'PT_TYPE_CONTROL_POINT' ? (t?.m_nControlPoint | 0) : 0);
-  if (type !== 'PT_TYPE_CONTROL_POINT') report(coll, `transform input ${type} not implemented (reads CP0, identity)`);
-  if (type !== 'PT_TYPE_CONTROL_POINT' || t?.m_bUseOrientation === false) {
-    return { ...cp, forward: [1, 0, 0], left: [0, 1, 0], up: [0, 0, 1] };
-  }
+  let type = t?.m_nType ?? 'PT_TYPE_CONTROL_POINT';
+  if (typeof type === 'number') type = TRANSFORM_TYPES[type] || 'PT_TYPE_INVALID';
+  if (type === 'PT_TYPE_INVALID') return { ...newControlPoint(), ...IDENTITY };
+  const cpi = type === 'PT_TYPE_CONTROL_POINT_RANGE' ? rangeCp(coll, t) : type === 'PT_TYPE_CONTROL_POINT' ? (t?.m_nControlPoint | 0) : 0;
+  const cp = getCp(coll, cpi);
+  if (type === 'PT_TYPE_NAMED_VALUE') report(coll, `transform input ${type} not implemented (reads CP0, identity)`);
+  if (type === 'PT_TYPE_NAMED_VALUE' || t?.m_bUseOrientation === false) return { ...cp, ...IDENTITY };
   return cp;
 };
 
@@ -183,3 +209,58 @@ export const applySetMethod = (m, v, init, cur, dt) => {
 
 // Report something unimplemented once per collection definition, never silently.
 export const report = (coll, msg) => coll.sys.report(`${coll.path}: ${msg}`);
+
+// ---- shared by the ported_*.js files (particles.dll md5 63babcbf3245e56855a777134323e74a).
+export const DEG2RAD = 0.0174532924; // DAT_180534170
+export const FLT_MIN = 1.17549435e-38; // DAT_180589120
+export const isZero = (v) => !v[0] && !v[1] && !v[2];
+// The random table entry at an index (DAT_180598f60, 4,096 floats; the index wraps at 0xfff).
+export const tableAt = (c, k) => c.table[k & 0xfff];
+// An enum field as its index: KV3 carries the name or the int; an unknown name reads `d`.
+export const enumIndex = (v, names, d = 0) => (typeof v === 'number' ? v : Math.max(names.indexOf(v), d));
+
+// The thread-local generator behind FUN_18036ba50 / FUN_18036b9c0 (lagged additive generator mod 1 in TLS+0x110).
+// UNSETTLED: its state is per thread and unseeded from the effect, so a seeded stream per function (its state
+// object) stands in; the draw order is the game's.
+export const threadRandom = (st) => (st.rng ||= mulberry32(0x2545f491));
+
+// VectorVectors (0x18035ed10): forward n, left = cross(Z, n)/|..|, up = cross(n, left); a vertical n gives left
+// (0,1,0), up (-n.z,0,0) (RE §11 C_OP_SetControlPointToImpactPoint).
+export const frameFromNormal = (n) => {
+  if (Math.abs(n[0]) < 1e-6 && Math.abs(n[1]) < 1e-6) return [n, [0, 1, 0], [-n[2], 0, 0]];
+  const l = norm(cross([0, 0, 1], n));
+  return [n, l, cross(n, l)];
+};
+
+// ParticleTraceSet_t and the game trace-set mask each one becomes (the switch before every trace loop:
+// ALL 0xf, STATIC 1, STATIC_AND_KEYFRAMED 3, DYNAMIC 6).
+export const TRACE_SETS = ['PARTICLE_TRACE_SET_ALL', 'PARTICLE_TRACE_SET_STATIC', 'PARTICLE_TRACE_SET_STATIC_AND_KEYFRAMED',
+  'PARTICLE_TRACE_SET_DYNAMIC'];
+export const traceSetMask = (set) => [0xf, 1, 3, 6][set] ?? 0xf;
+
+// Radical inverse in base b (Halton; bases 2 / 3 / 5 = DAT_1805341b8 0.5, DAT_1805341b0 1/3, DAT_1805341a0 0.2).
+export const halton = (i, b) => { let f = 1, r = 0; while (i > 0) { f /= b; r += f * (i % b); i = Math.floor(i / b); } return r; };
+
+// The distribute-evenly index an initializer gets for particle i of the batch [s, e) (the dispatchers 0x1800a0ec0 /
+// 0x180136930 pass coll+0x88 - first + index as param_7): coll+0x88 is the number of particles requested before
+// this frame (system.js c.added88, zeroed 0x180037a32, += coll+0x8c at frame end 0x180048658; coll+0x8c zeroed at
+// frame start 0x180047711, += each AddParticles count 0x180102aa5), so two batches in one frame reuse indices.
+export const evenIndex = (c, s, i) => ((c.added88 | 0) + (i - s)) | 0;
+
+// CRandomNumberGeneratorParameters between two vectors (FUN_1801231d0, the same rule C_INIT_CreateWithinBox
+// 0x180136ec0 inlines): not distribute-evenly reads T[c910 + 2*c914 + k], c910 += 3; distribute-evenly is Halton
+// 2/3/5 at (index + (m_nSeed < 0 ? m_nSeed + c914 : m_nSeed)) & 0x7fffffff, index = *param_4 (post-incremented by
+// the call; evenIndex above for the particle).
+export const randomBetween = (c, rp, lo, hi, index) => {
+  let r;
+  if (!rp || !rp.m_bDistributeEvenly) {
+    const b = c.rnd.counter + 2 * c.rnd.offset;
+    r = [tableAt(c, b), tableAt(c, b + 1), tableAt(c, b + 2)];
+    c.rnd.counter += 3;
+  } else {
+    const seed = (rp.m_nSeed | 0) < 0 ? (rp.m_nSeed | 0) + c.rnd.offset : rp.m_nSeed | 0;
+    const n = (index + seed) & 0x7fffffff;
+    r = [halton(n, 2), halton(n, 3), halton(n, 5)];
+  }
+  return [lo[0] + (hi[0] - lo[0]) * r[0], lo[1] + (hi[1] - lo[1]) * r[1], lo[2] + (hi[2] - lo[2]) * r[2]];
+};

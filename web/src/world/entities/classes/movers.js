@@ -5,6 +5,7 @@ import { register } from '../registry.js';
 import { DEG, num, parseVec, angleForward } from '../math.js';
 import { approach, clamp01 } from '../../../lib/math.js';
 import './trains.js'; // registers path_track, func_tracktrain, func_tanktrain, func_train
+import { doorMoveSound, doorArriveSound, moveLinearStartSound, moveLinearStopSound } from '../sound.js';
 
 // Linear movers share this: position 0 = pos1, 1 = pos2, in the parent's space.
 function linearMover(e, dir, dist, startPos = 0) {
@@ -18,7 +19,8 @@ function linearMover(e, dir, dist, startPos = 0) {
 function moveLinear(e, dt, onArrive) {
   const s = e.state;
   if (s.pos === s.target) return;
-  s.pos = approach(s.pos, s.target, s.dist > 0 ? (s.speed * dt) / s.dist : 1);
+  // dist is signed (a door whose lip exceeds its size moves backwards): the rate is over its length
+  s.pos = approach(s.pos, s.target, s.dist !== 0 ? (s.speed * dt) / Math.abs(s.dist) : 1);
   e.pos.lerpVectors(s.p1, s.p2, s.pos);
   e.engine.moved(e);
   if (s.pos === s.target) onArrive(s.target);
@@ -35,17 +37,21 @@ register('func_door', {
   solid: (e) => !(num(e.kv.spawnflags) & 8),
   spawn(e) {
     const dir = angleForward(parseVec(e.kv.movedir));
-    const dist = Math.max(0, modelSizeAlong(e, dir) - num(e.kv.lip));
+    // CS2 CBaseDoor::Spawn (cs2_server FUN_180d53f10): travel = |movedir . OBB size| - m_flLip, unclamped, and
+    // position2 = position1 + movedir x travel. A lip bigger than the brush gives a negative travel: the door moves
+    // backwards along movedir (ze_visualizer's dodge balls: 32 u doors with lip 3200 fly 3168 u "against" movedir).
+    const dist = modelSizeAlong(e, dir) - num(e.kv.lip);
     linearMover(e, dir, dist, 0);
     if (num(e.kv.spawnpos) === 1 || (num(e.kv.spawnflags) & 1)) { e.state.pos = e.state.target = 1; e.pos.copy(e.state.p2); }
   },
   input(e, inp, p, act) {
     const s = e.state;
+    // from rest, a door starts its moving sound (sound.js doorMoveSound)
     const open = () => {
       if (s.locked) return;
-      if (s.target !== 1) { s.target = 1; e.fireOutput('OnOpen', act); s.activator = act; }
+      if (s.target !== 1) { if (s.pos === s.target) doorMoveSound(e, true); s.target = 1; e.fireOutput('OnOpen', act); s.activator = act; }
     };
-    const close = () => { if (s.target !== 0) { s.target = 0; e.fireOutput('OnClose', act); s.activator = act; } };
+    const close = () => { if (s.target !== 0) { if (s.pos === s.target) doorMoveSound(e, false); s.target = 0; e.fireOutput('OnClose', act); s.activator = act; } };
     switch (inp) {
       case 'open': open(); return true;
       case 'close': close(); return true;
@@ -57,6 +63,7 @@ register('func_door', {
   },
   think(e, dt) {
     moveLinear(e, dt, (t) => {
+      doorArriveSound(e, t === 1);
       if (t === 1) {
         e.fireOutput('OnFullyOpen', e.state.activator);
         const wait = num(e.kv.wait, 4);
@@ -82,8 +89,8 @@ register('func_door_rotating', {
   },
   input(e, inp, p, act) {
     const s = e.state;
-    const open = () => { if (!s.locked && s.target !== 1) { s.target = 1; e.fireOutput('OnOpen', act); s.activator = act; } };
-    const close = () => { if (s.target !== 0) { s.target = 0; e.fireOutput('OnClose', act); s.activator = act; } };
+    const open = () => { if (!s.locked && s.target !== 1) { if (s.pos === s.target) doorMoveSound(e, true); s.target = 1; e.fireOutput('OnOpen', act); s.activator = act; } };
+    const close = () => { if (s.target !== 0) { if (s.pos === s.target) doorMoveSound(e, false); s.target = 0; e.fireOutput('OnClose', act); s.activator = act; } };
     switch (inp) {
       case 'open': open(); return true;
       case 'close': close(); return true;
@@ -100,6 +107,7 @@ register('func_door_rotating', {
     e.quat.copy(s.q0).multiply(new THREE.Quaternion().setFromAxisAngle(s.axis, s.deg * s.pos * DEG));
     e.engine.moved(e);
     if (s.pos !== s.target) return;
+    doorArriveSound(e, s.target === 1);
     if (s.target === 1) {
       e.fireOutput('OnFullyOpen', s.activator);
       const wait = num(e.kv.wait, 4);
@@ -125,6 +133,15 @@ register('func_button', {
   },
 });
 
+// a move to somewhere it isn't (Source MoveTo with a non-zero speed) plays StartSound (sound.js)
+function linearTo(e, target, act) {
+  const s = e.state;
+  if (target !== s.pos && s.speed) moveLinearStartSound(e);
+  s.target = target;
+  s.activator = act;
+  return true;
+}
+
 register('func_movelinear', {
   solid: (e) => !(num(e.kv.spawnflags) & 8),
   spawn(e) {
@@ -134,14 +151,15 @@ register('func_movelinear', {
   input(e, inp, p, act) {
     const s = e.state;
     switch (inp) {
-      case 'open': s.target = 1; s.activator = act; return true;
-      case 'close': s.target = 0; s.activator = act; return true;
-      case 'setposition': s.target = clamp01(num(p)); s.activator = act; return true;
+      case 'open': return linearTo(e, 1, act);
+      case 'close': return linearTo(e, 0, act);
+      case 'setposition': return linearTo(e, clamp01(num(p)), act);
       case 'setspeed': s.speed = num(p); return true;
     }
   },
   think(e, dt) {
     moveLinear(e, dt, (t) => {
+      moveLinearStopSound(e);
       if (t === 1) e.fireOutput('OnFullyOpen', e.state.activator);
       else if (t === 0) e.fireOutput('OnFullyClosed', e.state.activator);
       e.fireOutput('OnReachedPosition', e.state.activator);

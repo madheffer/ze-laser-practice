@@ -14,6 +14,7 @@
 import { createRunEngine, hazardName, TICK } from '../src/world/run-engine.js';
 import { useItems } from '../src/world/items.js';
 import { CollisionWorld, makeTrace } from '../src/world/collision.js';
+import { bulletWorld, BULLET_MASK } from '../src/world/bullets.js';
 import { CS } from '../src/world/movement.js';
 import { WEAPONS } from '../src/lib/weapons.js';
 
@@ -40,6 +41,8 @@ export class PlayerCheck {
     this.rules = rules;
     this.onDeath = onDeath; this.onOutcome = onOutcome; this.onCheat = onCheat; this.log = log;
     this.world = new CollisionWorld(assets.bvh);
+    // shots: CS2's bullet trace on the map's layered static world (shared by every check), as the client's bosses.js
+    this.shotWorld = bulletWorld(assets.fx, this.world);
     this.pos = [0, 0, 0]; this.yaw = 0; this.ducked = false;
     this.hp = scenario?.player?.health ?? 100; this.maxHp = this.hp;
     this.gravity = scenario?.player?.gravity ?? 1;
@@ -299,7 +302,7 @@ export class PlayerCheck {
       const near = [0, 1, 2].map((a) => Math.min(h.max[a], Math.max(h.min[a], eye[a])));
       if (len3(near, eye) > range) continue;
       for (const p of pts) {
-        this.world.traceBox(eye, p, [0, 0, 0], tr, true);
+        this.shotWorld.traceBox(eye, p, [0, 0, 0], tr, true, BULLET_MASK);
         if (tr.fraction >= 0.98) return true;
       }
     }

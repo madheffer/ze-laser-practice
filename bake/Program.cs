@@ -37,6 +37,13 @@ public static class Program
             SoundBake.Stock(Path.Combine(stockCs2, "pak01_dir.vpk"), Path.GetFullPath(args[1]));
             return 0;
         }
+        if (args.Length >= 3 && args[0] == "--sounds")
+        {
+            // lasers-bake --sounds <workshop.vpk> <web/public/maps/<name>> [--cs2 <game/csgo>]: only soundevents.json + sounds/
+            // (the map's events + the stock ones its entities name), for a map already baked (SoundBake.cs)
+            var si = Array.IndexOf(args, "--cs2");
+            return SoundBake.Run(Path.GetFullPath(args[1]), Path.GetFullPath(args[2]), si > 0 && si + 1 < args.Length ? args[si + 1] : FindCs2());
+        }
         if (args.Length >= 2 && args[0] == "--panorama")
         {
             // lasers-bake --panorama <web/public/panorama> [--cs2 <game/csgo>]: the CS2 HUD's own icons (SVG) and
@@ -327,8 +334,9 @@ sealed class Baker(string input, string outRoot, string? cs2, bool textures)
         // the cut-out alpha VRF's exporter drops (alpha-tested leaves, fences): AlphaBake.cs
         AlphaBake.Write(loader, outDir, Log);
 
-        // 5. sounds: soundevents.json (every event the map's .vsndevts_c files define) + the sounds they play.
-        var soundEvents = SoundBake.Map(loader, [map, outer], outDir);
+        // 5. sounds: soundevents.json (every event the map's .vsndevts_c files define, + the stock ones its entities
+        //    name: SoundRefs.cs) + the sounds they play (SoundBake.cs).
+        var soundEvents = SoundBake.Map(loader, [map, outer], outDir, cs2 != null ? Program.StockPaks(cs2) : []);
 
         // 6. shots/: the map's loading-screen screenshots, for the home page (ShotsBake.cs)
         ShotsBake.Write(outer, outDir, Log);
@@ -535,9 +543,10 @@ sealed class Baker(string input, string outRoot, string? cs2, bool textures)
         //    runtime can apply the exact mask of each trace. Ours only: cybo's format is unchanged.
         var fxTris = new List<float>();
         var fxLayers = new List<uint>();
+        var fxSurfaces = new List<uint>(); // each triangle's surface property hash (collision_fx_surfaces.bin: bullet impacts)
         if (loader.LoadFile($"maps/{mapName}/world_physics.vmdl_c")?.DataBlock is Model physModel2 && PhysOf(loader, physModel2) is { } phys2)
         {
-            AppendTriangles(phys2, Matrix4x4.Identity, fxTris, playerSolidOnly: false, fxLayers, ParticleLayers);
+            AppendTriangles(phys2, Matrix4x4.Identity, fxTris, playerSolidOnly: false, fxLayers, ParticleLayers, fxSurfaces);
         }
         var fxBin = new byte[fxTris.Count * 4];
         Buffer.BlockCopy(fxTris.ToArray(), 0, fxBin, 0, fxBin.Length);
@@ -545,6 +554,9 @@ sealed class Baker(string input, string outRoot, string? cs2, bool textures)
         var layerBin = new byte[fxLayers.Count * 4];
         Buffer.BlockCopy(fxLayers.ToArray(), 0, layerBin, 0, layerBin.Length);
         File.WriteAllBytes(Path.Combine(outDir, "collision_fx_layers.bin"), layerBin);
+        var surfBin = new byte[fxSurfaces.Count * 4];
+        Buffer.BlockCopy(fxSurfaces.ToArray(), 0, surfBin, 0, surfBin.Length);
+        File.WriteAllBytes(Path.Combine(outDir, "collision_fx_surfaces.bin"), surfBin);
         Log($"collision_fx: {fxLayers.Count} triangles");
     }
 
@@ -572,8 +584,10 @@ sealed class Baker(string input, string outRoot, string? cs2, bool textures)
         "debris", "physics_prop", "navignore", "navlocalignore", "postprocessingvolume", "unused_layer3", "carriedobject",
         "pushaway", "serverentityonclient", "carriedweapon", "staticlevel",
     ];
-    // every layer some particle trace can hit (0x1db001: solid, window, passbullets, water, slime, player, npc, debris)
-    internal const uint ParticleLayers = 0x1db001;
+    // every layer a particle trace (0x1db001 at most: solid, window, passbullets, water, slime, player, npc, debris) or a
+    // bullet trace (0x1c300b, server.dll 0x180a71821: adds hitboxes and sky) can hit; each trace applies its own mask per
+    // triangle, so sky triangles are kept for bullets and skipped by particles
+    internal const uint ParticleLayers = 0x1db001 | 0x1c300b;
 
     // A collision attribute's interaction layers (m_InteractAsStrings) as bits; 0 for the trigger / never groups,
     // which no trace collides with. Any other group but conditionallysolid is solid to everything (CS2Fixes const.h
@@ -596,9 +610,12 @@ sealed class Baker(string input, string outRoot, string? cs2, bool textures)
     }
 
     // outLayers / layerMask: keep only shapes whose layers meet layerMask and record each triangle's layer bits.
+    // outSurfaces: each triangle's surface property hash (the shape's, or a mesh triangle's own material).
     static void AppendTriangles(PhysAggregateData phys, Matrix4x4 xf, List<float> outTris, bool playerSolidOnly,
-        List<uint>? outLayers = null, uint layerMask = 0)
+        List<uint>? outLayers = null, uint layerMask = 0, List<uint>? outSurfaces = null)
     {
+        var hashes = phys.SurfacePropertyHashes ?? [];
+        uint Surf(int i) => i >= 0 && i < hashes.Length ? hashes[i] : 0;
         var bind = phys.BindPose;
         for (var p = 0; p < phys.Parts.Length; p++)
         {
@@ -625,7 +642,7 @@ sealed class Baker(string input, string outRoot, string? cs2, bool textures)
                         e = next;
                     }
                 }
-                for (var k = before; k < outTris.Count; k += 9) outLayers?.Add(layers);
+                for (var k = before; k < outTris.Count; k += 9) { outLayers?.Add(layers); outSurfaces?.Add(Surf(h.SurfacePropertyIndex)); }
             }
             foreach (var m in shape.Meshes)
             {
@@ -634,9 +651,14 @@ sealed class Baker(string input, string outRoot, string? cs2, bool textures)
                 if (outLayers != null && (layers & layerMask) == 0) continue;
                 var before = outTris.Count;
                 var verts = m.Shape.GetVertices();
+                var mats = m.Shape.Materials ?? [];
+                var ti = 0;
                 foreach (var t in m.Shape.GetTriangles())
                 {
                     Tri(outTris, Vector3.Transform(verts[t.X], pose), Vector3.Transform(verts[t.Y], pose), Vector3.Transform(verts[t.Z], pose));
+                    // a mesh triangle's material indexes the aggregate's surface list (UNSETTLED: read from VRF's types only)
+                    outSurfaces?.Add(Surf(ti < mats.Length ? mats[ti] : m.SurfacePropertyIndex));
+                    ti++;
                 }
                 for (var k = before; k < outTris.Count; k += 9) outLayers?.Add(layers);
             }
@@ -718,285 +740,4 @@ sealed class Baker(string input, string outRoot, string? cs2, bool textures)
     }
 
     static void Log(string s) => Console.WriteLine(s);
-}
-
-// ---------------------------------------------------------------------------------------------------------
-// Sounds: soundevents (.vsndevts_c, KV3) -> a small soundevents.json the player reads, and every .vsnd_c an
-// event names -> a browser-playable file. MP3 stays MP3; WAV is written as PCM16 WAV (Valve's MS-ADPCM
-// waves are decoded here, since browsers only decode PCM WAV).
-//
-//   soundevents.json: { "<event>": { type, files: ["sounds/x.wav"], volume, pitch, pitchRandom?: [min, max],
-//                       curve?: [[distance, volume], ...], delay?, local?, children?: [event], duration?,
-//                       loop?: true, loopStart?: seconds, loopEnd?: seconds } }
-//
-// `curve` is the event's distance_volume_mapping_curve (Source units -> gain); `base` inheritance is resolved.
-// `local` marks events that play on the listener (position_relative_to_player). Files are relative to the
-// folder the json sits in.
-static class SoundBake
-{
-    static readonly JsonSerializerOptions Json = new() { WriteIndented = false };
-    const int MaxSoundBytes = 64 << 20; // one sound file; CS2's longest music tracks are a few MB
-
-    // The player's own sounds. Names are CS2's (pak01 soundevents/game_sounds_*.vsndevts_c).
-    static readonly string[] StockFiles =
-    [
-        "soundevents/game_sounds_weapons.vsndevts_c",
-        "soundevents/game_sounds_player.vsndevts_c",
-        "soundevents/game_sounds_footsteps.vsndevts_c",
-    ];
-    static readonly string[] StockEvents =
-    [
-        "Weapon_Knife.Deploy", "Weapon_Knife.Slash", "Weapon_Knife.Stab", "Weapon_Knife.Hit", "Weapon_Knife.HitWall",
-        "Weapon_AK47.Draw", "Weapon_AK47.Single", "Weapon_AK47.Clipout", "Weapon_AK47.Clipin", "Weapon_AK47.BoltPull",
-        "Default.WalkJump", "CT_Concrete.StepLeft", "Land_Concrete.StepLeft", "CT_Default.StepLeft", "Land_Default.StepLeft",
-        "Player.DamageBody.Victim", "Player.DamageFall", "Player.BurnDamage", "Player.Death",
-    ];
-
-    /// The map's events (every vsndevts_c in its packages). Returns the event count written.
-    public static int Map(GameFileLoader loader, IEnumerable<Package> packages, string outDir)
-    {
-        var raw = new Dictionary<string, KVObject>(StringComparer.OrdinalIgnoreCase);
-        foreach (var pkg in packages.Distinct())
-        {
-            if (!pkg.Entries.TryGetValue("vsndevts_c", out var entries)) continue;
-            foreach (var e in entries)
-            {
-                pkg.ReadEntry(e, out var bytes);
-                ReadEvents(bytes, e.GetFullPath(), raw);
-            }
-        }
-        if (raw.Count == 0) { Console.WriteLine("sounds: map ships no soundevents"); return 0; }
-        var (events, files, failed) = Export(loader, raw, raw.Keys.ToList(), outDir);
-        File.WriteAllText(Path.Combine(outDir, "soundevents.json"), events.ToJsonString(Json));
-        Console.WriteLine($"sounds: {events.Count} events, {files} files exported, {failed.Count} failed{(failed.Count > 0 ? ": " + string.Join(", ", failed) : "")}");
-        return events.Count;
-    }
-
-    /// The shared stock set (knife, AK-47, footsteps, damage) -> <outDir>/soundevents.json + sounds.
-    public static void Stock(string pak01, string outDir)
-    {
-        var pkg = new Package();
-        pkg.Read(pak01);
-        using var loader = new GameFileLoader(pkg, null);
-        var raw = new Dictionary<string, KVObject>(StringComparer.OrdinalIgnoreCase);
-        foreach (var f in StockFiles)
-        {
-            var entry = pkg.FindEntry(f);
-            if (entry == null) { Console.WriteLine($"stock: {f} not in pak01"); continue; }
-            pkg.ReadEntry(entry, out var bytes);
-            ReadEvents(bytes, f, raw);
-        }
-        Directory.CreateDirectory(outDir);
-        var (events, files, failed) = Export(loader, raw, StockEvents, outDir);
-        File.WriteAllText(Path.Combine(outDir, "soundevents.json"), events.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
-        Console.WriteLine($"stock sounds: {events.Count} events, {files} files -> {outDir}{(failed.Count > 0 ? "; failed: " + string.Join(", ", failed) : "")}");
-    }
-
-    static void ReadEvents(byte[] bytes, string name, Dictionary<string, KVObject> into)
-    {
-        using var res = new Resource { FileName = name };
-        res.Read(new MemoryStream(bytes));
-        var data = res.DataBlock switch
-        {
-            BinaryKV3 b => b.Data,
-            KeyValuesOrNTRO k => k.Data,
-            _ => null,
-        };
-        if (data == null) { Console.WriteLine($"sounds: {name}: not KV3"); return; }
-        foreach (var (key, value) in data.Children)
-        {
-            if (key != null && value.IsCollection) into[key] = value;
-        }
-    }
-
-    // Event fields with its base chain applied (the event's own fields win).
-    static Dictionary<string, KVObject> Flatten(Dictionary<string, KVObject> raw, string name, int depth = 0)
-    {
-        var o = new Dictionary<string, KVObject>(StringComparer.OrdinalIgnoreCase);
-        if (depth > 8 || !raw.TryGetValue(name, out var ev)) return o;
-        if (ev.TryGetValue("base", out var b) && b.ValueType == KVValueType.String)
-        {
-            foreach (var (k, v) in Flatten(raw, b.ToString(CultureInfo.InvariantCulture), depth + 1)) o[k] = v;
-        }
-        foreach (var (k, v) in ev.Children) if (k != null && k != "base") o[k] = v;
-        return o;
-    }
-
-    static double Num(KVObject v) => v.ValueType switch
-    {
-        KVValueType.Boolean => v.ToBoolean(CultureInfo.InvariantCulture) ? 1 : 0,
-        KVValueType.String => double.TryParse(v.ToString(CultureInfo.InvariantCulture), NumberStyles.Float, CultureInfo.InvariantCulture, out var d) ? d : 0,
-        _ => v.ToDouble(CultureInfo.InvariantCulture),
-    };
-
-    static IEnumerable<string> Strings(KVObject v)
-    {
-        if (v.ValueType == KVValueType.String) { var s = v.ToString(CultureInfo.InvariantCulture); if (s.Length > 0) yield return s; }
-        else if (v.IsArray) foreach (var (_, c) in v.Children) foreach (var s in Strings(c)) yield return s;
-    }
-
-    static (JsonObject events, int files, List<string> failed) Export(GameFileLoader loader, Dictionary<string, KVObject> raw, IEnumerable<string> wanted, string outDir)
-    {
-        var events = new JsonObject();
-        var exported = new Dictionary<string, (string? rel, Sound? snd)>(StringComparer.OrdinalIgnoreCase);
-        var failed = new List<string>();
-        var queue = new Queue<string>(wanted);
-        while (queue.Count > 0)
-        {
-            var name = queue.Dequeue();
-            if (events.ContainsKey(name)) continue;
-            if (!raw.ContainsKey(name)) { failed.Add($"{name} (no such event)"); continue; }
-            var f = Flatten(raw, name);
-            var vsnds = f.Where(kv => kv.Key.StartsWith("vsnd_files", StringComparison.OrdinalIgnoreCase)).SelectMany(kv => Strings(kv.Value)).ToList();
-            var children = f.Where(kv => kv.Key.StartsWith("soundevent_", StringComparison.OrdinalIgnoreCase)).SelectMany(kv => Strings(kv.Value)).ToList();
-            if (vsnds.Count == 0 && children.Count == 0) continue; // a template (base.*), nothing to play
-
-            var ev = new JsonObject { ["type"] = f.TryGetValue("type", out var t) ? t.ToString(CultureInfo.InvariantCulture) : "csgo_mega" };
-            var files = new JsonArray();
-            Sound? first = null;
-            foreach (var v in vsnds)
-            {
-                if (!exported.TryGetValue(v, out var done)) exported[v] = done = ExportFile(loader, v, outDir, failed);
-                if (done.rel != null) { files.Add(done.rel); first ??= done.snd; }
-            }
-            ev["files"] = files;
-            ev["volume"] = f.TryGetValue("volume", out var vol) ? Math.Round(Num(vol), 4) : 1;
-            ev["pitch"] = f.TryGetValue("pitch", out var pit) ? Math.Round(Num(pit), 4) : 1;
-            if (f.TryGetValue("pitch_random_min", out var pmin) && f.TryGetValue("pitch_random_max", out var pmax) && (Num(pmin) != 0 || Num(pmax) != 0))
-                ev["pitchRandom"] = new JsonArray(Math.Round(Num(pmin), 4), Math.Round(Num(pmax), 4));
-            if (f.TryGetValue("delay", out var del) && Num(del) > 0) ev["delay"] = Math.Round(Num(del), 4);
-            if (f.TryGetValue("distance_volume_mapping_curve", out var curve) && curve.IsArray)
-            {
-                var pts = new JsonArray();
-                foreach (var (_, p) in curve.Children)
-                {
-                    if (!p.IsArray || p.Count < 2) continue;
-                    pts.Add(new JsonArray(Math.Round(Num(p[0]), 2), Math.Round(Num(p[1]), 4)));
-                }
-                var useCurve = !f.TryGetValue("use_distance_volume_mapping_curve", out var use) || Num(use) != 0;
-                if (pts.Count > 0 && useCurve) ev["curve"] = pts;
-            }
-            if (f.TryGetValue("position_relative_to_player", out var rel) && Num(rel) != 0) ev["local"] = true;
-            if (f.TryGetValue("vsnd_duration", out var dur)) ev["duration"] = Math.Round(Num(dur), 3);
-            if (first != null && first.LoopStart >= 0 && first.SampleRate > 0)
-            {
-                // the wave carries a loop point (Source loops those until stopped); loopEnd 0 = to the end
-                ev["loop"] = true;
-                ev["loopStart"] = Math.Round((double)first.LoopStart / first.SampleRate, 4);
-                if (first.LoopEnd > first.LoopStart) ev["loopEnd"] = Math.Round((double)first.LoopEnd / first.SampleRate, 4);
-            }
-            if (children.Count > 0)
-            {
-                ev["children"] = new JsonArray([.. children.Select(c => (JsonNode)c!)]);
-                foreach (var c in children) if (raw.ContainsKey(c)) queue.Enqueue(c);
-            }
-            events[name] = ev;
-        }
-        return (events, exported.Values.Count(x => x.rel != null), failed);
-    }
-
-    static (string?, Sound?) ExportFile(GameFileLoader loader, string vsnd, string outDir, List<string> failed)
-    {
-        var path = vsnd.Replace('\\', '/');
-        if (path.EndsWith("_c", StringComparison.Ordinal)) path = path[..^2];
-        try
-        {
-            var res = loader.LoadFile(path + "_c");
-            if (res?.DataBlock is not Sound snd) { failed.Add($"{path} (missing)"); return (null, null); }
-            var bytes = snd.GetSound();
-            if (bytes.Length > MaxSoundBytes) { failed.Add($"{path} (over {MaxSoundBytes / 1048576} MB)"); return (null, null); }
-            string ext;
-            switch (snd.SoundType)
-            {
-                case Sound.AudioFileType.MP3: ext = ".mp3"; break;
-                case Sound.AudioFileType.AAC: ext = ".aac"; break;
-                default: ext = ".wav"; bytes = WavToPcm16(bytes); break;
-            }
-            // the sound's VPK path names the file on disk and its URL in soundevents.json
-            var rel = SafePath.Rel(Path.ChangeExtension(path, ext));
-            if (rel == null) { failed.Add($"{SafePath.Describe(path)} (path refused)"); return (null, null); }
-            File.WriteAllBytes(SafePath.OutFile(outDir, rel), bytes);
-            return (rel, snd);
-        }
-        catch (Exception e)
-        {
-            failed.Add($"{path} ({e.Message})");
-            return (null, null);
-        }
-    }
-
-    // A RIFF wave in MS-ADPCM (format 2) -> PCM16; anything else is returned as it is.
-    static byte[] WavToPcm16(byte[] wav)
-    {
-        if (wav.Length < 12 || BitConverter.ToUInt32(wav, 0) != 0x46464952) return wav; // "RIFF"
-        int pos = 12, fmtAt = -1, fmtLen = 0, dataAt = -1, dataLen = 0;
-        while (pos + 8 <= wav.Length)
-        {
-            var id = BitConverter.ToUInt32(wav, pos);
-            var len = BitConverter.ToInt32(wav, pos + 4);
-            if (id == 0x20746d66) { fmtAt = pos + 8; fmtLen = len; } // "fmt "
-            else if (id == 0x61746164) { dataAt = pos + 8; dataLen = Math.Min(len, wav.Length - pos - 8); } // "data"
-            if (len < 0) break;
-            pos += 8 + len + (len & 1);
-        }
-        if (fmtAt < 0 || dataAt < 0) return wav;
-        if (BitConverter.ToUInt16(wav, fmtAt) != 2) return wav;
-        int ch = BitConverter.ToUInt16(wav, fmtAt + 2);
-        var rate = BitConverter.ToInt32(wav, fmtAt + 4);
-        int blockAlign = BitConverter.ToUInt16(wav, fmtAt + 12);
-        // a block is a 7-byte header per channel plus data: anything smaller would never advance the decoder
-        if (ch < 1 || ch > 8 || blockAlign < 7 * ch || rate <= 0) return wav;
-        int samplesPerBlock = fmtLen >= 20 ? BitConverter.ToUInt16(wav, fmtAt + 18) : 0;
-        short[] c1 = [256, 512, 0, 192, 240, 460, 392], c2 = [0, -256, 0, 64, 0, -208, -232];
-        if (fmtLen >= 22)
-        {
-            int n = BitConverter.ToUInt16(wav, fmtAt + 20);
-            if (n > 0 && fmtLen >= 22 + n * 4)
-            {
-                c1 = new short[n]; c2 = new short[n];
-                for (var i = 0; i < n; i++) { c1[i] = BitConverter.ToInt16(wav, fmtAt + 22 + i * 4); c2[i] = BitConverter.ToInt16(wav, fmtAt + 24 + i * 4); }
-            }
-        }
-        if (samplesPerBlock == 0) samplesPerBlock = (blockAlign - 7 * ch) * 2 / ch + 2;
-        int[] adapt = [230, 230, 230, 230, 307, 409, 512, 614, 768, 614, 512, 409, 307, 230, 230, 230];
-        var outS = new List<short>(dataLen * 2);
-        var co1 = new int[ch]; var co2 = new int[ch]; var delta = new int[ch]; var s1 = new int[ch]; var s2 = new int[ch];
-        for (var blk = dataAt; blk + 7 * ch <= dataAt + dataLen; blk += blockAlign)
-        {
-            var end = Math.Min(blk + blockAlign, dataAt + dataLen);
-            var p = blk;
-            for (var c = 0; c < ch; c++) { var pi = Math.Min((int)wav[p++], c1.Length - 1); co1[c] = c1[pi]; co2[c] = c2[pi]; }
-            for (var c = 0; c < ch; c++) { delta[c] = BitConverter.ToInt16(wav, p); p += 2; }
-            for (var c = 0; c < ch; c++) { s1[c] = BitConverter.ToInt16(wav, p); p += 2; }
-            for (var c = 0; c < ch; c++) { s2[c] = BitConverter.ToInt16(wav, p); p += 2; }
-            for (var c = 0; c < ch; c++) outS.Add((short)s2[c]);
-            for (var c = 0; c < ch; c++) outS.Add((short)s1[c]);
-            var produced = 2;
-            var c0 = 0;
-            for (; p < end && produced < samplesPerBlock; p++)
-            {
-                for (var half = 0; half < 2; half++)
-                {
-                    var nib = half == 0 ? wav[p] >> 4 : wav[p] & 15;
-                    var signed = nib >= 8 ? nib - 16 : nib;
-                    var pred = (s1[c0] * co1[c0] + s2[c0] * co2[c0]) / 256 + signed * delta[c0];
-                    pred = Math.Clamp(pred, short.MinValue, short.MaxValue);
-                    s2[c0] = s1[c0]; s1[c0] = pred;
-                    delta[c0] = Math.Max(16, adapt[nib] * delta[c0] / 256);
-                    outS.Add((short)pred);
-                    if (++c0 == ch) { c0 = 0; produced++; }
-                }
-            }
-        }
-        var pcm = new byte[outS.Count * 2];
-        Buffer.BlockCopy(outS.ToArray(), 0, pcm, 0, pcm.Length);
-        using var ms = new MemoryStream();
-        using var w = new BinaryWriter(ms);
-        w.Write(0x46464952); w.Write(36 + pcm.Length); w.Write(0x45564157); // RIFF....WAVE
-        w.Write(0x20746d66); w.Write(16); w.Write((short)1); w.Write((short)ch); w.Write(rate);
-        w.Write(rate * ch * 2); w.Write((short)(ch * 2)); w.Write((short)16);
-        w.Write(0x61746164); w.Write(pcm.Length); w.Write(pcm);
-        w.Flush();
-        return ms.ToArray();
-    }
 }

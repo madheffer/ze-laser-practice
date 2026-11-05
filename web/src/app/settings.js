@@ -17,7 +17,7 @@ export const FOV = 90; // CS2's horizontal FOV at 4:3, fixed
 
 export const DEFAULTS = {
   sens: 2.0, autoBhop: false, god: false, hitboxes: false, timescale: 1,
-  humans: 20, bossHp: 100, autoFire: true, fallDamage: false, fullscreen: true,
+  humans: 20, bossHp: 100, autoFire: false, fallDamage: false, fullscreen: true,
   healItem: false, // hold the map's heal item (EntWatch / map data: mist's Cleansing Aura, westersand's Heal Magick), E to use it
   sfx: 0.5, music: 0.5,
   perfectTeam: false, // true = the other humans never stop shooting (the old fast kill)
@@ -60,7 +60,17 @@ export function sanitizeSettings(saved) {
   return out;
 }
 
-export const settings = { ...DEFAULTS, ...sanitizeSettings(loadJson(KEY)) };
+// Saved settings from before a default changed get it once: v2 turned the team's boss fire off by default.
+const SETTINGS_VERSION = 2;
+function migrate(saved) {
+  if (!saved || typeof saved !== 'object') return {};
+  const v = Number.isInteger(saved.settingsVersion) ? saved.settingsVersion : 1;
+  const out = { ...saved, settingsVersion: SETTINGS_VERSION };
+  if (v < 2) delete out.autoFire;
+  return out;
+}
+
+export const settings = { ...DEFAULTS, ...sanitizeSettings(migrate(loadJson(KEY))), settingsVersion: SETTINGS_VERSION };
 
 export function saveSettings() { saveJson(KEY, settings); }
 

@@ -9,7 +9,7 @@ import { cleanSettings, cleanText } from '../lib/room-rules.js';
 import { isMapName } from '../lib/paths.js';
 
 export const ROOM_CODE = /^[A-Z]{4}$/;
-const GAME = new Set(['start', 's', 'dead', 'bd', 'clock', 'leader', 'end', 'use']);
+const GAME = new Set(['start', 's', 'dead', 'bd', 'clock', 'leader', 'end', 'use', 'wait', 'go']);
 
 export class CoopClient {
   constructor() {

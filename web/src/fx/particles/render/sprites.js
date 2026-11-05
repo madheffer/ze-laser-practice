@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { createSpritecardMaterial, applyControls, whiteTexture } from './spritecard.js';
-import { spritecardControls, makeInputs } from './controls.js';
+import { spritecardControls, makeInputs, normalizeRef } from './controls.js';
 import { colorBlend } from './barn.js';
 import { sheetSample } from './basis.js';
 
@@ -38,12 +38,12 @@ export class SpriteRenderer {
   /** ctx: { time, camPos (Source), report(msg) }. Returns the controls it applied. */
   update(col, p, raw, ctx) {
     const ev = makeInputs(col);
-    const ctl = spritecardControls('C_OP_RenderSprites', p, raw, ev, col.time || 0);
+    const sheetOf = (g) => !!(g.m_hTexture && this.assets.sheet(normalizeRef(g.m_hTexture)));
+    const ctl = spritecardControls('C_OP_RenderSprites', p, raw, ev, col.time || 0, sheetOf);
     applyControls(this.material, ctl);
     const tex = ctl.texture ? this.assets.texture(ctl.texture, ctl.clampUVs) : null;
     this.material.uniforms.uBase.value = tex || whiteTexture();
     const sheet = ctl.texture ? this.assets.sheet(ctl.texture) : null;
-    if (sheet) this.material.uniforms.PC_c19z.value |= 32768;                   // PS0:106 sheet bit
     const n = col.count || 0;
     if (n > this.capacity) this._grow(n);
     const A = col.attr || {};
@@ -79,10 +79,10 @@ export class SpriteRenderer {
       if (sheet) {
         const age = time - (A[8]?.[i] ?? 0);
         const seq = seqOverride >= 0 ? seqOverride : (A[9]?.[i] ?? 0);
-        // FIT_LIFETIME as one pass of the sequence over the particle's life: UNSETTLED.
-        s = ctl.vc.animationType === 1
-          ? sheetSample(sheet, seq, age, 1 / Math.max(1e-6, A[1]?.[i] ?? 1), false)
-          : sheetSample(sheet, seq, age, rate, inFps);
+        // FIT_LIFETIME: the vertex age is (time - creation) / lifetime, 0 for a lifetime <= 0 (FUN_180033400, the
+        // FIT_LIFETIME vertex writer); the VS then runs the sheet at m_flAnimationRate as for FIXED_RATE (VS0:1693).
+        const life = A[1]?.[i] ?? 1;
+        s = sheetSample(sheet, seq, ctl.vc.animationType === 1 ? (life > 0 ? age / life : 0) : age, rate, inFps);
       }
       if (s) {
         g.iRect0.setXYZW(j, s.rect0[0], s.rect0[1], s.rect0[2], s.rect0[3]);

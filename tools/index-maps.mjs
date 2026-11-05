@@ -6,6 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { isMapName } from '../web/src/lib/paths.js';
+import { mapItems } from '../web/src/world/items.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../web/public');
 const mapsDir = path.join(root, 'maps');
@@ -33,9 +34,13 @@ for (const name of fs.readdirSync(mapsDir).sort()) {
   // the map's own screenshots (lasers-bake writes shots/1.jpg, 2.jpg, ...): the home page hero
   const shotsDir = path.join(mapsDir, name, 'shots');
   const shots = fs.existsSync(shotsDir) ? fs.readdirSync(shotsDir).filter((f) => /^\d{1,2}\.jpg$/.test(f)).sort((a, b) => parseInt(a) - parseInt(b)) : [];
+  // the map's EntWatch items (world/items.js), so the stage list's heal option needs no entity data: picking a map
+  // loads only its stage list, the rest waits for a stage (web/src/main.js)
+  const read = (f) => { const q = path.join(mapsDir, name, f); return fs.existsSync(q) ? JSON.parse(fs.readFileSync(q, 'utf8')) : null; };
+  const items = mapItems(read('entities.json'), read('entwatch.json'));
   maps.push({
     name, title: file.title || m.title || name, description: file.description || '', workshop: file.workshop || '',
-    scenarios: list.length, parts, version: m.version, shots,
+    scenarios: list.length, parts, version: m.version, shots, items,
   });
 }
 fs.writeFileSync(path.join(mapsDir, 'index.json'), JSON.stringify({ maps }, null, 1));

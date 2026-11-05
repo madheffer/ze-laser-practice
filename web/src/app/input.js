@@ -144,7 +144,8 @@ export function installInput(canvas, actions) {
   document.addEventListener('pointerlockchange', () => {
     S.locked = document.pointerLockElement === canvas;
     if (S.replay) return; // a replay plays on with or without the mouse (it only steers the free camera)
-    if (S.locked && S.run && !S.run.done) actions.unpause();
+    // a picked stage still loading (ui/loading.js) has no run yet: the menu stays away until you press Esc
+    if (S.locked && ((S.run && !S.run.done) || G.loading?.isOpen)) actions.unpause();
     else actions.pause();
   });
   // leaving fullscreen any other way (F11, the browser's own Esc, Android's back gesture) also pauses

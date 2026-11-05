@@ -5,6 +5,7 @@ import { boxTouchesHull } from '../../collision.js';
 import { register } from '../registry.js';
 import { DEG, num, bool, parseVec, angleForward } from '../math.js';
 import { nameMatches } from '../../../lib/names.js';
+import { explosionSound } from '../sound.js';
 
 const triggerBase = {
   input(e, inp, p, act) {
@@ -190,6 +191,7 @@ register('env_explosion', {
     const sf = num(e.kv.spawnflags);
     const mag = num(e.kv.imagnitude, 100);
     const radius = num(e.kv.iradiusoverride) > 0 ? num(e.kv.iradiusoverride) : mag * 2.5;
+    explosionSound(e); // unless spawnflag 64 (sound.js)
     const ph = engine.playerHull;
     if (!(sf & 1) && ph && mag > 0 && radius > 0) {
       const o = e.worldOrigin();

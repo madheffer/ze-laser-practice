@@ -9,6 +9,10 @@ import { angleForward } from '../world/entities/index.js';
 import { stripPrefix } from '../lib/names.js';
 import { clamp } from '../lib/math.js';
 import { bossHittable, replayBossFire } from '../world/run-engine.js';
+import { bulletWorld, BULLET_MASK } from '../world/bullets.js';
+
+// the static world as bullets see it: the map's particle collision set with layer bits, else the player-solid one
+const shotWorld = () => bulletWorld(S.map?.collisionFx, S.world);
 
 // The other humans, as a squad. Each carries a rifle (AK-47: 10 rounds/s, 36 dmg), an SMG (P90: 14.3/s,
 // 26 dmg) or just a knife (no boss damage), lands about half its rounds, and is only firing part of the time:
@@ -51,7 +55,7 @@ function bossVisible(e) {
   const eye = eyePos();
   const d = Math.hypot(c[0] - eye[0], c[1] - eye[1], c[2] - eye[2]);
   if (d > 8192) return false;
-  return S.world.traceRay(eye, c, undefined, true).fraction >= 0.999;
+  return shotWorld().traceRay(eye, c, undefined, true, BULLET_MASK).fraction >= 0.999;
 }
 
 
@@ -66,8 +70,9 @@ function hitBoss(e, damage, how = 'me') {
 
 // Damage that lands (yours solo; in a round, the hits the server sends back).
 export function applyBossDamage(e, damage, byTeam = false) {
-  // the team's bullets carry the team as activator (engine.teamEnt), yours carry you
-  S.engine.damage(e, damage, byTeam ? S.engine.teamEnt : S.engine.playerEnt);
+  // the team's bullets carry the team as activator (engine.teamEnt), yours carry you. A shot is a trace hit: the
+  // breakable's hit sound (world/entities/sound.js hitSound); its RandomInt(0, 1) is rolled here, off the engine's stream
+  S.engine.damage(e, damage, byTeam ? S.engine.teamEnt : S.engine.playerEnt, { trace: true, alt: Math.random() < 0.5 });
 }
 
 // silent: during a fast-forward replay (shoots the scenario's fastForwardBosses, no line of sight needed)
@@ -136,14 +141,15 @@ export function onShot(shot) {
 
 // the shot itself, fired along yaw / pitch from the player's eye (a replay passes the recorded view)
 export function shootAs(shot, yaw, pitch) {
-  const { run, engine, player, world, scenario } = S;
+  const { run, engine, player, scenario } = S;
   if (!run || run.done || !engine) return;
   G.audio.play(shot.kind === 'bullet' ? 'gun.fire' : shot.kind === 'stab' ? 'knife.stab' : 'knife.slash', { pos: player.origin });
   const noDamage = run.endless && scenario?.endless?.noBossDamage;
   const dir = angleForward([pitch, yaw, 0]);
   const eye = eyePos();
   const range = shot.range || 8192;
-  const wallTr = world.traceRay(eye, eye.map((v, i) => v + dir[i] * range), undefined, true);
+  // CS2's bullet trace (world/bullets.js): player clips don't stop it (knife too: the same static world here)
+  const wallTr = shotWorld().traceRay(eye, eye.map((v, i) => v + dir[i] * range), undefined, true, BULLET_MASK);
   const wallDist = wallTr.fraction * range;
   for (const { e } of bossTargets()) {
     for (const h of e.hulls() || []) {
@@ -160,6 +166,8 @@ export function shootAs(shot, yaw, pitch) {
     }
   }
   if (shot.kind !== 'bullet' && wallTr.fraction < 1) G.audio.play('knife.hitwall', { pos: player.origin });
+  // a bullet that hit no boss: the surface it hits plays its bullet impact sound there (world/impacts.js)
+  if (shot.kind === 'bullet') { const hit = G.impacts?.hit(eye, dir, range); if (hit) G.audio.bulletImpact(hit.hash, hit.pos); }
 }
 
 // Every tick: remember each segmented boss's segment size (the most its health + offset has held, ignoring
@@ -202,4 +210,22 @@ export function bossStatus(b) {
     run.bossPeak.set(b.target, peak);
   }
   return { name: b.name || stripPrefix(b.target), hp: Math.round(hp), pct: Math.round(clamp((hp / Math.max(1, peak)) * 100, 0, 100)) };
+}
+
+// Whether a boss shows on the HUD (GFL's BossHUD, gflze/CS2-ZE-Configs bosshud/template.jsonc): it appears once the boss
+// takes damage, i.e. once its HP has gone down, so a boss the map keeps unhittable (a damage filter, an entrance
+// animation before its breakable or counter accepts hits) stays off the HUD until the map lets it be hurt. The
+// template's "timeout" (s without damage before it hides again; 0 = stays) is read from the stage's boss entry.
+// UNSETTLED: the BossHUD plugin source is not public; this follows the config schema's documented keys.
+export function bossShown(b, status) {
+  const run = S.run;
+  if (!run || !status) return false;
+  const seen = (run.bossHud ||= new Map());
+  let st = seen.get(b.target);
+  if (!st) seen.set(b.target, (st = { hp: status.hp, hitAt: null }));
+  if (status.hp < st.hp) st.hitAt = S.engine?.time ?? 0;
+  st.hp = status.hp;
+  if (st.hitAt == null) return false;
+  const timeout = Number(b.timeout) || 0;
+  return !(timeout > 0 && (S.engine?.time ?? 0) - st.hitAt > timeout);
 }

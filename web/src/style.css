@@ -20,6 +20,37 @@
 body.touch { --tap: 44px; }
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); color: var(--text); }
+
+/* CS2's Panorama fonts (lasers-bake --panorama): here, in the page's one blocking stylesheet, so the boot screen,
+   the menu and the HUD all have them from the first frame */
+@font-face { font-family: 'Stratum2'; src: url('/panorama/fonts/stratum2-regular.otf'); font-weight: 400; font-display: block; }
+@font-face { font-family: 'Stratum2'; src: url('/panorama/fonts/stratum2-medium.otf'); font-weight: 500; font-display: block; }
+@font-face { font-family: 'Stratum2'; src: url('/panorama/fonts/stratum2-bold.otf'); font-weight: 700; font-display: block; }
+@font-face { font-family: 'Stratum2 TF'; src: url('/panorama/fonts/stratum2_tf_bold.otf'); font-weight: 700; font-display: block; }
+@font-face { font-family: 'Stratum2 Mono'; src: url('/panorama/fonts/stratum2mono-bold.otf'); font-weight: 700; font-display: block; }
+
+/* The boot screen: until main.js has built and drawn the first view (the menu or the home page), html.booting hides
+   everything else, so the menu's markup never shows before the stylesheets the modules bring (menu.css, ...) */
+html.booting body > :not(#boot) { visibility: hidden !important; }
+#boot {
+  position: fixed; inset: 0; z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 18px; padding: 24px; background: var(--bg); color: var(--text); text-align: center; transition: opacity 0.3s ease;
+}
+#boot.out { opacity: 0; pointer-events: none; }
+.boot-brand { font: 700 clamp(20px, 5vw, 30px)/1 'Stratum2', 'Segoe UI', sans-serif; letter-spacing: 0.08em; white-space: nowrap; }
+.boot-spin {
+  width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--line); border-top-color: var(--accent);
+  animation: boot-spin 0.8s linear infinite;
+}
+.boot-msg { min-height: 1.4em; max-width: 560px; font-size: 13px; line-height: 1.4; color: var(--dim); overflow-wrap: anywhere; }
+#boot.failed .boot-spin { display: none; }
+#boot.failed .boot-msg { color: var(--accent); }
+.boot-retry {
+  min-height: var(--tap); padding: 0 16px; border-radius: 6px; border: 1px solid var(--line); background: #18202a;
+  color: var(--text); font: inherit; cursor: pointer;
+}
+@keyframes boot-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .boot-spin { animation-duration: 2.4s; } #boot { transition: none; } }
 #view { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 .hidden { display: none !important; }
 

@@ -3,48 +3,36 @@
 //   const audio = new GameAudio();
 //   await audio.loadMap(mapName, version?)  // reads maps/<map>/soundevents.json (+ the sound files it names);
 //                                           //   version = the map's manifest.version, put on every URL (?v=)
-//   audio.onSound(ev)                       // engine 'sound' event: { type: 'start'|'stop'|'volume'|'pitch',
-//                                           //   ent (Entity; ent.id is stable), name (soundevent name), pos [x,y,z],
-//                                           //   local (bool: play 2D to you), value? }
+//   audio.onSound(ev)                       // engine 'sound' request (world/entities/sound.js): { type: 'start'|'stop'|
+//                                           //   'volume'|'pitch', ent (Entity; ent.id is stable), name (soundevent name),
+//                                           //   pos [x,y,z], local (bool: play 2D to you), slot? (one of the entity's
+//                                           //   sounds; stop / pitch / volume without one reach all of them), volume?,
+//                                           //   volumeRandom? [min, max], pitch? (x1), follow()? (where it is now), value? }
 //   audio.play(name, { pos?, volume? })     // one-shot by soundevent name (weapons: 'Weapon_Knife.Slash', ...)
 //   audio.setListener(pos, yaw, pitch)      // every frame; Source units, degrees
 //   audio.setVolumes({ sfx, music })        // 0..1 each (slider^2 gain); the master gain is only the pause fade
 //   audio.pause() / audio.resume()          // menu open/closed
 //   audio.stopAll()                         // scenario restart
+//   audio.ready()                           // resolves when the map's table is in (app/readiness.js waits; requests
+//                                           //   that come earlier are held and played then)
+//   audio.bulletImpact(hash, pos)           // a bullet on a world surface (world/impacts.js; audio/surfaces.js)
 //
 // Extras: audio.footstep(pos) (a concrete step), audio.report() (what resolved, for audio-test.html).
 //
 // Sound tables come from lasers-bake: sounds/soundevents.json (stock CS2: knife, AK-47, player) and
 // maps/<map>/soundevents.json. Each event: { type, files, volume, pitch, pitchRandom?, curve?, delay?, local?,
-// loop?, loopStart?, loopEnd?, children? }. `curve` is CS2's distance_volume_mapping_curve: [[units, gain], ...].
+// loop?, loopStart?, loopEnd?, children?, instanceLimit?, blockDuration?, blockDistance?, blockMatchEntity?,
+// blockMatching? } (the last five: audio/limits.js). `curve` is CS2's distance_volume_mapping_curve: [[units, gain], ...].
 // Spatial sounds are panned by hand (gain + stereo pan from the listener's yaw), so everything stays in
 // Source units with Z up and nothing depends on WebAudio's PannerNode coordinate conventions.
 
 import { clamp01 } from '../lib/math.js';
-import { mapName, safeRelPath, versioned } from '../lib/paths.js';
-import { FRESH } from '../lib/fetch.js';
+import { mapName } from '../lib/paths.js';
 import { spatialMix } from './spatial.js';
+import { VoiceLimits } from './limits.js';
+import { SurfaceSounds } from './surfaces.js';
+import { ALIASES, readTable, fileUrl } from './tables.js';
 
-// main.js's short names -> stock CS2 events (an entry can override pitch/volume)
-const ALIASES = {
-  'gun.fire': 'Weapon_AK47.Single',
-  'gun.deploy': 'Weapon_AK47.Draw',
-  'gun.clipout': 'Weapon_AK47.Clipout',
-  'gun.clipin': 'Weapon_AK47.Clipin',
-  'gun.boltpull': 'Weapon_AK47.BoltPull',
-  'knife.deploy': 'Weapon_Knife.Deploy',
-  'knife.slash': 'Weapon_Knife.Slash',
-  'knife.stab': { name: 'Weapon_Knife.Slash', pitch: 0.85, volume: 1.3 }, // the heavy swing; Weapon_Knife.Stab is its *hit*
-  'knife.hit': 'Weapon_Knife.Hit',
-  'knife.hitwall': 'Weapon_Knife.HitWall',
-  'jump': 'Default.WalkJump',
-  'land': 'Land_Concrete.StepLeft',
-  'footstep': 'CT_Concrete.StepLeft',
-  'hurt': 'Player.DamageBody.Victim',
-  'hurt.fall': 'Player.DamageFall',
-  'hurt.burn': 'Player.BurnDamage',
-  'death': 'Player.Death',
-};
 
 const MAX_VOICES = 64;
 const FADE = 0.35; // pause / resume fade, seconds
@@ -65,6 +53,8 @@ export class GameAudio {
     this.logged = new Set();
     this.voices = new Set();
     this.byEnt = new Map();     // ent.id -> Set<voice>
+    this.limits = new VoiceLimits();
+    this.surfaces = new SurfaceSounds(); // the map's surface sounds (bullet impacts, prop breaks)
     this.listener = { pos: [0, 0, 0], yaw: 0, pitch: 0 };
     this.paused = true; // the menu is up at boot; resume() on entering a stage
     this.volumes = { sfx: 1, music: 1 };
@@ -95,37 +85,58 @@ export class GameAudio {
     this.mapName = mapName(name);
     const base = `maps/${this.mapName}/`;
     this.tables.map = { base, version, events: new Map() };
-    if (!this.ctx) return;
-    await Promise.all([this._loadTable('map', base + 'soundevents.json'), this.stockReady]);
+    if (!this.ctx) { this.mapReady = Promise.resolve(); return; }
+    const table = this.tables.map;
+    this.mapReady = Promise.all([this._loadTable('map', base + 'soundevents.json'), this.stockReady, this.surfaces.load(base, version)]).then(() => {
+      // requests that came in before the table: played now, as far into them as the wait took
+      const held = this.held || [];
+      this.held = null;
+      if (this.tables.map !== table) return;
+      const now = performance.now();
+      for (const { ev, at } of held) this.onSound({ ...ev, offset: (ev.offset || 0) + (now - at) / 1000 });
+    });
+    this.held = [];
+    await this.mapReady;
   }
+
+  // resolves once the map's sound table (and the stock one) is in: app/readiness.js waits for it before a stage starts
+  ready() { return this.mapReady || Promise.resolve(); }
 
   onSound(ev) {
     if (!this.ctx || !ev) return;
+    // the map's table is still loading: hold the request (in order) rather than lose it as an unknown name
+    if (this.held && this.held.length < 512) { this.held.push({ ev, at: performance.now() }); return; }
     const id = ev.ent?.id;
     switch (ev.type) {
       case 'start': {
-        this._start(ev.name, { pos: ev.pos, ent: ev.ent, local: !!ev.local, entId: id, offset: ev.offset || 0 });
+        // a prop's break names its model: the sound is its surface's (audio/surfaces.js), none for most
+        const name = ev.name || (ev.surfaceBreak ? this.surfaces.breakOf(ev.surfaceBreak) : '');
+        if (!name) return;
+        const vr = Array.isArray(ev.volumeRandom) ? ev.volumeRandom : null;
+        const volume = (Number.isFinite(ev.volume) ? ev.volume : 1) * (vr ? vr[0] + Math.random() * (vr[1] - vr[0]) : 1);
+        this._start(name, {
+          pos: ev.pos, ent: ev.ent, local: !!ev.local, entId: id, offset: ev.offset || 0, slot: ev.slot ?? null,
+          volume, pitch: Number.isFinite(ev.pitch) && ev.pitch > 0 ? ev.pitch : 1, follow: typeof ev.follow === 'function' ? ev.follow : null,
+          repeat: !!ev.repeat,
+        });
         return;
       }
       case 'stop': {
-        const set = id != null && this.byEnt.get(id);
-        if (set) for (const v of [...set]) this._stopVoice(v);
+        for (const v of this._voicesOf(id, ev.slot)) this._stopVoice(v);
         return;
       }
       case 'volume': {
         let val = Number(ev.value);
         if (!Number.isFinite(val)) return;
         if (val > 1) val /= 10; // ambient_generic's 0..10
-        const set = id != null && this.byEnt.get(id);
-        if (set) for (const v of set) { v.userVolume = clamp01(val); this._update(v); }
+        for (const v of this._voicesOf(id, ev.slot)) { v.userVolume = clamp01(val); this._update(v); }
         return;
       }
       case 'pitch': {
         let val = Number(ev.value);
         if (!Number.isFinite(val) || val <= 0) return;
         if (val > 4) val /= 100; // percent (100 = normal)
-        const set = id != null && this.byEnt.get(id);
-        if (set) for (const v of set) {
+        for (const v of this._voicesOf(id, ev.slot)) {
           v.userPitch = val;
           for (const s of v.sources) s.playbackRate.setValueAtTime(v.rate * val, this.ctx.currentTime);
         }
@@ -140,6 +151,12 @@ export class GameAudio {
   }
 
   footstep(pos) { this.play('footstep', { pos }); }
+
+  // a bullet hitting the world: the surface's (by its hash, world/impacts.js) bullet impact sound at the hit
+  bulletImpact(hash, pos) {
+    const name = this.surfaces.bulletImpact(hash);
+    if (name) this.play(name, { pos });
+  }
 
   setListener(pos, yaw, pitch) {
     if (pos) { this.listener.pos[0] = pos[0]; this.listener.pos[1] = pos[1]; this.listener.pos[2] = pos[2]; }
@@ -189,6 +206,8 @@ export class GameAudio {
   stopAll() {
     for (const v of [...this.voices]) this._stopVoice(v);
     this.byEnt.clear();
+    this.limits.clear();
+    if (this.held) this.held = []; // a restart drops what the old run asked for while the table loaded
   }
 
   // For audio-test.html: which events/files resolved.
@@ -214,19 +233,11 @@ export class GameAudio {
     console.warn(msg);
   }
 
-  // A soundevents.json. The map's carries the map's version; the stock one is revalidated every load and its
-  // ETag becomes the version of the stock sound files (a --stock-sounds rebake rewrites it).
+  // a soundevents.json into this.tables[which] (audio/tables.js readTable)
   async _loadTable(which, url) {
     const table = this.tables[which];
     try {
-      const r = await fetch(versioned(url, table.version), which === 'stock' ? FRESH : undefined);
-      if (!r.ok) throw new Error(`${r.status}`);
-      if (which === 'stock') table.version = r.headers.get('etag') || r.headers.get('last-modified');
-      const json = await r.json();
-      const events = new Map();
-      for (const [name, def] of Object.entries(json && typeof json === 'object' ? json : {})) {
-        if (def && typeof def === 'object' && !Array.isArray(def)) events.set(name.toLowerCase(), { ...def, name });
-      }
+      const events = await readTable(url, table, which === 'stock');
       // a later loadMap may have replaced the table meanwhile
       if (this.tables[which] === table) table.events = events;
     } catch (e) {
@@ -258,11 +269,7 @@ export class GameAudio {
     return null;
   }
 
-  // A sound file a table names, as a URL (null if the path isn't a safe relative one: tables are a map's data).
-  _fileUrl(table, file) {
-    const rel = safeRelPath(file);
-    return rel == null ? null : versioned(table.base + rel, table.version);
-  }
+  _fileUrl(table, file) { return fileUrl(table, file); }
 
   _buffer(url) {
     if (url == null) return Promise.resolve(null);
@@ -278,18 +285,30 @@ export class GameAudio {
     return p;
   }
 
+  // an entity's voices (one slot's only, when given)
+  _voicesOf(id, slot) {
+    const set = id != null && this.byEnt.get(id);
+    if (!set) return [];
+    return [...set].filter((v) => slot == null || v.slot === slot);
+  }
+
   _start(name, o, depth = 0) {
     const hit = this._lookup(name);
+    // CS2 too plays nothing for a name no table defines (soundsystem.dll "Unable to find soundevent")
     if (!hit) { if (name) this._warn(`audio: unknown sound event "${name}"`); return; }
     const { def, table } = hit;
+    // CS2's voice management: a blocked start plays nothing, its children included; over the limit, the oldest stops
+    if (!this.limits.allow(def, o, this.ctx.currentTime)) return;
+    for (const old of this.limits.overLimit(def, o.entId, this.voices)) this._stopVoice(old);
     const isMusic = /music/i.test(def.type || '');
     const files = Array.isArray(def.files) ? def.files : [];
     if (files.length) {
       const file = files[(Math.random() * files.length) | 0];
       const pr = def.pitchRandom;
-      const rate = Math.max(0.05, (def.pitch ?? 1) * hit.pitch + (pr ? pr[0] + Math.random() * (pr[1] - pr[0]) : 0));
+      const rate = Math.max(0.05, ((def.pitch ?? 1) * hit.pitch + (pr ? pr[0] + Math.random() * (pr[1] - pr[0]) : 0)) * (o.pitch ?? 1));
       const v = {
         def, name: def.name, sources: [], gain: null, pan: null, ent: o.ent, entId: o.entId, pos: o.pos ? [...o.pos] : null,
+        slot: o.slot ?? null, follow: o.follow || null, repeat: !!o.repeat,
         offset: o.offset || 0, // seconds already played (a stage that starts mid-ending joins its music mid-track)
         spatial: !!o.pos && !o.local && !def.local && !isMusic, music: isMusic, rate,
         baseVolume: (def.volume ?? 1) * hit.volume * (o.volume ?? 1), userVolume: 1, userPitch: 1, stopped: false,
@@ -332,7 +351,7 @@ export class GameAudio {
       src.loop = true;
       src.loopStart = v.def.loopStart || 0;
       if (v.def.loopEnd > src.loopStart) src.loopEnd = Math.min(v.def.loopEnd, buf.duration);
-    }
+    } else if (v.repeat) src.loop = true; // played again each time it ends, until stopped (a door's loopmovesound)
     v.gain = ctx.createGain();
     let node = src;
     if (v.spatial && ctx.createStereoPanner) {
@@ -360,7 +379,7 @@ export class GameAudio {
     if (!v.gain) return;
     let g = v.baseVolume * v.userVolume, p = 0;
     if (v.spatial) {
-      const pos = (v.ent && typeof v.ent.worldOrigin === 'function' && v.ent.alive !== false && safeOrigin(v.ent)) || v.pos;
+      const pos = (v.ent && v.ent.alive !== false && (v.follow ? safeCall(v.follow) : typeof v.ent.worldOrigin === 'function' && safeOrigin(v.ent))) || v.pos;
       ({ gain: g, pan: p } = spatialMix(pos, this.listener, v.def.curve, g));
     }
     const t = this.ctx.currentTime;
@@ -398,4 +417,7 @@ export class GameAudio {
 
 function safeOrigin(ent) {
   try { const o = ent.worldOrigin(); return o && o.length >= 3 ? o : null; } catch { return null; }
+}
+function safeCall(fn) {
+  try { const o = fn(); return o && o.length >= 3 ? o : null; } catch { return null; }
 }

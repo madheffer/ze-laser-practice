@@ -292,18 +292,6 @@ export const operators = {
     },
   },
 
-  // VRF cross-check, UNSETTLED: the collection re-arms its emitters every sampled duration.
-  C_OP_RestartAfterDuration: {
-    evidence: 'VRF',
-    op(fn, c) {
-      if (fn.m_bOnlyChildren) { report(c, 'C_OP_RestartAfterDuration m_bOnlyChildren not implemented'); return; }
-      if (c.restartAt != null) return;
-      let d = fn.m_flDurationMin + (fn.m_flDurationMax - fn.m_flDurationMin) * c.table[(c.rnd.offset + c.rnd.counter++) & 0xfff];
-      if (fn.m_nCP >= 0 && fn.m_nCPField >= 0) d *= getCp(c, fn.m_nCP).position[fn.m_nCPField] ?? 1;
-      c.restartAt = c.time + d;
-    },
-  },
-
   // VRF cross-check, UNSETTLED.
   C_OP_DampenToCP: {
     evidence: 'VRF',

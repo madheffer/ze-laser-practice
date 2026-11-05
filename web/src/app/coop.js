@@ -18,6 +18,7 @@ import { showRoundEnd } from './coop-end.js';
 import { isMapName } from '../lib/paths.js';
 import { lastFrameAt } from './loop.js';
 import { itemState, spendUse, usableHeals } from '../world/items.js';
+import { beginRoster, applyWait, markOut, rosterGo, clearRoster, waitLine, startReports } from './coop-load.js';
 
 export const net = new CoopClient();
 export const lobby = { busy: false }; // busy = a round is on that you're not in (you'll be in the next one)
@@ -52,6 +53,7 @@ class Round {
     this.ticks = []; this.tick0 = 0; // your positions since the last send: tick tick0, tick0 + 1, ...
     this.specId = null;
     this.lastAliveSaid = false;
+    this.readyIds = new Set(); // who has loaded the stage (the server's 'wait'), until its 'go'
   }
 
   get isHost() { return net.isHost; } // the room owner (Play again on the end card)
@@ -131,6 +133,10 @@ class Round {
   }
   spectateLabel() { const v = this.spectateView(); return v ? `Spectating ${this.name(v.id)}` : 'You died'; }
 
+  // ---- loading: the stage is loaded and drawn here (app/readiness.js); the server starts the clock when all are
+  sendReady() { if (!this.ended) { this.readyIds.add(this.me); net.game({ t: 'ready', r: this.r }); } }
+  waitLine() { return waitLine(); } // app/coop-load.js: the ready ones among those still in
+
   hudLine() {
     const n = this.players.size, a = this.alive.length;
     const cheats = [this.rules.god && 'god mode', this.rules.hitboxes && 'hitboxes', this.rules.autoBhop && 'auto bhop'].filter(Boolean);
@@ -204,26 +210,55 @@ async function onStart(d) {
     rules: { ...cleanRules(d.rules), seed: d.seed }, roster, leader: Number.isInteger(d.leader) ? d.leader : 0,
     holders: Array.isArray(d.holders) ? d.holders.filter((id) => roster.some((m) => m.id === id)) : [],
   };
+  // the round's messages that arrive while we load (its 'wait', or the 'go' and our 'dead' if we load too slowly)
+  // are kept and played once the round exists here
+  const pend = { r: start.r, queue: [] };
+  starting = pend;
+  // everyone's load progress on the loading screen (app/coop-load.js), and ours to the server while we load
+  beginRoster(start, net.you);
+  startReports(start.r, (m) => net.game(m));
+  const stop = (note) => { if (starting === pend) { starting = null; G.loading.close(false); } if (note) G.lobby.note(note); };
+  // the loading screen (ui/loading.js) until the server's go
+  G.loading.begin(start.map, start.stage, S.map?.name === start.map && S.map.loaded ? 300 : 0);
   if (S.map?.name !== start.map) {
-    try { await G.selectMap(start.map); } catch (e) { G.lobby.note(`Could not load ${start.map}: ${e.message || e}`); return; }
+    try { await G.selectMap(start.map); } catch (e) { stop(`Could not load ${start.map}: ${e.message || e}`); return; }
   }
+  G.loading.begin(start.map, start.stage); // its stage's name, now that the map's stage list is in
+  // the map's world, collision and entities (main.js loadStage, once per map); the server's clock waits for us
+  try { await G.loadStage(); } catch (e) { stop(`Could not load ${start.map}: ${e.message || e}`); return; }
+  if (starting !== pend || !S.map?.loaded || S.map.name !== start.map) { stop(); return; }
   const i = start.stage == null ? -1 : S.scenarios.findIndex((s) => s.id === start.stage);
-  if (start.stage != null && i < 0) { G.lobby.note(`This copy has no stage "${start.stage}"`); return; }
+  if (start.stage != null && i < 0) { stop(`This copy has no stage "${start.stage}"`); return; }
+  starting = null;
   G.overlay.hide();
   G.killfeed.clear();
   lobby.busy = false;
   S.mp = new Round(start);
   G.peers.set(roster.filter((m) => m.id !== net.you));
   startScenario(i, start.mode);
+  for (const { d: m, at } of pend.queue) onGame(m, at);
   // already in the game (the owner's click, or still locked in from the last round): play at once; otherwise
   // the menu shows Resume until you click in
   if (S.locked) G.unpause(); else G.menu.update();
   G.lobby.render();
 }
 
-function onGame(d) {
+let starting = null; // { r, queue: [{ d, at }] }: the round being loaded (onStart)
+const MAX_PENDING = 64;
+
+// at: when the message arrived (a 'go' kept while loading starts the clock from then, as the others' did)
+function onGame(d, at = performance.now()) {
   const mp = S.mp, run = S.run;
   if (d.t === 'start') { onStart(d); return; }
+  // the loading roster follows its round from the start, loaded here or not
+  if (d.t === 'wait') applyWait(d);
+  else if (d.t === 'go') rosterGo(d.r);
+  else if (d.t === 'dead' && Number.isInteger(d.id)) markOut(d.r, d.id);
+  if (starting && d.r === starting.r) {
+    // positions and clocks are stale by the time we start; the rest is kept
+    if (d.t !== 's' && d.t !== 'clock' && starting.queue.length < MAX_PENDING) starting.queue.push({ d, at });
+    return;
+  }
   if (!mp || d.r !== mp.r) return;
   switch (d.t) {
     case 's':
@@ -238,6 +273,11 @@ function onGame(d) {
         const drift = d.at - (performance.now() - run.wall0) / 1000;
         if (Math.abs(drift) > 0.04) run.wall0 -= drift * 500;
       }
+      break;
+    case 'wait': if (Array.isArray(d.ready)) mp.readyIds = new Set(d.ready.filter(Number.isInteger).slice(0, 8)); break;
+    case 'go':
+      // everyone has loaded: the round's clock starts now, for every client together
+      if (run && !run.done && !run.go) { run.go = true; run.wall0 = at; }
       break;
     case 'dead': if (Number.isInteger(d.id)) mp.markDead(d.id, cleanText(d.by, 40) || 'the map', num(d.at, 0, 1e6) ? d.at : stageTime(), cleanText(d.note, 30)); break;
     case 'bd': if (!mp.ended) applyHits(d.h); break;
@@ -264,6 +304,7 @@ function onRoom(room) {
 function onLeft(why) {
   const run = S.run;
   S.mp = null;
+  clearRoster();
   lobby.busy = false;
   G.peers.clear();
   if (run && !run.done && run.spectating) { run.spectating = false; finish('dead'); }

@@ -16,7 +16,9 @@ const DEFAULT_CONTENTS = 0x1c3001;
 
 // world: the movement CollisionWorld (its .dynamic is refreshed each tick); fx: { tris, layers } or null
 export function particleTrace(world, fx = null) {
-  const fxWorld = fx ? new CollisionWorld(fx.tris, fx.layers) : null;
+  // built once per map and kept on fx: world/impacts.js finds bullet hits in the same world
+  // (fx.bvh: its tree, when main.js built it in a worker)
+  const fxWorld = fx ? (fx.world ||= new CollisionWorld(fx.bvh || fx.tris, fx.layers)) : null;
   const tr = makeTrace();
   const e = [0, 0, 0];
   return (from, dir, length, query) => {

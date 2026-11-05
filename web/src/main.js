@@ -5,7 +5,9 @@
 //   world/   entities (the map's I/O logic); collision, movement, render, assets
 //   audio.js, viewmodel.js (+ fp/): sound and the first-person weapon
 import { loadMapIndex, loadMap, loadScenarios } from './world/assets.js';
+import { loadImpacts } from './world/impacts.js';
 import { CollisionWorld } from './world/collision.js';
+import { buildBVH } from './world/bvh-build.js';
 import { particleTrace } from './fx/trace.js';
 import { Player, CS } from './world/movement.js';
 import { Renderer } from './world/render.js';
@@ -31,6 +33,9 @@ import { ItemHud } from './ui/itemhud.js';
 import { Killfeed } from './ui/killfeed.js';
 import { Lobby } from './ui/lobby.js';
 import { Home } from './ui/home.js';
+import { LoadingScreen } from './ui/loading.js';
+import { bootDone, bootFailed } from './ui/boot.js';
+import { stepProgress } from './app/readiness.js';
 import { installReplays, bootReplays, replayKey, hasReplayLink } from './app/replay-boot.js';
 import { Peers } from './world/peers.js';
 import { usableHeals } from './world/items.js';
@@ -53,6 +58,7 @@ G.hud = new Hud($('#hud'));
 G.radar = new Radar($('#hud')); // the minimap (CS2's own radar) and the EntWatch-style item list under it
 G.itemHud = new ItemHud($('#hud'));
 G.overlay = new Overlay($('#overlay'));
+G.loading = new LoadingScreen($('#loading')); // a picked stage, until its clock starts
 G.killfeed = new Killfeed($('#killfeed'));
 G.peers = new Peers(G.renderer.scene, { log, onModel: litByParticles }); // the other players in a co-op / versus round
 G.simulate = simulate;
@@ -80,14 +86,27 @@ G.resume = () => { if (S.run && !S.run.done) enterGame(canvas); };
 G.play = (i, mode = 'normal') => {
   if (net.inRoom) {
     if (!net.isHost) { G.lobby.note('The host picks the stage'); return; }
+    beginStageLoading(i);
     enterGame(canvas);
     hostStart(i, mode);
     return;
   }
   S.mp = null;
+  beginStageLoading(i);
   enterGame(canvas);
-  startScenario(i, mode);
+  loadStage().then(() => {
+    if (!S.map?.loaded) { G.loading.close(false); return; } // another map was picked meanwhile
+    startScenario(i, mode);
+    // the lock landed while the map loaded: play on; on touch, enterGame again (it unpauses once a run exists)
+    if (S.locked) G.unpause(); else enterGame(canvas);
+  }, (e) => { G.loading.close(false); log(`stage: ${e.message || e}`); G.pause(); });
 };
+// the loading screen (ui/loading.js) from the click on: at once for a map still to load; on a loaded one, only if the
+// stage isn't ready within a few frames (no flash on a quick restart)
+function beginStageLoading(i) {
+  if (!S.map) return;
+  G.loading.begin(S.map.name, i >= 0 ? S.scenarios[i]?.id : null, S.map.loaded ? 300 : 0);
+}
 
 // ---- small HUD effects
 // light an element's `on` class for `ms` (restarting its animation if it is already on)
@@ -146,8 +165,9 @@ installInput(canvas, {
   restart: () => { if (net.inRoom) { if (net.isHost) hostStart(S.scenarioIndex, S.run?.mode); } else startScenario(S.scenarioIndex, S.run?.mode); },
 });
 
-// Load a map (its world, collision, sounds, stages) and open its stage list. The same map again just reopens the
-// list. The URL keeps ?map=<name>, so a reload comes back to it.
+// Picking a map loads only what its stage list needs (the scenario file, and the map's items from index.json for the
+// heal option); the world, collision, entities, lighting and sounds load when a stage is picked (loadStage), and then
+// only the area around that stage is streamed in first (world/stream.js). The URL keeps ?map=<name>.
 let loadingMap = null;
 // fromRound: the host's round start brought this map (a guest can't leave a live round for another map)
 async function openMap(name, fromRound = false) {
@@ -155,43 +175,18 @@ async function openMap(name, fromRound = false) {
   if (!fromRound && S.mp && !S.mp.ended && S.run && !S.run.done && !net.isHost && S.map?.name !== name) { G.lobby.note('Leave the room to play another map'); return; }
   if (S.map?.name === name) { G.menu.show('stages'); return; }
   loadingMap = name;
-  const progress = (t) => { $('#status').textContent = `loading ${name}: ${t}`; G.maps.loading(name, t); };
   try {
-    progress('starting');
+    G.maps.loading(name, 'stages');
+    if (!fromRound) G.loading.close(false); // a stage of the last map still loading is dropped (a round's is this map's)
     abortRound(); // the host leaving a live round for another map ends it for everyone
     endRun();
-    // quality: the setting, or Auto (high with BC6H/BC7 on the GPU, low without); a tier the map wasn't baked at is high
-    const tier = await pickTier(name);
-    S.map = await loadMap(name, progress, { tier, chunks: !new URLSearchParams(location.search).has('nochunks') }); // ?nochunks: the whole world glb (comparisons)
-    // the map's own CS2 lighting and post-processing (lasers-bake --lighting; the old fixed lighting without it)
-    progress('lighting');
-    // off in the settings: none of it is downloaded, the simple lighting stays
-    const lightmaps = !settings.bakedLighting ? null : await loadLightmaps(`maps/${name}/`, G.renderer.renderer, log, { reflections: settings.reflections, tier })
-      .catch((e) => { log(`lighting: ${e.message || e}`); return null; });
-    G.renderer.lighting.setMap(S.map.entities, lightmaps);
-    await G.renderer.post.setMap(`maps/${name}/`, S.map.entities, lightmaps);
-    G.stream?.dispose();
-    G.stream = null;
-    G.renderer.setWorld(S.map.world);
-    // a chunked world streams in around you (world/stream.js); the loop asks for what the camera needs
-    if (S.map.chunks.length) {
-      G.stream = new WorldStream(S.map.chunks, {
-        load: S.map.loadChunk, add: (scene) => G.renderer.addWorldChunk(scene), mode: streamMode(), log,
-      });
-    }
-    G.radar.setMap(S.map.radar);
-    S.world = new CollisionWorld(S.map.collision);
-    if (S.map.effects) S.map.effects.trace = particleTrace(S.world, S.map.collisionFx);
-    S.player = new Player(S.world);
-    G.audio.loadMap(name, S.map.version).catch((e) => log(`audio: ${e.message || e}`));
+    unloadWorld();
+    const info = S.mapIndex.find((m) => m.name === name) || {};
     const file = await loadScenarios(name);
     S.scenarios = Array.isArray(file.scenarios) ? file.scenarios : [];
-    const info = S.mapIndex.find((m) => m.name === name) || {};
+    S.map = { name, loaded: false, items: Array.isArray(info.items) ? info.items : [] };
     G.menu.build({ title: file.title || info.title, description: file.description || info.description });
-    $('#status').textContent = `${name}: ${S.map.collision.length / 9} collision triangles, ${Object.keys(S.map.entities.lumps).length} entity lumps`;
-    // a still view of the map behind the menu; nothing runs until a stage is picked
-    const ct = S.map.entities.lumps.default_ents?.find((d) => d.kv.classname === 'info_player_counterterrorist');
-    S.player.teleport(ct ? parseVec(ct.kv.origin) : [0, 0, 0], 0);
+    $('#status').textContent = `${name}: pick a stage`;
     const url = new URL(location.href);
     url.searchParams.set('map', name);
     history.replaceState(null, '', url);
@@ -207,6 +202,81 @@ async function openMap(name, fromRound = false) {
     G.menu.update();
   }
 }
+
+// the last map's world off the GPU (its stream, chunks, entity visuals): nothing of it stays behind the menu
+function unloadWorld() {
+  G.stream?.dispose();
+  G.stream = null;
+  G.renderer.setWorld(null);
+}
+
+// The rest of the picked map, once (a second stage on the same map reuses it). Resolves when it is in place;
+// app/readiness.js then waits for the stage's own area, models, effects and shaders before its clock starts.
+// A map picked while another's load is still running waits for that one to stop, then loads its own (the old one
+// leaves nothing behind: it checks the pick before each step that touches the renderer or the game state).
+let stageLoad = null; // { name, promise }
+async function loadStage() {
+  if (!S.map || S.map.loaded) return;
+  if (stageLoad?.name === S.map.name) return stageLoad.promise;
+  if (stageLoad) { await stageLoad.promise.catch(() => {}); return loadStage(); }
+  const name = S.map.name;
+  const picked = () => S.map?.name === name && !S.map.loaded;
+  const progress = (t) => {
+    $('#status').textContent = `loading ${name}: ${t}`;
+    G.loading.step(stepProgress(t));
+    G.hud.update({ title: `Loading ${name}`, sub: t, hp: 100, armor: 0 });
+  };
+  if (!G.loading.isOpen) G.loading.begin(name, undefined); // a replay, a test: the screen still covers the load
+  const promise = (async () => {
+    progress('starting');
+    // quality: the setting, or Auto (high with BC6H/BC7 on the GPU, low without); a tier the map wasn't baked at is high
+    const tier = await pickTier(name);
+    if (!picked()) return;
+    // the map's own CS2 lighting (lasers-bake --lighting; the old fixed lighting without it) downloads alongside the
+    // map's data, not after it: it is the biggest part of a map. Off in the settings: none of it is downloaded
+    const lightmapsLoad = !settings.bakedLighting ? Promise.resolve(null) : loadLightmaps(`maps/${name}/`, G.renderer.renderer, log, { reflections: settings.reflections, tier })
+      .catch((e) => { log(`lighting: ${e.message || e}`); return null; });
+    const data = await loadMap(name, progress, { tier, chunks: !new URLSearchParams(location.search).has('nochunks') }); // ?nochunks: the whole world glb (comparisons)
+    if (!picked()) return;
+    // the movement and the particle / bullet collision trees, in workers while the lighting loads (world/bvh-build.js)
+    const trees = Promise.all([buildBVH(data.collision), data.collisionFx ? buildBVH(data.collisionFx.tris) : null]);
+    // the lighting (started above) and post-processing
+    progress('lighting');
+    const lightmaps = await lightmapsLoad;
+    if (!picked()) return;
+    G.renderer.lighting.setMap(data.entities, lightmaps);
+    await G.renderer.post.setMap(`maps/${name}/`, data.entities, lightmaps);
+    if (!picked()) return;
+    const [bvh, fxBvh] = await trees;
+    if (!picked()) return;
+    if (fxBvh) data.collisionFx.bvh = fxBvh;
+    G.stream?.dispose();
+    G.stream = null;
+    G.renderer.setWorld(data.world);
+    // a chunked world streams in around you (world/stream.js); the loop asks for what the camera needs.
+    // load goes through S.map.loadChunk at each call (tests slow it down there to stand in for a phone's network)
+    if (data.chunks.length) {
+      G.stream = new WorldStream(data.chunks, {
+        load: (...a) => (S.map?.loadChunk || data.loadChunk)(...a), add: (scene) => G.renderer.addWorldChunk(scene), mode: streamMode(), log,
+      });
+    }
+    G.radar.setMap(data.radar);
+    S.world = new CollisionWorld(bvh);
+    if (data.effects) data.effects.trace = particleTrace(S.world, data.collisionFx);
+    // particle sounds (C_OP_RenderSound, fx/particles/render/sound.js) play through the game audio
+    if (data.effects) data.effects.onSound = (req) => G.audio.onSound(req);
+    // where your bullets hit the world and on what surface (world/impacts.js): its bullet impact sound
+    G.impacts = null;
+    loadImpacts(name, data.version, data.collisionFx).then((i) => { if (S.map?.name === name) G.impacts = i; }, () => {});
+    S.player = new Player(S.world);
+    G.audio.loadMap(name, data.version).catch((e) => log(`audio: ${e.message || e}`));
+    S.map = { ...data, items: data.items, loaded: true };
+    $('#status').textContent = `${name}: ${data.collision.length / 9} collision triangles, ${Object.keys(data.entities.lumps).length} entity lumps`;
+  })();
+  stageLoad = { name, promise };
+  try { await promise; } finally { if (stageLoad?.promise === promise) stageLoad = null; }
+}
+G.loadStage = loadStage;
 
 async function init() {
   bindSettings(applySettings);
@@ -225,6 +295,7 @@ async function init() {
   // first visit (no ?map, no invite link): the home page
   G.home.setMaps(S.mapIndex);
   if (!asked && !net.inRoom && !new URLSearchParams(location.search).has('room') && !hasReplayLink()) G.home.show();
+  bootDone(); // the first view is built: the boot screen fades (ui/boot.js)
   await bootReplays(); // who is signed in, then a shared replay link (?replay=<id>)
 }
 
@@ -275,7 +346,9 @@ window.__lasers = {
   get engine() { return S.engine; }, get player() { return S.player; }, get run() { return S.run; }, get world() { return S.world; },
   get paused() { return S.paused; }, get renderer() { return G.renderer; }, get map() { return S.map; }, get vm() { return G.vm; }, get body() { return G.body; }, get audio() { return G.audio; }, get overlayOpen() { return G.overlay.open; },
   get stream() { return G.stream; },
-  startScenario, settings, scenarios: () => S.scenarios,
+  // a stage loads its map first (loadStage); the run then waits for app/readiness.js (run.ready) before its clock
+  async startScenario(i, mode) { beginStageLoading(i); await loadStage(); if (S.map?.loaded) startScenario(i, mode); return S.run; },
+  settings, scenarios: () => S.scenarios,
   get replay() { return S.replay; }, watchReplay: (id) => G.watchReplay(id), watchLastRun: () => G.watchLastRun(),
   coop: { net, lobby, get round() { return S.mp; }, peers: G.peers },
   // run the simulation n seconds synchronously (tests; a hidden tab gets no animation frames)
@@ -283,5 +356,5 @@ window.__lasers = {
   advance(seconds) { if (S.mp) return 'solo only'; for (let i = 0; i < Math.round(seconds / CS.tick); i++) { if (!S.run || S.run.done) break; step(); } updateHud(); },
 };
 
-init().catch((e) => { $('#status').textContent = String(e); console.error(e); });
+init().catch((e) => { $('#status').textContent = String(e); console.error(e); bootFailed(e); });
 requestAnimationFrame(frame);

@@ -21,6 +21,7 @@ import './classes/physics.js';
 import './classes/server.js';
 import './classes/beams.js';
 import { fogState } from './classes/fog.js';
+import { breakSound, hitSound } from './sound.js';
 
 // Limits on what a map's data can make the engine do (a map is untrusted). Far above any real map:
 // ze_mist_p peaks at ~2000 live entities in a firestorm wave and ~20 simulated humans.
@@ -189,6 +190,7 @@ export class EntityEngine {
       this.kill(c);
     }
     this.live--;
+    C[e.cls]?.killed?.(e); // a class's own removal (a train's stop sound)
     if (e.parent) e.parent.children.delete(e);
     this.byKey.get(e.key)?.delete(e);
     this.byClass.get(e.cls)?.delete(e);
@@ -207,8 +209,11 @@ export class EntityEngine {
 
   // A hit for `amount` (one bullet). Breakables die at 0; physboxes only break when told to, because ZE
   // bosses count their segments with OnHealthChanged and get topped back up by the map.
-  damage(e, amount, activator, { unfiltered = false } = {}) {
+  // trace: a bullet / knife hit (CS2's TraceAttack, which plays the breakable's hit sound before any filter or
+  // health rule: sound.js hitSound); the map's RemoveHealth is not one. alt: the hit's RandomInt(0, 1), rolled by the caller.
+  damage(e, amount, activator, { unfiltered = false, trace = false, alt = false } = {}) {
     if (!e.alive || !C[e.cls] || e.state.health == null) return;
+    if (trace) hitSound(e, alt);
     const s = e.state;
     if (s.max <= 1 && s.health <= 0 && e.cls === 'func_breakable') return; // health 0 = unbreakable
     // a damage filter that keeps humans out (ze_deadcore's cube cores until the cube wakes up: SetDamageFilter human)
@@ -227,6 +232,7 @@ export class EntityEngine {
 
   breakEntity(e, activator) {
     if (!e.alive) return;
+    breakSound(e); // CBreakable::Die: the material's break sound (sound.js)
     e.fireOutput('OnBreak', activator);
     this.kill(e);
   }

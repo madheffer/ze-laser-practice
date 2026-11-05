@@ -5,7 +5,7 @@ import { settings } from './settings.js';
 import { rule, timescale, godMode, moveSettings } from './rules.js';
 import { clamp } from '../lib/math.js';
 import { readInput, takeLookDelta, syncLeaveGuard } from './input.js';
-import { bossFire, bossStatus, trackSegments, shootAs } from './bosses.js';
+import { bossFire, bossStatus, bossShown, trackSegments, shootAs } from './bosses.js';
 import { applyPose, eventsAfter, eventsDuring } from './replay-play.js';
 import { replayView } from './replay-view.js';
 import { useItems as pressItems } from '../world/items.js';
@@ -28,6 +28,8 @@ export function resetClock() { last = lastSim = performance.now(); }
 export function simulate(now) {
   const { player, engine, run } = S;
   if (!player || !engine || !run) return;
+  // a round's clock starts at the server's go (every player loaded); until then nothing moves
+  if (S.mp && !run.go) return;
   if (S.mp && !run.done) {
     const target = Math.floor((now - run.wall0) / 1000 / CS.tick);
     let steps = 0;
@@ -39,8 +41,8 @@ export function simulate(now) {
     return;
   }
   if (S.paused || S.replay?.paused || S.replay?.fast) { lastSim = now; return; } // a replay's pause / seek (app/replay.js)
-  // solo: a stage's clock waits until the world around you is drawn (world/stream.js); a round never waits
-  if (!run.started && G.stream && !G.stream.ready(player.origin)) { lastSim = now; return; }
+  // solo: a stage's clock waits until it is loaded and drawn (app/readiness.js: world, models, effects, shaders)
+  if (!run.ready) { lastSim = now; return; }
   const realDt = Math.min(0.1, (now - lastSim) / 1000);
   lastSim = now;
   acc += realDt * timescale();
@@ -217,12 +219,13 @@ export function updateHud() {
   G.itemHud?.update();
   const t = run.started ? stageTime() : -(run.startAt - run.t);
   const bosses = [];
-  for (const b of scenario?.bosses || []) { const s = bossStatus(b); if (s) bosses.push(s); }
+  // a boss shows once it has taken damage (bosses.js bossShown: GFL BossHUD)
+  for (const b of scenario?.bosses || []) { const s = bossStatus(b); if (s && bossShown(b, s)) bosses.push(s); }
   const sub = [];
-  if (G.stream && !run.started) {
-    const [have, need] = G.stream.progress(player.origin);
-    if (have < need) sub.push(`loading area ${have}/${need}`);
-  }
+  if (!run.ready && run.loading) {
+    const [have, need] = G.stream ? G.stream.progress(player.origin) : [0, 0];
+    sub.push(have < need ? `${run.loading} ${have}/${need}` : run.loading);
+  } else if (S.mp && !run.go) sub.push(S.mp.waitLine());
   if (run.hits) sub.push(plural(run.hits, 'hit'));
   if (player.gravityScale !== 1) sub.push(`gravity ${player.gravityScale}×`);
   if (timescale() !== 1) sub.push(`${timescale()}× speed`);

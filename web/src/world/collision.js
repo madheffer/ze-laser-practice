@@ -109,6 +109,71 @@ export class TriangleBVH {
       }
     }
   }
+
+  // Calls fn(triIndex) for the triangles in leaves the segment s + t*d (t in [0, best()]) passes through, nearest
+  // boxes first enough: best() is re-read per node, so boxes beyond the closest hit so far are skipped.
+  queryRay(s, d, best, fn) {
+    if (!this.count) return;
+    const B = this.nodeB, I = this.nodeI, st = this.stack;
+    const ix = 1 / d[0], iy = 1 / d[1], iz = 1 / d[2];
+    let sp = 0;
+    st[sp++] = 0;
+    while (sp) {
+      const n = st[--sp];
+      const o = n * 6;
+      // slab test (an infinite inverse on a zero component gives +-Infinity, which the min/max handle)
+      let t0 = (B[o] - s[0]) * ix, t1 = (B[o + 3] - s[0]) * ix;
+      let lo = Math.min(t0, t1), hi = Math.max(t0, t1);
+      t0 = (B[o + 1] - s[1]) * iy; t1 = (B[o + 4] - s[1]) * iy;
+      lo = Math.max(lo, Math.min(t0, t1)); hi = Math.min(hi, Math.max(t0, t1));
+      t0 = (B[o + 2] - s[2]) * iz; t1 = (B[o + 5] - s[2]) * iz;
+      lo = Math.max(lo, Math.min(t0, t1)); hi = Math.min(hi, Math.max(t0, t1));
+      // NaN (a zero direction component exactly on a box face) keeps the node: never skip a box wrongly
+      if (hi < Math.max(lo, 0) - 1e-6 || lo > best() + 1e-6) continue;
+      if (I[n * 3] === 1) {
+        const s0 = I[n * 3 + 1], c = I[n * 3 + 2];
+        for (let k = s0; k < s0 + c; k++) fn(this.idx[k]);
+      } else {
+        st[sp++] = I[n * 3 + 1];
+        st[sp++] = I[n * 3 + 2];
+      }
+    }
+  }
+}
+
+// ---------------------------------------------------------------- rays
+
+// A zero-size trace against one triangle: Moller-Trumbore for where the segment crosses it, then the same stand-off
+// the box clip gives (DIST_EPSILON short of the face, the normal facing the start; along the ray when that is less). A start
+// within DIST_EPSILON of the face, over the triangle, is start-solid, as the clip's padded slab reports.
+const EDGE_TOL = 1e-5; // barycentric slack, so a ray along a shared edge hits one of its two triangles
+function rayTriangle(T, o, s, d, tr) {
+  const ax = T[o], ay = T[o + 1], az = T[o + 2];
+  const e1x = T[o + 3] - ax, e1y = T[o + 4] - ay, e1z = T[o + 5] - az;
+  const e2x = T[o + 6] - ax, e2y = T[o + 7] - ay, e2z = T[o + 8] - az;
+  let nx = e1y * e2z - e1z * e2y, ny = e1z * e2x - e1x * e2z, nz = e1x * e2y - e1y * e2x;
+  const nl = Math.hypot(nx, ny, nz);
+  if (nl < 1e-9) return;
+  nx /= nl; ny /= nl; nz /= nl;
+  let d1 = nx * (s[0] - ax) + ny * (s[1] - ay) + nz * (s[2] - az);
+  let dd = nx * d[0] + ny * d[1] + nz * d[2]; // d2 - d1
+  if (d1 < 0) { d1 = -d1; dd = -dd; nx = -nx; ny = -ny; nz = -nz; }
+  // where on the triangle: the start's projection when it sits on the face, else the crossing point
+  const t = d1 <= DIST_EPSILON ? 0 : dd < 0 ? d1 / -dd : Infinity;
+  if (!(t <= 1)) return;
+  const px = s[0] + d[0] * t - ax, py = s[1] + d[1] * t - ay, pz = s[2] + d[2] * t - az;
+  const d00 = e1x * e1x + e1y * e1y + e1z * e1z, d01 = e1x * e2x + e1y * e2y + e1z * e2z, d11 = e2x * e2x + e2y * e2y + e2z * e2z;
+  const d20 = px * e1x + py * e1y + pz * e1z, d21 = px * e2x + py * e2y + pz * e2z;
+  const den = d00 * d11 - d01 * d01;
+  if (den <= 0) return;
+  const v = (d11 * d20 - d01 * d21) / den, w = (d00 * d21 - d01 * d20) / den;
+  if (v < -EDGE_TOL || w < -EDGE_TOL || v + w > 1 + EDGE_TOL) return;
+  if (d1 <= DIST_EPSILON) { tr.startSolid = true; return; }
+  // stand off DIST_EPSILON along the normal, or along the ray if that is less: a grazing ray would otherwise stop
+  // far short of the face (DIST_EPSILON / cos), where the box clip's other planes hide it
+  const len = Math.hypot(d[0], d[1], d[2]);
+  const f = Math.max(0, t - Math.min(DIST_EPSILON / -dd, len > 0 ? DIST_EPSILON / len : 0));
+  if (f < tr.fraction) { tr.fraction = f; tr.normal[0] = nx; tr.normal[1] = ny; tr.normal[2] = nz; tr.hit = null; }
 }
 
 // ---------------------------------------------------------------- clipping
@@ -245,7 +310,14 @@ export class CollisionWorld {
     }
     const T = this.bvh.tris;
     const L = mask ? this.layers : null;
-    this.bvh.query(lo, hi, L ? (t) => { if (L[t] & mask) clipTriangle(T, t * 9, h, s, e, tr); } : (t) => clipTriangle(T, t * 9, h, s, e, tr));
+    if (h[0] === 0 && h[1] === 0 && h[2] === 0) {
+      // a ray: the BVH walked along it and an exact triangle test (rayTriangle), not the box clip
+      const d = this._d || (this._d = [0, 0, 0]);
+      d[0] = e[0] - s[0]; d[1] = e[1] - s[1]; d[2] = e[2] - s[2];
+      this.bvh.queryRay(s, d, () => tr.fraction, (t) => { if (!L || (L[t] & mask)) rayTriangle(T, t * 9, s, d, tr); });
+    } else {
+      this.bvh.query(lo, hi, L ? (t) => { if (L[t] & mask) clipTriangle(T, t * 9, h, s, e, tr); } : (t) => clipTriangle(T, t * 9, h, s, e, tr));
+    }
     for (const d of worldOnly ? [] : this.dynamic) {
       if (d.max[0] < lo[0] || d.min[0] > hi[0] || d.max[1] < lo[1] || d.min[1] > hi[1] || d.max[2] < lo[2] || d.min[2] > hi[2]) continue;
       for (const hull of d.hulls) if (!mask || hull.layers == null || (hull.layers & mask)) clipHull(hull, h, s, e, tr, d.ref);

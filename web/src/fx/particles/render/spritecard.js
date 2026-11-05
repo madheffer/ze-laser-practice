@@ -1,39 +1,43 @@
 import * as THREE from 'three';
+import { MAX_LIGHTS, FOG_PARS } from '../../../world/lighting.js';
 
 // spritecard.vfx as a ShaderMaterial (RE §3, §4), a line-for-line GLSL port of the dumped combos (PS0 =
 // spritecard_vulkan_50_ps_s0_f0.cb.hlsl, VS0 = _vs_s0_f0.cb.hlsl), all in Source space: modelViewMatrix carries
 // the axis swap and camera vectors arrive as Source-space uniforms. controls.js fills the cbuffer slots.
 
-export const MAX_BARNS = 4;
-
-// One barn light on a particle vertex (RE §8: no N.L on particles; RE §10 record). The GLSL twin
-// of barn.js barnScalar(); light.js packs the uniforms.
+// Particles take the scene's barn lights per vertex (VS0:3380-3650: the same g_BarnLights list and cluster cull bits
+// csgo_complex reads, RE §8), so they share the world's packed set: world/lighting.js barnUniforms() (cs2Barn*,
+// MAX_LIGHTS, ranked by setLights), bound by effects.js setFxCamera(). The gather is lighting.js's cs2Barn() term for
+// term (colour x gain x 1/max(d^2, 1) x smoothstep(fade), 0 at d >= R, the cone) with no N.L and no pi: the VS sums
+// the light and PS0:689 multiplies the colour by it (RE §8: particles have no N.L). The GLSL twin of barn.js.
+export const MAX_BARNS = MAX_LIGHTS;
 export const BARN_GLSL = /* glsl */`
-uniform int uBarnCount;
-uniform vec3 uBarnPos[${MAX_BARNS}];
-uniform vec3 uBarnAxis[${MAX_BARNS}];
-uniform vec3 uBarnColor[${MAX_BARNS}];
-uniform vec4 uBarnShape[${MAX_BARNS}];   // range, inner t, tan(phi) (< 0 = point), unused
-uniform vec2 uBarnFade[${MAX_BARNS}];
+uniform int cs2BarnCount;
+uniform vec3 cs2BarnPos[${MAX_LIGHTS}];
+uniform vec3 cs2BarnAxis[${MAX_LIGHTS}];
+uniform vec3 cs2BarnColor[${MAX_LIGHTS}];
+uniform vec4 cs2BarnShape[${MAX_LIGHTS}];  // range, inner t, tan(phi) (< 0 = point), renders specular
+uniform vec2 cs2BarnFade[${MAX_LIGHTS}];
+uniform float cs2BarnUnit, cs2BarnGain;
 float efxStep(float e0, float e1, float x) { float t = clamp((x - e0) / (e1 - e0), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
-vec3 efxBarn(int i, vec3 p, out vec3 toLight) {
-  vec3 v = p - uBarnPos[i];
+vec3 efxBarn(int i, vec3 p) {
+  vec3 v = (p - cs2BarnPos[i]) * cs2BarnUnit;
   float d = length(v);
-  toLight = d > 0.0 ? -v / d : vec3(0.0, 0.0, 1.0);
-  vec4 s = uBarnShape[i];
-  float fall = efxStep(0.0, 1.0, uBarnFade[i].x + uBarnFade[i].y * d) / max(d * d, 1.0);
+  vec4 s = cs2BarnShape[i];
+  if (d >= s.x) return vec3(0.0);
+  float fall = efxStep(0.0, 1.0, cs2BarnFade[i].x + cs2BarnFade[i].y * d) / max(d * d, 1.0);
   float cone = 1.0;
   if (s.z >= 0.0) {
-    float z = dot(v, uBarnAxis[i]);
+    float z = dot(v, cs2BarnAxis[i]);
     float c = z / max(d, 1e-6);
     float r = sqrt(max(0.0, 1.0 - c * c)) / max(c, 1e-6) / s.z;
-    cone = (z < 1.0 || z > s.x || r > 1.0) ? 0.0 : (s.y < 1.0 ? efxStep(0.0, 1.0, (1.0 - r) / (1.0 - s.y)) : 1.0);
+    cone = (z < 1.0 || r > 1.0) ? 0.0 : (s.y < 1.0 ? efxStep(0.0, 1.0, (1.0 - r) / max(1.0 - s.y, 1e-6)) : 1.0);
   }
-  return uBarnColor[i] * fall * cone;
+  return cs2BarnColor[i] * cs2BarnGain * fall * cone;
 }
 vec3 efxBarnSum(vec3 p) {
-  vec3 L = vec3(0.0), tl;
-  for (int i = 0; i < ${MAX_BARNS}; i++) { if (i >= uBarnCount) break; L += efxBarn(i, p, tl); }
+  vec3 L = vec3(0.0);
+  for (int i = 0; i < ${MAX_LIGHTS}; i++) { if (i >= cs2BarnCount) break; L += efxBarn(i, p); }
   return L;
 }
 `;
@@ -144,6 +148,7 @@ void main() {
 // PS0 (static 0, dynamic 0), DIFFUSE texture type. Line numbers are PS0's.
 const PS = /* glsl */`
 uniform sampler2D uBase;
+${FOG_PARS}
 uniform vec4 PC_c0, PC_c1, PC_c3, PC_c4, PC_c5, PC_c6, PC_c8, PC_c9;
 uniform int PC_c19x, PC_c19y, PC_c19z;
 varying vec4 vUv;
@@ -206,7 +211,13 @@ void main() {
   if (mod2x) {                                                               // 705-713, 803-807
     o = vec4(clamp(mix(vec3(0.5), mix(vec3(0.5), c.rgb, vColor.rgb), a), 0.0, 1.0), a * abs(PC_c1.w));
   } else {
-    if ((PC_c19z & 16) != 0) lit *= PC_c1.z;                                 // 718-720
+    if ((PC_c19z & 16) != 0) lit *= PC_c1.z;                                 // 718-720 (F_ADDSELF: 1 + add self)
+    // 733-790, F_FOG_PARTICLES: rgb = lerp(fogColour * PC_c1.w, rgb, 1 - amount), alpha kept. The world's own fog
+    // (world/lighting.js cs2ApplyFog, which mixes toward the colour) gives both terms: mix(rgb, C, t) - C t + w C t.
+    if ((PC_c19z & 128) != 0) {
+      vec3 fogC = cs2ApplyFog(vec3(0.0), vWorld);
+      lit = cs2ApplyFog(lit, vWorld) + (PC_c1.w - 1.0) * fogC;
+    }
     lit *= mix(a, 1.0, clamp(-PC_c1.w, 0.0, 1.0));                           // 795
     o = vec4(lit, a * abs(PC_c1.w));                                         // 803
   }
@@ -220,20 +231,12 @@ const FACTOR = {
 };
 const EQUATION = { ADD: THREE.AddEquation, MAX: THREE.MaxEquation };
 
-export function createBarnUniforms() {
-  return {
-    uBarnCount: { value: 0 },
-    uBarnPos: { value: Array.from({ length: MAX_BARNS }, () => new THREE.Vector3()) },
-    uBarnAxis: { value: Array.from({ length: MAX_BARNS }, () => new THREE.Vector3(1, 0, 0)) },
-    uBarnColor: { value: Array.from({ length: MAX_BARNS }, () => new THREE.Vector3()) },
-    uBarnShape: { value: Array.from({ length: MAX_BARNS }, () => new THREE.Vector4()) },
-    uBarnFade: { value: Array.from({ length: MAX_BARNS }, () => new THREE.Vector2()) },
-  };
-}
+// Every live spritecard material, so effects.js can point them all at a newly bound lighting set (setFxCamera).
+export const liveMaterials = new Set();
 
 /**
  * A spritecard material. `shared` holds the per-frame uniforms every particle material of a side
- * reads (camera vectors, ambient, the barn lights), so they are written once per frame.
+ * reads (camera vectors, ambient, the world's barn lights and fog: effects.js fxShared), written once per frame.
  */
 export function createSpritecardMaterial(kind, shared, texture) {
   const v4 = () => new THREE.Vector4();
@@ -256,6 +259,8 @@ export function createSpritecardMaterial(kind, shared, texture) {
     side: THREE.DoubleSide,
     toneMapped: false,
   });
+  liveMaterials.add(mat);
+  mat.addEventListener('dispose', () => liveMaterials.delete(mat));
   return mat;
 }
 

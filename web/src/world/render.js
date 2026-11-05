@@ -370,7 +370,7 @@ export class Renderer {
   updateEffects(time) {
     const dt = this.fxClock == null ? 0 : Math.max(0, Math.min(0.1, time - this.fxClock));
     this.fxClock = time;
-    setFxCamera(this.camera);
+    setFxCamera(this.camera, this.lighting); // the world barn lights + fog reach particles (fx/effects.js)
     // particles are lit by the map's own sky ambient (world/lighting.js, from its light_environment / probes), white without a bake
     const amb = this.lighting?.ambient;
     if (amb) fxShared.uAmbient.value.set(amb.r, amb.g, amb.b); else fxShared.uAmbient.value.set(1, 1, 1);

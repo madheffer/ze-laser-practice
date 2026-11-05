@@ -1,0 +1,1803 @@
+{
+  "map": "ze_visualizer",
+  "title": "ze_visualizer",
+  "workshop": "3261434415",
+  "description": "Six levels of particles, by Madara. Level 5 ends under falling balls; level 6 ends in the Blue Particle (16 segments, 22 attacks of track lasers, rotating beams, sphere rings and laser fans) and a final dodge of shots rising from below.",
+  "scenarios": [
+    {
+      "id": "l5_ending",
+      "group": "Level 5 – ending",
+      "featured": true,
+      "name": "Level 5 ending: falling balls",
+      "description": "Ride the ending platform (le5_movelinear_end, 7.5 s). On arrival l5_ending_relay drops two then four lines of balls from above every 0.15 s (12–20 s, l5_ball_end_hurt: instant kill) while the cube dodge sweeps the platform (stage5ending_hurt: 800). Win when s5_once_win turns on at +22 s.",
+      "spawn": {
+        "origin": [
+          -3072,
+          -3072,
+          -4410
+        ],
+        "yaw": 90
+      },
+      "start": [
+        {
+          "target": "[PR#]level5_relay",
+          "input": "Trigger"
+        },
+        {
+          "target": "[PR#]s5_beam*",
+          "input": "TurnOff",
+          "delay": 9
+        },
+        {
+          "target": "[PR#]s5_beam_1_8_new*",
+          "input": "Stop",
+          "delay": 9
+        },
+        {
+          "target": "[PR#]s5_beam_cube*",
+          "input": "Kill",
+          "delay": 9
+        },
+        {
+          "target": "[PR#]s5_slow_nuke",
+          "input": "Enable",
+          "delay": 9
+        },
+        {
+          "target": "[PR#]s5_end_water_hurt",
+          "input": "SetDamage",
+          "param": "999999",
+          "delay": 9
+        },
+        {
+          "target": "[PR#]s5_last_teleport",
+          "input": "Enable",
+          "delay": 9
+        },
+        {
+          "target": "[PR#]zombie_gravity_button",
+          "input": "Kill",
+          "delay": 9
+        },
+        {
+          "target": "[PR#]zombie_freezeball_button",
+          "input": "Kill",
+          "delay": 9
+        },
+        {
+          "target": "[PR#]zombie_energyball_button",
+          "input": "Kill",
+          "delay": 9
+        },
+        {
+          "target": "[PR#]s5_beam*",
+          "input": "Kill",
+          "delay": 9.02
+        },
+        {
+          "target": "[PR#]s5_beam_rotating*",
+          "input": "Kill",
+          "delay": 9.04
+        },
+        {
+          "target": "[PR#]movelinear_stage5_ending_template",
+          "input": "ForceSpawn",
+          "delay": 9.04
+        },
+        {
+          "target": "[PR#]s5_ending_breakable",
+          "input": "Break",
+          "delay": 9.04
+        },
+        {
+          "target": "[PR#]s5_ending_sphere",
+          "input": "Start",
+          "delay": 10
+        }
+      ],
+      "fastForward": 11,
+      "win": {
+        "target": "[PR#]s5_once_score",
+        "input": "Enable"
+      },
+      "hazards": {
+        "l5_ball_end_hurt": "a falling ball",
+        "stage5ending_hurt": "a cube"
+      }
+    },
+    {
+      "id": "l6_boss",
+      "group": "Level 6 – Blue Particle",
+      "full": true,
+      "featured": true,
+      "name": "Blue Particle (boss)",
+      "childrenTitle": "Single attacks",
+      "description": "main_boss_start_relay: the boss spawns over the room, boss_add_hp gives each human 90 hits per segment (16 segments, boss_healthcount), and 123_boss_case_attack_main picks one of 22 attacks after each one ends. stage6_playerboss_hp sets 160 HP. Win when boss_death_relay fires (its 16th segment).",
+      "spawn": {
+        "origin": [
+          -12224,
+          576,
+          -320
+        ],
+        "yaw": 90
+      },
+      "start": [
+        {
+          "target": "[PR#]level6_relay",
+          "input": "Trigger"
+        },
+        {
+          "target": "[PR#]part2_s6_template",
+          "input": "ForceSpawn",
+          "delay": 0.1
+        }
+      ],
+      "fastForward": 12,
+      "setup": [
+        {
+          "target": "[PR#]main_boss_start_relay",
+          "input": "Trigger"
+        }
+      ],
+      "bosses": [
+        {
+          "target": "[PR#]boss_physbox",
+          "name": "Blue Particle",
+          "counter": "[PR#]boss_health_main",
+          "counterMode": "hits"
+        }
+      ],
+      "win": {
+        "target": "[PR#]boss_death_relay",
+        "input": "Trigger"
+      },
+      "hazards": {
+        "1_hurt": "a track laser",
+        "newsphere_hurt": "a sphere",
+        "2_hurt": "a floor sphere",
+        "3_1_hurt": "a side laser",
+        "3_2_hurt": "a side laser",
+        "4_1_hurt": "a sweeping laser",
+        "8_laserhurt1": "a wall laser",
+        "9_hurt": "a track laser",
+        "10_hurt": "a fan laser",
+        "11_hurt": "the rotating beam",
+        "12_hurt": "a sphere",
+        "npc_hurt": "an NPC",
+        "rotating_npc_hurt": "a rotating NPC",
+        "13_hurt1": "a rotating beam",
+        "13_hurt2": "a rotating beam",
+        "14_hurt1": "the triple beam",
+        "14_hurt2": "the triple beam",
+        "14_hurt3": "the triple beam",
+        "16_hurt": "a sphere",
+        "17_hurt1": "a falling laser",
+        "18_laserhurt1": "a wall laser",
+        "19_beam_hurt": "a rotating beam"
+      }
+    },
+    {
+      "id": "l6_final_dodge",
+      "group": "Level 6 – Blue Particle",
+      "featured": true,
+      "name": "Final dodge (after the boss)",
+      "description": "From the boss's death: the floor breaks under you at +61 s and final_dodge_relay fires 43 s of shots rising from ~3000 u below (look down): l6 balls (instant kill), l7 balls (180), l8 beams (120), the l9 beam spray (instant kill) and l10 rings every 2–4 s (instant kill). Then the floor breaks again; win on the humans-win trigger the fall reaches.",
+      "spawn": {
+        "origin": [
+          8032,
+          -10400,
+          2612
+        ],
+        "yaw": 270
+      },
+      "start": [
+        {
+          "target": "[PR#]level6_relay",
+          "input": "Trigger"
+        },
+        {
+          "target": "[PR#]part2_s6_template",
+          "input": "ForceSpawn",
+          "delay": 0.1
+        },
+        {
+          "target": "[PR#]template_sphereboss",
+          "input": "ForceSpawn",
+          "delay": 0.2
+        },
+        {
+          "target": "[PR#]boss_death_relay",
+          "input": "Trigger",
+          "delay": 0.5
+        }
+      ],
+      "fastForward": 60,
+      "win": {
+        "target": "[PR#]p2_s6_once_score",
+        "input": "Enable"
+      },
+      "hazards": {
+        "l6_ball_end_hurt": "a rising ball",
+        "l7_ball_end_hurt": "a rising ball",
+        "l8_beam_hurt1": "a rising beam",
+        "l9_beam_hurt": "the beam spray",
+        "l10_hurt": "a rising ring"
+      }
+    },
+    {
+      "id": "l6_a01",
+      "parent": "l6_boss",
+      "name": "Attack 1: track lasers",
+      "description": "first_attack_maker pairs send track lasers (1_hurt: 20) and spheres (newsphere_hurt: 20) across the room at 0, 2, 4 and 6 s (makers 1+3, 7+8, 4+5, 8+7).",
+      "spawn": {
+        "origin": [
+          -12224,
+          576,
+          -320
+        ],
+        "yaw": 90
+      },
+      "start": [
+        {
+          "target": "[PR#]level6_relay",
+          "input": "Trigger"
+        },
+        {
+          "target": "[PR#]part2_s6_template",
+          "input": "ForceSpawn",
+          "delay": 0.1
+        }
+      ],
+      "fastForward": 12,
+      "setup": [
+        {
+          "target": "[PR#]template_sphereboss",
+          "input": "ForceSpawn"
+        },
+        {
+          "target": "[PR#]123_boss_attack_template",
+          "input": "ForceSpawn"
+        },
+        {
+          "target": "[PR#]stage6_playerboss_hp",
+          "input": "Enable"
+        },
+        {
+          "target": "[PR#]123_boss_case_attack_main",
+          "input": "Kill",
+          "delay": 0.5
+        },
+        {
+          "target": "[PR#]premier_relay",
+          "input": "Trigger",
+          "delay": 2
+        }
+      ],
+      "winAfter": 14,
+      "hazards": {
+        "1_hurt": "a track laser",
+        "newsphere_hurt": "a sphere",
+        "2_hurt": "a floor sphere",
+        "3_1_hurt": "a side laser",
+        "3_2_hurt": "a side laser",
+        "4_1_hurt": "a sweeping laser",
+        "8_laserhurt1": "a wall laser",
+        "9_hurt": "a track laser",
+        "10_hurt": "a fan laser",
+        "11_hurt": "the rotating beam",
+        "12_hurt": "a sphere",
+        "npc_hurt": "an NPC",
+        "rotating_npc_hurt": "a rotating NPC",
+        "13_hurt1": "a rotating beam",
+        "13_hurt2": "a rotating beam",
+        "14_hurt1": "the triple beam",
+        "14_hurt2": "the triple beam",
+        "14_hurt3": "the triple beam",
+        "16_hurt": "a sphere",
+        "17_hurt1": "a falling laser",
+        "18_laserhurt1": "a wall laser",
+        "19_beam_hurt": "a rotating beam"
+      }
+    },
+    {
+      "id": "l6_a01b",
+      "parent": "l6_boss",
+      "name": "Attack 1b: track lasers",
+      "description": "The other order of attack 1: makers 4+5, 6+9, 3+1, 4+5 at 0, 2, 4 and 6 s.",
+      "spawn": {
+        "origin": [
+          -12224,
+          576,
+          -320
+        ],
+        "yaw": 90
+      },
+      "start": [
+        {
+          "target": "[PR#]level6_relay",
+          "input": "Trigger"
+        },
+        {
+          "target": "[PR#]part2_s6_template",
+          "input": "ForceSpawn",
+          "delay": 0.1
+        }
+      ],
+      "fastForward": 12,
+      "setup": [
+        {
+          "target": "[PR#]template_sphereboss",
+          "input": "ForceSpawn"
+        },
+        {
+          "target": "[PR#]123_boss_attack_template",
+          "input": "ForceSpawn"
+        },
+        {
+          "target": "[PR#]stage6_playerboss_hp",
+          "input": "Enable"
+        },
+        {
+          "target": "[PR#]123_boss_case_attack_main",
+          "input": "Kill",
+          "delay": 0.5
+        },
+        {
+          "target": "[PR#]premier_relay_2",
+          "input": "Trigger",
+          "delay": 2
+        }
+      ],
+      "winAfter": 11,
+      "hazards": {
+        "1_hurt": "a track laser",
+        "newsphere_hurt": "a sphere",
+        "2_hurt": "a floor sphere",
+        "3_1_hurt": "a side laser",
+        "3_2_hurt": "a side laser",
+        "4_1_hurt": "a sweeping laser",
+        "8_laserhurt1": "a wall laser",
+        "9_hurt": "a track laser",
+        "10_hurt": "a fan laser",
+        "11_hurt": "the rotating beam",
+        "12_hurt": "a sphere",
+        "npc_hurt": "an NPC",
+        "rotating_npc_hurt": "a rotating NPC",
+        "13_hurt1": "a rotating beam",
+        "13_hurt2": "a rotating beam",
+        "14_hurt1": "the triple beam",
+        "14_hurt2": "the triple beam",
+        "14_hurt3": "the triple beam",
+        "16_hurt": "a sphere",
+        "17_hurt1": "a falling laser",
+        "18_laserhurt1": "a wall laser",
+        "19_beam_hurt": "a rotating beam"
+      }
+    },
+    {
+      "id": "l6_a02",
+      "parent": "l6_boss",
+      "name": "Attack 2: floor spheres",
+      "description": "Six second_makers drop spheres along the floor (2_hurt: 40), then track lasers at 12.5 s.",
+      "spawn": {
+        "origin": [
+          -12224,
+          576,
+          -320
+        ],
+        "yaw": 90
+      },
+      "start": [
+        {
+          "target": "[PR#]level6_relay",
+          "input": "Trigger"
+        },
+        {
+          "target": "[PR#]part2_s6_template",
+          "input": "ForceSpawn",
+          "delay": 0.1
+        }
+      ],
+      "fastForward": 12,
+      "setup": [
+        {
+          "target": "[PR#]template_sphereboss",
+          "input": "ForceSpawn"
+        },
+        {
+          "target": "[PR#]123_boss_attack_template",
+          "input": "ForceSpawn"
+        },
+        {
+          "target": "[PR#]stage6_playerboss_hp",
+          "input": "Enable"
+        },
+        {
+          "target": "[PR#]123_boss_case_attack_main",
+          "input": "Kill",
+          "delay": 0.5
+        },
+        {
+          "target": "[PR#]second_relay",
+          "input": "Trigger",
+          "delay": 2
+        }
+      ],
+      "winAfter": 17,
+      "hazards": {
+        "1_hurt": "a track laser",
+        "newsphere_hurt": "a sphere",
+        "2_hurt": "a floor sphere",
+        "3_1_hurt": "a side laser",
+        "3_2_hurt": "a side laser",
+        "4_1_hurt": "a sweeping laser",
+        "8_laserhurt1": "a wall laser",
+        "9_hurt": "a track laser",
+        "10_hurt": "a fan laser",
+        "11_hurt": "the rotating beam",
+        "12_hurt": "a sphere",
+        "npc_hurt": "an NPC",
+        "rotating_npc_hurt": "a rotating NPC",
+        "13_hurt1": "a rotating beam",
+        "13_hurt2": "a rotating beam",
+        "14_hurt1": "the triple beam",
+        "14_hurt2": "the triple beam",
+        "14_hurt3": "the triple beam",
+        "16_hurt": "a sphere",
+        "17_hurt1": "a falling laser",
+        "18_laserhurt1": "a wall laser",
+        "19_beam_hurt": "a rotating beam"
+      }
+    },
+    {
+      "id": "l6_a03",
+      "parent": "l6_boss",
+      "name": "Attack 3: side spheres",
+      "description": "Two mini spheres run the sides on tracktrains (600 u/s) and fire side lasers (3_1_hurt: 40, 3_2_hurt: 30) every 1.3–2.6 s for 8.5 s; track lasers at 13.5 and 15.5 s.",
+      "spawn": {
+        "origin": [
+          -12224,
+          576,
+          -320
+        ],
+        "yaw": 90
+      },
+      "start": [
+        {
+          "target": "[PR#]level6_relay",
+          "input": "Trigger"
+        },
+        {
+          "target": "[PR#]part2_s6_template",
+          "input": "ForceSpawn",
+          "delay": 0.1
+        }
+      ],
+      "fastForward": 12,
+      "setup": [
+        {
+          "target": "[PR#]template_sphereboss",
+          "input": "ForceSpawn"
+        },
+        {
+          "target": "[PR#]123_boss_attack_template",
+          "input": "ForceSpawn"
+        },
+        {
+          "target": "[PR#]stage6_playerboss_hp",
+          "input": "Enable"
+        },
+        {
+          "target": "[PR#]123_boss_case_attack_main",
+          "input": "Kill",
+          "delay": 0.5
+        },
+        {
+          "target": "[PR#]third_double_sphere_side_relay",
+          "input": "Trigger",
+          "delay": 2
+        }
+      ],
+      "winAfter": 21,
+      "hazards": {
+        "1_hurt": "a track laser",
+        "newsphere_hurt": "a sphere",
+        "2_hurt": "a floor sphere",
+        "3_1_hurt": "a side laser",
+        "3_2_hurt": "a side laser",
+        "4_1_hurt": "a sweeping laser",
+        "8_laserhurt1": "a wall laser",
+        "9_hurt": "a track laser",
+        "10_hurt": "a fan laser",
+        "11_hurt": "the rotating beam",
+        "12_hurt": "a sphere",
+        "npc_hurt": "an NPC",
+        "rotating_npc_hurt": "a rotating NPC",
+        "13_hurt1": "a rotating beam",
+        "13_hurt2": "a rotating beam",
+        "14_hurt1": "the triple beam",
+        "14_hurt2": "the triple beam",
+        "14_hurt3": "the triple beam",
+        "16_hurt": "a sphere",
+        "17_hurt1": "a falling laser",
+        "18_laserhurt1": "a wall laser",
+        "19_beam_hurt": "a rotating beam"
+      }
+    },
+    {
+      "id": "l6_a04",
+      "parent": "l6_boss",
+      "name": "Attack 4: sweeping lasers",
+      "description": "fourth_attack_template: a door (512 u at 400 u/s) carries 10 makers of sweeping lasers (4_1_hurt: 30).",
+      "spawn": {
+        "origin": [
+          -12224,
+          576,
+          -320
+        ],
+        "yaw": 90
+      },
+      "start": [
+        {
+          "target": "[PR#]level6_relay",
+          "input": "Trigger"
+        },
+        {
+          "target": "[PR#]part2_s6_template",
+          "input": "ForceSpawn",
+          "delay": 0.1
+        }
+      ],
+      "fastForward": 12,
+      "setup": [
+        {
+          "target": "[PR#]template_sphereboss",
+          "input": "ForceSpawn"
+        },
+        {
+          "target": "[PR#]123_boss_attack_template",
+          "input": "ForceSpawn"
+        },
+        {
+          "target": "[PR#]stage6_playerboss_hp",
+          "input": "Enable"
+        },
+        {
+          "target": "[PR#]123_boss_case_attack_main",
+          "input": "Kill",
+          "delay": 0.5
+        },
+        {
+          "target": "[PR#]fourth_attack_relay",
+          "input": "Trigger",
+          "delay": 2
+        }
+      ],
+      "winAfter": 21,
+      "hazards": {
+        "1_hurt": "a track laser",
+        "newsphere_hurt": "a sphere",
+        "2_hurt": "a floor sphere",
+        "3_1_hurt": "a side laser",
+        "3_2_hurt": "a side laser",
+        "4_1_hurt": "a sweeping laser",
+        "8_laserhurt1": "a wall laser",
+        "9_hurt": "a track laser",
+        "10_hurt": "a fan laser",
+        "11_hurt": "the rotating beam",
+        "12_hurt": "a sphere",
+        "npc_hurt": "an NPC",
+        "rotating_npc_hurt": "a rotating NPC",
+        "13_hurt1": "a rotating beam",
+        "13_hurt2": "a rotating beam",
+        "14_hurt1": "the triple beam",
+        "14_hurt2": "the triple beam",
+        "14_hurt3": "the triple beam",
+        "16_hurt": "a sphere",
+        "17_hurt1": "a falling laser",
+        "18_laserhurt1": "a wall laser",
+        "19_beam_hurt": "a rotating beam"
+      }
+    },
+    {
+      "id": "l6_a05",
+      "parent": "l6_boss",
+      "name": "Attack 5: twin sphere rings",
+      "description": "Two spheres circle on tracktrains and spit rings of spheres (newsphere_hurt: 20) every 0.13 s (4.7–10 s, then 15–19.5 s); track lasers at 23 s. The longest attack.",
+      "spawn": {
+        "origin": [
+          -12224,
+          576,
+          -320
+        ],
+        "yaw": 90
+      },
+      "start": [
+        {
+          "target": "[PR#]level6_relay",
+          "input": "Trigger"
+        },
+        {
+          "target": "[PR#]part2_s6_template",
+          "input": "ForceSpawn",
+          "delay": 0.1
+        }
+      ],
+      "fastForward": 12,
+      "setup": [
+        {
+          "target": "[PR#]template_sphereboss",
+          "input": "ForceSpawn"
+        },
+        {
+          "target": "[PR#]123_boss_attack_template",
+          "input": "ForceSpawn"
+        },
+        {
+          "target": "[PR#]stage6_playerboss_hp",
+          "input": "Enable"
+        },
+        {
+          "target": "[PR#]123_boss_case_attack_main",
+          "input": "Kill",
+          "delay": 0.5
+        },
+        {
+          "target": "[PR#]fifth_attack_relay",
+          "input": "Trigger",
+          "delay": 2
+        }
+      ],
+      "winAfter": 35,
+      "hazards": {
+        "1_hurt": "a track laser",
+        "newsphere_hurt": "a sphere",
+        "2_hurt": "a floor sphere",
+        "3_1_hurt": "a side laser",
+        "3_2_hurt": "a side laser",
+        "4_1_hurt": "a sweeping laser",
+        "8_laserhurt1": "a wall laser",
+        "9_hurt": "a track laser",
+        "10_hurt": "a fan laser",
+        "11_hurt": "the rotating beam",
+        "12_hurt": "a sphere",
+        "npc_hurt": "an NPC",
+        "rotating_npc_hurt": "a rotating NPC",
+        "13_hurt1": "a rotating beam",
+        "13_hurt2": "a rotating beam",
+        "14_hurt1": "the triple beam",
+        "14_hurt2": "the triple beam",
+        "14_hurt3": "the triple beam",
+        "16_hurt": "a sphere",
+        "17_hurt1": "a falling laser",
+        "18_laserhurt1": "a wall laser",
+        "19_beam_hurt": "a rotating beam"
+      }
+    },
+    {
+      "id": "l6_a06",
+      "parent": "l6_boss",
+      "name": "Attack 6: push or gravity",
+      "description": "boss_six_random_case: a push or a gravity pull, then track lasers at 4.15 s.",
+      "spawn": {
+        "origin": [
+          -12224,
+          576,
+          -320
+        ],
+        "yaw": 90
+      },
+      "start": [
+        {
+          "target": "[PR#]level6_relay",
+          "input": "Trigger"
+        },
+        {
+          "target": "[PR#]part2_s6_template",
+          "input": "ForceSpawn",
+          "delay": 0.1
+        }
+      ],
+      "fastForward": 12,
+      "setup": [
+        {
+          "target": "[PR#]template_sphereboss",
+          "input": "ForceSpawn"
+        },
+        {
+          "target": "[PR#]123_boss_attack_template",
+          "input": "ForceSpawn"
+        },
+        {
+          "target": "[PR#]stage6_playerboss_hp",
+          "input": "Enable"
+        },
+        {
+          "target": "[PR#]123_boss_case_attack_main",
+          "input": "Kill",
+          "delay": 0.5
+        },
+        {
+          "target": "[PR#]six_attack_relay",
+          "input": "Trigger",
+          "delay": 2
+        }
+      ],
+      "winAfter": 9,
+      "hazards": {
+        "1_hurt": "a track laser",
+        "newsphere_hurt": "a sphere",
+        "2_hurt": "a floor sphere",
+        "3_1_hurt": "a side laser",
+        "3_2_hurt": "a side laser",
+        "4_1_hurt": "a sweeping laser",
+        "8_laserhurt1": "a wall laser",
+        "9_hurt": "a track laser",
+        "10_hurt": "a fan laser",
+        "11_hurt": "the rotating beam",
+        "12_hurt": "a sphere",
+        "npc_hurt": "an NPC",
+        "rotating_npc_hurt": "a rotating NPC",
+        "13_hurt1": "a rotating beam",
+        "13_hurt2": "a rotating beam",
+        "14_hurt1": "the triple beam",
+        "14_hurt2": "the triple beam",
+        "14_hurt3": "the triple beam",
+        "16_hurt": "a sphere",
+        "17_hurt1": "a falling laser",
+        "18_laserhurt1": "a wall laser",
+        "19_beam_hurt": "a rotating beam"
+      }
+    },
+    {
+      "id": "l6_a07",
+      "parent": "l6_boss",
+      "name": "Attack 7: NPC drops",
+      "description": "boss_seven_timer drops NPCs (npc_hurt: 40) at one of six spawnpoints every 1.5–3.3 s for 10 s.",
+      "spawn": {
+        "origin": [
+          -12224,
+          576,
+          -320
+        ],
+        "yaw": 90
+      },
+      "start": [
+        {
+          "target": "[PR#]level6_relay",
+          "input": "Trigger"
+        },
+        {
+          "target": "[PR#]part2_s6_template",
+          "input": "ForceSpawn",
+          "delay": 0.1
+        }
+      ],
+      "fastForward": 12,
+      "setup": [
+        {
+          "target": "[PR#]template_sphereboss",
+          "input": "ForceSpawn"
+        },
+        {
+          "target": "[PR#]123_boss_attack_template",
+          "input": "ForceSpawn"
+        },
+        {
+          "target": "[PR#]stage6_playerboss_hp",
+          "input": "Enable"
+        },
+        {
+          "target": "[PR#]123_boss_case_attack_main",
+          "input": "Kill",
+          "delay": 0.5
+        },
+        {
+          "target": "[PR#]seven_attack_relay",
+          "input": "Trigger",
+          "delay": 2
+        }
+      ],
+      "winAfter": 20,
+      "hazards": {
+        "1_hurt": "a track laser",
+        "newsphere_hurt": "a sphere",
+        "2_hurt": "a floor sphere",
+        "3_1_hurt": "a side laser",
+        "3_2_hurt": "a side laser",
+        "4_1_hurt": "a sweeping laser",
+        "8_laserhurt1": "a wall laser",
+        "9_hurt": "a track laser",
+        "10_hurt": "a fan laser",
+        "11_hurt": "the rotating beam",
+        "12_hurt": "a sphere",
+        "npc_hurt": "an NPC",
+        "rotating_npc_hurt": "a rotating NPC",
+        "13_hurt1": "a rotating beam",
+        "13_hurt2": "a rotating beam",
+        "14_hurt1": "the triple beam",
+        "14_hurt2": "the triple beam",
+        "14_hurt3": "the triple beam",
+        "16_hurt": "a sphere",
+        "17_hurt1": "a falling laser",
+        "18_laserhurt1": "a wall laser",
+        "19_beam_hurt": "a rotating beam"
+      }
+    },
+    {
+      "id": "l6_a08",
+      "parent": "l6_boss",
+      "name": "Attack 8: laser wall",
+      "description": "height_attack_template: a door (328 u down at 600 u/s) with 19 makers of wall lasers (8_laserhurt1: 20); track lasers at 14 and 15 s.",
+      "spawn": {
+        "origin": [
+          -12224,
+          576,
+          -320
+        ],
+        "yaw": 90
+      },
+      "start": [
+        {
+          "target": "[PR#]level6_relay",
+          "input": "Trigger"
+        },
+        {
+          "target": "[PR#]part2_s6_template",
+          "input": "ForceSpawn",
+          "delay": 0.1
+        }
+      ],
+      "fastForward": 12,
+      "setup": [
+        {
+          "target": "[PR#]template_sphereboss",
+          "input": "ForceSpawn"
+        },
+        {
+          "target": "[PR#]123_boss_attack_template",
+          "input": "ForceSpawn"
+        },
+        {
+          "target": "[PR#]stage6_playerboss_hp",
+          "input": "Enable"
+        },
+        {
+          "target": "[PR#]123_boss_case_attack_main",
+          "input": "Kill",
+          "delay": 0.5
+        },
+        {
+          "target": "[PR#]height_attack_relay",
+          "input": "Trigger",
+          "delay": 2
+        }
+      ],
+      "winAfter": 19,
+      "hazards": {
+        "1_hurt": "a track laser",
+        "newsphere_hurt": "a sphere",
+        "2_hurt": "a floor sphere",
+        "3_1_hurt": "a side laser",
+        "3_2_hurt": "a side laser",
+        "4_1_hurt": "a sweeping laser",
+        "8_laserhurt1": "a wall laser",
+        "9_hurt": "a track laser",
+        "10_hurt": "a fan laser",
+        "11_hurt": "the rotating beam",
+        "12_hurt": "a sphere",
+        "npc_hurt": "an NPC",
+        "rotating_npc_hurt": "a rotating NPC",
+        "13_hurt1": "a rotating beam",
+        "13_hurt2": "a rotating beam",
+        "14_hurt1": "the triple beam",
+        "14_hurt2": "the triple beam",
+        "14_hurt3": "the triple beam",
+        "16_hurt": "a sphere",
+        "17_hurt1": "a falling laser",
+        "18_laserhurt1": "a wall laser",
+        "19_beam_hurt": "a rotating beam"
+      }
+    },
+    {
+      "id": "l6_a09",
+      "parent": "l6_boss",
+      "name": "Attack 9: track pairs",
+      "description": "nine_track_case fires two of four tracks every 2 s from 2 to 12 s (9_hurt: 30).",
+      "spawn": {
+        "origin": [
+          -12224,
+          576,
+          -320
+        ],
+        "yaw": 90
+      },
+      "start": [
+        {
+          "target": "[PR#]level6_relay",
+          "input": "Trigger"
+        },
+        {
+          "target": "[PR#]part2_s6_template",
+          "input": "ForceSpawn",
+          "delay": 0.1
+        }
+      ],
+      "fastForward": 12,
+      "setup": [
+        {
+          "target": "[PR#]template_sphereboss",
+          "input": "ForceSpawn"
+        },
+        {
+          "target": "[PR#]123_boss_attack_template",
+          "input": "ForceSpawn"
+        },
+        {
+          "target": "[PR#]stage6_playerboss_hp",
+          "input": "Enable"
+        },
+        {
+          "target": "[PR#]123_boss_case_attack_main",
+          "input": "Kill",
+          "delay": 0.5
+        },
+        {
+          "target": "[PR#]nine_attack_relay",
+          "input": "Trigger",
+          "delay": 2
+        }
+      ],
+      "winAfter": 20,
+      "hazards": {
+        "1_hurt": "a track laser",
+        "newsphere_hurt": "a sphere",
+        "2_hurt": "a floor sphere",
+        "3_1_hurt": "a side laser",
+        "3_2_hurt": "a side laser",
+        "4_1_hurt": "a sweeping laser",
+        "8_laserhurt1": "a wall laser",
+        "9_hurt": "a track laser",
+        "10_hurt": "a fan laser",
+        "11_hurt": "the rotating beam",
+        "12_hurt": "a sphere",
+        "npc_hurt": "an NPC",
+        "rotating_npc_hurt": "a rotating NPC",
+        "13_hurt1": "a rotating beam",
+        "13_hurt2": "a rotating beam",
+        "14_hurt1": "the triple beam",
+        "14_hurt2": "the triple beam",
+        "14_hurt3": "the triple beam",
+        "16_hurt": "a sphere",
+        "17_hurt1": "a falling laser",
+        "18_laserhurt1": "a wall laser",
+        "19_beam_hurt": "a rotating beam"
+      }
+    },
+    {
+      "id": "l6_a10",
+      "parent": "l6_boss",
+      "name": "Attack 10: laser fan",
+      "description": "ten_attack_maker sweeps a fan of 8 lasers 25° apart, one every 0.5 s, left or right (10_hurt: 60).",
+      "spawn": {
+        "origin": [
+          -12224,
+          576,
+          -320
+        ],
+        "yaw": 90
+      },
+      "start": [
+        {
+          "target": "[PR#]level6_relay",
+          "input": "Trigger"
+        },
+        {
+          "target": "[PR#]part2_s6_template",
+          "input": "ForceSpawn",
+          "delay": 0.1
+        }
+      ],
+      "fastForward": 12,
+      "setup": [
+        {
+          "target": "[PR#]template_sphereboss",
+          "input": "ForceSpawn"
+        },
+        {
+          "target": "[PR#]123_boss_attack_template",
+          "input": "ForceSpawn"
+        },
+        {
+          "target": "[PR#]stage6_playerboss_hp",
+          "input": "Enable"
+        },
+        {
+          "target": "[PR#]123_boss_case_attack_main",
+          "input": "Kill",
+          "delay": 0.5
+        },
+        {
+          "target": "[PR#]ten_attack_relay",
+          "input": "Trigger",
+          "delay": 2
+        }
+      ],
+      "winAfter": 17,
+      "hazards": {
+        "1_hurt": "a track laser",
+        "newsphere_hurt": "a sphere",
+        "2_hurt": "a floor sphere",
+        "3_1_hurt": "a side laser",
+        "3_2_hurt": "a side laser",
+        "4_1_hurt": "a sweeping laser",
+        "8_laserhurt1": "a wall laser",
+        "9_hurt": "a track laser",
+        "10_hurt": "a fan laser",
+        "11_hurt": "the rotating beam",
+        "12_hurt": "a sphere",
+        "npc_hurt": "an NPC",
+        "rotating_npc_hurt": "a rotating NPC",
+        "13_hurt1": "a rotating beam",
+        "13_hurt2": "a rotating beam",
+        "14_hurt1": "the triple beam",
+        "14_hurt2": "the triple beam",
+        "14_hurt3": "the triple beam",
+        "16_hurt": "a sphere",
+        "17_hurt1": "a falling laser",
+        "18_laserhurt1": "a wall laser",
+        "19_beam_hurt": "a rotating beam"
+      }
+    },
+    {
+      "id": "l6_a11",
+      "parent": "l6_boss",
+      "name": "Attack 11: rotating beam",
+      "description": "One beam turns around the room (11_rotating, 13°/s, 11_hurt: 60); track lasers at 20 s.",
+      "spawn": {
+        "origin": [
+          -12224,
+          576,
+          -320
+        ],
+        "yaw": 90
+      },
+      "start": [
+        {
+          "target": "[PR#]level6_relay",
+          "input": "Trigger"
+        },
+        {
+          "target": "[PR#]part2_s6_template",
+          "input": "ForceSpawn",
+          "delay": 0.1
+        }
+      ],
+      "fastForward": 12,
+      "setup": [
+        {
+          "target": "[PR#]template_sphereboss",
+          "input": "ForceSpawn"
+        },
+        {
+          "target": "[PR#]123_boss_attack_template",
+          "input": "ForceSpawn"
+        },
+        {
+          "target": "[PR#]stage6_playerboss_hp",
+          "input": "Enable"
+        },
+        {
+          "target": "[PR#]123_boss_case_attack_main",
+          "input": "Kill",
+          "delay": 0.5
+        },
+        {
+          "target": "[PR#]eleven_attack_relay",
+          "input": "Trigger",
+          "delay": 2
+        }
+      ],
+      "winAfter": 25,
+      "hazards": {
+        "1_hurt": "a track laser",
+        "newsphere_hurt": "a sphere",
+        "2_hurt": "a floor sphere",
+        "3_1_hurt": "a side laser",
+        "3_2_hurt": "a side laser",
+        "4_1_hurt": "a sweeping laser",
+        "8_laserhurt1": "a wall laser",
+        "9_hurt": "a track laser",
+        "10_hurt": "a fan laser",
+        "11_hurt": "the rotating beam",
+        "12_hurt": "a sphere",
+        "npc_hurt": "an NPC",
+        "rotating_npc_hurt": "a rotating NPC",
+        "13_hurt1": "a rotating beam",
+        "13_hurt2": "a rotating beam",
+        "14_hurt1": "the triple beam",
+        "14_hurt2": "the triple beam",
+        "14_hurt3": "the triple beam",
+        "16_hurt": "a sphere",
+        "17_hurt1": "a falling laser",
+        "18_laserhurt1": "a wall laser",
+        "19_beam_hurt": "a rotating beam"
+      }
+    },
+    {
+      "id": "l6_a12",
+      "parent": "l6_boss",
+      "name": "Attack 12: yellow spheres",
+      "description": "Two spheres ride tracktrains out (600 u/s) and fire yellow spheres (12_hurt: 40) every 0.1–0.4 s from 3 to 9 s.",
+      "spawn": {
+        "origin": [
+          -12224,
+          576,
+          -320
+        ],
+        "yaw": 90
+      },
+      "start": [
+        {
+          "target": "[PR#]level6_relay",
+          "input": "Trigger"
+        },
+        {
+          "target": "[PR#]part2_s6_template",
+          "input": "ForceSpawn",
+          "delay": 0.1
+        }
+      ],
+      "fastForward": 12,
+      "setup": [
+        {
+          "target": "[PR#]template_sphereboss",
+          "input": "ForceSpawn"
+        },
+        {
+          "target": "[PR#]123_boss_attack_template",
+          "input": "ForceSpawn"
+        },
+        {
+          "target": "[PR#]stage6_playerboss_hp",
+          "input": "Enable"
+        },
+        {
+          "target": "[PR#]123_boss_case_attack_main",
+          "input": "Kill",
+          "delay": 0.5
+        },
+        {
+          "target": "[PR#]twelve_attack_relay",
+          "input": "Trigger",
+          "delay": 2
+        }
+      ],
+      "winAfter": 20,
+      "hazards": {
+        "1_hurt": "a track laser",
+        "newsphere_hurt": "a sphere",
+        "2_hurt": "a floor sphere",
+        "3_1_hurt": "a side laser",
+        "3_2_hurt": "a side laser",
+        "4_1_hurt": "a sweeping laser",
+        "8_laserhurt1": "a wall laser",
+        "9_hurt": "a track laser",
+        "10_hurt": "a fan laser",
+        "11_hurt": "the rotating beam",
+        "12_hurt": "a sphere",
+        "npc_hurt": "an NPC",
+        "rotating_npc_hurt": "a rotating NPC",
+        "13_hurt1": "a rotating beam",
+        "13_hurt2": "a rotating beam",
+        "14_hurt1": "the triple beam",
+        "14_hurt2": "the triple beam",
+        "14_hurt3": "the triple beam",
+        "16_hurt": "a sphere",
+        "17_hurt1": "a falling laser",
+        "18_laserhurt1": "a wall laser",
+        "19_beam_hurt": "a rotating beam"
+      }
+    },
+    {
+      "id": "l6_a13",
+      "parent": "l6_boss",
+      "name": "Attack 13: twin rotating beams",
+      "description": "Two beams turn at different speeds (15 and 35°/s, 13_hurt: 30 each).",
+      "spawn": {
+        "origin": [
+          -12224,
+          576,
+          -320
+        ],
+        "yaw": 90
+      },
+      "start": [
+        {
+          "target": "[PR#]level6_relay",
+          "input": "Trigger"
+        },
+        {
+          "target": "[PR#]part2_s6_template",
+          "input": "ForceSpawn",
+          "delay": 0.1
+        }
+      ],
+      "fastForward": 12,
+      "setup": [
+        {
+          "target": "[PR#]template_sphereboss",
+          "input": "ForceSpawn"
+        },
+        {
+          "target": "[PR#]123_boss_attack_template",
+          "input": "ForceSpawn"
+        },
+        {
+          "target": "[PR#]stage6_playerboss_hp",
+          "input": "Enable"
+        },
+        {
+          "target": "[PR#]123_boss_case_attack_main",
+          "input": "Kill",
+          "delay": 0.5
+        },
+        {
+          "target": "[PR#]thirteen_attack_relay",
+          "input": "Trigger",
+          "delay": 2
+        }
+      ],
+      "winAfter": 29,
+      "hazards": {
+        "1_hurt": "a track laser",
+        "newsphere_hurt": "a sphere",
+        "2_hurt": "a floor sphere",
+        "3_1_hurt": "a side laser",
+        "3_2_hurt": "a side laser",
+        "4_1_hurt": "a sweeping laser",
+        "8_laserhurt1": "a wall laser",
+        "9_hurt": "a track laser",
+        "10_hurt": "a fan laser",
+        "11_hurt": "the rotating beam",
+        "12_hurt": "a sphere",
+        "npc_hurt": "an NPC",
+        "rotating_npc_hurt": "a rotating NPC",
+        "13_hurt1": "a rotating beam",
+        "13_hurt2": "a rotating beam",
+        "14_hurt1": "the triple beam",
+        "14_hurt2": "the triple beam",
+        "14_hurt3": "the triple beam",
+        "16_hurt": "a sphere",
+        "17_hurt1": "a falling laser",
+        "18_laserhurt1": "a wall laser",
+        "19_beam_hurt": "a rotating beam"
+      }
+    },
+    {
+      "id": "l6_a14",
+      "parent": "l6_boss",
+      "name": "Attack 14: triple beam",
+      "description": "Three beams on one rotator (14°/s), 100 damage each.",
+      "spawn": {
+        "origin": [
+          -12224,
+          576,
+          -320
+        ],
+        "yaw": 90
+      },
+      "start": [
+        {
+          "target": "[PR#]level6_relay",
+          "input": "Trigger"
+        },
+        {
+          "target": "[PR#]part2_s6_template",
+          "input": "ForceSpawn",
+          "delay": 0.1
+        }
+      ],
+      "fastForward": 12,
+      "setup": [
+        {
+          "target": "[PR#]template_sphereboss",
+          "input": "ForceSpawn"
+        },
+        {
+          "target": "[PR#]123_boss_attack_template",
+          "input": "ForceSpawn"
+        },
+        {
+          "target": "[PR#]stage6_playerboss_hp",
+          "input": "Enable"
+        },
+        {
+          "target": "[PR#]123_boss_case_attack_main",
+          "input": "Kill",
+          "delay": 0.5
+        },
+        {
+          "target": "[PR#]fourteen_attack_relay",
+          "input": "Trigger",
+          "delay": 2
+        }
+      ],
+      "winAfter": 21,
+      "hazards": {
+        "1_hurt": "a track laser",
+        "newsphere_hurt": "a sphere",
+        "2_hurt": "a floor sphere",
+        "3_1_hurt": "a side laser",
+        "3_2_hurt": "a side laser",
+        "4_1_hurt": "a sweeping laser",
+        "8_laserhurt1": "a wall laser",
+        "9_hurt": "a track laser",
+        "10_hurt": "a fan laser",
+        "11_hurt": "the rotating beam",
+        "12_hurt": "a sphere",
+        "npc_hurt": "an NPC",
+        "rotating_npc_hurt": "a rotating NPC",
+        "13_hurt1": "a rotating beam",
+        "13_hurt2": "a rotating beam",
+        "14_hurt1": "the triple beam",
+        "14_hurt2": "the triple beam",
+        "14_hurt3": "the triple beam",
+        "16_hurt": "a sphere",
+        "17_hurt1": "a falling laser",
+        "18_laserhurt1": "a wall laser",
+        "19_beam_hurt": "a rotating beam"
+      }
+    },
+    {
+      "id": "l6_a15",
+      "parent": "l6_boss",
+      "name": "Attack 15: rotating NPCs",
+      "description": "boss_fiveteen_random_case spawns rotating NPCs (rotating_npc_hurt: 30) at two of four spawnpoints.",
+      "spawn": {
+        "origin": [
+          -12224,
+          576,
+          -320
+        ],
+        "yaw": 90
+      },
+      "start": [
+        {
+          "target": "[PR#]level6_relay",
+          "input": "Trigger"
+        },
+        {
+          "target": "[PR#]part2_s6_template",
+          "input": "ForceSpawn",
+          "delay": 0.1
+        }
+      ],
+      "fastForward": 12,
+      "setup": [
+        {
+          "target": "[PR#]template_sphereboss",
+          "input": "ForceSpawn"
+        },
+        {
+          "target": "[PR#]123_boss_attack_template",
+          "input": "ForceSpawn"
+        },
+        {
+          "target": "[PR#]stage6_playerboss_hp",
+          "input": "Enable"
+        },
+        {
+          "target": "[PR#]123_boss_case_attack_main",
+          "input": "Kill",
+          "delay": 0.5
+        },
+        {
+          "target": "[PR#]fiveteen_attack_relay",
+          "input": "Trigger",
+          "delay": 2
+        }
+      ],
+      "winAfter": 16,
+      "hazards": {
+        "1_hurt": "a track laser",
+        "newsphere_hurt": "a sphere",
+        "2_hurt": "a floor sphere",
+        "3_1_hurt": "a side laser",
+        "3_2_hurt": "a side laser",
+        "4_1_hurt": "a sweeping laser",
+        "8_laserhurt1": "a wall laser",
+        "9_hurt": "a track laser",
+        "10_hurt": "a fan laser",
+        "11_hurt": "the rotating beam",
+        "12_hurt": "a sphere",
+        "npc_hurt": "an NPC",
+        "rotating_npc_hurt": "a rotating NPC",
+        "13_hurt1": "a rotating beam",
+        "13_hurt2": "a rotating beam",
+        "14_hurt1": "the triple beam",
+        "14_hurt2": "the triple beam",
+        "14_hurt3": "the triple beam",
+        "16_hurt": "a sphere",
+        "17_hurt1": "a falling laser",
+        "18_laserhurt1": "a wall laser",
+        "19_beam_hurt": "a rotating beam"
+      }
+    },
+    {
+      "id": "l6_a16",
+      "parent": "l6_boss",
+      "name": "Attack 16: sphere train",
+      "description": "sixteen_tracktrain carries a maker that throws spheres (16_hurt: 20) while a door moves 1000 u.",
+      "spawn": {
+        "origin": [
+          -12224,
+          576,
+          -320
+        ],
+        "yaw": 90
+      },
+      "start": [
+        {
+          "target": "[PR#]level6_relay",
+          "input": "Trigger"
+        },
+        {
+          "target": "[PR#]part2_s6_template",
+          "input": "ForceSpawn",
+          "delay": 0.1
+        }
+      ],
+      "fastForward": 12,
+      "setup": [
+        {
+          "target": "[PR#]template_sphereboss",
+          "input": "ForceSpawn"
+        },
+        {
+          "target": "[PR#]123_boss_attack_template",
+          "input": "ForceSpawn"
+        },
+        {
+          "target": "[PR#]stage6_playerboss_hp",
+          "input": "Enable"
+        },
+        {
+          "target": "[PR#]123_boss_case_attack_main",
+          "input": "Kill",
+          "delay": 0.5
+        },
+        {
+          "target": "[PR#]sixteen_attack_relay",
+          "input": "Trigger",
+          "delay": 2
+        }
+      ],
+      "winAfter": 27,
+      "hazards": {
+        "1_hurt": "a track laser",
+        "newsphere_hurt": "a sphere",
+        "2_hurt": "a floor sphere",
+        "3_1_hurt": "a side laser",
+        "3_2_hurt": "a side laser",
+        "4_1_hurt": "a sweeping laser",
+        "8_laserhurt1": "a wall laser",
+        "9_hurt": "a track laser",
+        "10_hurt": "a fan laser",
+        "11_hurt": "the rotating beam",
+        "12_hurt": "a sphere",
+        "npc_hurt": "an NPC",
+        "rotating_npc_hurt": "a rotating NPC",
+        "13_hurt1": "a rotating beam",
+        "13_hurt2": "a rotating beam",
+        "14_hurt1": "the triple beam",
+        "14_hurt2": "the triple beam",
+        "14_hurt3": "the triple beam",
+        "16_hurt": "a sphere",
+        "17_hurt1": "a falling laser",
+        "18_laserhurt1": "a wall laser",
+        "19_beam_hurt": "a rotating beam"
+      }
+    },
+    {
+      "id": "l6_a17",
+      "parent": "l6_boss",
+      "name": "Attack 17: falling lasers",
+      "description": "seventeen_rotating (45°/s) carries four makers of falling lasers (17_hurt1: 80).",
+      "spawn": {
+        "origin": [
+          -12224,
+          576,
+          -320
+        ],
+        "yaw": 90
+      },
+      "start": [
+        {
+          "target": "[PR#]level6_relay",
+          "input": "Trigger"
+        },
+        {
+          "target": "[PR#]part2_s6_template",
+          "input": "ForceSpawn",
+          "delay": 0.1
+        }
+      ],
+      "fastForward": 12,
+      "setup": [
+        {
+          "target": "[PR#]template_sphereboss",
+          "input": "ForceSpawn"
+        },
+        {
+          "target": "[PR#]123_boss_attack_template",
+          "input": "ForceSpawn"
+        },
+        {
+          "target": "[PR#]stage6_playerboss_hp",
+          "input": "Enable"
+        },
+        {
+          "target": "[PR#]123_boss_case_attack_main",
+          "input": "Kill",
+          "delay": 0.5
+        },
+        {
+          "target": "[PR#]seventeen_attack_relay",
+          "input": "Trigger",
+          "delay": 2
+        }
+      ],
+      "winAfter": 27,
+      "hazards": {
+        "1_hurt": "a track laser",
+        "newsphere_hurt": "a sphere",
+        "2_hurt": "a floor sphere",
+        "3_1_hurt": "a side laser",
+        "3_2_hurt": "a side laser",
+        "4_1_hurt": "a sweeping laser",
+        "8_laserhurt1": "a wall laser",
+        "9_hurt": "a track laser",
+        "10_hurt": "a fan laser",
+        "11_hurt": "the rotating beam",
+        "12_hurt": "a sphere",
+        "npc_hurt": "an NPC",
+        "rotating_npc_hurt": "a rotating NPC",
+        "13_hurt1": "a rotating beam",
+        "13_hurt2": "a rotating beam",
+        "14_hurt1": "the triple beam",
+        "14_hurt2": "the triple beam",
+        "14_hurt3": "the triple beam",
+        "16_hurt": "a sphere",
+        "17_hurt1": "a falling laser",
+        "18_laserhurt1": "a wall laser",
+        "19_beam_hurt": "a rotating beam"
+      }
+    },
+    {
+      "id": "l6_a18",
+      "parent": "l6_boss",
+      "name": "Attack 18: laser wall 2",
+      "description": "heighteen_attack_template: a door (512 u at 400 u/s) with 19 makers of wall lasers (18_laserhurt1: 30).",
+      "spawn": {
+        "origin": [
+          -12224,
+          576,
+          -320
+        ],
+        "yaw": 90
+      },
+      "start": [
+        {
+          "target": "[PR#]level6_relay",
+          "input": "Trigger"
+        },
+        {
+          "target": "[PR#]part2_s6_template",
+          "input": "ForceSpawn",
+          "delay": 0.1
+        }
+      ],
+      "fastForward": 12,
+      "setup": [
+        {
+          "target": "[PR#]template_sphereboss",
+          "input": "ForceSpawn"
+        },
+        {
+          "target": "[PR#]123_boss_attack_template",
+          "input": "ForceSpawn"
+        },
+        {
+          "target": "[PR#]stage6_playerboss_hp",
+          "input": "Enable"
+        },
+        {
+          "target": "[PR#]123_boss_case_attack_main",
+          "input": "Kill",
+          "delay": 0.5
+        },
+        {
+          "target": "[PR#]heighteen_attack_relay",
+          "input": "Trigger",
+          "delay": 2
+        }
+      ],
+      "winAfter": 18,
+      "hazards": {
+        "1_hurt": "a track laser",
+        "newsphere_hurt": "a sphere",
+        "2_hurt": "a floor sphere",
+        "3_1_hurt": "a side laser",
+        "3_2_hurt": "a side laser",
+        "4_1_hurt": "a sweeping laser",
+        "8_laserhurt1": "a wall laser",
+        "9_hurt": "a track laser",
+        "10_hurt": "a fan laser",
+        "11_hurt": "the rotating beam",
+        "12_hurt": "a sphere",
+        "npc_hurt": "an NPC",
+        "rotating_npc_hurt": "a rotating NPC",
+        "13_hurt1": "a rotating beam",
+        "13_hurt2": "a rotating beam",
+        "14_hurt1": "the triple beam",
+        "14_hurt2": "the triple beam",
+        "14_hurt3": "the triple beam",
+        "16_hurt": "a sphere",
+        "17_hurt1": "a falling laser",
+        "18_laserhurt1": "a wall laser",
+        "19_beam_hurt": "a rotating beam"
+      }
+    },
+    {
+      "id": "l6_a19",
+      "parent": "l6_boss",
+      "name": "Attack 19: four beams",
+      "description": "19_template: four rotating beams (14°/s, 19_beam_hurt: 60); track lasers at 22 s.",
+      "spawn": {
+        "origin": [
+          -12224,
+          576,
+          -320
+        ],
+        "yaw": 90
+      },
+      "start": [
+        {
+          "target": "[PR#]level6_relay",
+          "input": "Trigger"
+        },
+        {
+          "target": "[PR#]part2_s6_template",
+          "input": "ForceSpawn",
+          "delay": 0.1
+        }
+      ],
+      "fastForward": 12,
+      "setup": [
+        {
+          "target": "[PR#]template_sphereboss",
+          "input": "ForceSpawn"
+        },
+        {
+          "target": "[PR#]123_boss_attack_template",
+          "input": "ForceSpawn"
+        },
+        {
+          "target": "[PR#]stage6_playerboss_hp",
+          "input": "Enable"
+        },
+        {
+          "target": "[PR#]123_boss_case_attack_main",
+          "input": "Kill",
+          "delay": 0.5
+        },
+        {
+          "target": "[PR#]nineteen_attack_relay",
+          "input": "Trigger",
+          "delay": 2
+        }
+      ],
+      "winAfter": 28,
+      "hazards": {
+        "1_hurt": "a track laser",
+        "newsphere_hurt": "a sphere",
+        "2_hurt": "a floor sphere",
+        "3_1_hurt": "a side laser",
+        "3_2_hurt": "a side laser",
+        "4_1_hurt": "a sweeping laser",
+        "8_laserhurt1": "a wall laser",
+        "9_hurt": "a track laser",
+        "10_hurt": "a fan laser",
+        "11_hurt": "the rotating beam",
+        "12_hurt": "a sphere",
+        "npc_hurt": "an NPC",
+        "rotating_npc_hurt": "a rotating NPC",
+        "13_hurt1": "a rotating beam",
+        "13_hurt2": "a rotating beam",
+        "14_hurt1": "the triple beam",
+        "14_hurt2": "the triple beam",
+        "14_hurt3": "the triple beam",
+        "16_hurt": "a sphere",
+        "17_hurt1": "a falling laser",
+        "18_laserhurt1": "a wall laser",
+        "19_beam_hurt": "a rotating beam"
+      }
+    },
+    {
+      "id": "l6_a20",
+      "parent": "l6_boss",
+      "name": "Attack 20: sphere fan",
+      "description": "twenty_case throws up to 16 spheres from twenty_maker, fanned 10–30° apart (12_hurt: 40); track lasers at 8 s.",
+      "spawn": {
+        "origin": [
+          -12224,
+          576,
+          -320
+        ],
+        "yaw": 90
+      },
+      "start": [
+        {
+          "target": "[PR#]level6_relay",
+          "input": "Trigger"
+        },
+        {
+          "target": "[PR#]part2_s6_template",
+          "input": "ForceSpawn",
+          "delay": 0.1
+        }
+      ],
+      "fastForward": 12,
+      "setup": [
+        {
+          "target": "[PR#]template_sphereboss",
+          "input": "ForceSpawn"
+        },
+        {
+          "target": "[PR#]123_boss_attack_template",
+          "input": "ForceSpawn"
+        },
+        {
+          "target": "[PR#]stage6_playerboss_hp",
+          "input": "Enable"
+        },
+        {
+          "target": "[PR#]123_boss_case_attack_main",
+          "input": "Kill",
+          "delay": 0.5
+        },
+        {
+          "target": "[PR#]twenty_attack_relay",
+          "input": "Trigger",
+          "delay": 2
+        }
+      ],
+      "winAfter": 13,
+      "hazards": {
+        "1_hurt": "a track laser",
+        "newsphere_hurt": "a sphere",
+        "2_hurt": "a floor sphere",
+        "3_1_hurt": "a side laser",
+        "3_2_hurt": "a side laser",
+        "4_1_hurt": "a sweeping laser",
+        "8_laserhurt1": "a wall laser",
+        "9_hurt": "a track laser",
+        "10_hurt": "a fan laser",
+        "11_hurt": "the rotating beam",
+        "12_hurt": "a sphere",
+        "npc_hurt": "an NPC",
+        "rotating_npc_hurt": "a rotating NPC",
+        "13_hurt1": "a rotating beam",
+        "13_hurt2": "a rotating beam",
+        "14_hurt1": "the triple beam",
+        "14_hurt2": "the triple beam",
+        "14_hurt3": "the triple beam",
+        "16_hurt": "a sphere",
+        "17_hurt1": "a falling laser",
+        "18_laserhurt1": "a wall laser",
+        "19_beam_hurt": "a rotating beam"
+      }
+    }
+  ]
+}

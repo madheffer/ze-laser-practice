@@ -87,8 +87,9 @@ function planeTrace(c, k, idx, from, delta, q) {
   k.normal[idx] = t.normal || UP.slice();
 }
 
-// 0x1800eccf0: refresh the cache from the CP (m_nCP + m_vecCpOffset, offset unrotated).
-function updatePlanes(fn, c, k, mode, retest, q) {
+// 0x1800eccf0: refresh the cache from the CP (m_nCP + m_vecCpOffset, offset unrotated). Exported for
+// C_OP_WorldCollideConstraint (ported_contact.js), which keeps its own cache in its operator state.
+export function updatePlanes(fn, c, k, mode, retest, q) {
   if (k.count !== 0 && mode === 0) return; // INITIAL_TRACE_DOWN traces once
   const cp = add(getCp(c, fn.m_nCP | 0).position, vec3(fn.m_vecCpOffset));
   const tol = +fn.m_flCpMovementTolerance;

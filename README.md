@@ -108,9 +108,25 @@ Backups: `pg_dump -U lasers -Fc lasers > lasers.dump`, restore with `pg_restore 
 
 ### Hosting
 
-Serve the built game (`npm --prefix web run build` -> `web/dist/`) from any web server and reverse-proxy `/coop`
-(WebSocket) and `/api/` to `npm --prefix web run coop-server` (port 5810, `--port` to change) on the same origin.
-`/healthz` answers `ok`.
+**One container** (`web/Dockerfile`): the built game, `/coop` and `/api/` on port 8080. The baked content isn't in
+the image (several GB, Valve content): mount a folder holding `maps/ sounds/ weapons/ panorama/ player/` (a copy of
+your `web/public/` after the bake) at `/assets`.
+
+```bash
+docker build -t lasers web
+docker run -d -p 8080:8080 -e DATABASE_URL=postgres://lasers:<password>@<db host>:5432/lasers -v /path/to/baked:/assets:ro lasers
+```
+
+**Without Docker**: `npm --prefix web run build`, then
+`npm --prefix web run coop-server -- --static dist --static public` serves the same thing on port 5810 (`--port`
+to change). Or serve `web/dist/` from your own web server and reverse-proxy `/coop` (WebSocket) and `/api/` to
+`coop-server` on the same origin.
+
+Behind a reverse proxy or tunnel, every socket arrives from the proxy, so set `CLIENT_IP_HEADER` to the header it
+puts the client's address in (`cf-connecting-ip` for Cloudflare, `x-real-ip` for many nginx setups). The
+per-address connection cap then counts players, not the proxy. Only set it when the proxy always sets that header
+and clients can't reach the server around it. Pages get the CSP as a response header (with `frame-ancestors 'none'`),
+and versioned maps and sounds are cached for a year. `/healthz` answers `ok`.
 
 ## Replays, run history, Steam sign-in
 
@@ -274,9 +290,15 @@ name, coloured HP and %, a 14-block bar; a segmented boss counts `(segments - 1)
 
 Weapons: `weapons/viewmodel.js` + `weapons/fp/` is vpkstuff's previewer engine (CS2's own AnimGraph2) with the AK-47 and
 CT knife; assets in `web/public/weapons/fp/` are copied from the weaponviewer bake (`Z:\weaponviewer\fp`,
-gitignored). Sound: `lasers-bake` writes `maps/<map>/soundevents.json` + `sounds/`, and
+gitignored). Sound: `lasers-bake` writes `maps/<map>/soundevents.json` + `sounds/` (the map's events plus the stock
+CS2 ones its entities name: breakables, env_explosion, doors, trains, particles; `bake/SoundRefs.cs`; plus `surfaces.json`,
+CS2's surface properties for bullet impacts and prop breaks, `bake/SurfaceBake.cs`, with `collision_fx_surfaces.bin` per
+world triangle from `--collision`;
+`lasers-bake --sounds <vpk> <map folder>` redoes only that), and
 `lasers-bake --stock-sounds web/public/sounds` writes the stock knife/AK/player set (gitignored);
-`audio/audio.js` plays them (CS2 distance curves, music through the music volume). Test pages:
+the entity engine only emits sound requests (`world/entities/sound.js`: breakable break / hit by material, env_explosion,
+train move / ping / start / stop, door and movelinear sounds, from server.dll / Source) and
+`audio/audio.js` plays them (CS2 distance curves, csgo_mega voice limits in `audio/limits.js`, music through the music volume). Test pages:
 `audio-test.html`, `vm-test.html`.
 
 Third person (CS2Fixes `!tp`, menu "Video & camera"): `world/body.js` draws your CT, the stock

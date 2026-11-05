@@ -12,7 +12,7 @@ export const CHEATS = ['god', 'hitboxes', 'autoBhop'];
 
 // A ZE server's defaults: the map's boss HP for 20 humans, the team shooting, no fall damage, no cheats.
 export const RULE_DEFAULTS = Object.freeze({
-  humans: 20, bossHp: 100, autoFire: true, perfectTeam: false, fallDamage: false,
+  humans: 20, bossHp: 100, autoFire: false, perfectTeam: false, fallDamage: false,
   god: false, hitboxes: false, autoBhop: false,
   // who carries the map's heal item (world/items.js usableHeals). Co-op: 'none', 'random' (one player, from the round's
   // seed) or a player's id: a heal is an aura the group gathers round, so ONE human holds it, as on a server.

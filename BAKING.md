@@ -18,7 +18,8 @@ It builds `bake/` (Release), then runs, per map:
 
 | Step | lasers-bake | Writes (`web/public/maps/<map>/`) |
 |---|---|---|
-| `map` | `<vpk> web/public/maps` | manifest, entities, collision, hulls, glbs + textures (cut-out alpha put back), particles + `fx/`, sounds, `shots/`, `overview/` |
+| `map` | `<vpk> web/public/maps` | manifest, entities, collision (+ `collision_fx*.bin`, what particle traces hit), hulls, glbs + textures (cut-out alpha put back; animated props with their sequences + `animations.json`), particles + `fx/`, sounds (the stock events the map's entities name), `shots/`, `overview/` |
+| `entwatch` | `node tools/entwatch.mjs <map>` | `entwatch.json`: GFL's EntWatch config (the map's items: the heal option, the item HUD); none if GFL has no config for the map |
 | `lighting` | `--lighting <vpk> <map dir>` | `lighting/`: lightmaps (raw BC6H/BC7/DXT1/BC4 blocks), probes, tonemap + LUT (`post/`), skies, reflection cubemaps. The **high** tier |
 | `tiers` | `--tiers <vpk> <map dir>` | `q/medium/`, `q/low/`: smaller textures and PNG lightmaps any GPU can take |
 | `chunks` | `node tools/chunk-world.mjs <map dir>` | `world/chunk_<n>.glb` + `world/chunks.json`, and `"chunks"` in the manifest: the world streamed in pieces (below) |
@@ -34,8 +35,9 @@ runs it the first time).
 
 A world glb is one 7-200 MB file with hundreds to thousands of meshes (mist: 6,319 draw calls). `chunk-world.mjs`
 cuts it into 4096-unit cells and the game (`world/stream.js`) loads only the cells around you, nearest first, so a stage
-starts once its own area is in (mist's throne finale: about 6 MB of the world's 59 MB). A solo stage's clock
-waits for its area ("loading area n/m" on the HUD); a co-op round never waits (the server's clock), it just streams.
+starts once its own area is in (mist's throne finale: about 6 MB of the world's 59 MB). A stage starts once
+it is loaded and drawn (app/readiness.js): its area, models, effects, sounds and shaders. Solo, its clock waits; a
+co-op / versus round's server starts everyone's clock once all have loaded (server/coop-round.js).
 
 Rendering only: collision, hulls, entities and logic are whole from the start, so the game plays the same 1:1
 whatever has loaded. Per chunk:
@@ -59,6 +61,8 @@ Shared assets, once per checkout (not per map):
 
 ```bash
 ./bake/bin/Release/net10.0/lasers-bake.exe --stock-sounds web/public/sounds   # knife / AK / player sounds
+# per map, sounds only (soundevents.json + sounds/, the stock events its entities name included; manifest version bumped):
+# ./bake/bin/Release/net10.0/lasers-bake.exe --sounds <workshop.vpk> web/public/maps/<map>
 ./bake/bin/Release/net10.0/lasers-bake.exe --panorama web/public/panorama     # HUD icons, fonts, Panorama reference
 ./bake/bin/Release/net10.0/lasers-bake.exe --player web/public/player         # your third-person body
 ```

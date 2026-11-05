@@ -12,12 +12,14 @@
 //    passed the last node to the orientation at the node after next; ease in/out is (1 - cos(p pi)) / 2.
 //  - At spawn the train takes its first path_track's angles (pitch zeroed with No Pitch), not the direction to the
 //    next node; a path_track's speed only applies to a train with "No User Control" (spawnflag 2).
-// Not modelled: move sounds (as before), blocking / dmg (the engine has no mover pushing), local-space motion of a
+// Sounds: sound.js trainSoundUpdate / trainSoundStop (CS2's FUN_180fdcbb0 / FUN_180fdca10), from Next / DeadEnd / Stop.
+// Not modelled: blocking / dmg (the engine has no mover pushing), local-space motion of a
 // parented train (positions and angles here are world space).
 import { register } from '../registry.js';
 import { num, bool, angleQuat, poseMatrix, rotationOf, quatAngles, angleDistance, approachAngle, fixupAngles } from '../math.js';
 import { clamp } from '../../../lib/math.js';
 import * as P from './paths.js';
+import { trainSoundUpdate, trainSoundStop } from '../sound.js';
 
 // spawnflags (FGD BaseTrain; Source trains.h)
 const SF = { NOPITCH: 1, NOCONTROL: 2, PASSABLE: 8, FIXED: 16 };
@@ -103,8 +105,9 @@ const T = register('func_tracktrain', {
   // Next (FUN_180fd3310)
   next(e, dt) {
     const s = e.state;
-    if (!s.speed) return;
-    if (!s.path || !s.path.alive) { s.speed = 0; return; } // "Lost path"
+    if (!s.speed) { trainSoundStop(e); return; }
+    if (!s.path || !s.path.alive) { trainSoundStop(e); s.speed = 0; return; } // "Lost path"
+    trainSoundUpdate(e);
     const o = e.worldOrigin();
     const np = [o[0], o[1], o[2] - s.height];
     let { node, nextNext } = P.lookAhead(s.path, np, s.speed * LOOKAHEAD, true);
@@ -134,6 +137,7 @@ const T = register('func_tracktrain', {
   // the end of the path: drive onto the last point at the old speed, then DeadEnd
   toDeadEnd(e, o, np) {
     const s = e.state;
+    trainSoundStop(e);
     s.avel = [0, 0, 0];
     s.oldSpeed = s.speed;
     s.speed = 0;
@@ -207,7 +211,10 @@ const T = register('func_tracktrain', {
     s.oldSpeed = s.speed;
     s.speed = 0;
     s.thinkAt = null;
+    trainSoundStop(e);
   },
+  // removed (Source UpdateOnRemove): SoundStop, the stop sound included
+  killed(e) { trainSoundStop(e); },
   // SetDirForward (FUN_180fdaa20): turning round steps the current node across the train
   setDir(e, forward) {
     const s = e.state;

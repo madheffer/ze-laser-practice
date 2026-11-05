@@ -36,7 +36,10 @@ const ENUM_INT = {
     'PF_TYPE_CLOSEST_CAMERA_DISTANCE', 'PF_TYPE_SNAPSHOT_COUNT', 'PF_TYPE_SNAPSHOT_CHANGED', 'PF_TYPE_CONTROL_POINT_IS_SET',
     'PF_TYPE_RENDERER_CAMERA_DISTANCE', 'PF_TYPE_RENDERER_CAMERA_DOT_PRODUCT', 'PF_TYPE_PARTICLE_NOISE', 'PF_TYPE_PARTICLE_AGE',
     'PF_TYPE_PARTICLE_AGE_NORMALIZED', 'PF_TYPE_PARTICLE_FLOAT', 'PF_TYPE_PARTICLE_INITIAL_FLOAT',
-    'PF_TYPE_PARTICLE_VECTOR_COMPONENT', 'PF_TYPE_PARTICLE_INITIAL_VECTOR_COMPONENT', 'PF_TYPE_PARTICLE_SPEED'],
+    'PF_TYPE_PARTICLE_VECTOR_COMPONENT', 'PF_TYPE_PARTICLE_INITIAL_VECTOR_COMPONENT', 'PF_TYPE_PARTICLE_SPEED',
+    'PF_TYPE_PARTICLE_NUMBER', 'PF_TYPE_PARTICLE_NUMBER_NORMALIZED', 'PF_TYPE_PARTICLE_ROPE_SEGMENT',
+    'PF_TYPE_PARTICLE_ROPE_SEGMENT_NORMALIZED', 'PF_TYPE_PARTICLE_SCREENSPACE_CAMERA_DISTANCE',
+    'PF_TYPE_PARTICLE_SCREENSPACE_CAMERA_DOT_PRODUCT'],
   m_nMapType: ['PF_MAP_TYPE_DIRECT', 'PF_MAP_TYPE_MULT', 'PF_MAP_TYPE_REMAP', 'PF_MAP_TYPE_REMAP_BIASED', 'PF_MAP_TYPE_CURVE',
     'PF_MAP_TYPE_NOTCHED', 'PF_MAP_TYPE_ROUND', 'PF_MAP_TYPE_MIN', 'PF_MAP_TYPE_MAX', 'PF_MAP_TYPE_MOD'],
   m_nInputMode: ['PF_INPUT_MODE_CLAMPED', 'PF_INPUT_MODE_LOOPED'],
@@ -62,12 +65,18 @@ export const asVecInput = (inp) => (inp == null ? { m_nType: 'PVEC_TYPE_LITERAL'
 // A per-input random seed. The game reads it from an op seed block (input+0x88) plus a per-frame
 // op seed (coll+0x918); neither is extracted, so m_nRandomSeed is used when set and otherwise a
 // stable per-input number. UNSETTLED: seed values (RE §11 UNSETTLED 3).
+// The number comes from a counter owned by the ParticleSystem (ctx.sys), not the module: a module counter carried
+// over from one system to the next, so the same system with the same table drew different CONSTANT randoms on
+// its second build in one process.
 const seeds = new WeakMap();
-let nextSeed = 0x9e37;
-const seedOf = (inp) => {
+const seedOf = (inp, ctx) => {
   const s = f(inp, 'm_nRandomSeed');
   if (s >= 0) return s | 0;
-  if (!seeds.has(inp)) seeds.set(inp, (nextSeed = (nextSeed * 1103515245 + 12345) & 0x7fffffff) & 0xfff);
+  if (!seeds.has(inp)) {
+    const owner = ctx?.sys || ctx || {};
+    const n = owner._inputSeed = ((owner._inputSeed ?? 0x9e37) * 1103515245 + 12345) & 0x7fffffff;
+    seeds.set(inp, n & 0xfff);
+  }
   return seeds.get(inp);
 };
 
@@ -76,7 +85,7 @@ const seedOf = (inp) => {
 const draw = (inp, ctx, i, extra = 0) => {
   if (f(inp, 'm_nRandomMode') === 'PF_RANDOM_MODE_VARYING') return drawVarying(ctx);
   const pid = i >= 0 && ctx.attr ? ctx.attr[A.ID][i] : 0;
-  return drawConstant(ctx, seedOf(inp) + (ctx.rnd?.frameSeed || 0) + extra, pid);
+  return drawConstant(ctx, seedOf(inp, ctx) + (ctx.rnd?.frameSeed || 0) + extra, pid);
 };
 
 // Bias (RE §11, precompute 0x18005b5b0, apply 0x18006f1e0).
@@ -227,6 +236,13 @@ function source(inp, ctx, i, kind) {
       // noise output range. UNSETTLED.
       ctx.sys?.report(`${ctx.path}: PF_TYPE_PARTICLE_NOISE is UNSETTLED; using the middle of the noise output range`);
       return (f(inp, 'm_flNoiseOutputMin') + f(inp, 'm_flNoiseOutputMax')) / 2;
+    case 'PF_TYPE_PARTICLE_NUMBER_NORMALIZED': {
+      // particles.dll 63babcbf 0x18006f510 case 0x1b: the particle's index (block * 4 + lane; the lane offsets
+      // DAT_1805ea540 are runtime-initialised, read as 0..3) * 1 / max(1, n), n = coll+0x74 - 1, or coll+0x74 when the
+      // definition's behaviour version (+8) is below 12 (DAT_180534200 = 1). m_bReverseOrder is not read by this case.
+      const n = Math.max(1, (ctx.def?.m_nBehaviorVersion | 0) < 12 ? ctx.count : ctx.count - 1);
+      return i * (1 / n);
+    }
     default:
       ctx.sys?.report(`${ctx.path}: float input type ${type} not implemented (reads 0)`);
       return 0;

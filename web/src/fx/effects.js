@@ -14,8 +14,11 @@ import * as THREE from 'three';
 import { ParticleSystem, expandDefaults } from './particles/system.js';
 import { SpriteRenderer } from './particles/render/sprites.js';
 import { RopeRenderer } from './particles/render/ropes.js';
+import { TrailRenderer } from './particles/render/trails.js';
 import { LightRenderer } from './particles/render/lights.js';
-import { createBarnUniforms } from './particles/render/spritecard.js';
+import { SoundRenderer } from './particles/render/sound.js';
+import { liveMaterials } from './particles/render/spritecard.js';
+import { barnUniforms } from '../world/lighting.js';
 import { safeRelPath } from '../lib/paths.js';
 
 // particles.dll's class defaults (2.3 MB generated): loaded with the first map that has effects, not at page start
@@ -23,12 +26,32 @@ let expanded = null;
 const loadDefaults = () => (expanded ? Promise.resolve() : import('./particles/defaults.js').then((m) => { expanded ||= expandDefaults(m.default); }));
 const MAX_SYSTEMS_PER_EFFECT = 64;
 
-// one set of view uniforms for every effect's materials: render.js sets the camera each frame
+// one set of view uniforms for every effect's materials: render.js sets the camera each frame. The barn lights and the
+// fog are the world's own uniform objects (world/lighting.js barnUniforms / fogUniforms, bound by setFxCamera): CS2
+// lights particles from the scene's barn list (spritecard.js) and fogs them with the view's fog (PS0:733).
+const FOG_OFF = () => ({
+  cs2FogType: { value: 0 }, cs2FogColor: { value: new THREE.Color(0, 0, 0) },
+  cs2FogDist: { value: new THREE.Vector4() }, cs2FogHeight: { value: new THREE.Vector4() }, cs2FogStartSq: { value: 0 },
+});
 export const fxShared = {
   uCamPos: { value: new THREE.Vector3() }, uCamUp: { value: new THREE.Vector3() }, uCamFwd: { value: new THREE.Vector3() },
-  uAmbient: { value: new THREE.Vector3(1, 1, 1) }, ...createBarnUniforms(),
+  uAmbient: { value: new THREE.Vector3(1, 1, 1) }, ...barnUniforms(), ...FOG_OFF(),
 };
-export function setFxCamera(camera) {
+let boundLighting = null;
+// share a MapLighting's barn + fog uniform objects with every particle material (live ones are repointed)
+function bindFxLighting(lighting) {
+  if (!lighting || lighting === boundLighting) return;
+  boundLighting = lighting;
+  const set = { ...(lighting.barnUniforms || {}), ...(lighting.fogUniforms || {}) };
+  for (const [k, u] of Object.entries(set)) {
+    if (!Object.hasOwn(fxShared, k)) continue;
+    fxShared[k] = u;
+    for (const m of liveMaterials) if (m.uniforms[k]) m.uniforms[k] = u;
+  }
+}
+// lighting: the renderer's MapLighting (world/lighting.js), optional
+export function setFxCamera(camera, lighting = null) {
+  bindFxLighting(lighting);
   const p = camera.position;
   fxShared.uCamPos.value.set(p.x, p.y, p.z);
   camera.getWorldDirection(fxShared.uCamFwd.value);
@@ -57,6 +80,7 @@ export class MapEffects {
     this.loader = new THREE.TextureLoader();
     this.reports = new Set();
     this.trace = null; // (from, dir, length, query) -> hit | null: fx/trace.js on the map collision
+    this.onSound = null; // (request) -> void: C_OP_RenderSound's sound requests (render/sound.js); main.js hands them to audio.js
     this.instances = new Set(); // live EffectInstances, for .lights
     this._lights = [];
   }
@@ -109,12 +133,14 @@ export class MapEffects {
         let base = this.texCache.get(url);
         if (!base) {
           // one load per file; each wrap mode is its own Texture sharing the image, filled when the load lands
-          base = { image: null, variants: new Map() };
+          base = { image: null, variants: new Map(), loaded: null };
           this.texCache.set(url, base);
-          this.loader.load(url, (loaded) => {
+          // settles either way: app/readiness.js waits on it before a stage starts (a failed texture draws white)
+          base.loaded = new Promise((done) => this.loader.load(url, (loaded) => {
             base.image = loaded.image;
             for (const v of base.variants.values()) { v.image = loaded.image; v.needsUpdate = true; }
-          }, undefined, () => this.report(`texture ${path} failed to load`));
+            done();
+          }, undefined, () => { this.report(`texture ${path} failed to load`); done(); }));
         }
         const mode = clamp ? THREE.ClampToEdgeWrapping : THREE.RepeatWrapping;
         let t = base.variants.get(mode);
@@ -131,6 +157,9 @@ export class MapEffects {
       sheet: (path) => (Array.isArray(entry(path)?.sheet) ? entry(path).sheet : null),
     };
   }
+
+  // every effect texture asked for so far, loaded (or failed): app/readiness.js
+  texturesLoaded() { return Promise.all([...this.texCache.values()].map((b) => b.loaded)); }
 
   report(m) { if (!this.reports.has(m)) { this.reports.add(m); this.onReport?.(m); } }
 
@@ -189,12 +218,15 @@ export class EffectInstance {
         let rend = this.renderers.get(key);
         if (!rend) {
           if (r.cls === 'C_OP_RenderSprites') rend = new SpriteRenderer(fxShared, this.assets);
-          else if (r.cls === 'C_OP_RenderRopes' || r.cls === 'C_OP_RenderTrails') rend = new RopeRenderer(fxShared, this.assets);
+          else if (r.cls === 'C_OP_RenderRopes') rend = new RopeRenderer(fxShared, this.assets);
+          else if (r.cls === 'C_OP_RenderTrails') rend = new TrailRenderer(fxShared, this.assets); // one streak per particle
           else if (r.cls === 'C_OP_RenderStandardLight') rend = new LightRenderer();
+          else if (r.cls === 'C_OP_RenderSound') rend = new SoundRenderer((req) => this.effects.onSound?.(req));
           else { this.effects.report(`${r.cls} is not drawn`); rend = { update: () => ({ unsupported: [] }), dispose() {}, mesh: null }; }
           this.renderers.set(key, rend);
           if (rend.mesh) this.group.add(rend.mesh);
         }
+        if (rend instanceof SoundRenderer) { rend.update(col, r.p); return; }
         if (rend instanceof LightRenderer) {
           const ctl = rend.update(col, r.p, raw);
           for (const l of rend.lights) this.lights.push(l);

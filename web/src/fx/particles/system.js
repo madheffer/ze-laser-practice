@@ -109,6 +109,8 @@ export class ParticleSystem {
   }
 
   _build() {
+    // inputs.js numbers unseeded inputs from this counter in draw order; a rebuild numbers them the same way again
+    this._inputSeed = undefined;
     const rootPath = normPath(this.doc.root || this.doc.systems?.[0]?.path);
     this.collections = [];
     this.root = this._collection(rootPath, null, null, 0);
@@ -144,6 +146,10 @@ export class ParticleSystem {
       // Operator time origin (RE §11 collection layout +0x60). UNSETTLED: its value; 0, so operator time is collection time.
       nextId: 0, opTimeOrigin: 0, endcap: { active: false, start: 0 }, emissionStopped: false,
       started: false, depth, childRefs: [],
+      // coll+0x88: particles requested before this frame; coll+0x8c: requested in this frame (zeroed 0x180037a32 /
+      // 0x180047711, += each AddParticles count 0x180102aa5, folded in at frame end 0x180048658). The distribute-evenly
+      // index of the initializers (common.js evenIndex). The m_nInitialParticles batch counts in the first frame.
+      added88: 0, added8c: 0,
     };
     c.startTime = c.time; // emitter start times count from here (VRF StartAge)
     c.concurrent = () => (this.opts.concurrent ? this.opts.concurrent(c.path) : c.emissionStopped ? 0 : 1);
@@ -302,8 +308,9 @@ const stateOf = (c, fn) => { if (!c.state.has(fn)) c.state.set(fn, {}); return c
 // What C_OP_BasicMovement (functions/ported_movement.js, 0x1801c0ba0) runs: the force generators and the
 // constraints live in its Operate, not in the frame loop, so a system without it moves and constrains nothing.
 const SUB = {
-  // every m_ForceGenerators entry with strength > 0 (0x18003f820) gets the gravity (slot 35) and adds into acc (slot 34)
-  forces(c, acc, gravity) {
+  // every m_ForceGenerators entry with strength > 0 (0x18003f820) gets the gravity (slot 35) and adds into acc (slot 34);
+  // mass is BasicMovement's mass buffer (a Float32Array per particle, or null for the constant 1.0)
+  forces(c, acc, gravity, mass = null) {
     for (const fn of c.def.m_ForceGenerators) {
       const f = impl(c, fn);
       if (!f || !f.force) continue;
@@ -311,7 +318,7 @@ const SUB = {
       if (s <= 0) continue;
       const st = stateOf(c, fn);
       st.gravity = gravity;
-      f.force(fn, c, acc, s, st);
+      f.force(fn, c, acc, s, st, mass);
     }
   },
   // Every constraint's slot 34 (prepare) runs first, and slot 36 says whether it runs once after the passes (final).
@@ -340,6 +347,8 @@ const SUB = {
 export function emitParticles(c, ages) {
   const def = c.def;
   const start = c.count;
+  // AddParticles counts the request, before the capacity clamp (0x180102aa5)
+  c.added8c += ages.length;
   for (const age of ages) {
     if (c.count >= c.capacity) break; // max particles
     const i = c.count++;
@@ -431,6 +440,8 @@ function simulate(c, dt) {
     f.op(fn, c, s, stateOf(c, fn), SUB);
   }
   compact(c);
+  c.added88 += c.added8c;
+  c.added8c = 0;
   if (c.restartAt != null && c.time >= c.restartAt) rearm(c);
 }
 

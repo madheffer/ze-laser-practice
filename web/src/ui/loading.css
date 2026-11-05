@@ -1,0 +1,61 @@
+/* The stage loading screen (ui/loading.js): over the game and its HUD, under the menu (pausing still works) and the
+   home page. Fades out the moment the stage's clock starts. */
+#loading {
+  position: fixed; inset: 0; z-index: 25; display: grid; align-items: end; justify-items: center;
+  padding: max(24px, var(--safe-t)) max(20px, var(--safe-r)) max(48px, calc(var(--safe-b) + 32px)) max(20px, var(--safe-l));
+  background: var(--bg); color: var(--text); opacity: 1; transition: opacity 0.35s ease; user-select: none;
+}
+#loading[hidden] { display: none; }
+#loading.out { opacity: 0; pointer-events: none; }
+
+.ld-bg {
+  position: absolute; inset: 0; background: var(--bg) center / cover no-repeat; opacity: 0; transition: opacity 0.6s ease;
+}
+#loading.has-shot .ld-bg { opacity: 0.55; }
+/* darker toward the text, so it reads on any screenshot */
+.ld-bg::after {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(to top, rgba(13, 17, 22, 0.96) 0%, rgba(13, 17, 22, 0.6) 45%, rgba(13, 17, 22, 0.25) 100%);
+}
+
+.ld-card { position: relative; width: min(560px, 100%); display: grid; gap: 6px; }
+.ld-map {
+  font: 700 clamp(20px, 4.2vw, 30px)/1.1 'Stratum2', 'Segoe UI', sans-serif; letter-spacing: 0.04em;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+/* fixed line heights: a name arriving late never moves the bar */
+.ld-stage {
+  min-height: 1.35em; font: 500 15px/1.35 'Stratum2', 'Segoe UI', sans-serif; color: var(--gold);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.ld-bar { height: 4px; margin-top: 14px; border-radius: 2px; background: rgba(255, 255, 255, 0.12); overflow: hidden; }
+.ld-bar i {
+  display: block; height: 100%; background: var(--accent); transform: scaleX(0); transform-origin: left;
+  transition: transform 0.25s ease-out;
+}
+.ld-step {
+  min-height: 1.4em; font: 13px/1.4 'Segoe UI', system-ui, sans-serif; color: var(--dim);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums;
+}
+
+@media (max-height: 480px) {
+  #loading { padding-bottom: max(20px, calc(var(--safe-b) + 12px)); }
+  .ld-bar { margin-top: 8px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #loading, .ld-bg, .ld-bar i { transition: none; }
+}
+
+/* a round's players (ui/loading.js roster): name, bar, percent / tick / out; fixed row height, no jumps */
+.ld-players { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 6px; }
+.ld-players li { display: grid; grid-template-columns: minmax(0, 1fr) minmax(60px, 34%) 3.2em; align-items: center; gap: 10px; height: 20px; font-size: 13px; }
+.ld-pname { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ld-players li.you .ld-pname { color: var(--text); font-weight: 600; }
+.ld-pbar { height: 3px; border-radius: 2px; background: rgba(255, 255, 255, 0.12); overflow: hidden; }
+.ld-pbar i { display: block; height: 100%; background: var(--dim); transform-origin: left; transition: transform 0.25s ease-out; }
+.ld-pstate { text-align: right; color: var(--dim); font-variant-numeric: tabular-nums; }
+.ld-players li.ready .ld-pbar i { background: var(--good); }
+.ld-players li.ready .ld-pstate { color: var(--good); font-weight: 700; }
+.ld-players li.out { opacity: 0.5; }
+.ld-players li.out .ld-pstate { color: var(--accent); }
+.ld-players[hidden] { display: none; }
