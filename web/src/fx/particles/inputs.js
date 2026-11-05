@@ -57,10 +57,23 @@ const f = (inp, k) => {
   const v = inp[k] ?? FLOAT_D[k];
   return typeof v === 'number' && ENUM_INT[k] ? ENUM_INT[k][v] : v;
 };
-const short = (n) => ({ m_nType: 'PF_TYPE_LITERAL', m_flLiteralValue: +n });
+// A bare number / array input as its literal input object. Operators read these per particle, so the wrappers are
+// made once and shared (the effect's data never changes; evalVec copies the literal out, nothing writes into them).
+const short = (n) => {
+  let w = SHORT.get(n);
+  if (!w) { w = Object.freeze({ m_nType: 'PF_TYPE_LITERAL', m_flLiteralValue: +n }); if (SHORT.size < 4096) SHORT.set(n, w); }
+  return w;
+};
+const SHORT = new Map();
+const ZERO_VEC = Object.freeze({ m_nType: 'PVEC_TYPE_LITERAL', m_vLiteralValue: Object.freeze([0, 0, 0]) });
+const VEC_WRAP = new WeakMap();
+const vecLiteral = (a) => {
+  let w = VEC_WRAP.get(a);
+  if (!w) VEC_WRAP.set(a, (w = Object.freeze({ m_nType: 'PVEC_TYPE_LITERAL', m_vLiteralValue: Object.freeze(a.map(Number)) })));
+  return w;
+};
 export const asFloatInput = (inp) => (inp == null ? short(0) : typeof inp === 'number' ? short(inp) : inp);
-export const asVecInput = (inp) => (inp == null ? { m_nType: 'PVEC_TYPE_LITERAL', m_vLiteralValue: [0, 0, 0] }
-  : Array.isArray(inp) ? { m_nType: 'PVEC_TYPE_LITERAL', m_vLiteralValue: inp.map(Number) } : inp);
+export const asVecInput = (inp) => (inp == null ? ZERO_VEC : Array.isArray(inp) ? vecLiteral(inp) : inp);
 
 // A per-input random seed. The game reads it from an op seed block (input+0x88) plus a per-frame
 // op seed (coll+0x918); neither is extracted, so m_nRandomSeed is used when set and otherwise a

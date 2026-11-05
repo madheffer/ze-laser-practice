@@ -28,8 +28,8 @@ const lumDesat = (c) => 0.2125 * c[0] + 0.7154 * c[1] + 0.0721 * c[2];
 
 // The sprite renderers' colour blend per ParticleColorBlendType_t, in 0..1 (tint = particle colour, s = colour
 // scale). The light does its own byte version below (lightColorBytes).
-export function colorBlend(type, s, t) {
-  const out = [0, 0, 0];
+// out: an array to write into (the sprite loop reuses one per renderer: no garbage per particle)
+export function colorBlend(type, s, t, out = [0, 0, 0]) {
   for (let i = 0; i < 3; i++) {
     let v;
     switch (type) {

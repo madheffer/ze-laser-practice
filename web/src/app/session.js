@@ -7,6 +7,7 @@ import { createRunEngine, hazardName as hazardText, COUNTDOWN, legacyCountdown, 
 import { standsFree } from '../world/movement.js';
 import { heldItems } from './items.js';
 import { prepareStage } from './readiness.js';
+import { warmTemplates } from '../world/warm.js';
 import { DEFAULT_GUN } from '../lib/weapons.js';
 import { S, G, log } from './state.js';
 import { settings } from './settings.js';
@@ -154,6 +155,8 @@ export function startScenario(i, mode = 'normal') {
     run.ready = true;
     run.loading = '';
     if (S.mp) S.mp.sendReady();
+    // what the map spawns mid-stage, made ready in idle time so its first spawn doesn't stall a frame (world/warm.js)
+    if (!S.replay?.fast) warmTemplates({ renderer: G.renderer, map, engine: S.engine, origin: [...player.origin], isCurrent: () => S.run === run && !run.done }).catch((e) => console.warn('warm-up:', e));
   });
   // the loading screen (ui/loading.js) covers it until the clock starts; a restart on a loaded map is usually
   // ready within a few frames, so it shows only if it isn't by then

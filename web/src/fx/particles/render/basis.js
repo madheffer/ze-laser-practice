@@ -96,21 +96,44 @@ export function ropeV(distStart, distEnd, t, offset, invWorldSize) {
 * Advances k*age*rate per second: k = 1/totalTime with VC_c16w & 4096 (taken as m_bAnimateInFPS, UNSETTLED), else 1.
 * An out-of-range sequence reads 0; a clamped one holds its last frame; blend weights toward the next frame.
 */
-export function sheetSample(sheet, sequence, age, rate, inFps) {
+// out: an object to write into (a renderer samples every particle every frame: no garbage per particle). A
+// sequence's frame steps and rects are worked out once (sheets are immutable once loaded).
+export function sheetSample(sheet, sequence, age, rate, inFps, out = {}) {
   if (!Array.isArray(sheet) || !sheet.length) return null;
   const seq = sheet[sequence >= 0 && sequence < sheet.length ? Math.floor(sequence) : 0];
-  const frames = seq.frames || [];
-  if (!frames.length) return null;
-  const times = frames.map((f) => Math.max(0, f.time || 0));
-  const total = times.reduce((a, b) => a + b, 0) || frames.length;
-  const step = (j) => (times[j] > 0 ? times[j] : total / frames.length);
+  const q = seqInfo(seq);
+  if (!q) return null;
+  const { steps, rects, total } = q;
+  const n = steps.length;
   const k = inFps ? 1 / total : 1;
   let pos = k * age * rate * total;
   if (seq.clamp) pos = Math.min(Math.max(pos, 0), total * (1 - 1e-6));
   else pos = ((pos % total) + total) % total;
   let i = 0, start = 0;
-  while (i < frames.length - 1 && start + step(i) <= pos) { start += step(i); i++; }
-  const next = i + 1 < frames.length ? i + 1 : (seq.clamp ? i : 0);
-  const rect = (f) => (f.uv && f.uv.length === 4 ? f.uv : [0, 0, 1, 1]);
-  return { rect0: rect(frames[i]), rect1: rect(frames[next]), blend: Math.min(1, Math.max(0, (pos - start) / step(i))) };
+  while (i < n - 1 && start + steps[i] <= pos) { start += steps[i]; i++; }
+  const next = i + 1 < n ? i + 1 : (seq.clamp ? i : 0);
+  out.rect0 = rects[i];
+  out.rect1 = rects[next];
+  out.blend = Math.min(1, Math.max(0, (pos - start) / steps[i]));
+  return out;
+}
+const SEQ_INFO = new WeakMap();
+const FULL_RECT = Object.freeze([0, 0, 1, 1]);
+function seqInfo(seq) {
+  if (!seq || typeof seq !== 'object') return null;
+  let q = SEQ_INFO.get(seq);
+  if (q !== undefined) return q;
+  const frames = Array.isArray(seq.frames) ? seq.frames : [];
+  if (!frames.length) q = null;
+  else {
+    const times = frames.map((f) => Math.max(0, f.time || 0));
+    const total = times.reduce((a, b) => a + b, 0) || frames.length;
+    q = {
+      total,
+      steps: times.map((t) => (t > 0 ? t : total / frames.length)),
+      rects: frames.map((f) => (f.uv && f.uv.length === 4 ? f.uv : FULL_RECT)),
+    };
+  }
+  SEQ_INFO.set(seq, q);
+  return q;
 }

@@ -177,18 +177,7 @@ export class Renderer {
       any = true;
     } else if (e.cls === 'trigger_hurt') {
       // hitboxes, shown with H; what you see in game is the particles parented next to them
-      const hulls = map.hulls[e.model];
-      if (hulls) {
-        // one geometry per model, shared by every spawned copy (a firestorm wave spawns hundreds)
-        if (!this.hullGeo.has(e.model)) {
-          const geos = [];
-          for (const h of hulls) {
-            const pts = [];
-            for (let i = 0; i < h.verts.length; i += 3) pts.push(new THREE.Vector3(h.verts[i], h.verts[i + 1], h.verts[i + 2]));
-            if (pts.length >= 4) geos.push(new ConvexGeometry(pts));
-          }
-          this.hullGeo.set(e.model, geos);
-        }
+      if (this.hullGeometries(e.model, map)) {
         // a heal zone (negative damage: mist's Cleansing Aura) is drawn for everyone, as the area to stand in. CS2 shows
         // it with particles spread over the area; ours are summarised to a point, so the zone's own volume stands in.
         const heal = Number(kv.damage) < 0;
@@ -250,6 +239,22 @@ export class Renderer {
     group.userData.born = e.engine.time;
     this.visuals.set(e, group);
     this.entRoot.add(group);
+  }
+
+  // A trigger model's hulls as convex meshes: one set per model, shared by every spawned copy (a firestorm wave
+  // spawns hundreds); null when the model has none. world/warm.js builds them ahead of a mid-stage spawn.
+  hullGeometries(model, map) {
+    if (this.hullGeo.has(model)) return this.hullGeo.get(model);
+    const hulls = map.hulls?.[model];
+    if (!hulls) return null;
+    const geos = [];
+    for (const h of hulls) {
+      const pts = [];
+      for (let i = 0; i < h.verts.length; i += 3) pts.push(new THREE.Vector3(h.verts[i], h.verts[i + 1], h.verts[i + 2]));
+      if (pts.length >= 4) geos.push(new ConvexGeometry(pts));
+    }
+    this.hullGeo.set(model, geos);
+    return geos;
   }
 
   // A sprite effect as a cloud of soft additive points inside its emit box (from particles.json).

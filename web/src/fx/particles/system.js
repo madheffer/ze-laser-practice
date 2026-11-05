@@ -448,21 +448,29 @@ function simulate(c, dt) {
 
 // Remove killed particles, keeping the survivors in order (ropes join particles in index order).
 // UNSETTLED: whether the game swaps from the end instead (VRF compacts in order).
+// Each unbroken run of survivors moves in one copy per stream: the oldest die first, so a frame's kills are
+// usually a few at the front and everything behind them shifts (a per-particle copy was 54 calls a particle).
 function compact(c) {
-  let w = 0;
-  for (let r = 0; r < c.count; r++) {
-    if (c.killed[r]) continue;
-    if (w !== r) {
-      for (const a of STREAMS) {
-        const n = VECTOR_ATTRS.has(a) ? 3 : 1;
-        c.attr[a].copyWithin(n * w, n * r, n * r + n);
-        c.init[a].copyWithin(n * w, n * r, n * r + n);
-      }
+  const count = c.count, killed = c.killed;
+  let r = 0;
+  while (r < count && !killed[r]) r++; // the survivors before the first kill stay where they are
+  let w = r;
+  while (r < count) {
+    while (r < count && killed[r]) r++;
+    const from = r;
+    while (r < count && !killed[r]) r++;
+    const len = r - from;
+    if (!len) break;
+    for (let k = 0; k < STREAMS.length; k++) {
+      const a = STREAMS[k], n = STREAM_WIDTH[k];
+      c.attr[a].copyWithin(n * w, n * from, n * r);
+      c.init[a].copyWithin(n * w, n * from, n * r);
     }
-    w++;
+    w += len;
   }
   c.count = w;
 }
+const STREAM_WIDTH = STREAMS.map((a) => (VECTOR_ATTRS.has(a) ? 3 : 1));
 
 // The collection restart (particles.dll 63babcbf 0x18003ffb0, mode 0, C_OP_RestartAfterDuration's call): live
 // particles and the clock are kept; coll+0x88 / +0x8c are zeroed, the operator time origin (+0x60) becomes the

@@ -112,33 +112,51 @@ export const operators = {
       const out = attrIndex(fn.m_nFieldOutput, A.POSITION), outPrev = attrIndex(fn.m_nFieldOutputPrev, A.PREV);
       const range = +fn.m_flRange || 0;
       const rb = range !== 0 ? evalFloat(fn.m_flRangeBias, c, -1) : 0;
-      const prevFrame = { forward: st.f, left: st.l, up: st.u };
-      const rot = (v) => toWorld(cp, toLocal(prevFrame, v)); // Rcur * Rprev^-1
-      for (let i = 0; i < c.count; i++) {
+      // Plain numbers, no arrays per particle (a laser strip runs this on every particle every frame): the same sums,
+      // in the same order, as add / sub / mul / toLocal / toWorld (common.js) would make them
+      const movePrev = fn.m_flPrevPosScale !== 0 && outPrev !== A.NONE;
+      const ps = fn.m_flPrevPosScale, lockRot = !!fn.m_bLockRot;
+      const po = c.attr[out], pp = movePrev ? c.attr[outPrev] : null;
+      const SP = st.P, pf = st.f, pl = st.l, pu = st.u, cf = cp.forward, cl = cp.left, cu = cp.up;
+      // Rcur * Rprev^-1 of (v - Pprev), into r
+      const r = [0, 0, 0];
+      const rot = (x, y, z) => {
+        const vx = x - SP[0], vy = y - SP[1], vz = z - SP[2];
+        const l0 = pf[0] * vx + pf[1] * vy + pf[2] * vz, l1 = pl[0] * vx + pl[1] * vy + pl[2] * vz, l2 = pu[0] * vx + pu[1] * vy + pu[2] * vz;
+        r[0] = cf[0] * l0 + cl[0] * l1 + cu[0] * l2;
+        r[1] = cf[1] * l0 + cl[1] * l1 + cu[1] * l2;
+        r[2] = cf[2] * l0 + cl[2] * l1 + cu[2] * l2;
+      };
+      for (let i = 0; po && i < c.count; i++) {
         const f = c.dt > 0 ? Math.min(age(c, i), c.dt) / c.dt : 1;
         if (f <= 0) continue;
-        let d = mul(delta, f);
-        const pos = getV(c, out, i);
+        let d0 = delta[0] * f, d1 = delta[1] * f, d2 = delta[2] * f;
+        const x = po[3 * i], y = po[3 * i + 1], z = po[3 * i + 2];
         if (range !== 0) {
-          const g = Math.min(1, len(sub(add(pos, d), P)) / range);
+          const ex = x + d0 - P[0], ey = y + d1 - P[1], ez = z + d2 - P[2];
+          const g = Math.min(1, Math.sqrt(ex * ex + ey * ey + ez * ez) / range);
           // Schlick bias of g by m_flRangeBias: b <= 0 -> 0, b >= 1 -> 1.
           const bg = rb <= 0 ? 0 : rb >= 1 ? 1 : g / ((1 - g) * (1 / rb - 2) + 1);
-          d = mul(d, 1 - bg);
+          const k = 1 - bg;
+          d0 *= k; d1 *= k; d2 *= k;
         }
-        d = [d[0] * scale[0], d[1] * scale[1], d[2] * scale[2]];
-        const movePrev = fn.m_flPrevPosScale !== 0 && outPrev !== A.NONE;
-        if (!fn.m_bLockRot) {
-          setV(c, out, i, add(pos, d));
-          if (movePrev) setV(c, outPrev, i, add(getV(c, outPrev, i), mul(d, fn.m_flPrevPosScale)));
-        } else {
-          const w = s * f;
-          const target = add(st.P, add(rot(sub(pos, st.P)), d));
-          setV(c, out, i, add(pos, mul(sub(target, pos), w)));
-          if (movePrev) {
-            const q = getV(c, outPrev, i);
-            const tq = add(st.P, add(rot(sub(q, st.P)), d));
-            setV(c, outPrev, i, add(q, mul(sub(tq, q), w * fn.m_flPrevPosScale)));
-          }
+        d0 *= scale[0]; d1 *= scale[1]; d2 *= scale[2];
+        if (!lockRot) {
+          po[3 * i] = x + d0; po[3 * i + 1] = y + d1; po[3 * i + 2] = z + d2;
+          if (pp) { pp[3 * i] = pp[3 * i] + d0 * ps; pp[3 * i + 1] = pp[3 * i + 1] + d1 * ps; pp[3 * i + 2] = pp[3 * i + 2] + d2 * ps; }
+          continue;
+        }
+        const w = s * f;
+        rot(x, y, z);
+        po[3 * i] = x + (SP[0] + (r[0] + d0) - x) * w;
+        po[3 * i + 1] = y + (SP[1] + (r[1] + d1) - y) * w;
+        po[3 * i + 2] = z + (SP[2] + (r[2] + d2) - z) * w;
+        if (pp) {
+          const qx = pp[3 * i], qy = pp[3 * i + 1], qz = pp[3 * i + 2], wp = w * ps;
+          rot(qx, qy, qz);
+          pp[3 * i] = qx + (SP[0] + (r[0] + d0) - qx) * wp;
+          pp[3 * i + 1] = qy + (SP[1] + (r[1] + d1) - qy) * wp;
+          pp[3 * i + 2] = qz + (SP[2] + (r[2] + d2) - qz) * wp;
         }
       }
       st.P = P.slice(); st.f = cp.forward.slice(); st.l = cp.left.slice(); st.u = cp.up.slice();

@@ -25,6 +25,10 @@ export class SpriteRenderer {
     this.mesh.frustumCulled = false;
     this._grow(16);
     this._order = [];
+    // scratch reused by every particle of every frame (update)
+    this._d2 = new Float64Array(16);
+    this._tint = [1, 1, 1]; this._rgb = [0, 0, 0]; this._lb = [-1, -1, -1];
+    this._s0 = {}; this._sl = {}; this._sm = {};
   }
 
   // A bigger set of instance buffers goes on a new geometry: three.js sizes an instanced geometry once, at its first
@@ -73,14 +77,18 @@ export class SpriteRenderer {
     const order = this._order; order.length = n;
     for (let i = 0; i < n; i++) order[i] = i;
     if ((p.m_nSortMethod ?? 'PARTICLE_SORTING_NEAREST') === 'PARTICLE_SORTING_NEAREST' && A[0]) {
+      // each particle's distance once, not twice per comparison
       const c = ctx.camPos, P = A[0];
-      const d2 = (i) => (P[3 * i] - c[0]) ** 2 + (P[3 * i + 1] - c[1]) ** 2 + (P[3 * i + 2] - c[2]) ** 2;
-      order.sort((a, b) => d2(b) - d2(a));
+      if (this._d2.length < n) this._d2 = new Float64Array(Math.max(n, this._d2.length * 2));
+      const d2 = this._d2;
+      for (let i = 0; i < n; i++) d2[i] = (P[3 * i] - c[0]) ** 2 + (P[3 * i + 1] - c[1]) ** 2 + (P[3 * i + 2] - c[2]) ** 2;
+      order.sort((a, b) => d2[b] - d2[a]);
     }
+    const tint = this._tint, rgb = this._rgb, lb = this._lb, s0 = this._s0, sl = this._sl, sm = this._sm;
     for (let j = 0; j < n; j++) {
       const i = order[j];
-      const tint = A[6] ? [A[6][3 * i], A[6][3 * i + 1], A[6][3 * i + 2]] : [1, 1, 1];
-      const rgb = colorBlend(blendType, scale, tint);
+      if (A[6]) { tint[0] = A[6][3 * i]; tint[1] = A[6][3 * i + 1]; tint[2] = A[6][3 * i + 2]; } else tint[0] = tint[1] = tint[2] = 1;
+      colorBlend(blendType, scale, tint, rgb);
       const alpha = (A[7]?.[i] ?? 1) * (alpha2 ? alpha2[i] : 1) * alphaScale;
       g.iPos.setXYZ(j, A[0]?.[3 * i] ?? 0, A[0]?.[3 * i + 1] ?? 0, A[0]?.[3 * i + 2] ?? 0);
       g.iColor.setXYZW(j, rgb[0], rgb[1], rgb[2], alpha);
@@ -92,15 +100,15 @@ export class SpriteRenderer {
       // FIT_LIFETIME vertex writer); the VS then runs the sheet at m_flAnimationRate as for FIXED_RATE (VS0:1693).
       const life = A[1]?.[i] ?? 1;
       const t = ctl.vc.animationType === 1 ? (life > 0 ? age / life : 0) : age;
-      const s = sheet ? sheetSample(sheet, seq, t, rate, inFps) : null;
+      const s = sheet ? sheetSample(sheet, seq, t, rate, inFps, s0) : null;
       if (s) {
         g.iRect0.setXYZW(j, s.rect0[0], s.rect0[1], s.rect0[2], s.rect0[3]);
         g.iRect1.setXYZW(j, s.rect1[0], s.rect1[1], s.rect1[2], s.rect1[3]);
         g.iBlend.setX(j, s.blend);
       } else g.iBlend.setX(j, -1);
-      const lb = [-1, -1, -1];
+      lb[0] = lb[1] = lb[2] = -1;
       for (let k = 1; k < sheets.length; k++) {
-        const ls = sheets[k] ? sheetSample(sheets[k], seq, t, rate, inFps) : null;
+        const ls = sheets[k] ? sheetSample(sheets[k], seq, t, rate, inFps, sl) : null;
         if (!ls) continue;
         g['iL' + k + 'a'].setXYZW(j, ls.rect0[0], ls.rect0[1], ls.rect0[2], ls.rect0[3]);
         g['iL' + k + 'b'].setXYZW(j, ls.rect1[0], ls.rect1[1], ls.rect1[2], ls.rect1[3]);
@@ -109,7 +117,7 @@ export class SpriteRenderer {
       g.iLBlend.setXYZ(j, lb[0], lb[1], lb[2]);
       // the motion texture runs its own sheet on the same sequence and age (its frames match the colour sheet's);
       // without one it takes the base layer's frame rects
-      const ms = mvSheet ? sheetSample(mvSheet, seq, t, rate, inFps) : s;
+      const ms = mvSheet ? sheetSample(mvSheet, seq, t, rate, inFps, sm) : s;
       if (ms) { g.iMa.setXYZW(j, ms.rect0[0], ms.rect0[1], ms.rect0[2], ms.rect0[3]); g.iMb.setXYZW(j, ms.rect1[0], ms.rect1[1], ms.rect1[2], ms.rect1[3]); }
     }
     for (const name of Object.keys(LAYOUT)) g[name].needsUpdate = true;
