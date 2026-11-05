@@ -4,8 +4,24 @@
     {
       "name": "web",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev", "--prefix", "web"],
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--prefix",
+        "web"
+      ],
       "port": 5804
+    },
+    {
+      "name": "play",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "play",
+        "--prefix",
+        "web"
+      ],
+      "port": 5805
     }
   ]
 }
