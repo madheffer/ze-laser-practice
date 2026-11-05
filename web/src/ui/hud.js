@@ -9,7 +9,9 @@ import { clamp, clamp01 } from '../lib/math.js';
 import { thousands } from '../lib/format.js';
 import { GUNS, DEFAULT_GUN } from '../lib/weapons.js';
 
-const P = 'panorama/';
+// absolute: these go into CSS custom properties (--src: url(...)), and a relative url() there resolves against the
+// built stylesheet's folder (/assets/), not the page: every HUD icon 404'd on the hosted build, fine in dev
+const P = `${import.meta.env?.BASE_URL ?? '/'}panorama/`;
 const ICONS = {
   gun: (name) => `${P}icons/equipment/${GUNS[name].icon}.svg`, // a gun's (lasers-bake --panorama, one per buyable gun)
   knife: `${P}icons/equipment/knife.svg`,
