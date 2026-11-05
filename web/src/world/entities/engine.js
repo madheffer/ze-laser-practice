@@ -288,13 +288,13 @@ export class EntityEngine {
     // OnTrigger once per `wait` (trigger_once: once), and a relay's OnTrigger once per Trigger. Repeating those
     // multiplied counters a server bumps once (deadcore's level_counter, neochrome's door counters, gris' laser picks).
     const fromTouch = activator === this.playerEnt && low === 'onstarttouch';
-    for (let i = 0; i < e.io.length; i++) {
     // The team walks into an HP trigger once, together. A trigger_multiple left alive through the fight (westersand's
     // Guard_Boss_Hp_To_Boss, Boss_Push_Hp_To_Boss, Belias_Hp_To_Boss) would otherwise add `humans` x HP again every
     // time you step back in while dodging, and the boss never dies. So only your first touch adds; a counter the
     // trigger also takes back on OnEndTouch (a "humans in the zone" count) still follows every entry.
     const reTouch = fromTouch && e._hpTouched;
     if (fromTouch) e._hpTouched = true;
+    for (let i = 0; i < e.io.length; i++) {
       const c = e.io[i];
       if (c.output.toLowerCase() !== low) continue;
       const p = c.param !== '' && c.param != null ? c.param : (param != null ? String(param) : '');

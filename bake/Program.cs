@@ -406,9 +406,9 @@ sealed class Baker(string input, string outRoot, string? cs2, bool textures)
         Log($"textures: {resized} resized to <= {MaxTexture}px, {before / 1048576} MB -> {after / 1048576} MB");
         // the cut-out alpha VRF's exporter drops (alpha-tested leaves, fences): AlphaBake.cs
         AlphaBake.Write(loader, outDir, Log);
-
         // the water shader's own textures (waves, foam, debris), which the glTF exporter drops: WaterBake.cs
         WaterBake.Write(loader, outDir, Log);
+
         // 5. sounds: soundevents.json (every event the map's .vsndevts_c files define, + the stock ones its entities
         //    name: SoundRefs.cs) + the sounds they play (SoundBake.cs).
         var soundEvents = SoundBake.Map(loader, [map, outer], outDir, cs2 != null ? Program.StockPaks(cs2) : []);
