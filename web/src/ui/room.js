@@ -39,7 +39,7 @@ export class RoomScreen {
     this.panel = new SettingsPanel({ net, lobby, hasHeal });
     // the menu's lobby strip: Room settings opens the menu's Settings tab on Room
     lobby.onRoomSettings = () => { G.menu.selectTab($('#tab-settings')); this.panel.show('room'); G.menu.update(); };
-    this.picker = new RoomPicker({ maps: () => S.mapIndex, onPick: (map, stage) => this.pickStage(map, stage) });
+    this.picker = new RoomPicker({ maps: () => S.mapIndex, onPick: (map, stage, mode) => this.pickStage(map, stage, mode) });
     this.build();
     net.on('room', () => this.sync());
     net.on('left', () => { this.away = false; this.closeDialog(); this.pingSent = null; this.sync(); });
@@ -238,11 +238,8 @@ export class RoomScreen {
           : `Waiting for ${owner?.name || 'the host'} to start`;
   }
 
-  pickStage(map, stage) {
-    const prev = this.net.room?.next;
-    const mode = prev?.map === map && prev?.stage === stage ? prev.mode : 'normal';
-    this.net.pick(map, stage, mode);
-  }
+  // a card picks Normal, its ∞ Endless (the bottom bar's Normal / Endless switches it after)
+  pickStage(map, stage, mode = 'normal') { this.net.pick(map, stage, mode); }
 
   setMode(mode) {
     const next = this.net.room?.next;
