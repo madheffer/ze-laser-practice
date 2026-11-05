@@ -73,6 +73,8 @@ export class CoopClient {
   start(map, stage, mode) { if (this.isHost) this.send({ t: 'start', map, stage, mode }); }
   // the next round's stage, chosen on the room screen (everyone in the room sees it)
   pick(map, stage, mode) { if (this.isHost && isMapName(map)) this.send({ t: 'pick', map, stage, mode }); }
+  // your simulated ping (ms), for the room to show next to your name (each player sets their own)
+  setPing(ms) { if (this.room && Number.isFinite(ms)) this.send({ t: 'ping', ms: Math.round(ms) }); }
   abort() { if (this.isHost) this.send({ t: 'abort' }); }
   leave() {
     if (!this.room) return;
@@ -91,7 +93,8 @@ export class CoopClient {
       case 'welcome': this.you = m.you | 0; break;
       case 'room': {
         if (!ROOM_CODE.test(m.code) || !Array.isArray(m.members)) return;
-        const members = m.members.filter((x) => Number.isInteger(x?.id)).slice(0, 8).map((x) => ({ id: x.id, name: cleanText(x.name, 24) || 'Player' }));
+        const members = m.members.filter((x) => Number.isInteger(x?.id)).slice(0, 8).map((x) => ({
+          id: x.id, name: cleanText(x.name, 24) || 'Player', ping: Number.isInteger(x.ping) ? Math.max(0, Math.min(500, x.ping)) : 0 }));
         const round = m.round && Number.isInteger(m.round.r)
           ? { r: m.round.r, stage: cleanText(m.round.stage, 60), ids: Array.isArray(m.round.ids) ? m.round.ids.filter(Number.isInteger) : [] } : null;
         const prev = this.room;

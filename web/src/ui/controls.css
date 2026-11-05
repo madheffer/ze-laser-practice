@@ -1,0 +1,70 @@
+/* Form controls, app-wide (the menu's settings, the room screen, its settings tab, the pause screen): sliders with a
+   filled track, dark dropdowns with a chevron, dark text / number fields. Keyboard focus shows a ring; touch gets the
+   44px targets from --tap (style.css). The slider fill reads --p (0-100%), kept up to date by ui/controls.js. */
+
+:is(#menu, .sheet) input[type=range] {
+  -webkit-appearance: none; appearance: none; background: transparent; cursor: pointer;
+  width: 100%; min-height: var(--tap); margin: 0; --p: 50%;
+}
+:is(#menu, .sheet) input[type=range]::-webkit-slider-runnable-track {
+  height: 6px; border-radius: 999px; border: 0;
+  background: linear-gradient(90deg, var(--accent) 0 var(--p), #253141 var(--p) 100%);
+}
+:is(#menu, .sheet) input[type=range]::-moz-range-track { height: 6px; border-radius: 999px; background: #253141; }
+:is(#menu, .sheet) input[type=range]::-moz-range-progress { height: 6px; border-radius: 999px; background: var(--accent); }
+:is(#menu, .sheet) input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none; width: 18px; height: 18px; margin-top: -6px; border-radius: 50%;
+  background: #fff; border: 3px solid var(--accent); box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5); transition: transform 0.1s;
+}
+:is(#menu, .sheet) input[type=range]::-moz-range-thumb {
+  width: 12px; height: 12px; border-radius: 50%; background: #fff; border: 3px solid var(--accent); box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+}
+:is(#menu, .sheet) input[type=range]:hover::-webkit-slider-thumb, :is(#menu, .sheet) input[type=range]:active::-webkit-slider-thumb { transform: scale(1.15); }
+:is(#menu, .sheet) input[type=range]:focus-visible { outline: none; }
+:is(#menu, .sheet) input[type=range]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(124, 196, 255, 0.45); }
+:is(#menu, .sheet) input[type=range]:focus-visible::-moz-range-thumb { box-shadow: 0 0 0 4px rgba(124, 196, 255, 0.45); }
+:is(#menu, .sheet) input[type=range]:disabled { cursor: default; filter: grayscale(1); opacity: 0.6; }
+
+/* dropdowns: the closed box is ours; the open list follows the dark color-scheme */
+:is(#menu, .sheet) select {
+  -webkit-appearance: none; appearance: none; color-scheme: dark; cursor: pointer;
+  min-height: var(--tap); padding: 0 34px 0 12px; border-radius: 8px; font-size: 14px; color: var(--text);
+  background: #0b0f14 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 4.5L6 8l3.5-3.5' fill='none' stroke='%238796a6' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 12px center / 12px;
+  border: 1px solid var(--line);
+}
+:is(#menu, .sheet) select:hover { border-color: #3b4c60; }
+:is(#menu, .sheet) select option { background: #121922; color: var(--text); }
+:is(#menu, .sheet) select:disabled { opacity: 0.6; cursor: default; }
+
+/* text and number fields */
+:is(#menu, .sheet) input:is([type=text], [type=number], [type=search], :not([type])) {
+  min-height: var(--tap); padding: 0 12px; border-radius: 8px; font-size: 14px; color: var(--text); color-scheme: dark;
+  background: #0b0f14; border: 1px solid var(--line); box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+:is(#menu, .sheet) input:is([type=text], [type=number], [type=search], :not([type])):hover { border-color: #3b4c60; }
+:is(#menu, .sheet) input:is([type=text], [type=number], [type=search], :not([type])):focus { outline: none; border-color: var(--focus); box-shadow: 0 0 0 3px rgba(124, 196, 255, 0.2); }
+:is(#menu, .sheet) input::placeholder { color: #5b6876; }
+:is(#menu, .sheet) input:disabled { opacity: 0.6; cursor: default; }
+:is(#menu, .sheet) input[type=number] { -moz-appearance: textfield; text-align: right; font: 600 14px ui-monospace, Consolas, monospace; }
+:is(#menu, .sheet) input[type=number]::-webkit-inner-spin-button, :is(#menu, .sheet) input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+
+/* a slider's value next to its label */
+:is(#menu, .sheet) .card .field output { padding: 1px 8px; border-radius: 6px; background: #0b0f14; border: 1px solid var(--line); font-size: 13px; }
+
+/* ---- the settings panel's Game | Room tabs (ui/settings-panel.js) */
+.sp { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.sp-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); }
+.sp-tabs[hidden] { display: none; }
+:is(#menu, .sheet) .sp-tab {
+  position: relative; border: 0; background: none; color: var(--dim); font-size: 14px; font-weight: 600;
+  padding: 10px 4px 12px; margin-right: 18px; min-height: var(--tap);
+}
+:is(#menu, .sheet) .sp-tab:hover { color: var(--text); }
+:is(#menu, .sheet) .sp-tab[aria-selected="true"] { color: var(--text); }
+:is(#menu, .sheet) .sp-tab[aria-selected="true"]::after { content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; border-radius: 2px; background: var(--accent); }
+.sp-pane[hidden] { display: none; }
+.sp-note { margin: 0 0 10px; font-size: 13px; color: var(--dim); }
+.sp-room .room-form .rf-buttons { position: sticky; bottom: 0; padding: 10px 0 2px; background: linear-gradient(transparent, var(--panel) 30%); }
+.sp-note:empty { display: none; }
+/* a number box that fills its row (Sensitivity) reads left to right; the small ones beside a slider stay right-aligned */
+:is(#menu, .sheet) .card .field > input[type=number] { text-align: left; }

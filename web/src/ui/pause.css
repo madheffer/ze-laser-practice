@@ -46,3 +46,4 @@
   .pz-room { border-left: 0; border-top: 1px solid var(--line); }
   .pz-code { font-size: 40px; }
 }
+.pz-ms { font: 600 11px ui-monospace, Consolas, monospace; color: var(--dim); white-space: nowrap; }

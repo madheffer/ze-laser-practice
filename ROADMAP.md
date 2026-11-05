@@ -103,6 +103,7 @@ exact map-folder format so he can lift our maps straight into his site. See [REA
 - [ ] **Escape-dragon endless** — the chase ends by geography; a loop (teleport back + respawn the boss) would make it endless
 - [ ] **Verify armor vs map damage live** — CS2Fixes gives `item_assaultsuit`; we assume armor doesn't absorb `DMG_ENERGYBEAM` (CS:GO's `bDamageTypeApplyToArmor` = bullet/blast/club/slash). Check on our server: one ball with and without `!kev`
 - [ ] **Laser sound check on westersand** — its lasers carry sounds (snd_event_point in the templates); confirm they follow the laser and use CS2's distance curves
+- [x] **Settings tabs, controls, per-player ping (2026-11-06)** — Settings has Game | Room tabs (`ui/settings-panel.js`; Room editable by the owner, read-only for others), opened on the room screen as a sheet (✕ / Esc / click outside); restyled sliders (filled track), dark dropdowns and fields (`ui/controls.css`); each player sets their own simulated ping on the room screen and everyone's shows by their name (the `ping` message, kept per player by the relay)
 - [ ] **Ping jitter** — ± variation on the simulated ping (cybo has it), and delayed HUD damage feedback (one-way)
 - [ ] **Remaining mist attacks as drills** — pentagram/target/charge/wind/zdef (they already run inside the full fight)
 - [ ] **Third-person body animation** — the CT stands in the knife idle (crouch blended by duck amount); CS2's walk/run/jump clips, aim pitch and the AK hold aren't played (the lab bake has them: `extract-tp-clips.py`)

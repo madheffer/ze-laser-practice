@@ -4,13 +4,11 @@
 //   browse  the public room list (ui/lobby-browse.js)
 //   room    a strip for the room you're in (Back to room, invite link, Room settings, Leave); the room itself lives
 //           on the room screen (ui/room.js), which shows between rounds
-//   edit    the room settings form (ui/lobby-form.js), for the owner
 // In a room the owner's stage pick here becomes the room's next round; the others' stage cards are dimmed.
 import './lobby.css';
 import { loadJson, saveJson } from '../lib/storage.js';
 import { ROOM_CODE } from '../net/coop-client.js';
 import { cleanSettings, cleanText, cheatsOn, CHEAT_LABELS, SETTINGS_DEFAULTS, RULE_DEFAULTS } from '../lib/room-rules.js';
-import { roomForm } from './lobby-form.js';
 import { RoomBrowser } from './lobby-browse.js';
 
 const KEY = 'lasers.coop'; // { name, room: last room settings you created }
@@ -30,6 +28,7 @@ export class Lobby {
   // onRoomScreen(): back to the room screen (ui/room.js)
   constructor(root, { net, state, getMap = () => '', mapTitle = (n) => n, hasHeal = () => false, onRoomScreen = () => {} }) {
     this.onRoomScreen = onRoomScreen;
+    this.onRoomSettings = () => {}; // Settings → Room (set by ui/room.js, which owns the settings panel)
     this.root = root;
     this.net = net;
     this.state = state;
@@ -70,9 +69,6 @@ export class Lobby {
     joinBox.append(this.code, button('Join', 'ghost', () => this.joinCode(this.code.value)));
     this.home.append(nameLabel, button('Create room', 'primary', () => this.openCreate(false)), button('Browse rooms', 'ghost', () => this.go('browse')), text('span', 'or', 'or join by code'), joinBox);
 
-    // create / edit (filled when opened)
-    this.formBox = el('div', 'form-box');
-
     // room
     this.roomBox = el('div', 'room-box');
     const top = el('div', 'lobby-row room-top');
@@ -80,7 +76,7 @@ export class Lobby {
     this.codeOut = el('span', 'room-code', { title: 'Room code' });
     this.badges = el('span', 'room-badges');
     this.ownerBtns = el('span', 'owner-btns');
-    this.ownerBtns.append(button('Room settings', 'ghost', () => this.openEdit()));
+    this.ownerBtns.append(button('Room settings', 'ghost', () => this.onRoomSettings()));
     top.append(this.roomName, this.codeOut, this.badges, el('span', 'grow'), button('Back to room', 'primary', () => this.onRoomScreen()), button('Copy invite link', 'ghost', () => this.copyLink()), this.ownerBtns, button('Leave', 'ghost', () => this.net.leave()));
     this.rules = el('ul', 'rule-chips', { 'aria-label': 'Room rules' });
     this.members = el('ul', 'members', { 'aria-label': 'Players in the room' });
@@ -88,7 +84,7 @@ export class Lobby {
 
     this.hint = el('div', 'lobby-hint');
     this.noteEl = el('div', 'lobby-note', { role: 'status' });
-    r.replaceChildren(head, this.home, this.formBox, this.browser.root, this.roomBox, this.hint, this.noteEl);
+    r.replaceChildren(head, this.home, this.browser.root, this.roomBox, this.hint, this.noteEl);
   }
 
   saveName() {
@@ -124,17 +120,6 @@ export class Lobby {
 
   openCreate(isPublic) { this.createNow(isPublic); }
 
-  openEdit() {
-    const room = this.net.room;
-    if (!room || !this.net.isHost) return;
-    this.formBox.replaceChildren(roomForm(room.settings, {
-      mode: 'edit', ownerName: this.net.member(room.owner)?.name, members: room.members.length, players: room.members, heal: this.hasHeal(),
-      onSubmit: (s) => { this.lastSettings = s; saveJson(KEY, { name: this.name, room: s }); this.net.setSettings(s); this.go('room'); },
-      onCancel: () => this.go('room'),
-    }));
-    this.go('edit');
-  }
-
   copyLink() {
     const room = this.net.room;
     if (!room) return;
@@ -153,12 +138,11 @@ export class Lobby {
   render() {
     const { net, state } = this;
     const room = net.room;
-    // in a room the room view shows (unless the owner is editing); out of one, home / create / browse
-    if (room && !['room', 'edit'].includes(this.view)) { if (this.view === 'browse') this.browser.close(); this.view = 'room'; }
-    if (!room && ['room', 'edit'].includes(this.view)) this.view = 'home';
+    // in a room, the room view shows; out of one, home / browse
+    if (room && this.view !== 'room') { if (this.view === 'browse') this.browser.close(); this.view = 'room'; }
+    if (!room && this.view === 'room') this.view = 'home';
     const v = this.view;
     this.home.hidden = v !== 'home';
-    this.formBox.hidden = v !== 'create' && v !== 'edit';
     this.browser.root.hidden = v !== 'browse';
     this.roomBox.hidden = v !== 'room';
     this.dot.className = `net-dot ${net.status}`;

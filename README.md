@@ -349,9 +349,15 @@ owner presses **Start round** (**Start alone** while nobody has joined), everyon
 player's progress, and the round's clock starts once all have loaded. After a round, **Back to room** returns there
 (the owner also has **Play again**). If the owner leaves, the next oldest member owns the room.
 
+Everyone sets their own **simulated ping** on the room screen (under your name; the same value as Settings → Game),
+and each player's ping shows next to their name (the client sends `ping`, the server keeps it per player, 0–500 ms).
+**Settings** (`ui/settings-panel.js`) has two tabs, **Game** (your own) and **Room** (the room's rules and size: the
+owner edits them, everyone else sees them read-only). On the room screen it opens in a sheet that closes with ✕, Esc
+or a click outside; in the menu it is the Settings tab. Sliders, dropdowns and fields share one style (`ui/controls.css`).
+
 **The pause screen** (`ui/pause.js`, Esc during a run): Resume, Restart, Change stage (solo) / End round (room
 owner), Settings, Leave room / Home, the stage, clock, hits and HP, and in a room the room code with Copy code /
-Invite link and who is alive. Change stage and Settings open the full menu.
+Invite link and who is alive (with each player's ping). Change stage and Settings open the full menu.
 
 - **Co-op**: survive together. When someone dies, the kill feed (top right, CS2-style) says what got them, and you
   can still clear the stage alone as the last one alive. Everyone dead = team wiped (endless: whoever lasted

@@ -82,7 +82,7 @@ export function attachCoopRelay(httpServer, { log = () => {}, store = openStore(
 
   const roomView = (room) => ({
     code: room.code, owner: room.owner, settings: room.settings, map: room.map, next: room.next || null,
-    members: room.members.map((m) => ({ id: m.id, name: m.name })),
+    members: room.members.map((m) => ({ id: m.id, name: m.name, ping: m.ping || 0 })),
     round: room.round && !room.round.ended ? { r: room.round.r, stage: room.round.stage.name, ids: [...room.round.players.keys()] } : null,
   });
   const announce = (room) => { const v = roomView(room); for (const m of room.members) send(m, { t: 'room', you: m.id, ...v }); };
@@ -195,6 +195,13 @@ export function attachCoopRelay(httpServer, { log = () => {}, store = openStore(
       case 'map': if (owner && isMapName(m.map)) { room.map = m.map; if (room.next?.map !== m.map) room.next = null; announce(room); } break;
       // the owner's pick for the next round (the room screen, ui/room.js): everyone sees it before the start
       case 'pick': pickStage(c, m).catch(() => {}); break;
+      // a player's own simulated ping (0-500 ms, their setting): shown next to their name. Always kept; the room hears
+      // the changes in one announce a moment later (a slider dragged by several players at once is one message)
+      case 'ping': {
+        c.ping = Number.isFinite(m.ms) ? Math.max(0, Math.min(500, Math.round(m.ms))) : 0;
+        if (room && !room.pingT) room.pingT = setTimeout(() => { room.pingT = null; if (rooms.get(room.code) === room) announce(room); }, 200);
+        break;
+      }
       case 'kick': {
         if (!owner || m.id === c.id) return;
         const target = room.members.find((x) => x.id === m.id);

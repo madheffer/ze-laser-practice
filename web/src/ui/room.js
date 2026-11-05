@@ -1,15 +1,18 @@
 // The room screen: where a co-op / versus room waits between rounds. Everything on one page:
 //   left   the room code, big, with Copy code / Copy invite link; the players (empty slots wait for more to join;
-//          the owner can remove someone); your name; the room's rules
+//          the owner can remove someone; everyone's simulated ping); your name and your own ping; the room's rules
 //   right  the map + stage picker (ui/room-picker.js): the owner picks, everyone sees the pick
 //   bottom the next round (map, stage, Normal / Endless) and Start round (owner) or who it waits for (the rest)
 // It shows whenever you are in a room and no round of yours is loading or running (and no end card is up), so
-// creating or joining a room lands here, and so does the end of a round. Room settings open in a dialog (the same
-// form as before, ui/lobby-form.js). Names and room text come from the server: textContent only.
+// creating or joining a room lands here, and so does the end of a round. Settings (Game | Room tabs,
+// ui/settings-panel.js) open in a sheet over it. Names and room text come from the server: textContent only.
 import './room.css';
 import { S, G } from '../app/state.js';
-import { cleanName, cheatsOn, CHEAT_LABELS } from '../lib/room-rules.js';
-import { roomForm } from './lobby-form.js';
+import { cheatsOn, CHEAT_LABELS } from '../lib/room-rules.js';
+import { SettingsPanel } from './settings-panel.js';
+import { settings } from '../app/settings.js';
+import { $ } from '../lib/dom.js';
+import { fillSlider } from './controls.js';
 import { RoomPicker } from './room-picker.js';
 import { displayName } from './maps.js';
 
@@ -31,11 +34,22 @@ export class RoomScreen {
     this.net = net;
     this.lobby = lobby;
     this.hasHeal = hasHeal;
-    this.away = false; // you opened the full menu from here (Settings): stay hidden until you come back
+    this.away = false; // the menu's lobby strip is open instead (its Back to room button comes back)
+    // Settings (Game | Room): one panel, in the menu's Settings tab or this screen's sheet
+    this.panel = new SettingsPanel({ net, lobby, hasHeal });
+    // the menu's lobby strip: Room settings opens the menu's Settings tab on Room
+    lobby.onRoomSettings = () => { G.menu.selectTab($('#tab-settings')); this.panel.show('room'); G.menu.update(); };
     this.picker = new RoomPicker({ maps: () => S.mapIndex, onPick: (map, stage) => this.pickStage(map, stage) });
     this.build();
     net.on('room', () => this.sync());
-    net.on('left', () => { this.away = false; this.closeDialog(); this.sync(); });
+    net.on('left', () => { this.away = false; this.closeDialog(); this.pingSent = null; this.sync(); });
+    // your simulated ping, to the room (everyone sees it next to your name): when you join and whenever it changes,
+    // from here or from the Game settings (app/settings.js owns the value)
+    net.on('room', (room, prev) => { if (room && room.code !== prev?.code) this.sendPing(true); });
+    document.addEventListener('input', (ev) => { if (ev.target?.id === 'ping' || ev.target?.id === 'ping-num') this.sendPing(); }, true);
+    document.addEventListener('change', (ev) => { if (ev.target?.id === 'ping-num') this.sendPing(); }, true);
+    // Esc closes the settings sheet; a click on the dim backdrop too
+    document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape' && this.open && !this.dialog.hidden) { ev.preventDefault(); ev.stopPropagation(); this.closeDialog(); } }, true);
     net.on('status', () => this.sync());
     setInterval(() => this.sync(), SYNC_MS); // rounds, the loading screen and end cards come and go around it
   }
@@ -53,9 +67,8 @@ export class RoomScreen {
     this.nameEl = el('h1', 'rm-name');
     this.badges = el('div', 'rm-badges');
     title.append(this.nameEl, this.badges);
-    this.settingsBtn = btn('Room settings', 'ghost', () => this.openSettings());
-    const gameSettings = btn('Game settings', 'ghost', () => { this.away = true; this.sync(); G.menu.selectTab(document.getElementById('tab-settings')); G.menu.update(); }, 'Sensitivity, video, audio');
-    head.append(this.leaveBtn, title, el('span', 'grow'), this.settingsBtn, gameSettings);
+    this.settingsBtn = btn('Settings', 'ghost rm-settings-btn', () => this.openSettings(), 'Settings: the room (host) and your own');
+    head.append(this.leaveBtn, title, el('span', 'grow'), this.settingsBtn);
 
     // left: code, players, you, rules
     const side = el('aside', 'rm-side');
@@ -80,7 +93,17 @@ export class RoomScreen {
     Object.assign(this.nameIn, { type: 'text', maxLength: 20, placeholder: 'Player', autocomplete: 'nickname', spellcheck: false });
     this.nameIn.addEventListener('change', () => { this.lobby.nameIn.value = this.nameIn.value; this.lobby.saveName(); this.nameIn.value = this.lobby.name; });
     you.append(this.nameIn);
-    players.append(ph, this.slots, you);
+    // your simulated ping (Settings → Game → Simulated ping, the same value): everyone plays with their own
+    const ping = el('label', 'rm-ping');
+    const pingTop = el('span', 'rm-ping-top');
+    this.pingOut = el('output', 'rm-ping-v');
+    pingTop.append(el('span', null, 'Your simulated ping'), this.pingOut);
+    this.pingIn = el('input');
+    Object.assign(this.pingIn, { type: 'range', min: 0, max: 500, step: 5 });
+    this.pingIn.setAttribute('aria-label', 'Your simulated ping in milliseconds');
+    this.pingIn.addEventListener('input', () => this.setPing(Number(this.pingIn.value)));
+    ping.append(pingTop, this.pingIn, el('small', null, 'The lasers reach you this late, like on a server. Only you see it; the others set their own.'));
+    players.append(ph, this.slots, you, ping);
 
     const rules = el('section', 'rm-rules');
     rules.append(el('h2', null, 'Rules'));
@@ -113,6 +136,7 @@ export class RoomScreen {
     this.toast.setAttribute('role', 'status');
     this.dialog = el('div', 'rm-dialog');
     this.dialog.hidden = true;
+    this.dialog.addEventListener('click', (ev) => { if (ev.target === this.dialog) this.closeDialog(); });
     r.replaceChildren(head, side, main, foot, this.toast, this.dialog);
   }
 
@@ -151,8 +175,9 @@ export class RoomScreen {
       el('i', `badge ${s.public ? 'public' : 'private'}`, s.public ? 'Public' : 'Private'),
       el('i', `badge ${s.kind}`, s.kind === 'versus' ? 'Versus' : 'Co-op'));
     if (this.codeEl.textContent !== room.code) this.codeEl.textContent = room.code;
-    this.settingsBtn.hidden = !host;
     if (document.activeElement !== this.nameIn) this.nameIn.value = this.lobby.name;
+    if (document.activeElement !== this.pingIn) { this.pingIn.value = settings.ping; fillSlider(this.pingIn); }
+    this.pingOut.textContent = `${settings.ping} ms`;
 
     // players: the members, then empty slots up to the room's size
     this.countEl.textContent = `${room.members.length}/${s.max}`;
@@ -162,6 +187,7 @@ export class RoomScreen {
       const rows = room.members.map((m) => {
         const li = el('li', `rm-slot${m.id === room.owner ? ' owner' : ''}${m.id === net.you ? ' you' : ''}`);
         li.append(el('span', 'rm-avatar', (m.name || '?').slice(0, 1).toUpperCase()), el('span', 'rm-pname', m.name));
+        li.append(el('span', `rm-ms${m.ping ? '' : ' zero'}`, `${m.ping || 0} ms`));
         if (m.id === room.owner) li.append(el('span', 'rm-tag owner', 'Host'));
         if (m.id === net.you) li.append(el('span', 'rm-tag', 'You'));
         if (host && m.id !== net.you) li.append(btn('✕', 'rm-kick', () => { if (confirm(`Remove ${m.name} from the room?`)) net.kick(m.id); }, `Remove ${m.name}`));
@@ -251,22 +277,46 @@ export class RoomScreen {
     this.toastT = setTimeout(() => this.toast.classList.remove('on'), 5000);
   }
 
+  // Settings in a sheet over the room: Game | Room tabs (ui/settings-panel.js, borrowed from the menu). The host
+  // lands on Room, everyone else on Game. Leave it with the close button, Esc or a click outside.
   openSettings() {
-    const room = this.net.room;
-    if (!room || !this.net.isHost) return;
-    const box = el('div', 'rm-dialog-box');
+    this.dialog.replaceChildren();
+    const box = el('div', 'rm-dialog-box rm-settings');
     box.setAttribute('role', 'dialog');
     box.setAttribute('aria-modal', 'true');
-    box.setAttribute('aria-label', 'Room settings');
-    box.append(roomForm(room.settings, {
-      mode: 'edit', ownerName: cleanName(this.net.member(room.owner)?.name), members: room.members.length, players: room.members, heal: this.hasHeal(),
-      onSubmit: (s) => { this.lobby.rememberSettings(s); this.net.setSettings(s); this.closeDialog(); },
-      onCancel: () => this.closeDialog(),
-    }));
-    this.dialog.replaceChildren(box);
+    box.setAttribute('aria-label', 'Settings');
+    const head = el('div', 'rm-settings-head');
+    head.append(el('h2', null, 'Settings'), btn('✕', 'rm-close', () => this.closeDialog(), 'Close settings'));
+    const body = el('div', 'rm-settings-body');
+    box.append(head, body);
+    this.dialog.append(box);
     this.dialog.hidden = false;
-    box.querySelector('input, button')?.focus();
+    this.panel.mountIn(body);
+    this.panel.show(this.net.isHost ? 'room' : 'game');
+    head.querySelector('.rm-close').focus();
   }
 
-  closeDialog() { this.dialog.hidden = true; this.dialog.replaceChildren(); }
+  closeDialog() {
+    if (this.dialog.hidden) return;
+    this.panel.mountHome();
+    this.dialog.hidden = true;
+    this.dialog.replaceChildren();
+  }
+
+  // your ping: through the Game settings' own slider, so it is saved and applied exactly as there (app/settings.js)
+  setPing(ms) {
+    const r = $('#ping');
+    if (!r) return;
+    r.value = String(ms);
+    r.dispatchEvent(new Event('input', { bubbles: true }));
+    this.pingOut.textContent = `${settings.ping} ms`;
+  }
+
+  // the room sees your ping (shortly after you stop moving the slider)
+  sendPing(now = false) {
+    clearTimeout(this.pingT);
+    const go = () => { if (this.net.room && this.pingSent !== settings.ping) { this.pingSent = settings.ping; this.net.setPing(settings.ping); } };
+    if (now) go(); else this.pingT = setTimeout(go, 250);
+  }
 }
+

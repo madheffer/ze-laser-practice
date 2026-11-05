@@ -108,14 +108,14 @@ export class PauseScreen {
     const rows = room.members.map((m) => {
       const p = mp?.players.get(m.id);
       const state = !p ? 'lobby' : p.alive ? 'alive' : 'dead';
-      return { id: m.id, name: m.name, state, host: m.id === room.owner, you: m.id === net.you };
+      return { id: m.id, name: m.name, ping: m.ping || 0, state, host: m.id === room.owner, you: m.id === net.you };
     });
     const key = JSON.stringify(rows);
     if (key === this.playersKey) return;
     this.playersKey = key;
     this.players.replaceChildren(...rows.map((p) => {
       const li = el('li', `pz-p ${p.state}${p.you ? ' you' : ''}`);
-      li.append(el('i', 'pz-dot'), el('span', 'pz-pname', p.name));
+      li.append(el('i', 'pz-dot'), el('span', 'pz-pname', p.name), el('span', 'pz-ms', `${p.ping} ms`));
       if (p.host) li.append(el('span', 'pz-tag host', 'Host'));
       if (p.you) li.append(el('span', 'pz-tag', 'You'));
       li.append(el('span', 'pz-state', p.state === 'alive' ? 'alive' : p.state === 'dead' ? 'dead' : 'in the room'));
