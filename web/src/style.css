@@ -25,6 +25,11 @@
 body.touch { --tap: 44px; }
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); color: var(--text); }
+/* A game, not a page: a click-drag never highlights the UI (it caught the mouse mid-laser). Text fields still select,
+   and the room code keeps its own user-select: all for copying */
+body { user-select: none; -webkit-user-select: none; }
+:is(input, textarea, [contenteditable]) { user-select: text; -webkit-user-select: text; }
+img { -webkit-user-drag: none; }
 
 /* CS2's Panorama fonts (lasers-bake --panorama): here, in the page's one blocking stylesheet, so the boot screen,
    the menu and the HUD all have them from the first frame */

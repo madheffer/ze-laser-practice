@@ -288,11 +288,22 @@ export class EntityEngine {
     // multiplied counters a server bumps once (deadcore's level_counter, neochrome's door counters, gris' laser picks).
     const fromTouch = activator === this.playerEnt && low === 'onstarttouch';
     for (let i = 0; i < e.io.length; i++) {
+    // The team walks into an HP trigger once, together. A trigger_multiple left alive through the fight (westersand's
+    // Guard_Boss_Hp_To_Boss, Boss_Push_Hp_To_Boss, Belias_Hp_To_Boss) would otherwise add `humans` x HP again every
+    // time you step back in while dodging, and the boss never dies. So only your first touch adds; a counter the
+    // trigger also takes back on OnEndTouch (a "humans in the zone" count) still follows every entry.
+    const reTouch = fromTouch && e._hpTouched;
+    if (fromTouch) e._hpTouched = true;
       const c = e.io[i];
       if (c.output.toLowerCase() !== low) continue;
       const p = c.param !== '' && c.param != null ? c.param : (param != null ? String(param) : '');
       const inl = c.input.toLowerCase();
-      const reps = fromTouch && (inl === 'addhealth' || inl === 'add') ? Math.min(MAX_HUMANS, Math.max(1, this.humans | 0)) : 1;
+      const isAdd = fromTouch && (inl === 'addhealth' || inl === 'add');
+      if (isAdd && reTouch && !e.io.some((o) => o.output.toLowerCase() === 'onendtouch' && o.target === c.target)) {
+        if (c.times > 0 && --c.times === 0) { e.io.splice(i, 1); i--; }
+        continue;
+      }
+      const reps = isAdd ? Math.min(MAX_HUMANS, Math.max(1, this.humans | 0)) : 1;
       for (let r = 1; r < reps; r++) this.queue.push({ t: this.time + (c.delay || 0), o: this.order++, target: c.target, input: c.input, param: p, activator, caller: e });
       this.queue.push({ t: this.time + (c.delay || 0), o: this.order++, target: c.target, input: c.input, param: p, activator, caller: e });
       if (c.times > 0 && --c.times === 0) { e.io.splice(i, 1); i--; }
