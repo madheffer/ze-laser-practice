@@ -81,7 +81,19 @@
         "hurt_beam5": "a beam",
         "hurt_nuke": "the nuke",
         "hurt_nuke_fail": "the nuke",
-        "hurt_finalfall": "the fall"
+        "hurt_finalfall": "the fall",
+        "hurt_electroball96": "an electro ball",
+        "hurt_pent": "the pentagram",
+        "hurt_bloodball96": "a blood ball",
+        "hurt_trianglea1": "a triangle laser",
+        "hurt_trianglea2": "a triangle laser",
+        "hurt_trianglea3": "a triangle laser",
+        "hurt_triangleb1": "a triangle laser",
+        "hurt_triangleb2": "a triangle laser",
+        "hurt_triangleb3": "a triangle laser",
+        "hurt_chalaser": "the charge's laser",
+        "hurt_curveballa": "a curveball",
+        "hurt_curveballb": "a curveball"
       },
       "endless": {
         "cancel": [
@@ -180,7 +192,19 @@
         "hurt_beam5": "a beam",
         "hurt_nuke": "the nuke",
         "hurt_nuke_fail": "the nuke",
-        "hurt_finalfall": "the fall"
+        "hurt_finalfall": "the fall",
+        "hurt_electroball96": "an electro ball",
+        "hurt_pent": "the pentagram",
+        "hurt_bloodball96": "a blood ball",
+        "hurt_trianglea1": "a triangle laser",
+        "hurt_trianglea2": "a triangle laser",
+        "hurt_trianglea3": "a triangle laser",
+        "hurt_triangleb1": "a triangle laser",
+        "hurt_triangleb2": "a triangle laser",
+        "hurt_triangleb3": "a triangle laser",
+        "hurt_chalaser": "the charge's laser",
+        "hurt_curveballa": "a curveball",
+        "hurt_curveballb": "a curveball"
       }
     },
     {
@@ -253,10 +277,358 @@
         "hurt_beam5": "a beam",
         "hurt_nuke": "the nuke",
         "hurt_nuke_fail": "the nuke",
-        "hurt_finalfall": "the fall"
+        "hurt_finalfall": "the fall",
+        "hurt_electroball96": "an electro ball",
+        "hurt_pent": "the pentagram",
+        "hurt_bloodball96": "a blood ball",
+        "hurt_trianglea1": "a triangle laser",
+        "hurt_trianglea2": "a triangle laser",
+        "hurt_trianglea3": "a triangle laser",
+        "hurt_triangleb1": "a triangle laser",
+        "hurt_triangleb2": "a triangle laser",
+        "hurt_triangleb3": "a triangle laser",
+        "hurt_chalaser": "the charge's laser",
+        "hurt_curveballa": "a curveball",
+        "hurt_curveballb": "a curveball"
       },
       "endless": {
         "noBossDamage": true
+      }
+    },
+    {
+      "id": "dragon_target",
+      "name": "Ball spit",
+      "summary": "The dragon hunts you and spits electro balls",
+      "description": "The dragon flies between its four perches and turns to hunt one human (a spinning trigger tags them with the dragontarget context); when its sight line (tr_dragon_foundtarget) finds them it spits a pattern of electro balls along it, 768 u/s for 2048 u, every ~0.9 s while it keeps sight. 10 damage a second per ball.",
+      "spawn": {
+        "origin": [
+          2560,
+          -3072,
+          -2944
+        ],
+        "yaw": 180
+      },
+      "start": [
+        {
+          "target": "[PR#]temp_dragon",
+          "input": "ForceSpawn"
+        },
+        {
+          "target": "[PR#]relay_atk_target",
+          "input": "Trigger",
+          "delay": 1
+        },
+        {
+          "target": "[PR#]music_birthofawish",
+          "input": "StartSound"
+        }
+      ],
+      "winAfter": 28,
+      "player": {
+        "health": 180
+      },
+      "parent": "dragon",
+      "hazards": {
+        "hurt_finalbullet": "a falling ball",
+        "hurt_esclaser": "an escape laser",
+        "hurt_escbullet": "an escape bullet",
+        "hurt_escfireball": "a fireball",
+        "hurt_escfire": "the side fire",
+        "firewall_hurt": "the firewall",
+        "hurt_escdragon": "the escape dragon",
+        "hurt_humandelay": "falling behind",
+        "hurt_vlaser": "a laser",
+        "hurt_claser": "a high laser",
+        "hurt_slaser1": "a spinning laser",
+        "hurt_slaser2": "a spinning laser",
+        "hurt_dragon": "the dragon",
+        "hurt_outerfire": "the outer fire",
+        "hurt_firestorm1": "the firestorm",
+        "hurt_firestorm2": "the firestorm",
+        "hurt_firestorm3": "the firestorm",
+        "hurt_firestorm4": "the firestorm",
+        "hurt_firestorm5": "the firestorm",
+        "hurt_firestorm6": "the firestorm",
+        "hurt_firestorm7": "the firestorm",
+        "hurt_firestorm8": "the firestorm",
+        "hurt_spin_low": "the low spin",
+        "hurt_spin_mid": "the mid spin",
+        "hurt_spin_high": "the high spin",
+        "hurt_beam1": "a beam",
+        "hurt_beam2": "a beam",
+        "hurt_beam3": "a beam",
+        "hurt_beam4": "a beam",
+        "hurt_beam5": "a beam",
+        "hurt_nuke": "the nuke",
+        "hurt_nuke_fail": "the nuke",
+        "hurt_finalfall": "the fall",
+        "hurt_electroball96": "an electro ball",
+        "hurt_pent": "the pentagram",
+        "hurt_bloodball96": "a blood ball",
+        "hurt_trianglea1": "a triangle laser",
+        "hurt_trianglea2": "a triangle laser",
+        "hurt_trianglea3": "a triangle laser",
+        "hurt_triangleb1": "a triangle laser",
+        "hurt_triangleb2": "a triangle laser",
+        "hurt_triangleb3": "a triangle laser",
+        "hurt_chalaser": "the charge's laser",
+        "hurt_curveballa": "a curveball",
+        "hurt_curveballb": "a curveball"
+      },
+      "endless": {
+        "repeat": 30
+      }
+    },
+    {
+      "id": "dragon_pentagram",
+      "name": "Pentagram",
+      "summary": "Blood balls from five circling stars",
+      "description": "Five pentagram stars (one a second) ride their track (func_tracktrain) around the arena from 5 s to 25 s, each turning ring of makers shooting blood balls every timer_pent tick. 10 damage a second per star or ball.",
+      "spawn": {
+        "origin": [
+          2560,
+          -3072,
+          -2944
+        ],
+        "yaw": 180
+      },
+      "start": [
+        {
+          "target": "[PR#]temp_dragon",
+          "input": "ForceSpawn"
+        },
+        {
+          "target": "[PR#]relay_atk_pentagram",
+          "input": "Trigger",
+          "delay": 1
+        },
+        {
+          "target": "[PR#]music_birthofawish",
+          "input": "StartSound"
+        }
+      ],
+      "winAfter": 27,
+      "player": {
+        "health": 180
+      },
+      "parent": "dragon",
+      "hazards": {
+        "hurt_finalbullet": "a falling ball",
+        "hurt_esclaser": "an escape laser",
+        "hurt_escbullet": "an escape bullet",
+        "hurt_escfireball": "a fireball",
+        "hurt_escfire": "the side fire",
+        "firewall_hurt": "the firewall",
+        "hurt_escdragon": "the escape dragon",
+        "hurt_humandelay": "falling behind",
+        "hurt_vlaser": "a laser",
+        "hurt_claser": "a high laser",
+        "hurt_slaser1": "a spinning laser",
+        "hurt_slaser2": "a spinning laser",
+        "hurt_dragon": "the dragon",
+        "hurt_outerfire": "the outer fire",
+        "hurt_firestorm1": "the firestorm",
+        "hurt_firestorm2": "the firestorm",
+        "hurt_firestorm3": "the firestorm",
+        "hurt_firestorm4": "the firestorm",
+        "hurt_firestorm5": "the firestorm",
+        "hurt_firestorm6": "the firestorm",
+        "hurt_firestorm7": "the firestorm",
+        "hurt_firestorm8": "the firestorm",
+        "hurt_spin_low": "the low spin",
+        "hurt_spin_mid": "the mid spin",
+        "hurt_spin_high": "the high spin",
+        "hurt_beam1": "a beam",
+        "hurt_beam2": "a beam",
+        "hurt_beam3": "a beam",
+        "hurt_beam4": "a beam",
+        "hurt_beam5": "a beam",
+        "hurt_nuke": "the nuke",
+        "hurt_nuke_fail": "the nuke",
+        "hurt_finalfall": "the fall",
+        "hurt_electroball96": "an electro ball",
+        "hurt_pent": "the pentagram",
+        "hurt_bloodball96": "a blood ball",
+        "hurt_trianglea1": "a triangle laser",
+        "hurt_trianglea2": "a triangle laser",
+        "hurt_trianglea3": "a triangle laser",
+        "hurt_triangleb1": "a triangle laser",
+        "hurt_triangleb2": "a triangle laser",
+        "hurt_triangleb3": "a triangle laser",
+        "hurt_chalaser": "the charge's laser",
+        "hurt_curveballa": "a curveball",
+        "hurt_curveballb": "a curveball"
+      },
+      "endless": {
+        "repeat": 30
+      }
+    },
+    {
+      "id": "dragon_charge",
+      "name": "Charge",
+      "summary": "Dragon copies charge across the arena",
+      "description": "The dragon rises out of the way (move_dragon_charge_atk) and the outer fire burns at the rim; every 3 s from 4 s a copy of it charges across the arena from one of 12 angles at 768 u/s, pushing you along (500) and firing a laser ahead of it. Seven charges.",
+      "spawn": {
+        "origin": [
+          2560,
+          -3072,
+          -2944
+        ],
+        "yaw": 180
+      },
+      "start": [
+        {
+          "target": "[PR#]temp_dragon",
+          "input": "ForceSpawn"
+        },
+        {
+          "target": "[PR#]relay_atk_charge",
+          "input": "Trigger",
+          "delay": 1
+        },
+        {
+          "target": "[PR#]music_birthofawish",
+          "input": "StartSound"
+        }
+      ],
+      "winAfter": 29,
+      "player": {
+        "health": 180
+      },
+      "parent": "dragon",
+      "hazards": {
+        "hurt_finalbullet": "a falling ball",
+        "hurt_esclaser": "an escape laser",
+        "hurt_escbullet": "an escape bullet",
+        "hurt_escfireball": "a fireball",
+        "hurt_escfire": "the side fire",
+        "firewall_hurt": "the firewall",
+        "hurt_escdragon": "the escape dragon",
+        "hurt_humandelay": "falling behind",
+        "hurt_vlaser": "a laser",
+        "hurt_claser": "a high laser",
+        "hurt_slaser1": "a spinning laser",
+        "hurt_slaser2": "a spinning laser",
+        "hurt_dragon": "the dragon",
+        "hurt_outerfire": "the outer fire",
+        "hurt_firestorm1": "the firestorm",
+        "hurt_firestorm2": "the firestorm",
+        "hurt_firestorm3": "the firestorm",
+        "hurt_firestorm4": "the firestorm",
+        "hurt_firestorm5": "the firestorm",
+        "hurt_firestorm6": "the firestorm",
+        "hurt_firestorm7": "the firestorm",
+        "hurt_firestorm8": "the firestorm",
+        "hurt_spin_low": "the low spin",
+        "hurt_spin_mid": "the mid spin",
+        "hurt_spin_high": "the high spin",
+        "hurt_beam1": "a beam",
+        "hurt_beam2": "a beam",
+        "hurt_beam3": "a beam",
+        "hurt_beam4": "a beam",
+        "hurt_beam5": "a beam",
+        "hurt_nuke": "the nuke",
+        "hurt_nuke_fail": "the nuke",
+        "hurt_finalfall": "the fall",
+        "hurt_electroball96": "an electro ball",
+        "hurt_pent": "the pentagram",
+        "hurt_bloodball96": "a blood ball",
+        "hurt_trianglea1": "a triangle laser",
+        "hurt_trianglea2": "a triangle laser",
+        "hurt_trianglea3": "a triangle laser",
+        "hurt_triangleb1": "a triangle laser",
+        "hurt_triangleb2": "a triangle laser",
+        "hurt_triangleb3": "a triangle laser",
+        "hurt_chalaser": "the charge's laser",
+        "hurt_curveballa": "a curveball",
+        "hurt_curveballb": "a curveball"
+      },
+      "endless": {
+        "repeat": 30
+      }
+    },
+    {
+      "id": "dragon_wind",
+      "name": "Wind",
+      "summary": "A pull to the centre and sweeping gusts",
+      "description": "The dragon pulls everyone to the centre (push_gravity, 255) from 2 to 12 s and 16 to 26 s, while every 3 s a gust (temp_wind: turning push walls) sweeps across the arena.",
+      "spawn": {
+        "origin": [
+          2560,
+          -3072,
+          -2944
+        ],
+        "yaw": 180
+      },
+      "start": [
+        {
+          "target": "[PR#]temp_dragon",
+          "input": "ForceSpawn"
+        },
+        {
+          "target": "[PR#]relay_atk_wind",
+          "input": "Trigger",
+          "delay": 1
+        },
+        {
+          "target": "[PR#]music_birthofawish",
+          "input": "StartSound"
+        }
+      ],
+      "winAfter": 27,
+      "player": {
+        "health": 180
+      },
+      "parent": "dragon",
+      "hazards": {
+        "hurt_finalbullet": "a falling ball",
+        "hurt_esclaser": "an escape laser",
+        "hurt_escbullet": "an escape bullet",
+        "hurt_escfireball": "a fireball",
+        "hurt_escfire": "the side fire",
+        "firewall_hurt": "the firewall",
+        "hurt_escdragon": "the escape dragon",
+        "hurt_humandelay": "falling behind",
+        "hurt_vlaser": "a laser",
+        "hurt_claser": "a high laser",
+        "hurt_slaser1": "a spinning laser",
+        "hurt_slaser2": "a spinning laser",
+        "hurt_dragon": "the dragon",
+        "hurt_outerfire": "the outer fire",
+        "hurt_firestorm1": "the firestorm",
+        "hurt_firestorm2": "the firestorm",
+        "hurt_firestorm3": "the firestorm",
+        "hurt_firestorm4": "the firestorm",
+        "hurt_firestorm5": "the firestorm",
+        "hurt_firestorm6": "the firestorm",
+        "hurt_firestorm7": "the firestorm",
+        "hurt_firestorm8": "the firestorm",
+        "hurt_spin_low": "the low spin",
+        "hurt_spin_mid": "the mid spin",
+        "hurt_spin_high": "the high spin",
+        "hurt_beam1": "a beam",
+        "hurt_beam2": "a beam",
+        "hurt_beam3": "a beam",
+        "hurt_beam4": "a beam",
+        "hurt_beam5": "a beam",
+        "hurt_nuke": "the nuke",
+        "hurt_nuke_fail": "the nuke",
+        "hurt_finalfall": "the fall",
+        "hurt_electroball96": "an electro ball",
+        "hurt_pent": "the pentagram",
+        "hurt_bloodball96": "a blood ball",
+        "hurt_trianglea1": "a triangle laser",
+        "hurt_trianglea2": "a triangle laser",
+        "hurt_trianglea3": "a triangle laser",
+        "hurt_triangleb1": "a triangle laser",
+        "hurt_triangleb2": "a triangle laser",
+        "hurt_triangleb3": "a triangle laser",
+        "hurt_chalaser": "the charge's laser",
+        "hurt_curveballa": "a curveball",
+        "hurt_curveballb": "a curveball"
+      },
+      "endless": {
+        "repeat": 30
       }
     },
     {
@@ -320,7 +692,19 @@
         "hurt_beam5": "a beam",
         "hurt_nuke": "the nuke",
         "hurt_nuke_fail": "the nuke",
-        "hurt_finalfall": "the fall"
+        "hurt_finalfall": "the fall",
+        "hurt_electroball96": "an electro ball",
+        "hurt_pent": "the pentagram",
+        "hurt_bloodball96": "a blood ball",
+        "hurt_trianglea1": "a triangle laser",
+        "hurt_trianglea2": "a triangle laser",
+        "hurt_trianglea3": "a triangle laser",
+        "hurt_triangleb1": "a triangle laser",
+        "hurt_triangleb2": "a triangle laser",
+        "hurt_triangleb3": "a triangle laser",
+        "hurt_chalaser": "the charge's laser",
+        "hurt_curveballa": "a curveball",
+        "hurt_curveballb": "a curveball"
       },
       "endless": {
         "repeat": 30
@@ -387,7 +771,19 @@
         "hurt_beam5": "a beam",
         "hurt_nuke": "the nuke",
         "hurt_nuke_fail": "the nuke",
-        "hurt_finalfall": "the fall"
+        "hurt_finalfall": "the fall",
+        "hurt_electroball96": "an electro ball",
+        "hurt_pent": "the pentagram",
+        "hurt_bloodball96": "a blood ball",
+        "hurt_trianglea1": "a triangle laser",
+        "hurt_trianglea2": "a triangle laser",
+        "hurt_trianglea3": "a triangle laser",
+        "hurt_triangleb1": "a triangle laser",
+        "hurt_triangleb2": "a triangle laser",
+        "hurt_triangleb3": "a triangle laser",
+        "hurt_chalaser": "the charge's laser",
+        "hurt_curveballa": "a curveball",
+        "hurt_curveballb": "a curveball"
       },
       "endless": {
         "repeat": 30
@@ -454,7 +850,19 @@
         "hurt_beam5": "a beam",
         "hurt_nuke": "the nuke",
         "hurt_nuke_fail": "the nuke",
-        "hurt_finalfall": "the fall"
+        "hurt_finalfall": "the fall",
+        "hurt_electroball96": "an electro ball",
+        "hurt_pent": "the pentagram",
+        "hurt_bloodball96": "a blood ball",
+        "hurt_trianglea1": "a triangle laser",
+        "hurt_trianglea2": "a triangle laser",
+        "hurt_trianglea3": "a triangle laser",
+        "hurt_triangleb1": "a triangle laser",
+        "hurt_triangleb2": "a triangle laser",
+        "hurt_triangleb3": "a triangle laser",
+        "hurt_chalaser": "the charge's laser",
+        "hurt_curveballa": "a curveball",
+        "hurt_curveballb": "a curveball"
       },
       "endless": {
         "repeat": 30
@@ -521,7 +929,19 @@
         "hurt_beam5": "a beam",
         "hurt_nuke": "the nuke",
         "hurt_nuke_fail": "the nuke",
-        "hurt_finalfall": "the fall"
+        "hurt_finalfall": "the fall",
+        "hurt_electroball96": "an electro ball",
+        "hurt_pent": "the pentagram",
+        "hurt_bloodball96": "a blood ball",
+        "hurt_trianglea1": "a triangle laser",
+        "hurt_trianglea2": "a triangle laser",
+        "hurt_trianglea3": "a triangle laser",
+        "hurt_triangleb1": "a triangle laser",
+        "hurt_triangleb2": "a triangle laser",
+        "hurt_triangleb3": "a triangle laser",
+        "hurt_chalaser": "the charge's laser",
+        "hurt_curveballa": "a curveball",
+        "hurt_curveballb": "a curveball"
       },
       "endless": {
         "repeat": 30
@@ -593,7 +1013,19 @@
         "hurt_beam5": "a beam",
         "hurt_nuke": "the nuke",
         "hurt_nuke_fail": "the nuke",
-        "hurt_finalfall": "the fall"
+        "hurt_finalfall": "the fall",
+        "hurt_electroball96": "an electro ball",
+        "hurt_pent": "the pentagram",
+        "hurt_bloodball96": "a blood ball",
+        "hurt_trianglea1": "a triangle laser",
+        "hurt_trianglea2": "a triangle laser",
+        "hurt_trianglea3": "a triangle laser",
+        "hurt_triangleb1": "a triangle laser",
+        "hurt_triangleb2": "a triangle laser",
+        "hurt_triangleb3": "a triangle laser",
+        "hurt_chalaser": "the charge's laser",
+        "hurt_curveballa": "a curveball",
+        "hurt_curveballb": "a curveball"
       },
       "endless": {
         "repeat": 30
@@ -665,7 +1097,19 @@
         "hurt_beam5": "a beam",
         "hurt_nuke": "the nuke",
         "hurt_nuke_fail": "the nuke",
-        "hurt_finalfall": "the fall"
+        "hurt_finalfall": "the fall",
+        "hurt_electroball96": "an electro ball",
+        "hurt_pent": "the pentagram",
+        "hurt_bloodball96": "a blood ball",
+        "hurt_trianglea1": "a triangle laser",
+        "hurt_trianglea2": "a triangle laser",
+        "hurt_trianglea3": "a triangle laser",
+        "hurt_triangleb1": "a triangle laser",
+        "hurt_triangleb2": "a triangle laser",
+        "hurt_triangleb3": "a triangle laser",
+        "hurt_chalaser": "the charge's laser",
+        "hurt_curveballa": "a curveball",
+        "hurt_curveballb": "a curveball"
       },
       "endless": {
         "repeat": 30
@@ -740,7 +1184,19 @@
         "hurt_beam5": "a beam",
         "hurt_nuke": "the nuke",
         "hurt_nuke_fail": "the nuke",
-        "hurt_finalfall": "the fall"
+        "hurt_finalfall": "the fall",
+        "hurt_electroball96": "an electro ball",
+        "hurt_pent": "the pentagram",
+        "hurt_bloodball96": "a blood ball",
+        "hurt_trianglea1": "a triangle laser",
+        "hurt_trianglea2": "a triangle laser",
+        "hurt_trianglea3": "a triangle laser",
+        "hurt_triangleb1": "a triangle laser",
+        "hurt_triangleb2": "a triangle laser",
+        "hurt_triangleb3": "a triangle laser",
+        "hurt_chalaser": "the charge's laser",
+        "hurt_curveballa": "a curveball",
+        "hurt_curveballb": "a curveball"
       }
     }
   ]

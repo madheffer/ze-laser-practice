@@ -111,6 +111,9 @@ export function untouch(engine, e, events = pending(engine)) {
     // CS2Fixes' trigger_gravity (entities.cpp, always on): leaving any one sets your gravity back to 1
     if (e.cls === 'trigger_gravity') engine.player?.setGravity(1);
     e.fireOutput('OnEndTouch', engine.playerEnt);
+    // CBaseTrigger::EndTouch: the last toucher gone also fires OnEndTouchAll (m_OnEndTouchAll, cs2_server datadesc
+    // FUN_1803e1450 +0x918); one player per engine, so that is every end of touch
+    e.fireOutput('OnEndTouchAll', engine.playerEnt);
   }
 }
 
@@ -235,6 +238,9 @@ export function updateTriggers(engine, player) {
       if (inside && !was) {
         engine.touching.add(e);
         e.fireOutput('OnStartTouch', engine.playerEnt);
+        // the first toucher also fires OnStartTouchAll (m_OnStartTouchAll +0x8e8): mist's dragon spits its electroballs
+        // from tr_dragon_foundtarget's OnStartTouchAll
+        e.fireOutput('OnStartTouchAll', engine.playerEnt);
         if (cls === 'trigger_multiple' || cls === 'trigger_once') {
           e.fireOutput('OnTrigger', engine.playerEnt);
           if (cls === 'trigger_once') engine.kill(e);
