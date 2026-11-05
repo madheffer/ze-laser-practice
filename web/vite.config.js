@@ -46,8 +46,9 @@ export default defineConfig({
   plugins: [longCacheForAssets(), cspInBuild(), cspHeaderInPreview(), coopRelayPlugin(), stageShotsDevPlugin()],
   server: {
     port: 5804, strictPort: true,
-    // Generated content (bakes write thousands of files) never reloads a page or restarts anything.
-    watch: { ignored: ['**/public/maps/**', '**/public/sounds/**', '**/public/panorama/**', '**/public/weapons/**', '**/public/player/**', '**/dist/**'] },
+    // public/ stays watched: Vite only refreshes its list of public files from it (no page reload), and a file baked
+    // after start (e.g. a map's new stripper.json) is otherwise answered with index.html until a restart
+    watch: { ignored: ['**/dist/**'] },
   },
   // Every package the game imports, bundled up front: Vite never discovers a new one mid-session, which re-optimizes,
   // full-reloads every open page and can leave the server answering "504 Outdated Request" until it restarts.
