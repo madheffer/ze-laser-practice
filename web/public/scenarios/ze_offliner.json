@@ -74,11 +74,15 @@
       "id": "final_lasers",
       "group": "Ending",
       "name": "After the sphere: the 8 lasers",
-      "summary": "Cross the pillars, dodge 8 lasers",
-      "description": "Starts as the Green Sphere dies (end_laser_counter OnHitMin), on falldown_miss, where the map puts humans for this part. At +7 s ending_break drops the floor in front of you, leaving 7 pillars over a pit that kills (human-only trigger_hurt). final_laser_case fires 8 lasers at +12, 13, 14, 15, 15.7, 16.4, 17.2 and 18 s, each one of three heights (two to jump, one to duck), flying west at 1650 u/s from x -9384. At +19.5 s the wall on the sphere's platform breaks: win when you reach the teleport behind it.",
+      "summary": "Face the 8 lasers and dodge them",
+      "description": "Starts as the Green Sphere dies (end_laser_counter OnHitMin). You stand on the sphere's platform at the west end, facing back down the corridor: at +7 s ending_break drops the floor between you and falldown_miss, leaving 7 pillars over a pit that kills (human-only trigger_hurt). final_laser_case fires 8 lasers at +12, 13, 14, 15, 15.7, 16.4, 17.2 and 18 s, each one of three heights (two to jump, one to duck), flying west at 1650 u/s from x -9424 straight at you. Win when the last one has passed (+19.5 s, as the wall behind you breaks). On the map you then have until +25 s to take the teleport behind that wall: last_zm_tp sends everyone left in the level to the zombie cage.",
       "spawn": {
-        "at": "[PR#]falldown_miss",
-        "yaw": 180
+        "origin": [
+          -10720,
+          4544,
+          320
+        ],
+        "yaw": 0
       },
       "setup": [
         {
@@ -102,8 +106,8 @@
         "health": 100
       },
       "win": {
-        "target": "[PR#]fog_controller",
-        "input": "Disable"
+        "target": "[PR#]breakable_before_dodgeend",
+        "input": "Break"
       },
       "cages": {
         "[PR#]last_zm_dest": true
