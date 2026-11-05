@@ -1,13 +1,12 @@
-// One co-op / versus round, run by the server. No player decides anything for anyone else, not even for themself:
+// One multiplayer round, run by the server. No player decides anything for anyone else, not even for themself:
 //   - the server picks the seed and hands out the room's rules, so every client runs the same simulation;
 //   - it keeps the round clock (clients pull their clock onto it);
 //   - it runs its own copy of every player's run (coop-check.js, the anti-cheat): HP, deaths, the stage's win /
 //     lose and cheat flags come from that copy, fed by the per-tick positions each client sends;
 //   - boss damage goes through it: each hit is checked against the weapon and line of sight, the team's fire
 //     (one designated client, the "leader") is capped per human, and the sum goes back to every client;
-//   - it decides the end: co-op = the survivors win when the stage clears (alone if they're the last one alive),
-//     all dead = wiped; versus = the last one alive plays on until they clear it or go down, then wins (both or more
-//     clear it: fewest hits).
+//   - it decides the end and who did best (end): the survivors win when the stage clears (the last one alive plays
+//     on alone), fewest hits is the best run; all down, whoever lasted longest.
 // Players only ever talk to the server, so nobody learns anyone else's address.
 import { cleanText, healHolders } from '../src/lib/room-rules.js';
 import { TICK, COUNTDOWN } from '../src/world/run-engine.js'; // COUNTDOWN: s a round's run waits before the stage starts
@@ -261,34 +260,34 @@ export class Round {
   checkEnd() {
     if (this.ended) return;
     const a = this.alive.length;
-    // versus too: the last one standing plays on until they clear the stage (end('win') from their run) or go down,
-    // and only then is it over. Everyone down: whoever lasted longest wins (end: 'last')
-    if (a === 0) this.end(this.kind === 'versus' && this.players.size >= 2 ? 'last' : 'wiped');
+    // the last one standing plays on until they clear the stage (end('win') from their run) or go down too
+    if (a === 0) this.end('wiped');
   }
 
+  // One mode for every room: the stage is everyone's, and everyone is up against each other on it.
+  //   cleared ('win')  everyone still alive cleared it (winners); best = the survivors with the fewest hits
+  //   all down         nobody did (endless: the run is over); best = whoever lasted longest (within a tick: a tie)
+  //   failed ('lose')  the stage was lost with players alive; best = the survivors with the fewest hits
+  // The anti-cheat's removals and players who left never count as best.
   end(reason) {
     if (this.ended) return;
     const all = [...this.players.values()];
     const alive = all.filter((p) => p.alive);
-    const versus = this.kind === 'versus' && all.length >= 2;
-    const endless = this.mode === 'endless';
+    const fair = (list) => list.filter((p) => !p.cheat && !p.left);
     const hits = (p) => p.check.hits;
-    let winners = [];
-    if (reason === 'win') {
-      winners = alive;
-      if (versus && alive.length > 1) { const best = Math.min(...alive.map(hits)); winners = alive.filter((p) => hits(p) === best); }
-    } else if (reason === 'last' && alive.length) winners = alive;
-    else if (reason === 'last' || (reason === 'wiped' && (endless || versus))) {
-      // everyone is down: whoever lasted longest (within a tick = a draw); the anti-cheat's removals don't count
-      const fair = all.filter((p) => !p.cheat && !p.left);
-      const longest = Math.max(0, ...fair.map((p) => p.deadAt ?? 0));
-      winners = fair.filter((p) => (p.deadAt ?? 0) >= longest - TICK);
-    } else if (reason === 'lose' && versus) winners = alive;
-    const result = versus ? (winners.length === 1 ? 'win' : 'draw')
-      : reason === 'win' ? 'win' : reason === 'wiped' && endless ? 'over' : 'lose';
+    const fewestHits = (list) => { const f = fair(list); const m = Math.min(...f.map(hits)); return f.filter((p) => hits(p) === m); };
+    let winners = [], best;
+    if (reason === 'win') { winners = alive; best = fewestHits(alive); }
+    else if (reason === 'lose') best = fewestHits(alive);
+    else {
+      const f = fair(all);
+      const longest = Math.max(0, ...f.map((p) => p.deadAt ?? 0));
+      best = f.filter((p) => (p.deadAt ?? 0) >= longest - TICK);
+    }
+    const result = reason === 'win' ? 'win' : reason === 'wiped' && this.mode === 'endless' ? 'over' : 'lose';
     const t = this.stageTime;
     this.ended = true;
-    this.result = { t: 'end', r: this.r, result, reason, at: t, winners: winners.map((p) => p.id),
+    this.result = { t: 'end', r: this.r, result, reason, at: t, winners: winners.map((p) => p.id), best: all.length > 1 ? best.map((p) => p.id) : [],
       stats: all.map((p) => ({ id: p.id, alive: p.alive, at: p.deadAt == null ? null : Math.min(p.deadAt, t), hits: hits(p), cheat: p.cheat || undefined })) };
     this.broadcast(this.result);
     // the copies are done: free their engines

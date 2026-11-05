@@ -67,7 +67,7 @@ export class HomeHistory {
     const li = el('li', `hf-row hh-row tone-${r.result === 'win' ? 'win' : r.result === 'over' ? 'endless' : 'lose'}`);
     const body = el('div', 'hf-body');
     const line = el('p', 'hf-line');
-    line.append(el('b', 'hf-what', r.stage), ` · ${RESULT[r.result]}${r.kind !== 'solo' ? (r.kind === 'versus' ? ' · Versus' : ' · Co-op') : ''}`);
+    line.append(el('b', 'hf-what', r.stage), ` · ${RESULT[r.result]}${r.kind !== 'solo' ? (r.kind === 'versus' ? ' · Versus' : ' · Online') : ''}`);
     const meta = el('p', 'hf-meta');
     const bits = [r.map ? displayName(this.mapTitle(r.map)) : '', r.hits != null ? `${r.hits} hit${r.hits === 1 ? '' : 's'}` : ''];
     meta.append(el('span', null, bits.filter(Boolean).join(' · ')));

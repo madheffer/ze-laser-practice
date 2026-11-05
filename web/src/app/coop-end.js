@@ -1,47 +1,47 @@
-// The end card of a co-op / versus round (the server's verdict): who won, how, and a line per player (survived /
-// died at). The room owner's card has "Play again" (the server starts the next round for everyone); everyone has
-// "Back to room" (the room screen, where the owner picks the next stage).
+// The end card of a multiplayer round (the server's verdict, server/coop-round.js end): did the stage get cleared,
+// who did best, and a line per player (survived / died at, hits), best run first. One mode: together on the same
+// stage, and against each other. The room owner's card has "Play again" (the server starts the next round for
+// everyone); everyone has "Back to room" (the room screen, where the owner picks the next stage).
 import { S, G } from './state.js';
 import { formatTime, plural } from '../lib/format.js';
 
 export function showRoundEnd(round, d) {
   const me = round.me;
   const won = d.winners.includes(me);
-  const versus = round.kind === 'versus' && round.players.size >= 2;
+  const top = d.best.includes(me);
   const solo = round.players.size === 1;
   const names = (ids) => ids.map((id) => (id === me ? 'You' : round.name(id))).join(' & ');
+  const hitsOf = (id) => d.stats.find((s) => s.id === id)?.hits ?? 0;
   const scenario = S.scenario;
   let kind, title, subtitle;
-  if (versus) {
-    kind = d.result === 'draw' ? 'endless' : won ? 'win' : 'dead';
-    title = d.result === 'draw' ? 'DRAW' : won ? 'VICTORY' : 'DEFEAT';
-    // the round runs until the last one standing clears it or goes down (server/coop-round.js checkEnd)
-    const cleared = d.stats.filter((s) => s.alive).length;
-    subtitle = d.result === 'draw' ? (d.winners.length ? `${names(d.winners)} tied` : 'Nobody made it')
-      : d.reason === 'win' ? (cleared > 1 ? `${names(d.winners)} cleared it with the fewest hits` : `${names(d.winners)} cleared it, the last one alive`)
-        : d.reason === 'last' ? `${names(d.winners)} lasted the longest`
-          : `${names(d.winners)} survived to the end`;
-  } else if (d.result === 'win') {
+  if (d.result === 'win') {
     kind = 'win';
     const survivors = d.winners;
-    title = won ? 'STAGE CLEARED' : 'TEAM CLEARED';
-    subtitle = solo ? 'Cleared' : survivors.length === 1 && round.players.size > 1
-      ? `${names(survivors)} cleared it solo, the last one alive`
-      : `${plural(survivors.length, 'survivor')}: ${names(survivors)}`;
+    // you survived and had the best run: the round is yours; survived: cleared; down while others cleared it: theirs
+    title = solo ? 'STAGE CLEARED' : top && won ? 'VICTORY' : won ? 'STAGE CLEARED' : 'TEAM CLEARED';
+    subtitle = solo ? 'Cleared'
+      : survivors.length === 1 ? `${names(survivors)} cleared it, the last one alive`
+        : `${names(survivors)} cleared it · best run: ${names(d.best)} (${plural(hitsOf(d.best[0]), 'hit')})`;
   } else if (d.result === 'over') {
     kind = 'endless';
-    title = 'RUN OVER';
-    subtitle = solo ? 'Survived to the end' : `Last alive: ${names(d.winners)}`;
+    title = solo ? 'RUN OVER' : top ? 'LASTED LONGEST' : 'RUN OVER';
+    subtitle = solo ? 'Survived to the end' : `${names(d.best)} lasted the longest`;
+  } else if (d.reason === 'wiped') {
+    kind = 'dead';
+    title = solo ? 'YOU DIED' : top ? 'LASTED LONGEST' : 'EVERYONE DOWN';
+    subtitle = solo ? 'Nobody survived' : `Nobody cleared it · ${names(d.best)} lasted the longest`;
   } else {
     kind = 'dead';
-    title = d.reason === 'wiped' ? (solo ? 'YOU DIED' : 'TEAM WIPED') : 'STAGE FAILED';
-    subtitle = d.reason === 'wiped' ? 'Nobody survived' : 'The stage was lost';
+    title = 'STAGE FAILED';
+    subtitle = d.best.length ? `The stage was lost · best run: ${names(d.best)}` : 'The stage was lost';
   }
 
-  const stats = d.stats.map((s) => [
+  // best run first, then who survived, then who lasted longer
+  const order = [...d.stats].sort((a, b) => (d.best.includes(b.id) - d.best.includes(a.id)) || (b.alive - a.alive) || ((b.at ?? Infinity) - (a.at ?? Infinity)) || (a.hits - b.hits));
+  const stats = order.map((s) => [
     s.id === me ? `${round.name(s.id)} (you)` : round.name(s.id),
-    `${s.alive ? 'alive' : `died ${formatTime(s.at)}`} · ${plural(s.hits, 'hit')}`,
-    d.winners.includes(s.id),
+    `${s.alive ? 'alive' : `died ${formatTime(s.at)}`} · ${plural(s.hits, 'hit')}${d.best.includes(s.id) && !solo ? ' · best' : ''}`,
+    d.best.includes(s.id) || (d.result === 'win' && d.winners.includes(s.id)),
   ]);
   stats.push(['Round time', formatTime(d.at)]);
 
@@ -52,7 +52,7 @@ export function showRoundEnd(round, d) {
     : [room];
   G.overlay.show({
     kind,
-    kicker: `${scenario?.name || 'Free roam'} · ${versus ? 'versus' : 'co-op'}${round.mode === 'endless' ? ' · endless' : ''}`,
+    kicker: `${scenario?.name || 'Free roam'} · online${round.mode === 'endless' ? ' · endless' : ''}`,
     title, subtitle, record: round.isHost ? '' : 'Waiting for the room owner to start the next round', stats, buttons,
   });
   G.menu.update();

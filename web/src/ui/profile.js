@@ -17,7 +17,7 @@ import { RESULT } from './home-history.js';
 
 function el(tag, cls, t) { const e = document.createElement(tag); if (cls) e.className = cls; if (t != null) e.textContent = t; return e; }
 
-const KIND = { solo: 'Solo', coop: 'Co-op', versus: 'Versus' };
+const KIND = { solo: 'Solo', coop: 'Online', versus: 'Versus' }; // 'versus': runs from before the one multiplayer mode
 const count = (v) => (Number.isInteger(v) && v >= 0 ? v : 0);
 const num = (v) => (Number.isFinite(v) && v >= 0 ? v : null);
 const kindOf = (v) => (KIND[v] ? v : 'solo');
@@ -131,7 +131,7 @@ export class Profile {
 
   numbers(t) {
     const dl = el('dl', 'home-stats pf-stats');
-    const split = [['solo', 'solo'], ['coop', 'co-op'], ['versus', 'versus']].filter(([k]) => t[k]).map(([k, w]) => `${thousands(t[k])} ${w}`).join(' · ');
+    const split = [['solo', 'solo'], ['coop', 'online'], ['versus', 'versus']].filter(([k]) => t[k]).map(([k, w]) => `${thousands(t[k])} ${w}`).join(' · ');
     for (const [n, label, sub] of [[t.runs, t.runs === 1 ? 'run' : 'runs', split], [t.wins, t.wins === 1 ? 'clear' : 'clears'], [t.cleared, 'stages cleared']]) {
       const d = el('div');
       d.append(el('dt', null, label), el('dd', null, thousands(n)));

@@ -1,4 +1,4 @@
-// The room screen: where a co-op / versus room waits between rounds. Everything on one page:
+// The room screen: where a multiplayer room waits between rounds. Everything on one page:
 //   left   the room code, big, with Copy code / Copy invite link; the players (empty slots wait for more to join;
 //          the owner can remove someone; everyone's simulated ping); your name and your own ping; the room's chat
 //          (ui/room-chat.js); the room's rules
@@ -175,8 +175,7 @@ export class RoomScreen {
     const owner = net.member(room.owner);
     this.nameEl.textContent = s.name || `${owner?.name || 'Someone'}'s room`;
     this.badges.replaceChildren(
-      el('i', `badge ${s.public ? 'public' : 'private'}`, s.public ? 'Public' : 'Private'),
-      el('i', `badge ${s.kind}`, s.kind === 'versus' ? 'Versus' : 'Co-op'));
+      el('i', `badge ${s.public ? 'public' : 'private'}`, s.public ? 'Public' : 'Private'));
     if (this.codeEl.textContent !== room.code) this.codeEl.textContent = room.code;
     if (document.activeElement !== this.nameIn) this.nameIn.value = this.lobby.name;
     if (document.activeElement !== this.pingIn) { this.pingIn.value = settings.ping; fillSlider(this.pingIn); }

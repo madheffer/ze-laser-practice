@@ -111,7 +111,7 @@ export function activityFeed({ send, findStage, stats, store, verify = null, log
       const winners = new Set(res.winners);
       const stats = new Map(res.stats.map((s) => [s.id, s]));
       record({
-        kind: round.kind === 'versus' && players.length >= 2 ? 'versus' : 'coop', verified: true,
+        kind: 'coop', verified: true, // one multiplayer mode (older runs may say 'versus')
         map: round.map, stageId: round.stage.id ?? 'free', stageName: round.stage.name, mode: round.mode,
         result: res.result, time: round1(res.at), players: players.length, named,
         roomName: named ? (room.settings.name || '') : '', cheats: cheatsOn(round.rules).length > 0, cause: '', finishedAt: Date.now(),

@@ -57,7 +57,6 @@ export class RoomBrowser {
     const main = el('div', 'br-main');
     const title = el('b', 'br-name', r.name);
     const tags = el('span', 'br-tags');
-    tags.append(el('i', `badge ${r.kind}`, r.kind === 'versus' ? 'Versus' : 'Co-op'));
     if (r.cheats.length) {
       const c = el('i', 'badge cheat', 'Cheats on');
       c.title = r.cheats.map((k) => CHEAT_LABELS[k] || k).join(', ');

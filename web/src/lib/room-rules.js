@@ -1,12 +1,16 @@
-// A co-op / versus room's settings, shared by the server (server/coop-*.js, which owns them) and the browser
+// A multiplayer room's settings, shared by the server (server/coop-*.js, which owns them) and the browser
 // (the lobby form, the round's rules). Pure functions, no DOM: anything from a client is untrusted, and both
 // sides clean it the same way.
+//
+// One mode: everyone plays the same stage together and against each other (server/coop-round.js decides the end
+// and who did best). Co-op and versus were two kinds; a room of either kind now cleans to the one ('coop', the
+// name the stored runs and leaderboards already use).
 //
 // Cheats (god mode, laser hitboxes, auto bunnyhop) start OFF in every room: only the room owner can turn them
 // on, everyone in the room sees that they are on (lobby + public list), and a round plays by the room's rules,
 // never by a player's own settings.
 
-export const ROOM_KINDS = ['coop', 'versus'];
+export const ROOM_KINDS = ['coop'];
 export const ROOM_MAX = 8;
 export const CHEATS = ['god', 'hitboxes', 'autoBhop'];
 
@@ -14,9 +18,9 @@ export const CHEATS = ['god', 'hitboxes', 'autoBhop'];
 export const RULE_DEFAULTS = Object.freeze({
   humans: 20, bossHp: 100, autoFire: false, perfectTeam: false, fallDamage: false,
   god: false, hitboxes: false, autoBhop: false,
-  // who carries the map's heal item (world/items.js usableHeals). Co-op: 'none', 'random' (one player, from the round's
-  // seed) or a player's id: a heal is an aura the group gathers round, so ONE human holds it, as on a server.
-  // Versus: 'none' or 'all' (everyone their own: each versus run is separate, so an aura heals only its holder)
+  // who carries the map's heal item (world/items.js usableHeals): 'none', 'random' (one player, from the round's
+  // seed) or a player's id (an aura the group gathers round, so ONE human holds it, as on a server), or 'all'
+  // (everyone their own: each player's run is separate, so an aura heals only its holder)
   heal: 'none',
 });
 const RANGES = { humans: [1, 64], bossHp: [1, 100] };
@@ -50,14 +54,11 @@ export function cleanRules(r) {
 export function cleanSettings(s, members = 1) {
   const o = s && typeof s === 'object' ? s : {};
   const max = Number.isInteger(o.max) ? o.max : SETTINGS_DEFAULTS.max;
-  const kind = ROOM_KINDS.includes(o.kind) ? o.kind : SETTINGS_DEFAULTS.kind;
   const rules = cleanRules(o.rules);
-  if (kind === 'versus' && rules.heal !== 'none') rules.heal = 'all';
-  if (kind !== 'versus' && rules.heal === 'all') rules.heal = 'random';
   return {
     name: cleanText(o.name, 32),
     public: o.public === true,
-    kind,
+    kind: SETTINGS_DEFAULTS.kind, // one mode (a saved 'versus' room comes back as it)
     max: Math.min(ROOM_MAX, Math.max(2, members, max)),
     rules,
   };

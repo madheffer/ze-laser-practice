@@ -1,4 +1,4 @@
-// A co-op / versus round on this client. The server runs the round (server/coop-round.js); this side builds the
+// A multiplayer round on this client. The server runs the round (server/coop-round.js); this side builds the
 // same run as everyone else and reports what happens to YOU. How a round stays 1:1 without syncing an entity:
 //   - the server's start carries the map, stage, mode, seed and the room's rules (lib/room-rules.js). Every
 //     client builds the same run from them, and the map's logic is deterministic for a seed;
@@ -6,8 +6,8 @@
 //   - boss damage goes through the server: your hits (and the team's fire, if you're the round's "leader") go up,
 //     everyone's capped hits come back and every client applies the same ones;
 //   - you send where you are ~20 times a second, when you die, and when your map says the stage is won / lost.
-// The server decides the end and who won (co-op: survivors, or the last one alive; versus: the last one standing,
-// once they have cleared the stage or gone down too).
+// The server decides the end, who won and who did best (server/coop-round.js end: one mode, together and against
+// each other).
 //
 // S.mp is the Round while you're in one (session, bosses and loop call its hooks); null solo.
 import { S, G, log } from './state.js';
@@ -149,7 +149,7 @@ class Round {
   hudLine() {
     const n = this.players.size, a = this.alive.length;
     const cheats = [this.rules.god && 'god mode', this.rules.hitboxes && 'hitboxes', this.rules.autoBhop && 'auto bhop'].filter(Boolean);
-    return `${this.kind === 'versus' ? 'Versus' : 'Co-op'}${n > 1 ? ` · ${a}/${n} alive` : ''}${cheats.length ? ` · ${cheats.join(', ')}` : ''}`;
+    return `Online${n > 1 ? ` · ${a}/${n} alive` : ''}${cheats.length ? ` · ${cheats.join(', ')}` : ''}`;
   }
 
   // the server says someone died (you too)
@@ -168,9 +168,8 @@ class Round {
     if (!this.lastAliveSaid && this.players.size > 1 && alive.length === 1) {
       this.lastAliveSaid = true;
       const last = alive[0];
-      // versus plays on: the last one standing wins once they clear the stage or outlast everyone (server/coop-round.js)
-      const goal = this.kind === 'versus' ? ': clear the stage or survive to win' : '';
-      systemLine([[last.id === this.me ? ` You are the last one alive${goal}` : ` ${last.name} is the last one alive`, NOTE_COLOR]]);
+      // the round plays on: the last one standing wins by clearing the stage (server/coop-round.js)
+      systemLine([[last.id === this.me ? ' You are the last one alive: clear the stage to win' : ` ${last.name} is the last one alive`, NOTE_COLOR]]);
     }
   }
 
@@ -216,10 +215,10 @@ export function hostStart(i, mode) {
 
 async function onStart(d) {
   const roster = Array.isArray(d.roster) ? d.roster.filter((m) => Number.isInteger(m?.id)).slice(0, 8).map((m) => ({ id: m.id, name: cleanText(m.name, 24) || 'Player' })) : [];
-  if (!Number.isInteger(d.r) || !Number.isInteger(d.seed) || d.seed < 1 || !isMapName(d.map) || !ROOM_KINDS.includes(d.kind) || !['normal', 'endless'].includes(d.mode)) return;
+  if (!Number.isInteger(d.r) || !Number.isInteger(d.seed) || d.seed < 1 || !isMapName(d.map) || !['normal', 'endless'].includes(d.mode)) return;
   if (!roster.some((m) => m.id === net.you)) { lobby.busy = true; G.lobby.render(); return; }
   const start = {
-    r: d.r, map: d.map, stage: d.stage == null ? null : cleanText(d.stage, 80), mode: d.mode, kind: d.kind,
+    r: d.r, map: d.map, stage: d.stage == null ? null : cleanText(d.stage, 80), mode: d.mode, kind: ROOM_KINDS[0], // one mode
     rules: { ...cleanRules(d.rules), seed: d.seed }, roster, leader: Number.isInteger(d.leader) ? d.leader : 0,
     holders: Array.isArray(d.holders) ? d.holders.filter((id) => roster.some((m) => m.id === id)) : [],
   };
@@ -309,6 +308,7 @@ function cleanEnd(d) {
   return {
     r: d.r, result: ['win', 'lose', 'draw', 'over'].includes(d.result) ? d.result : 'lose', reason: cleanText(d.reason, 10),
     at: num(d.at, 0, 1e6) ? d.at : 0, winners: d.winners.filter(Number.isInteger).slice(0, 8),
+    best: Array.isArray(d.best) ? d.best.filter(Number.isInteger).slice(0, 8) : [],
     stats: d.stats.slice(0, 8).filter((s) => Number.isInteger(s?.id)).map((s) => ({ id: s.id, alive: !!s.alive, at: num(s.at, 0, 1e6) ? s.at : null, hits: num(s.hits, 0, 1e6) ? s.hits : 0 })),
   };
 }

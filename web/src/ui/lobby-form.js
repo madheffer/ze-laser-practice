@@ -77,14 +77,6 @@ export function roomForm(settings, { mode, ownerName, members = 1, players = [],
   const syncVis = () => { visHint.textContent = vis.value === 'public' ? 'Anyone can find it under Browse rooms.' : 'Only people with the code or invite link can join.'; };
   vis.el.addEventListener('change', syncVis);
   syncVis();
-  const kind = seg('Mode', [
-    { id: 'coop', label: 'Co-op', hint: 'Survive together; the last one alive can still clear it' },
-    { id: 'versus', label: 'Versus', hint: 'Same stage, last one alive wins' },
-  ], s.kind);
-  const kindHint = text('small', 'rf-hint', '');
-  const syncKind = () => { kindHint.textContent = kind.value === 'versus' ? 'The same stage side by side: the last one alive wins (both clear it: fewer hits wins).' : 'Survive together. If your friends go down you can still clear it alone, as the last one alive.'; };
-  kind.el.addEventListener('change', syncKind);
-  syncKind();
   const maxId = `lf-${++uid}`;
   const maxLabel = el('label', 'field inline', { for: maxId });
   const max = el('select', '', { id: maxId });
@@ -92,7 +84,7 @@ export function roomForm(settings, { mode, ownerName, members = 1, players = [],
   max.value = String(s.max);
   maxLabel.append('Max players', max);
   const row = (label, ctl, hint) => { const d = el('div', 'rf-row'); d.append(text('span', 'rf-label', label), ctl, hint); return d; };
-  general.append(nameLabel, row('Visibility', vis.el, visHint), row('Mode', kind.el, kindHint), maxLabel);
+  general.append(nameLabel, row('Visibility', vis.el, visHint), maxLabel);
 
   // ---- bosses + damage
   const bosses = el('fieldset', 'card');
@@ -108,16 +100,14 @@ export function roomForm(settings, { mode, ownerName, members = 1, players = [],
   const heal = el('select', '', { id: healId });
   const syncHeal = () => {
     const keep = heal.value || String(r.heal);
-    // co-op: one holder (the aura heals whoever gathers round them); versus: each run is its own, so everyone or nobody
-    const opts = kind.value === 'versus' ? [['none', 'Nobody'], ['all', 'Everyone (their own)']]
-      : [['none', 'Nobody'], ['random', 'Random player'], ...players.map((p) => [String(p.id), p.name])];
+    // one holder (the aura heals whoever gathers round them), or everyone their own (each run is separate)
+    const opts = [['none', 'Nobody'], ['all', 'Everyone (their own)'], ['random', 'Random player'], ...players.map((p) => [String(p.id), p.name])];
     heal.replaceChildren(...opts.map(([v, t]) => { const o = el('option'); o.value = v; o.textContent = t; return o; }));
     heal.value = opts.some(([v]) => v === keep) ? keep : 'none';
   };
-  kind.el.addEventListener('change', syncHeal);
   syncHeal();
   healLabel.append('Heal item', heal);
-  const healHint = text('small', 'rf-hint', "The map's own heal aura, E to use: one player carries it and the group gathers round (random = picked each round). Versus: everyone their own, or nobody.");
+  const healHint = text('small', 'rf-hint', "The map's own heal aura, E to use: everyone their own, or one player carries it and the group gathers round (random = picked each round).");
   bosses.append(humans.el, bossHp.el, autoFire.el, perfect.el, fall.el);
   if (healOn) bosses.append(healLabel, healHint);
 
@@ -145,14 +135,14 @@ export function roomForm(settings, { mode, ownerName, members = 1, players = [],
   form.append(grid, bar);
 
   const read = () => cleanSettings({
-    name: name.value, public: vis.value === 'public', kind: kind.value, max: Number(max.value),
+    name: name.value, public: vis.value === 'public', max: Number(max.value),
     rules: { humans: humans.value, bossHp: bossHp.value, autoFire: autoFire.value, perfectTeam: perfect.value, fallDamage: fall.value,
       heal: !healOn ? r.heal : ['none', 'all', 'random'].includes(heal.value) ? heal.value : Number(heal.value), god: god.value, hitboxes: hitboxes.value, autoBhop: bhop.value },
   }, members);
   form.addEventListener('submit', (ev) => { ev.preventDefault(); onSubmit(read()); });
   cancel.addEventListener('click', () => onCancel());
   reset.addEventListener('click', () => {
-    const fresh = roomForm({ ...SETTINGS_DEFAULTS, name: name.value, public: vis.value === 'public', kind: kind.value, max: Number(max.value), rules: RULE_DEFAULTS }, { mode, ownerName, members, players, heal: healOn, onSubmit, onCancel });
+    const fresh = roomForm({ ...SETTINGS_DEFAULTS, name: name.value, public: vis.value === 'public', max: Number(max.value), rules: RULE_DEFAULTS }, { mode, ownerName, members, players, heal: healOn, onSubmit, onCancel });
     form.replaceWith(fresh);
     fresh.querySelector('button[type=submit]')?.focus();
   });

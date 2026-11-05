@@ -84,7 +84,7 @@ export class PauseScreen {
     const { net } = this;
     const run = S.run, room = net.room, mp = S.mp;
     const mapTitle = S.map ? displayName(S.mapIndex.find((m) => m.name === S.map.name)?.title || S.map.name) : '';
-    const kind = mp ? (mp.kind === 'versus' ? 'Versus' : 'Co-op') : 'Solo';
+    const kind = mp ? 'Online' : 'Solo';
     this.kicker.textContent = [mapTitle, kind, run?.endless ? 'Endless' : ''].filter(Boolean).join(' · ');
     this.stage.textContent = S.scenario?.name || 'Free roam';
     const cells = [];
