@@ -174,6 +174,8 @@ export function attachCoopRelay(httpServer, { log = () => {}, store = openStore(
         c.name = cleanName(m.name);
         if (room) { c.name = uniqueName(room, c.name, c); announce(room); }
         break;
+      // a round-trip probe (net/coop-client.js measure): echoed at once, for the player's ping meter
+      case 'rtt': if (Number.isInteger(m.n)) send(c, { t: 'rtt', n: m.n }); break;
       case 'list':
         if (now - c.listAt < LIST_MS) return;
         c.listAt = now;

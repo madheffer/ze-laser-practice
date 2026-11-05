@@ -15,6 +15,7 @@ import { bossHudHtml } from '../ui/hud.js';
 import { formatTime, plural } from '../lib/format.js';
 import { getRecord } from './records.js';
 import { cameraPosition } from './camera.js';
+import { perfFrame } from './perf.js';
 
 let acc = 0;
 let last = performance.now();
@@ -121,6 +122,9 @@ export function frame(now) {
   }
   if (rv) G.audio.setListener(rv.pos, rv.yaw, rv.pitch);
   else G.audio.setListener(eye, player.yaw, player.pitch);
+  // the frame rate (the meter) and the slow-PC check: only frames of a run being played count (app/perf.js)
+  const throttled = S.paused && !S.mp && !S.replay; // the paused redraws above: not the game's pace
+  perfFrame(now, { throttled, live: !!S.run && S.run.ready && S.run.go && !S.run.done && !S.run.spectating && !throttled && !S.replay });
   hudClock += realDt;
   if (S.run && hudClock >= 0.05) { hudClock = 0; updateHud(); }
 }

@@ -20,6 +20,8 @@ import { replayClass } from './lib/dom.js';
 import { isMapName } from './lib/paths.js';
 import { settings, bindSettings, FOV } from './app/settings.js';
 import { installGraphics } from './ui/graphics-ui.js';
+import { installPerf } from './app/perf.js';
+import { PerfMeter } from './ui/perf-meter.js';
 import { rule } from './app/rules.js';
 import { startScenario, endRun, finish } from './app/session.js';
 import { frame, step, simulate, resetClock, updateHud } from './app/loop.js';
@@ -298,7 +300,10 @@ G.loadStage = loadStage;
 async function init() {
   bindSettings(applySettings);
   // graphics presets (ui/graphics-ui.js): above the map list and in Video; Medium (Low on a phone) until one is picked
-  installGraphics({ apply: applySettings, mapLoaded: () => !!S.map?.loaded });
+  const gfx = installGraphics({ apply: applySettings, mapLoaded: () => !!S.map?.loaded });
+  // slow frames move a player who never picked a preset to Low, between runs, never mid-laser (app/perf.js)
+  installPerf({ apply: applySettings, presetChanged: gfx.presetChanged });
+  G.perfMeter = new PerfMeter($('#hud'), { rtt: () => net.rtt });
   applySettings();
   G.vm.load().catch((e) => log(`viewmodel: ${e.message || e}`));
   const idx = await loadMapIndex().catch(() => ({ maps: [] }));

@@ -110,3 +110,8 @@ body.touch-playing .hud-ws { display: none; }
 .hud-countdown.tick { animation: hud-countdown-pop 0.35s ease-out; }
 @keyframes hud-countdown-pop { from { transform: translate(-50%, -50%) scale(1.5); opacity: 0.2; } to { transform: translate(-50%, -50%) scale(1); opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .hud-countdown.tick { animation: none; } }
+
+/* ---- the FPS / ping readout (ui/perf-meter.js): top right, above the kill feed ---- */
+.hud-perf { position: absolute; right: max(calc(14 * var(--u)), var(--safe-r, 0px)); top: max(calc(16 * var(--u)), var(--safe-t, 0px));
+  font: 700 calc(15 * var(--u)) 'Stratum2 Mono', monospace; opacity: 0.75; white-space: pre; }
+.hud-perf .bad { color: #f5b041; }

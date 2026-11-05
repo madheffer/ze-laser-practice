@@ -4,6 +4,7 @@
 //   net.on('room', (room, prev) => ...)  // joined / members / settings / owner changed
 //   net.on('list', (rooms) => ...)       // the public rooms
 //   net.on('game', (msg) => ...)         // a round message from the server (untrusted: validate before use)
+//   net.rtt                              // the measured round trip to the server (ms) while in a room, 0 before one
 //   net.on('left', why) / net.on('error', msg) / net.on('status', status)
 //   net.on('chat', ({ id, name, text, team, dead } | { flood })) // room chat; net.chat(text, team) sends
 import { cleanSettings, cleanText } from '../lib/room-rules.js';
@@ -11,6 +12,7 @@ import { cleanChat, cleanChatName } from '../lib/chat-colors.js';
 import { isMapName } from '../lib/paths.js';
 
 export const ROOM_CODE = /^[A-Z]{4}$/;
+const RTT_MS = 2000;
 const GAME = new Set(['start', 's', 'dead', 'bd', 'clock', 'leader', 'end', 'use', 'wait', 'go']);
 
 export class CoopClient {
@@ -21,6 +23,17 @@ export class CoopClient {
     this.status = 'offline'; // offline | connecting | online
     this.handlers = new Map();
     this.pending = null;
+    this.rtt = 0;
+    this.probe = null; // { n, at }: the round-trip probe in flight
+    this.probeN = 0;
+    setInterval(() => this.measure(), RTT_MS);
+  }
+
+  // a round trip to the server every RTT_MS while in a room (server/coop-relay.js echoes 'rtt'): the FPS / ping meter
+  measure() {
+    if (!this.room || this.ws?.readyState !== 1) { this.rtt = 0; this.probe = null; return; }
+    this.probe = { n: ++this.probeN, at: performance.now() };
+    this.ws.send(JSON.stringify({ t: 'rtt', n: this.probe.n }));
   }
 
   on(type, fn) {
@@ -111,6 +124,7 @@ export class CoopClient {
       }
       case 'list': this.emit('list', Array.isArray(m.rooms) ? m.rooms.slice(0, 100).map(cleanListing).filter(Boolean) : []); break;
       case 'kicked': this.room = null; this.emit('left', 'kicked'); break;
+      case 'rtt': if (this.probe && m.n === this.probe.n) { this.rtt = Math.round(performance.now() - this.probe.at); this.probe = null; } break;
       case 'left': break; // our own leave, already handled
       case 'feed': case 'act': case 'stats': this.emit(m.t, m); break; // untrusted: ui/home-feed.js cleans it
       case 'error': this.emit('error', cleanText(m.msg, 120) || 'error'); break;

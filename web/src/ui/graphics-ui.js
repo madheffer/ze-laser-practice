@@ -2,7 +2,7 @@
 // the map list (the first thing you see when picking a map) and at the top of Settings > Video, above the knobs a
 // preset sets. A knob changed by hand shows Custom (no button lit).
 //
-//   installGraphics({ apply, mapLoaded })   apply(): main.js applySettings; mapLoaded(): a map is in (the texture
+//   installGraphics({ apply, mapLoaded }) -> { refresh, presetChanged }   apply(): main.js applySettings; mapLoaded(): a map is in (the texture
 //                                           tier and baked lighting then wait for the next one)
 import './graphics.css';
 import { $ } from '../lib/dom.js';
@@ -91,5 +91,6 @@ export function installGraphics({ apply, mapLoaded = () => false }) {
 
   syncControls();
   refresh();
-  return { refresh };
+  // presetChanged: a preset set from code (app/perf.js), the controls and pickers follow
+  return { refresh, presetChanged: () => { syncControls(); refresh(); } };
 }

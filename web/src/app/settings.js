@@ -23,6 +23,7 @@ export const DEFAULTS = {
   perfectTeam: false, // true = the other humans never stop shooting (the old fast kill)
   ping: 0, // simulated round trip in ms (0-500): the map's entities are drawn this late (see render.js record())
   thirdPerson: false, tpDist: 65,
+  perfMeter: true, // the FPS (and in a room, ping) readout top right (ui/perf-meter.js)
   minimap: true, // CS2's radar top left (ui/radar.js), on maps that ship an overview
   gamma: 2,
   // performance (Video): render resolution (x the screen's pixel ratio, capped at 2), MSAA, and the CS2 lighting
@@ -111,7 +112,7 @@ export function bindSettings(onChange) {
   bind('#god', 'god'); bind('#hitboxes', 'hitboxes'); bind('#humans', 'humans'); bind('#bosshp', 'bossHp');
   bind('#autofire', 'autoFire'); bind('#falldmg', 'fallDamage');
   bind('#fullscreen', 'fullscreen'); bind('#perfectteam', 'perfectTeam');
-  bind('#thirdperson', 'thirdPerson'); bind('#touchcrouch', 'touchCrouch'); bind('#minimap', 'minimap');
+  bind('#thirdperson', 'thirdPerson'); bind('#touchcrouch', 'touchCrouch'); bind('#minimap', 'minimap'); bind('#perfmeter', 'perfMeter');
   bind('#touchsens', 'touchSens', (v) => `${v.toFixed(1)}×`);
   bindPair('#ping', '#ping-num', 'ping', 0, 500, onChange);
   bindPair('#tpdist', '#tpdist-num', 'tpDist', 15, 150, onChange);
