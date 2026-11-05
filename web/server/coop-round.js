@@ -18,7 +18,7 @@ import { PlayerCheck, MAX_PING } from './coop-check.js';
 // max(GRACE_MIN_MS, half the time the slowest ready player took), counted from that moment; one whose reported progress
 // ('load') hasn't moved for STALL_MS within it is dropped at once; and nobody waits past LOAD_CAP_MS from the start.
 // A dropped player is out of the round (dead, 'could not load in time') and watches once their stage is drawn.
-const LOAD_CAP_MS = 90_000;
+const LOAD_CAP_MS = 60_000; // the most anyone waits, however few are ready: the round then goes on without the rest
 const GRACE_MIN_MS = 15_000;
 const STALL_MS = 10_000;
 const WAIT_MS = 500; // the loading roster ('wait': who is ready, everyone's progress) goes out at most this often

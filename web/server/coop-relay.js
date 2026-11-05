@@ -31,6 +31,14 @@ const MAX_FRAME = 8 * 1024; // bytes
 const RATE = 80; // messages per second per connection (20 Hz state + events)
 const PER_ADDRESS = 6; // open sockets per remote address
 const LIST_MS = 1000; // a client may ask for the public list once a second
+// failed joins (a wrong code) a minute, per connection and per address: 4-letter codes can't be guessed in bulk
+// (24^4 = 331,776 codes: over a week at 30 a minute), and friends behind one address (a LAN, a household) don't
+// lock each other out with a typo or two
+const JOIN_FAILS = 8, JOIN_FAILS_ADDR = 30, JOIN_FAIL_MS = 60_000;
+// a kick bans the connection for the room's life, and its address for a while (a reconnect is a new connection; the
+// address alone may be a whole LAN, a dorm or a phone network's shared one, so not for long). The address is the
+// real client's (http-util clientAddress: CLIENT_IP_HEADER behind a proxy), never the proxy's.
+const KICK_ADDR_MS = 10 * 60_000;
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ'; // no I / O (they read as 1 / 0)
 const CODE = /^[A-Z]{4}$/;
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -59,6 +67,11 @@ export function attachCoopRelay(httpServer, { log = () => {}, store = openStore(
   const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_FRAME, perMessageDeflate: false });
   const rooms = new Map(); // code -> room
   const perAddress = new Map();
+  const joinFails = new Map(); // address -> { at, n }: failed joins in the current minute (a connection keeps its own: c.fails)
+  const over = (f, now, max) => !!f && now - f.at < JOIN_FAIL_MS && f.n >= max;
+  const count = (f, now) => (!f || now - f.at >= JOIN_FAIL_MS ? { at: now, n: 1 } : (f.n++, f));
+  const joinBlocked = (c, now) => over(c.fails, now, JOIN_FAILS) || over(joinFails.get(c.addr), now, JOIN_FAILS_ADDR);
+  const joinFailed = (c, now) => { c.fails = count(c.fails, now); joinFails.set(c.addr, count(joinFails.get(c.addr), now)); };
   const findStage = scenarioStore(scenariosDir);
   const loadMap = mapStore(mapsDir);
   let nextId = 1;
@@ -165,7 +178,8 @@ export function attachCoopRelay(httpServer, { log = () => {}, store = openStore(
         if (rooms.size >= MAX_ROOMS) return send(c, { t: 'error', msg: 'The server is full, try again later' });
         const code = newCode(rooms);
         if (!code) return send(c, { t: 'error', msg: 'Could not make a room code' });
-        const r = { code, members: [c], owner: c.id, settings: cleanSettings(m.settings), map: isMapName(m.map) ? m.map : '', round: null, banned: new Set() };
+        // banned: kicked connections (the room's life); bannedAddr: their address -> until when (KICK_ADDR_MS)
+        const r = { code, members: [c], owner: c.id, settings: cleanSettings(m.settings), map: isMapName(m.map) ? m.map : '', round: null, banned: new Set(), bannedAddr: new Map() };
         rooms.set(code, r);
         c.room = r;
         announce(r);
@@ -173,11 +187,12 @@ export function attachCoopRelay(httpServer, { log = () => {}, store = openStore(
         break;
       }
       case 'join': {
+        if (joinBlocked(c, now)) return send(c, { t: 'error', msg: 'Too many tries, wait a minute' });
         const code = String(m.code ?? '').toUpperCase();
         const r = CODE.test(code) ? rooms.get(code) : null;
-        if (!r) return send(c, { t: 'error', msg: `No room ${CODE.test(code) ? code : ''}`.trim() });
+        if (!r) { joinFailed(c, now); return send(c, { t: 'error', msg: `No room ${CODE.test(code) ? code : ''}`.trim() }); }
         if (r === room) return announce(r);
-        if (r.banned.has(c.id)) return send(c, { t: 'error', msg: 'You were removed from that room' });
+        if (r.banned.has(c.id) || (r.bannedAddr.get(c.addr) || 0) > now) return send(c, { t: 'error', msg: 'You were removed from that room' });
         if (r.members.length >= r.settings.max) return send(c, { t: 'error', msg: `Room ${code} is full` });
         leave(c);
         c.name = uniqueName(r, c.name, c);
@@ -205,7 +220,7 @@ export function attachCoopRelay(httpServer, { log = () => {}, store = openStore(
       case 'kick': {
         if (!owner || m.id === c.id) return;
         const target = room.members.find((x) => x.id === m.id);
-        if (target) { room.banned.add(target.id); leave(target, 'kicked'); }
+        if (target) { room.banned.add(target.id); if (target.addr) room.bannedAddr.set(target.addr, now + KICK_ADDR_MS); leave(target, 'kicked'); }
         break;
       }
       case 'start': if (round && !round.ended && !owner) return; startRound(c, m); break;
@@ -249,6 +264,8 @@ export function attachCoopRelay(httpServer, { log = () => {}, store = openStore(
     feed.tick(now);
   }, 100);
   const ping = setInterval(() => {
+    const now = Date.now();
+    for (const [addr, f] of joinFails) if (now - f.at >= JOIN_FAIL_MS) joinFails.delete(addr); // old failed joins
     for (const ws of wss.clients) {
       if (ws.isAlive === false) { ws.terminate(); continue; }
       ws.isAlive = false;
