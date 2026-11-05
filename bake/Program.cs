@@ -98,6 +98,13 @@ public static class Program
             // lasers-bake --lighting <workshop.vpk> <web/public/maps/<name>>: the map's baked CS2 lighting (LightingBake.cs)
             return LightingBake.Run(Path.GetFullPath(args[1]), Path.GetFullPath(args[2]));
         }
+        if (args.Length >= 3 && args[0] == "--models")
+        {
+            // lasers-bake --models <workshop.vpk> <web/public/maps/<name>> [--cs2 <game/csgo>]: re-export the animated
+            // entity models with their sequences + animations.json (ModelBake.cs)
+            var mi = Array.IndexOf(args, "--cs2");
+            return ModelBake.Run(Path.GetFullPath(args[1]), Path.GetFullPath(args[2]), mi > 0 && mi + 1 < args.Length ? args[mi + 1] : FindCs2());
+        }
         if (args.Length >= 2 && args[0] == "--player")
         {
             // lasers-bake --player <web/public/player> [--cs2 <game/csgo>]: your own third-person body (CT agent + knife).
@@ -282,6 +289,9 @@ sealed class Baker(string input, string outRoot, string? cs2, bool textures)
             break; // CS2 maps compile to a single node
         }
         var renderModels = new JsonArray();
+        // models with real sequences get their skeleton + animations, and a line in animations.json (ModelBake.cs)
+        var animExporter = ModelBake.Exporter(loader, textures);
+        var animations = new JsonObject();
         foreach (var m in models)
         {
             var res = loader.LoadFileCompiled(m);
@@ -290,7 +300,9 @@ sealed class Baker(string input, string outRoot, string? cs2, bool textures)
             try
             {
                 var target = SafePath.OutFile(outDir, "models/" + Path.ChangeExtension(m, ".glb"));
-                exporter.Export(res, target);
+                var seqs = ModelBake.Sequences(loader, model, out var animated);
+                if (animated) ModelBake.Export(animExporter, res, target, seqs!); else exporter.Export(res, target);
+                if (seqs != null) animations[m] = seqs;
                 renderModels.Add(m);
             }
             catch (Exception e)
@@ -339,6 +351,8 @@ sealed class Baker(string input, string outRoot, string? cs2, bool textures)
             ["missingMaterials"] = new JsonArray([.. missing.Select(x => (JsonNode)x!)]),
         };
         if (soundEvents > 0) manifest["soundEvents"] = "soundevents.json";
+        File.WriteAllText(Path.Combine(outDir, ModelBake.IndexFile), animations.ToJsonString(Json));
+        manifest["animations"] = ModelBake.IndexFile;
         File.WriteAllText(Path.Combine(outDir, "manifest.json"), manifest.ToJsonString(JsonPretty));
         Log("done");
     }

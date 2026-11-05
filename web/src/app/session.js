@@ -62,7 +62,7 @@ export function startScenario(i, mode = 'normal') {
   // During a silent fast-forward, remember what is still sounding, so it can join at the right point after.
   const sounding = new Map(); // ent.id -> { ev, at }
   createRunEngine({
-    entities: map.entities, hulls: map.hulls, bounds: map.bounds,
+    entities: map.entities, hulls: map.hulls, bounds: map.bounds, animations: map.animations,
     traceBox: (s, e, h) => S.world.traceBox(s, e, h, undefined, true),
     scenario, mode, seed: S.mp?.rules.seed || settings.seed || (Date.now() & 0xffff),
     humans: rule('humans'), bossHp: rule('bossHp'), items: heldItems(), run,

@@ -2,7 +2,7 @@
 // the browser (app/session.js) and on the co-op server's checker (server/coop-check.js), so the server's copy of
 // a round can't drift from what players see. Pure: no DOM, no rendering, no audio, no player physics.
 //
-//   const run = createRunEngine({ entities, hulls, bounds, traceBox, scenario, mode, seed, humans, bossHp, items, hooks })
+//   const run = createRunEngine({ entities, hulls, bounds, animations, traceBox, scenario, mode, seed, humans, bossHp, items, hooks })
 //   hooks.attach(engine)    before the world spawns (renderer / sound / player hooks)
 //   hooks.silent(on)        a fast-forward replay starts / ends (the client mutes its sounds)
 //   hooks.win() / lose()    the scenario's win / lose input arrived (a disabled relay doesn't count)
@@ -20,9 +20,9 @@ export const TICK = 1 / 64;
 const DAMAGE_PER_HIT = 30;
 const PERFECT_HITS_PER_HUMAN = 5;
 
-export function createRunEngine({ entities, hulls, bounds, traceBox, scenario, mode = 'normal', seed, humans = 20, bossHp = 100, items = [], hooks = {}, run: into = {} }) {
+export function createRunEngine({ entities, hulls, bounds, animations, traceBox, scenario, mode = 'normal', seed, humans = 20, bossHp = 100, items = [], hooks = {}, run: into = {} }) {
   const endless = mode === 'endless' && !!scenario?.endless;
-  const engine = new EntityEngine(entities, { hulls, bounds }, { seed });
+  const engine = new EntityEngine(entities, { hulls, bounds, animations }, { seed });
   // physboxes (world/entities/classes/physics.js) slide along the static world only
   if (traceBox) engine.traceBox = traceBox;
   engine.humans = humans;

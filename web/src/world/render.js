@@ -7,6 +7,7 @@ import { GLTF_TO_SOURCE } from './assets.js';
 import { DEG, parseVec, angleForward } from './entities/index.js';
 import { assetKey } from '../lib/paths.js';
 import { setFxCamera, fxShared } from '../fx/effects.js';
+import { PropAnimator, cloneModel } from './anim.js';
 
 // an entity's world transform as a particle control point: position and its forward / left / up axes
 function cpFrom(ent) {
@@ -45,6 +46,7 @@ export class Renderer {
     this.entRoot = new THREE.Group();
     this.scene.add(this.entRoot);
     this.visuals = new Map(); // entity -> Object3D
+    this.anims = new PropAnimator(); // prop_dynamic sequences (world/anim.js)
     // real particle effects (fx/effects.js) draw in world space
     this.fxRoot = new THREE.Group();
     this.scene.add(this.fxRoot);
@@ -179,7 +181,8 @@ export class Renderer {
           any = true;
           p.then((scene) => {
             if (!scene || !e.alive) return;
-            const inst = scene.clone(true);
+            const inst = cloneModel(scene);
+            this.anims.attach(e, inst);
             const holder = new THREE.Group();
             holder.matrixAutoUpdate = false;
             holder.matrix.copy(GLTF_TO_SOURCE);
@@ -288,7 +291,7 @@ export class Renderer {
     if (!v) return;
     // with simulated ping the entity stays on screen until its death reaches you
     if (this.delay > 0) { v.userData.died = e.engine.time; return; }
-    this.entRoot.remove(v); this.visuals.delete(e);
+    this.entRoot.remove(v); this.visuals.delete(e); this.anims.detach(e);
     v.userData.fx?.dispose();
   }
 
@@ -356,6 +359,7 @@ export class Renderer {
 
   updateEntities(time = 0) {
     this.updateEffects(time - (this.delay || 0));
+    this.anims.update(time - (this.delay || 0));
     if (this._sprite) {
       this._sprite.uniforms.uTime.value = performance.now() / 1000;
       // point size in pixels per world unit at distance 1
@@ -366,7 +370,7 @@ export class Renderer {
     for (const [e, g] of this.visuals) {
       if (delayed) {
         const born = g.userData.born ?? -Infinity, died = g.userData.died;
-        if (died != null && target >= died) { this.entRoot.remove(g); this.visuals.delete(e); continue; }
+        if (died != null && target >= died) { this.entRoot.remove(g); this.visuals.delete(e); this.anims.detach(e); continue; }
         const s = target < born ? null : this.snapshot(g, target);
         g.visible = !!s && s.vis;
         if (!s) continue;

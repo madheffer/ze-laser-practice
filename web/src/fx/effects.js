@@ -5,6 +5,8 @@
 //   const inst = await fx.spawn('particles/x.vpcf')   // an EffectInstance, or null when the effect isn't baked
 //   inst.update(dt, { cps, active })                  // each frame: control points, on / off (stops emitting when off)
 //   inst.group                                        // three.js objects in world space (Source units, z up)
+//   fx.lights                                         // this frame's particle lights, every live visible instance's
+//                                                     // C_OP_RenderStandardLight (contract: particles/render/lights.js)
 //
 // An info_particle_system's control points: 0 = the entity itself, 1..63 = the entities its cpoint1..cpoint63 name
 // (render.js feeds them every frame): beams between two points, ropes and the like come from these.
@@ -13,6 +15,7 @@ import { ParticleSystem, expandDefaults } from './particles/system.js';
 import defaults from './particles/defaults.js';
 import { SpriteRenderer } from './particles/render/sprites.js';
 import { RopeRenderer } from './particles/render/ropes.js';
+import { LightRenderer } from './particles/render/lights.js';
 import { createBarnUniforms } from './particles/render/spritecard.js';
 import { safeRelPath } from '../lib/paths.js';
 
@@ -52,6 +55,8 @@ export class MapEffects {
     this.loader = new THREE.TextureLoader();
     this.reports = new Set();
     this.trace = null; // (from, dir, length, query) -> hit | null: fx/trace.js on the map collision
+    this.instances = new Set(); // live EffectInstances, for .lights
+    this._lights = [];
   }
 
   has(effect) { return Object.hasOwn(this.index.systems, norm(effect)); }
@@ -127,6 +132,14 @@ export class MapEffects {
 
   report(m) { if (!this.reports.has(m)) { this.reports.add(m); this.onReport?.(m); } }
 
+  // The particle lights of the last update of every instance whose group is shown; one array, refilled on each read.
+  get lights() {
+    const out = this._lights;
+    out.length = 0;
+    for (const inst of this.instances) if (inst.group.visible !== false) for (const l of inst.lights) out.push(l);
+    return out;
+  }
+
   async spawn(effect, opts = {}) {
     const doc = await this.doc(effect);
     return doc ? new EffectInstance(this, doc, opts) : null;
@@ -146,6 +159,8 @@ export class EffectInstance {
     this.assets = effects.assets();
     this.active = true;
     this.raw = new Map(doc.systems.map((s) => [s.path, s.data?.m_Renderers || []]));
+    this.lights = []; // this frame's C_OP_RenderStandardLight lights (lights.js contract)
+    effects.instances?.add(this);
   }
 
   // cps: [{ position, forward, left, up }] by control point index (any may be missing)
@@ -159,6 +174,7 @@ export class EffectInstance {
     this.sys.step(dt);
     for (const m of this.sys.reports.splice(0)) this.effects.report(m);
     const cols = this.sys.collections || [];
+    this.lights.length = 0;
     // children draw first, then the root
     for (let ci = cols.length - 1, order = 0; ci >= 0; ci--) {
       const col = cols[ci];
@@ -172,9 +188,16 @@ export class EffectInstance {
         if (!rend) {
           if (r.cls === 'C_OP_RenderSprites') rend = new SpriteRenderer(fxShared, this.assets);
           else if (r.cls === 'C_OP_RenderRopes' || r.cls === 'C_OP_RenderTrails') rend = new RopeRenderer(fxShared, this.assets);
+          else if (r.cls === 'C_OP_RenderStandardLight') rend = new LightRenderer();
           else { this.effects.report(`${r.cls} is not drawn`); rend = { update: () => ({ unsupported: [] }), dispose() {}, mesh: null }; }
           this.renderers.set(key, rend);
           if (rend.mesh) this.group.add(rend.mesh);
+        }
+        if (rend instanceof LightRenderer) {
+          const ctl = rend.update(col, r.p, raw);
+          for (const l of rend.lights) this.lights.push(l);
+          for (const u of ctl.unsupported) this.effects.report(`${r.cls}: ${u}`);
+          return;
         }
         if (!rend.mesh) return;
         rend.mesh.renderOrder = order++;
@@ -187,5 +210,10 @@ export class EffectInstance {
   // nothing left to draw and no longer emitting
   get finished() { return !this.active && (this.sys.collections || []).every((c) => !c.count); }
 
-  dispose() { for (const r of this.renderers.values()) r.dispose?.(); this.group.removeFromParent(); }
+  dispose() {
+    for (const r of this.renderers.values()) r.dispose?.();
+    this.group.removeFromParent();
+    this.lights.length = 0;
+    this.effects.instances?.delete(this);
+  }
 }

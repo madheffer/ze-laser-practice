@@ -29,6 +29,59 @@ export function angleForward(a) {
   return [Math.cos(p) * Math.cos(y), Math.cos(p) * Math.sin(y), -Math.sin(p)];
 }
 
+// ---- CS2 mathlib angle rules (server.dll 2026-09-23 build, read in Ghidra; Source's mathlib_base.cpp has the same
+// shapes). Angles are degrees, QAngle order [pitch, yaw, roll].
+
+// AngleDistance (FUN_181469180): next - cur, wrapped once into (-180, 180]
+export function angleDistance(next, cur) {
+  const d = next - cur;
+  if (d <= -180) return d + 360;
+  return d > 180 ? d - 360 : d;
+}
+
+// anglemod as ApproachAngle does it (FUN_181469650): into [0, 360)
+function angleMod(a) {
+  if (a < -180 || a > 180) a = Math.min(180, Math.max(-180, a - Math.floor(a / 360 + 0.5) * 360));
+  return a < 0 ? a + 360 : a;
+}
+
+// ApproachAngle (FUN_181469650): turn value toward target by at most |speed|, the short way round
+export function approachAngle(target, value, speed) {
+  target = angleMod(target); value = angleMod(value); speed = Math.abs(speed);
+  let d = target - value;
+  if (d < -180) d += 360; else if (d > 180) d -= 360;
+  if (d > speed) return value + speed;
+  return d < -speed ? value - speed : target;
+}
+
+// VectorAngles (FUN_18146fb60): a direction -> [pitch, yaw, 0], each in [0, 360); straight up / down is pitch 270 / 90
+export function vectorAngles(v) {
+  if (v[0] === 0 && v[1] === 0) return [v[2] > 0 ? 270 : 90, 0, 0];
+  let yaw = Math.atan2(v[1], v[0]) / DEG;
+  if (yaw < 0) yaw += 360;
+  let pitch = Math.atan2(-v[2], Math.hypot(v[0], v[1])) / DEG;
+  if (pitch < 0) pitch += 360;
+  return [pitch, yaw, 0];
+}
+
+// FixupAngles (FUN_180e73960, Source movement.cpp): each component into [0, 360], in place
+export function fixupAngles(a) {
+  for (let i = 0; i < 3; i++) {
+    let x = Number.isFinite(a[i]) ? a[i] : 0;
+    if (Math.abs(x) > 1e6) x %= 360;
+    while (x < 0) x += 360;
+    while (x > 360) x -= 360;
+    a[i] = x;
+  }
+  return a;
+}
+
+// A rotation (quaternion) -> QAngle [pitch, yaw, roll]: the inverse of angleQuat
+export function quatAngles(q) {
+  const e = new THREE.Euler().setFromQuaternion(q, 'ZYX');
+  return [e.y / DEG, e.z / DEG, e.x / DEG];
+}
+
 // Seeded PRNG for logic_case picks and random timers, so a seed replays a run exactly.
 export function mulberry32(a) {
   return function () {

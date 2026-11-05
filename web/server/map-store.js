@@ -22,16 +22,18 @@ export function mapStore(dir) {
     }
     const folder = path.join(dir, map); // [a-z0-9_-] only: never leaves dir
     const p = (async () => {
-      const [entities, hullsRaw, col, entwatch] = await Promise.all([
+      const [entities, hullsRaw, col, entwatch, animations] = await Promise.all([
         readFile(path.join(folder, 'entities.json'), 'utf8').then(JSON.parse),
         readFile(path.join(folder, 'hulls.json'), 'utf8').then(JSON.parse).catch(() => ({})),
         readFile(path.join(folder, 'collision.bin')),
         readFile(path.join(folder, 'entwatch.json'), 'utf8').then(JSON.parse).catch(() => null), // optional
+        // prop_dynamic sequence lengths, for OnAnimationDone (lasers-bake --models; optional)
+        readFile(path.join(folder, 'animations.json'), 'utf8').then(JSON.parse).catch(() => null),
       ]);
       const { hulls, bounds } = normaliseHulls(hullsRaw);
       const tris = new Float32Array(col.buffer.slice(col.byteOffset, col.byteOffset + col.byteLength));
       // the map's EntWatch items, as the browser reads them (world/items.js): a round's heal holders get its heals
-      return { map, entities, hulls, bounds, bvh: new TriangleBVH(tris), heals: usableHeals(mapItems(entities, entwatch)) };
+      return { map, entities, hulls, bounds, animations, bvh: new TriangleBVH(tris), heals: usableHeals(mapItems(entities, entwatch)) };
     })();
     p.catch(() => cache.delete(map));
     cache.set(map, p);

@@ -9,6 +9,27 @@ import {
 const halton = (i, b) => { let f = 1, r = 0; while (i > 0) { f /= b; r += f * (i % b); i = Math.floor(i / b); } return r; };
 const T = (c, k) => c.table[k & 0xfff];
 
+// Initializers whose output mask (vtable slot 30, a constant store in particles.dll 63babcbf) has bit 2, previous
+// position: once one has run, a later initializer sees that attribute as already initialised.
+const PREV_WRITERS = new Set([
+  'ChaoticAttractor', 'CreateAlongPath', 'CreateFromCPs', 'CreateFromParentParticles', 'CreateFromPlaneCache',
+  'CreateInEpitrochoid', 'CreateOnGrid', 'CreateOnModel', 'CreateOnModelAtHeight', 'CreatePhyllotaxis',
+  'CreateSequentialPath', 'CreateSequentialPathV2', 'CreateSpiralSphere', 'CreateWithinBox', 'CreateWithinCone',
+  'GlobalScale', 'InheritVelocity', 'InitFromCPSnapshot', 'InitFromVectorFieldSnapshot', 'InitialRepulsionVelocity',
+  'InitialVelocityFromHitbox', 'InitialVelocityNoise', 'InitSkinnedPositionFromCPSnapshot', 'InitVec',
+  'MoveBetweenPoints', 'PointList', 'PositionOffset', 'PositionOffsetToCP', 'PositionPlaceOnGround', 'PositionWarp',
+  'PositionWarpScalar', 'RingWave', 'ScaleVelocity', 'VelocityFromCP', 'VelocityFromNormal', 'VelocityRadialRandom',
+  'VelocityRandom',
+].map((n) => `C_INIT_${n}`));
+// Whether an enabled initializer listed before fn in its system is in the set.
+const initializedBefore = (c, fn, set) => {
+  for (const f of c.def.m_Initializers || []) {
+    if (f === fn) return false;
+    if (!f.m_bDisableOperator && set.has(f._class)) return true;
+  }
+  return false;
+};
+
 export const initializers = {
   // VRF cross-check, UNSETTLED: the notes give only the constructor defaults (0x1801b7750,
   // output field 3 = radius, RE §10). Angles are written in radians unless the method scales,
@@ -47,25 +68,44 @@ export const initializers = {
     },
   },
 
-  // RE §11 C_INIT_CreateWithinBox (0x180136ec0).
+  // C_INIT_CreateWithinBox, particles.dll 63babcbf: dispatcher slot 36 0x180136930, per-particle init slot 34
+  // 0x180136ec0, output mask slot 30 0x180123aa0 (= 5: position, previous position).
+  // m_bUseNewCode (this+0xfa8, tested at 0x18013695a) only adds a debug dump: it builds three evaluators of m_vecMin
+  // (0x1800c9340, 0x1800cb5f0, 0x1800cd120) into locals, logs "nFirstParticle=%?" and "vMins=%?" (the first one's
+  // result, 0x1801bc790) to LOG_GENERAL, frees them and falls through at 0x180136d51 to the same slot 34 calls as
+  // the old path; none of the three touches the random counter (+0x910). So both paths place particles identically.
+  // Per particle (slot 34): min / max from the vector inputs; r_k = T[(c910 + 2*c914 + k) & 0xfff], c910 += 3, or with
+  // m_bDistributeEvenly (this+0xfa0) Halton bases 2 / 3 / 5 (x / y / z: DAT_1805341b8 0.5, DAT_1805341b0 1/3,
+  // DAT_1805341a0 0.2) at (seed + index) & 0x7fffffff, seed = m_nSeed (+0xfa4) + c914 when negative. The index
+  // (param_7) is coll+0x88 + the particle's offset in this call (0x180136d60, 0x180136930 tail): coll+0x88 is the
+  // number of particles added before this frame (zeroed 0x180037a32, += coll+0x8c at frame end 0x180048658;
+  // coll+0x8c zeroed at frame start 0x180047711, += each AddParticles count 0x180102aa5), so two batches in one
+  // frame reuse the same indices. Position = CP position at creation time (lerp prev -> cur by
+  // max(0, (dt - (t - tc)) / dt), current position when dt == 0) + the box point, world-axis aligned; with
+  // m_bLocalSpace the box point goes through the CP transform at creation time (0x1800c1e70, 0x18036ac60).
+  // Previous position gets the same value when bit 2 of the pending-attribute mask is set (param_5 & 4): the
+  // InitializeNewParticles loop (0x18001a8b0) passes the system's attributes and clears each initializer's slot-30
+  // mask after it runs, so the box writes it unless an earlier initializer wrote it.
+  // UNSETTLED: the frame base counts particles we actually emitted (the game counts AddParticles requests, before
+  // the capacity clamp); local space uses the CP's current orientation (0x1800c1e70's orientation lerp is not
+  // read); earlier initializers whose slot-30 mask is computed from their fields are taken as not writing prev.
   C_INIT_CreateWithinBox: {
     evidence: 'RE',
-    init(fn, c, s, e) {
+    init(fn, c, s, e, _strength, st) {
       const cp = getCp(c, clamp(fn.m_nControlPointNumber | 0, 0, 63));
       const rp = fn.m_randomnessParameters || {};
+      if (st.writePrev === undefined) st.writePrev = !initializedBefore(c, fn, PREV_WRITERS);
+      if (st.frameTime !== c.time) { st.frameTime = c.time; st.frameBase = c.nextId - (e - s); }
       for (let i = s; i < e; i++) {
         const mn = evalVec(fn.m_vecMin, c, i, 'init'), mx = evalVec(fn.m_vecMax, c, i, 'init');
         let r;
         if (!rp.m_bDistributeEvenly) {
-          // r_i = T[(c910 + 2*c914 + i) & 0xfff] (c914 is added twice in the code), c910 += 3.
           const b = c.rnd.counter + 2 * c.rnd.offset;
           r = [T(c, b), T(c, b + 1), T(c, b + 2)];
           c.rnd.counter += 3;
         } else {
-          // Halton bases 2, 3, 5 at (seed < 0 ? seed + c914 : seed) + particle index, masked
-          // 0x7fffffff. UNSETTLED: whether "particle index" is the stream index or the particle ID.
           const seed = rp.m_nSeed < 0 ? rp.m_nSeed + c.rnd.offset : rp.m_nSeed;
-          const n = (seed + c.attr[A.ID][i]) & 0x7fffffff;
+          const n = (seed + st.frameBase + (i - s)) & 0x7fffffff;
           r = [halton(n, 2), halton(n, 3), halton(n, 5)];
         }
         const local = add(mn, [(mx[0] - mn[0]) * r[0], (mx[1] - mn[1]) * r[1], (mx[2] - mn[2]) * r[2]]);
@@ -73,9 +113,7 @@ export const initializers = {
         // Without m_bLocalSpace the box is world-axis aligned; with it, x forward, y left, z up.
         const p = fn.m_bLocalSpace ? add(at, toWorld(cp, local)) : add(at, local);
         setV(c, A.POSITION, i, p);
-        // Position Previous is written when the init flags request it (flag 4). UNSETTLED: when
-        // they do; written here, so the box gives no velocity.
-        setV(c, A.PREV, i, p);
+        if (st.writePrev) setV(c, A.PREV, i, p);
       }
     },
   },

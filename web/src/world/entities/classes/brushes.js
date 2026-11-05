@@ -10,7 +10,7 @@ import { physboxThink } from './physics.js';
 // CBreakable). ze_mist_p depends on it: pbox_dragon spawns at 1,000,000, each segment is SetHealth(10000) +
 // AddHealth(900 per human), and the map ends the segment when the fraction drops under 0.01 — i.e. after
 // the 900 x humans on top of the 10000 (GFL's BossHUD config reads it with "offset": -10000).
-const breakable = register('func_breakable', {
+export const breakable = register('func_breakable', {
   solid: (e) => e.cls !== 'prop_dynamic_override',
   spawn(e) {
     const h = num(e.kv.health, 0);
@@ -50,7 +50,7 @@ const physbox = {
 register('func_physbox', physbox);
 register('func_physbox_multiplayer', physbox);
 register('prop_physics_override', breakable);
-register('prop_dynamic_override', { input: breakable.input, spawn: breakable.spawn });
+// prop_dynamic_override: breakable + sequence playback, classes/props.js
 
 const brush = register('func_brush', {
   solid: (e) => e.enabled && num(e.kv.solidity) !== 1,

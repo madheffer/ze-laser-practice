@@ -391,7 +391,7 @@ web/src/
                      touch (joystick, look, jump / crouch / fire buttons) + their css
   world/             collision (box traces, BVH, ray-vs-hull), movement (CS2), render (three.js, ping history),
                      assets, body (third-person CT), entities/ (engine, entity, keyvalues, math, registry,
-                     classes/{logic,spawners,movers,brushes,triggers,fx})
+                     classes/{logic,spawners,movers,trains,paths,brushes,triggers,fx})
   audio/             audio.js (map + stock CS2 sound, pause fade), spatial.js (CS2 distance curves, pan)
   weapons/           viewmodel.js (fire gate, magazine, Q/lastinv) + fp/ (vpkstuff's previewer engine, kept verbatim)
 bake/                Program.cs (map bake), PanoramaBake.cs, SoundBake (stock + map), SafePath.cs (every output

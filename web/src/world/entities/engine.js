@@ -15,6 +15,7 @@ import './classes/logic.js';
 import './classes/spawners.js';
 import './classes/movers.js';
 import './classes/brushes.js';
+import './classes/props.js';
 import './classes/fx.js';
 import './classes/physics.js';
 import './classes/server.js';
@@ -44,7 +45,7 @@ function addTo(index, key, e) {
 
 export class EntityEngine {
   constructor(entitiesJson, assets, { seed = 1 } = {}) {
-    this.assets = assets; // { hulls: {model: [...]}, bounds: {model:{min,max}} }
+    this.assets = assets; // { hulls: {model: [...]}, bounds: {model:{min,max}}, animations?: animations.json (classes/props.js) }
     this.lumps = validLumps(entitiesJson?.lumps);
     this.live = 0; // entities alive (bounded by MAX_ENTITIES)
     this.time = 0;

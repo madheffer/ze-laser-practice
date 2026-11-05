@@ -1,10 +1,10 @@
-// Things that move: doors / movelinears (often carrying laser trigger_hurts), rotators, momentary_rot_button,
-// and trains riding chains of path_tracks.
+// Things that move: doors / movelinears (often carrying laser trigger_hurts), rotators, momentary_rot_button.
+// Trains riding chains of path_tracks are in trains.js / paths.js.
 import * as THREE from 'three';
 import { register } from '../registry.js';
-import { stripName } from '../entity.js';
-import { DEG, num, parseVec, angleQuat, angleForward, poseMatrix, rotationOf } from '../math.js';
+import { DEG, num, parseVec, angleForward } from '../math.js';
 import { approach, clamp01 } from '../../../lib/math.js';
+import './trains.js'; // registers path_track, func_tracktrain, func_tanktrain, func_train
 
 // Linear movers share this: position 0 = pos1, 1 = pos2, in the parent's space.
 function linearMover(e, dir, dist, startPos = 0) {
@@ -229,109 +229,3 @@ const rotButton = register('momentary_rot_button', {
   },
 });
 
-const pathTrack = register('path_track', {
-  next(node, dir) {
-    if (!node) return null;
-    if (dir > 0) {
-      if (node.state.disabled) return null;
-      return node.kv.target ? node.engine.findOne(node.kv.target) : null;
-    }
-    // previous: whoever targets this node
-    for (const e of node.engine.byClass.get('path_track') || []) if (e.kv.target && stripName(e.kv.target) === node.key) return e;
-    return null;
-  },
-  input(e, inp, p) {
-    if (inp === 'enablepath') { e.state.disabled = false; return true; }
-    if (inp === 'disablepath') { e.state.disabled = true; return true; }
-    if (inp === 'togglepath') { e.state.disabled = !e.state.disabled; return true; }
-    if (inp === 'enablealternatepath' || inp === 'disablealternatepath' || inp === 'togglealternatepath') return true;
-  },
-});
-
-// A train riding a chain of path_tracks at its speed. Origin sits on the path (plus "height").
-const trackTrain = register('func_tracktrain', {
-  // spawnflags: 8 passable, 16 fixed orientation. Keys: startspeed = max speed, speed = initial speed.
-  solid: (e) => !(num(e.kv.spawnflags) & 8),
-  spawn(e) {
-    const s = e.state;
-    s.max = num(e.kv.startspeed, 100) || 100;
-    s.speed = num(e.kv.speed, 0);
-    s.dir = 1;
-    s.height = num(e.kv.height, 0);
-    s.fixed = !!(num(e.kv.spawnflags) & 16) || (e.kv.orientationtype != null && num(e.kv.orientationtype) === 0);
-    // start on its first path_track
-    e.engine.fire(e, '__trainstart', '', 0, null, e);
-  },
-  input(e, inp, p, act) {
-    const s = e.state;
-    switch (inp) {
-      case '__trainstart': {
-        const first = e.engine.findOne(e.kv.target);
-        if (first) {
-          s.node = first;
-          const o = first.worldOrigin();
-          trackTrain.place(e, [o[0], o[1], o[2] + s.height]);
-          s.next = pathTrack.next(first, 1);
-        }
-        return true;
-      }
-      case 'startforward': s.dir = 1; s.speed = Math.abs(s.speed) || s.max; s.next = s.node ? pathTrack.next(s.node, 1) : null; return true;
-      case 'startbackward': s.dir = -1; s.speed = Math.abs(s.speed) || s.max; s.next = s.node ? pathTrack.next(s.node, -1) : null; return true;
-      case 'stop': s.speed = 0; return true;
-      case 'resume': s.speed = s.speed || s.max; return true;
-      case 'toggle': s.speed = s.speed ? 0 : s.max; return true;
-      case 'setspeed': s.speed = s.max * clamp01(num(p)); return true;
-      case 'setspeedreal': case 'setmaxspeed': s.speed = num(p); if (inp === 'setmaxspeed') s.max = num(p); return true;
-      case 'setspeeddir': s.dir = num(p) < 0 ? -1 : 1; s.speed = Math.abs(num(p)) * s.max; s.next = s.node ? pathTrack.next(s.node, s.dir) : null; return true;
-      case 'teleporttopathtrack': {
-        const t = e.engine.findOne(p);
-        if (t) { s.node = t; const o = t.worldOrigin(); trackTrain.place(e, [o[0], o[1], o[2] + s.height]); s.next = pathTrack.next(t, s.dir); }
-        return true;
-      }
-    }
-    void act;
-  },
-  place(e, at, faceTo) {
-    let q = rotationOf(e.getWorld());
-    if (faceTo && !e.state.fixed) {
-      const d = new THREE.Vector3(faceTo[0] - at[0], faceTo[1] - at[1], faceTo[2] - at[2]);
-      if (d.lengthSq() > 1) {
-        const yaw = Math.atan2(d.y, d.x) / DEG;
-        const pitch = -Math.atan2(d.z, Math.hypot(d.x, d.y)) / DEG;
-        q = angleQuat([pitch, yaw, 0]);
-      }
-    }
-    e.setWorldTransform(poseMatrix(at, q));
-  },
-  think(e, dt) {
-    const s = e.state;
-    if (!s.speed || !s.next) return;
-    let travel = Math.abs(s.speed) * dt;
-    let pos = e.worldOrigin();
-    pos[2] -= s.height;
-    let guard = 0;
-    while (travel > 0 && s.next && guard++ < 16) {
-      const t = s.next.worldOrigin();
-      const d = [t[0] - pos[0], t[1] - pos[1], t[2] - pos[2]];
-      const len = Math.hypot(d[0], d[1], d[2]);
-      if (len <= travel) {
-        pos = t;
-        travel -= len;
-        s.node = s.next;
-        s.node.fireOutput('OnPass', e);
-        // a path_track can change the train's speed as it passes
-        const ns = num(s.node.kv.speed, 0);
-        if (ns > 0) s.speed = ns;
-        s.next = pathTrack.next(s.node, s.dir);
-        if (!s.next) { s.speed = 0; s.node.fireOutput('OnTeleport', e); }
-      } else {
-        pos = [pos[0] + (d[0] / len) * travel, pos[1] + (d[1] / len) * travel, pos[2] + (d[2] / len) * travel];
-        travel = 0;
-      }
-    }
-    const look = s.next ? s.next.worldOrigin() : null;
-    trackTrain.place(e, [pos[0], pos[1], pos[2] + s.height], look && [look[0], look[1], look[2] + s.height]);
-  },
-});
-register('func_train', trackTrain);
-register('func_tanktrain', trackTrain); // the same path_track rider (CS2 CFuncTankTrain); ze_dreamin's line lasers ride one

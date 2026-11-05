@@ -59,7 +59,7 @@ export async function loadMap(name, onProgress = () => {}, opts = {}) {
   const tier = opts.tier === 'medium' || opts.tier === 'low' ? opts.tier : '';
   const loader = glbLoader(version, base, tier ? `${base}q/${tier}/tex/` : '');
   onProgress('entities');
-  const [entities, hullsRaw, colBuf, particles, entwatch, overview] = await Promise.all([
+  const [entities, hullsRaw, colBuf, particles, entwatch, overview, animations] = await Promise.all([
     fetchJson(url('entities.json')),
     fetchJson(url(manifestPath(manifest.hulls, 'hulls.json'))).catch(() => ({})),
     fetchBuffer(url(manifestPath(manifest.collision?.file, 'collision.bin'))),
@@ -67,6 +67,8 @@ export async function loadMap(name, onProgress = () => {}, opts = {}) {
     // optional: GFL's EntWatch items (tools/entwatch.mjs) and the map's CS2 radar (lasers-bake --overview)
     fetchJson(url('entwatch.json')).catch(() => null),
     fetchJson(url('overview/overview.json')).catch(() => null),
+    // optional: prop_dynamic sequence lengths (lasers-bake --models), read by entities/classes/props.js
+    manifest.animations ? fetchJson(url(manifestPath(manifest.animations, null))).catch(() => null) : null,
   ]);
   // optional: the static world as particle traces see it (lasers-bake collision_fx*.bin; older bakes have none)
   const [fxBuf, fxLayerBuf] = await Promise.all([fetchBuffer(url('collision_fx.bin')).catch(() => null), fetchBuffer(url('collision_fx_layers.bin')).catch(() => null)]);
@@ -97,13 +99,14 @@ export async function loadMap(name, onProgress = () => {}, opts = {}) {
   // the map's particle effects as the game has them (bake fx/), run by fx/particles; null for an older bake
   const effects = await MapEffects.load((rel) => url(rel), fetchJson);
   const radar = radarInfo(overview, (rel) => url(rel));
-  return { name, version, manifest, entities, collision, collisionFx, hulls, bounds, world, getModel, particles: fx, items, radar, effects };
+  return { name, version, manifest, entities, collision, collisionFx, hulls, bounds, animations, world, getModel, particles: fx, items, radar, effects };
 }
 
 // (the loader adds ?v=)
 function loadGlb(loader, url, onProgress) {
   return new Promise((resolve, reject) => {
-    loader.load(url, (g) => resolve(g.scene), (e) => e.total && onProgress?.(e.loaded / e.total), reject);
+    // the clips ride on the scene (Object3D.animations survives clone()): world/anim.js plays them
+    loader.load(url, (g) => { g.scene.animations = g.animations || []; resolve(g.scene); }, (e) => e.total && onProgress?.(e.loaded / e.total), reject);
   });
 }
 
