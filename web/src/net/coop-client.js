@@ -5,7 +5,9 @@
 //   net.on('list', (rooms) => ...)       // the public rooms
 //   net.on('game', (msg) => ...)         // a round message from the server (untrusted: validate before use)
 //   net.on('left', why) / net.on('error', msg) / net.on('status', status)
+//   net.on('chat', ({ id, name, text, team, dead } | { flood })) // room chat; net.chat(text, team) sends
 import { cleanSettings, cleanText } from '../lib/room-rules.js';
+import { cleanChat, cleanChatName } from '../lib/chat-colors.js';
 import { isMapName } from '../lib/paths.js';
 
 export const ROOM_CODE = /^[A-Z]{4}$/;
@@ -65,6 +67,7 @@ export class CoopClient {
   join(name, code) { this.send({ t: 'hello', name }); this.send({ t: 'join', code: String(code).toUpperCase() }); }
   rename(name) { if (this.ws?.readyState === 1) this.send({ t: 'hello', name }); }
   list() { this.send({ t: 'list' }); }
+  chat(text, team = false) { if (this.room) this.send({ t: 'chat', text: cleanChat(text), team: !!team }); }
   // the home page's live feed (server/activity.js): 'feed' (the recent rows + numbers), then 'act' / 'stats' pushes
   watchFeed(on = true) { if (on || this.ws?.readyState === 1) this.send({ t: 'feed', on }); }
   setSettings(settings) { if (this.isHost) this.send({ t: 'settings', settings }); }
@@ -111,6 +114,11 @@ export class CoopClient {
       case 'left': break; // our own leave, already handled
       case 'feed': case 'act': case 'stats': this.emit(m.t, m); break; // untrusted: ui/home-feed.js cleans it
       case 'error': this.emit('error', cleanText(m.msg, 120) || 'error'); break;
+      // room chat (server/coop-chat.js): { id, name, text, team, dead }, or { flood } when you typed too fast
+      case 'chat':
+        if (m.flood === true) { this.emit('chat', { flood: true }); break; }
+        if (this.room && cleanChat(m.text)) this.emit('chat', { id: m.id | 0, name: cleanChatName(m.name), text: cleanChat(m.text), team: m.team === true, dead: m.dead === true });
+        break;
       default: if (this.room && GAME.has(m.t)) this.emit('game', m);
     }
   }

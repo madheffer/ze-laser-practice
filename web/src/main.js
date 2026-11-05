@@ -32,6 +32,7 @@ import { MapPicker } from './ui/maps.js';
 import { Radar } from './ui/radar.js';
 import { ItemHud } from './ui/itemhud.js';
 import { Killfeed } from './ui/killfeed.js';
+import { installChat } from './app/chat.js';
 import { Lobby } from './ui/lobby.js';
 import { Home } from './ui/home.js';
 import { RoomScreen } from './ui/room.js';
@@ -63,12 +64,14 @@ G.itemHud = new ItemHud($('#hud'));
 G.overlay = new Overlay($('#overlay'));
 G.loading = new LoadingScreen($('#loading')); // a picked stage, until its clock starts
 G.killfeed = new Killfeed($('#killfeed'));
+installChat($('#chat'), { net }); // Y / U to talk (app/chat.js)
 G.peers = new Peers(G.renderer.scene, { log, onModel: litByParticles }); // the other players in a co-op / versus round
 G.simulate = simulate;
 
 // ---- pause / resume
 G.pause = () => {
   S.paused = true;
+  G.chat?.close();
   G.vm.trigger(false);
   G.vm.trigger2(false);
   clearKeys();
@@ -381,6 +384,8 @@ window.__lasers = {
   coop: { net, lobby, get round() { return S.mp; }, peers: G.peers },
   // run the simulation n seconds synchronously (tests; a hidden tab gets no animation frames)
   // solo only: a co-op / versus round runs on the server's clock
+  // tests: pause so the map stays silent and only advance() moves time (assigning .paused does nothing)
+  pause: () => G.pause(),
   advance(seconds) { if (S.mp) return 'solo only'; for (let i = 0; i < Math.round(seconds / CS.tick); i++) { if (!S.run || S.run.done) break; step(); } updateHud(); },
 };
 

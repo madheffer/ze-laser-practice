@@ -15,6 +15,7 @@ import { reportSolo } from './activity.js';
 import { ReplayRecorder, keepLastRun, lastRun } from './replay-record.js';
 import { account, SIGN_IN_URL } from './account.js';
 import { formatTime, plural } from '../lib/format.js';
+import { consoleSay } from './chat.js';
 
 export function endRun() {
   G.audio.stopAll();
@@ -45,6 +46,7 @@ export function startScenario(i, mode = 'normal') {
     // startAt: world/run-engine.js (COUNTDOWN, 3 s solo and in a round; a replay plays its own)
     t: 0, ticks: 0, started: false, hp: hp0, maxHp: hp0,
     armor: scenario?.player?.armor ?? 100, helmet: true,
+    money: 16000, // what you spend on !kevlar / weapons (app/chat-commands.js); the HUD's money
     hits: 0, done: false, result: '', mode: endless ? 'endless' : 'normal', endless,
     winAfter: endless ? null : scenario?.winAfter, fireAcc: 0, myHits: 0, myDamage: 0, noFall: false, bossPeak: new Map(),
     endlessTick: null,
@@ -88,6 +90,7 @@ export function startScenario(i, mode = 'normal') {
         engine.on('spawn', (e) => G.renderer.addEntity(e, map));
         engine.on('kill', (e) => G.renderer.removeEntity(e));
         engine.on('log', (m) => log(m));
+        engine.on('say', consoleSay); // point_servercommand "say ..." -> the chat, as CS2Fixes prints it
         engine.on('sound', (ev) => {
           if (run.silent) {
             const key = `${ev.ent.id}:${ev.slot ?? ''}`;

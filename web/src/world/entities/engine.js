@@ -63,7 +63,7 @@ export class EntityEngine {
     this.warned = new Set();
     this.moveStamps = new WeakMap();
     this.touching = new Set();
-    this.listeners = { spawn: [], kill: [], hit: [], log: [], sound: [], cvar: [] };
+    this.listeners = { spawn: [], kill: [], hit: [], log: [], sound: [], cvar: [], say: [] }; // say: point_servercommand "say ..." (classes/server.js)
     // The player as an I/O target / activator. worldOrigin() so "at the activator / at !player" spawns work, and
     // getWorld() + children so SetParent(!activator) makes an entity follow you (westersand's Xzone marker). The
     // session sets playerMatrix (a THREE.Matrix4, or anything with column-major `elements`); without one, e.g.

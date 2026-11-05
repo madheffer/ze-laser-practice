@@ -9,6 +9,7 @@ import { clamp } from '../lib/math.js';
 import { useItems } from './items.js';
 import { TouchControls, touchQuery } from '../ui/touch.js';
 import { freeLook } from './replay-view.js';
+import { chatKey, chatOpen } from './chat.js';
 
 const keys = new Set();
 let wheelJump = 0;
@@ -162,7 +163,7 @@ export function installInput(canvas, actions) {
   });
 
   document.addEventListener('mousedown', (ev) => {
-    if (!S.locked || S.replay || ev.sourceCapabilities?.firesTouchEvents) return; // a tap's emulated mouse is not Mouse 1
+    if (!S.locked || S.replay || chatOpen() || ev.sourceCapabilities?.firesTouchEvents) return; // a tap's emulated mouse is not Mouse 1
     if (ev.button === 0) G.vm.trigger(true);
     if (ev.button === 2) G.vm.trigger2(true);
   });
@@ -172,7 +173,7 @@ export function installInput(canvas, actions) {
   });
   document.addEventListener('contextmenu', (ev) => { if (S.locked) ev.preventDefault(); });
   document.addEventListener('mousemove', (ev) => {
-    if (!document.pointerLockElement) return;
+    if (!document.pointerLockElement || chatOpen()) return; // typing in the chat: no mouse look
     const k = settings.sens * M_YAW; // CS2: degrees per count = sensitivity * m_yaw (m_pitch = m_yaw)
     look(ev.movementX * k, ev.movementY * k);
   });
@@ -194,6 +195,9 @@ export function installInput(canvas, actions) {
       if (!ev.repeat) { keys.add(ev.code); act.replayKey?.(ev.code); }
       return;
     }
+    // the chat (app/chat.js): Y / U open it while playing; open, it has the keyboard and Esc only closes it
+    if (chatOpen()) { chatKey(ev); return; }
+    if (S.locked && !S.paused && S.run && !S.run.done && chatKey(ev)) return;
     // Esc is a tap: in fullscreen the keyboard lock delivers it to us, so we release the mouse ourselves;
     // in the menu, a tap resumes.
     // One tap leaves the game completely: mouse released AND fullscreen exited, menu up (Resume goes back in).

@@ -23,6 +23,7 @@ import { openStore } from './db/store.js';
 import { sameOriginSocket, clientAddress } from './http-util.js';
 import { serverAuth } from './auth/index.js';
 import { replayVerifier } from './replay-verify.js';
+import { roomChat } from './coop-chat.js';
 
 export const PATH = '/coop';
 const MAX_ROOMS = 300;
@@ -252,6 +253,12 @@ export function attachCoopRelay(httpServer, { log = () => {}, store = openStore(
       case 'ready': if (round && m.r === round.r) round.onReady(c, m); break;
       case 'load': if (round && m.r === round.r) round.onLoad(c, m); break;
       case 'use': if (round && m.r === round.r) round.onUse(c, m); break;
+      // room chat (app/chat.js): everyone in the room hears it, round or not
+      case 'chat': {
+        const out = roomChat(c, m, now, { flooded: () => send(c, { t: 'chat', flood: true }) });
+        if (out) for (const x of room.members) send(x, out);
+        break;
+      }
     }
   }
 

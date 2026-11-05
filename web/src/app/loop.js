@@ -252,7 +252,7 @@ export function updateHud() {
     // 3, 2, 1 big in the middle once the clock runs: loaded and drawn, and in a round everyone in (the server's go)
     countdown: scenario && t < 0 && run.ready && (!S.mp || run.go) ? Math.ceil(-t - 1e-6) : 0,
     sub: sub.join(' · '),
-    hp: run.spectating ? (S.mp?.spectateView()?.hp ?? 0) : run.hp, god: godMode(), armor: run.armor,
+    hp: run.spectating ? (S.mp?.spectateView()?.hp ?? 0) : run.hp, god: godMode(), armor: run.armor, money: run.money,
     spectate: run.spectating ? S.mp?.spectateLabel() : '',
     weapon: G.vm.weapon, clip: G.vm.clip, reserve: G.vm.reserve, reloading: G.vm.reloading,
     bossHtml: bossHudHtml(bosses),

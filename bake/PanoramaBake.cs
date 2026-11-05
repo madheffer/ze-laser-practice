@@ -46,6 +46,9 @@ static class PanoramaBake
         "panorama/styles/hud/hudweaponselection.vcss_c",
         "panorama/layout/hud/hudhealthbars.vxml_c",
         "panorama/styles/hud/hudhealthbars.vcss_c",
+        // the chat (ui/chat.js): map / CS2Fixes "Console" messages
+        "panorama/layout/hud/hudchat.vxml_c",
+        "panorama/styles/hud/hudchat.vcss_c",
         // the radar (ui/radar.js): layout, style, the north indicator and the player icons
         "panorama/layout/hud/hudradar.vxml_c",
         "panorama/styles/hud/hudradar.vcss_c",
