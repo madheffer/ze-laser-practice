@@ -28,6 +28,8 @@ function btn(label, cls, onClick, title) {
 }
 
 const SYNC_MS = 250;
+const PING_NOTE = 'The lasers reach you this late, like on a server. Only you see it; the others set their own.';
+const PING_LOCKED = 'Locked until the round ends.';
 
 export class RoomScreen {
   // net: CoopClient; lobby: ui/lobby.js's Lobby (your name, saved room settings); hasHeal(): the picked map has a heal
@@ -104,7 +106,8 @@ export class RoomScreen {
     Object.assign(this.pingIn, { type: 'range', min: 0, max: 500, step: 5 });
     this.pingIn.setAttribute('aria-label', 'Your simulated ping in milliseconds');
     this.pingIn.addEventListener('input', () => this.setPing(Number(this.pingIn.value)));
-    ping.append(pingTop, this.pingIn, el('small', null, 'The lasers reach you this late, like on a server. Only you see it; the others set their own.'));
+    this.pingNote = el('small', null, PING_NOTE);
+    ping.append(pingTop, this.pingIn, this.pingNote);
     players.append(ph, this.slots, you, ping);
 
     const rules = el('section', 'rm-rules');
@@ -300,6 +303,18 @@ export class RoomScreen {
     this.panel.mountHome();
     this.dialog.hidden = true;
     this.dialog.replaceChildren();
+  }
+
+  // a round locks your ping from its start to its end (app/coop-load.js lockPing): the room's slider and the Game
+  // settings' pair are disabled, saying why
+  lockPing(on) {
+    for (const c of [this.pingIn, $('#ping'), $('#ping-num')]) if (c) c.disabled = on;
+    if (this.pingNote) this.pingNote.textContent = on ? PING_LOCKED : PING_NOTE;
+    const field = $('#ping')?.closest('.field');
+    if (!field) return;
+    let note = field.querySelector('.ping-locked');
+    if (!note) { note = el('small', 'ping-locked', PING_LOCKED); field.append(note); }
+    note.hidden = !on;
   }
 
   // your ping: through the Game settings' own slider, so it is saved and applied exactly as there (app/settings.js)

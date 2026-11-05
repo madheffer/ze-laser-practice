@@ -18,6 +18,7 @@ import { ReplayRecorder, keepLastRun, lastRun } from './replay-record.js';
 import { account, SIGN_IN_URL } from './account.js';
 import { formatTime, plural } from '../lib/format.js';
 import { consoleSay } from './chat.js';
+import { simulatedPing } from './coop-load.js';
 
 export function endRun() {
   G.audio.stopAll();
@@ -103,7 +104,8 @@ export function startScenario(i, mode = 'normal') {
             }
             return;
           }
-          if (settings.ping > 0) setTimeout(() => { if (S.engine === engine) G.audio.onSound(ev); }, settings.ping);
+          const lag = simulatedPing(); // a round's is locked at its start (app/coop-load.js)
+          if (lag > 0) setTimeout(() => { if (S.engine === engine) G.audio.onSound(ev); }, lag);
           else G.audio.onSound(ev);
         });
         engine.onTeleportPlayer = (o, yaw) => player.teleport(landing(o), yaw ?? player.yaw);

@@ -71,6 +71,17 @@ export function startReports(r, send) {
   }, REPORT_MS);
 }
 
-// this player's simulated ping (settings, ms): with 'load' and 'ready', so the server's checks of our run allow for
-// it (server/coop-check.js MAX_PING); it is ours alone and changes nobody else's round
-export function simulatedPing() { return Math.max(0, Math.min(500, Math.round(Number(settings.ping) || 0))); }
+// this player's simulated ping (ms): with 'load' and 'ready', so the server's checks of our run allow for it
+// (server/coop-check.js MAX_PING); it is ours alone and changes nobody else's round. A round locks it from its start
+// to its end (the server only takes it while the round loads): the lasers are drawn and heard that late all round,
+// and the ping controls are disabled (ui/room.js lockPing). Solo it is the setting, whenever it changes.
+let lockedPing = null;
+const settingPing = () => Math.max(0, Math.min(500, Math.round(Number(settings.ping) || 0)));
+export const simulatedPing = () => lockedPing ?? settingPing();
+export function lockPing() { lockedPing = settingPing(); G.room?.lockPing(true); G.applySettings?.(); }
+export function unlockPing() {
+  if (lockedPing == null) return;
+  lockedPing = null;
+  G.room?.lockPing(false);
+  G.applySettings?.(); // a ping changed some other way meanwhile applies now
+}

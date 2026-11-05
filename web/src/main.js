@@ -55,6 +55,7 @@ import { WorldStream } from './world/stream.js';
 // 2 your area only; 0 the whole map)
 const streamMode = () => (settings.streamDistance === 0 ? 'all' : settings.streamDistance === 2 ? 'area' : 'auto');
 import { net, lobby, installCoop, hostStart, abortRound } from './app/coop.js';
+import { simulatedPing } from './app/coop-load.js';
 
 const canvas = $('#view');
 G.renderer = new Renderer(canvas);
@@ -133,9 +134,10 @@ G.hitmark = pulse('#hitmarker', 120);
 G.flash = pulse('#flash', 250);
 
 G.renderer.setFov(FOV); // CS2's fixed 90
+G.applySettings = () => applySettings();
 function applySettings() {
   G.renderer.showHitboxes = settings.hitboxes;
-  G.renderer.delay = settings.ping / 1000;
+  G.renderer.delay = simulatedPing() / 1000; // a round's is locked at its start (app/coop-load.js)
   if (S.engine) S.engine.humans = rule('humans');
   G.audio.setVolumes({ sfx: settings.sfx, music: settings.music });
   applyGamma(settings.gamma); // r_fullscreen_gamma (ui/gamma.js)

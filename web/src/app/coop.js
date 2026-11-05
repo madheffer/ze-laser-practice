@@ -21,7 +21,7 @@ import { TICK } from '../world/run-engine.js';
 import { lastFrameAt } from './loop.js';
 import { systemLine } from './chat.js';
 import { itemState, spendUse, usableHeals } from '../world/items.js';
-import { beginRoster, applyWait, markOut, rosterGo, clearRoster, waitLine, startReports, simulatedPing } from './coop-load.js';
+import { beginRoster, applyWait, markOut, rosterGo, clearRoster, waitLine, startReports, simulatedPing, lockPing, unlockPing } from './coop-load.js';
 
 export const net = new CoopClient();
 export const lobby = { busy: false }; // busy = a round is on that you're not in (you'll be in the next one)
@@ -176,6 +176,7 @@ class Round {
   applyEnd(d) {
     if (this.ended) return;
     this.ended = true;
+    unlockPing();
     for (const s of d.stats) {
       const p = this.players.get(s.id);
       if (p) { p.alive = s.alive; p.deadAt = s.at; p.hits = s.hits; }
@@ -228,8 +229,9 @@ async function onStart(d) {
   starting = pend;
   // everyone's load progress on the loading screen (app/coop-load.js), and ours to the server while we load
   beginRoster(start, net.you);
+  lockPing(); // your simulated ping, fixed until the round ends
   startReports(start.r, (m) => net.game(m));
-  const stop = (note) => { if (starting === pend) { starting = null; G.loading.close(false); } if (note) G.lobby.note(note); };
+  const stop = (note) => { if (starting === pend) { starting = null; G.loading.close(false); unlockPing(); } if (note) G.lobby.note(note); };
   // the loading screen (ui/loading.js) until the server's go
   G.loading.begin(start.map, start.stage, S.map?.name === start.map && S.map.loaded ? 300 : 0);
   if (S.map?.name !== start.map) {
@@ -323,6 +325,7 @@ function onLeft(why) {
   const run = S.run;
   S.mp = null;
   clearRoster();
+  unlockPing();
   lobby.busy = false;
   G.peers.clear();
   if (run && !run.done && run.spectating) { run.spectating = false; finish('dead'); }
