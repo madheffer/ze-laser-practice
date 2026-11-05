@@ -22,6 +22,7 @@ make that from your own CS2 install. You need:
 | ze_dreamin | [3415958616](https://steamcommunity.com/sharedfiles/filedetails/?id=3415958616) |
 | ze_visualizer | [3261434415](https://steamcommunity.com/sharedfiles/filedetails/?id=3261434415) |
 | ze_offliner | [3559892707](https://steamcommunity.com/sharedfiles/filedetails/?id=3559892707) |
+| ze_neochrome | [3437506779](https://steamcommunity.com/sharedfiles/filedetails/?id=3437506779) |
 
 (Each `web/public/scenarios/<map>.json` names its workshop id; that list is where `--scenarios` reads them.)
 
@@ -64,7 +65,7 @@ It builds `bake/` (Release), then runs, per map:
 | `entwatch` | `node tools/entwatch.mjs <map>` | `entwatch.json`: GFL's EntWatch config (the map's items: the heal option, the item HUD); none if GFL has no config for the map |
 | `stripper` | `node tools/stripper.mjs <map>` | `stripper.json`: GFL's StripperCS2 edits to the map's entities (below); none if GFL doesn't strip the map |
 | `lighting` | `--lighting <vpk> <map dir>` | `lighting/`: lightmaps (raw BC6H/BC7/DXT1/BC4 blocks), probes, tonemap + LUT (`post/`), skies, reflection cubemaps. The **high** tier |
-| `tiers` | `--tiers <vpk> <map dir>` | `q/medium/`, `q/low/`: smaller textures and PNG lightmaps any GPU can take |
+| `tiers` | `--tiers <vpk> <map dir>` | `q/medium/`, `q/low/`: smaller WebP textures and WebP / PNG lightmaps any GPU can take |
 | `chunks` | `node tools/chunk-world.mjs <map dir>` | `world/chunk_<n>.glb` + `world/chunks.json`, and `"chunks"` in the manifest: the world streamed in pieces (below) |
 | `index` | `node tools/index-maps.mjs` | `web/public/maps/index.json` (the map picker) |
 
@@ -136,11 +137,18 @@ The Video settings' **Quality** picks the tier a map loads at (next map load). A
 | Tier | Textures | Lightmaps | Reflections | Sky | ze_mist_p |
 |---|---|---|---|---|---|
 | high | as baked (1024 px) | full size, BC6H/BC7 blocks | cubemaps, all mips | BC6H cube | lighting 50 MB |
-| medium | 512 px | 2048 px, RGBM PNG | cubemaps <= 64 px | 512 px RGBM PNG faces | +54 MB |
-| low | 256 px | 1024 px, RGBM PNG | none | 256 px RGBM PNG faces | +19 MB |
+| medium | 512 px, WebP q80 | 2048 px: RGBM exact, the rest WebP q90 | cubemaps <= 64 px | 512 px RGBM faces, exact | +18 MB (PNG: +54) |
+| low | 256 px, WebP q80 | 1024 px: RGBM exact, the rest WebP q90 | none | 256 px RGBM faces, exact | +7.3 MB (PNG: +19) |
 
 RGBM: `rgb x a x 16`, linear (the lightmaps and skies sit well under 16). Geometry (`world/`, `models/` glbs) is
-the same for every tier; the loader swaps their PNGs for `q/<tier>/tex/` ones (`assets.js` `glbLoader`).
+the same for every tier; the loader swaps their PNGs for `q/<tier>/tex/` ones (`assets.js` `glbLoader`), as
+`.webp` when `q/<tier>/tex.json` says `"format": "webp"` (its `version` is the tier textures' cache key, so a
+`--tiers` re-bake alone reaches browsers). Formats: the host compresses `.bin` / `.glb` on the way, never images, so
+the images are what shrank. Textures are lossy WebP with exact alpha (cut-out edges keep their shape). RGBM can't
+take lossy error (the multiplier scales it up to 16x), so the irradiance and sky faces are exact pixels, in
+whichever of PNG / lossless WebP is smaller. The directional and shadow lightmaps were block-compressed in CS2
+(DXT1 / BC7) already, so WebP q90 adds about what the source lost. Side by side on westersand, old and new tiers
+look the same.
 Tiers don't change how the map plays: entities, collision and logic are the one bake.
 
 Other performance switches (Video, apply instantly): render resolution, MSAA, fog, reflections; "CS2 baked lighting"
@@ -164,8 +172,8 @@ For a map that's already baked, each piece can be redone on its own (`lasers-bak
 And `--scan <workshop/content/730> scan.json` ranks a local workshop library for laser-heavy maps.
 
 Cache: files are fetched with the manifest's / `lighting.json`'s `version` (a bake timestamp) as a query, so a
-re-bake reaches browsers. Re-running `--tiers` alone keeps the old manifest version for the tier textures: hard
-reload, or run the `map` step too.
+re-bake reaches browsers. The tier textures carry their own version (`q/<tier>/tex.json`), so `--tiers` alone is
+enough.
 
 ## Stage thumbnails
 

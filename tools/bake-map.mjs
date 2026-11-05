@@ -16,7 +16,7 @@
 //   entwatch  GFL's EntWatch config -> entwatch.json (tools/entwatch.mjs): the map's items, the heal option, the item HUD
 //   stripper  GFL's StripperCS2 configs -> stripper.json (tools/stripper.mjs): the entity edits GFL's servers make to the map
 //   lighting  the map's CS2 lighting: lightmaps, probes, tonemap / LUT, skies, reflection cubemaps (high tier)
-//   tiers     medium + low quality copies (q/medium, q/low: smaller textures, PNG lightmaps any GPU can take)
+//   tiers     medium + low quality copies (q/medium, q/low: smaller WebP textures, WebP lightmaps any GPU can take)
 //   chunks    the world split into streamed chunks, fewer draw calls (tools/chunk-world.mjs; needs tools' npm packages)
 //   index     web/public/maps/index.json (the map picker)
 import fs from 'node:fs';

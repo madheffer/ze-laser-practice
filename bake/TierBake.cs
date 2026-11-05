@@ -1,11 +1,16 @@
 // Medium / low quality copies of a baked map, for slower or older PCs and faster loading (the browser's Quality
 // setting; Auto picks low on a GPU without BC6H/BC7, e.g. phones). High is the map folder as baked.
-//   tier     textures  lightmaps (decoded, RGBM PNG)  reflections            sky (RGBM PNG faces)
+//   tier     textures  lightmaps (decoded, RGBM WebP) reflections            sky (RGBM WebP faces)
 //   medium   512 px    2048 px                       cubemaps <= 64 px      512 px
 //   low      256 px    1024 px                       none                   256 px
-// -> <map>/q/<tier>/tex/<world|models/...>.png (the glbs' textures, same names; the loader redirects them)
-//    <map>/q/<tier>/lighting/ (lighting.json + PNGs; post / probes copied; medium: the cubemaps' small mips)
+// -> <map>/q/<tier>/tex/<world|models/...>.webp (the glbs' textures, same names as .webp; the loader redirects them)
+//    <map>/q/<tier>/tex.json ({ format: "webp", version }: what the loader redirects to, and its cache version)
+//    <map>/q/<tier>/lighting/ (lighting.json + WebPs; post / probes copied; medium: the cubemaps' small mips)
 // Lightmaps and skies are decoded from the workshop VPK (VRF) and box-filtered; RGBM: rgb x a x range, linear.
+// Formats: PNGs don't shrink on the way (the host compresses the .bin / .glb files, not images), so textures are
+// lossy WebP (TextureQuality; alpha stays exact, cut-out leaves and fences keep their edges) and lightmaps / skies are
+// exact (RGBM can't take lossy error: PNG or lossless WebP, whichever is smaller); the directional / shadow lightmaps,
+// block-compressed in CS2 already, are high-quality lossy WebP.
 //
 //   lasers-bake --tiers <workshop.vpk> <web/public/maps/<name>>   (after --lighting and --sky)
 using System.Text.Json;
@@ -22,6 +27,8 @@ static class TierBake
     record Tier(string Name, int Texture, int Lightmap, int Cube, int Sky);
     static readonly Tier[] Tiers = [new("medium", 512, 2048, 64, 512), new("low", 256, 1024, 0, 256)];
     const float RgbmRange = 16f; // irradiance / sky values above this clip (CS2 lightmaps sit well under it)
+    const int TextureQuality = 80; // lossy WebP for the tier textures
+    const int LightmapQuality = 90; // lossy WebP for the directional / shadow lightmaps (block-compressed at the source)
 
     public static int Run(string vpk, string mapDir)
     {
@@ -52,7 +59,10 @@ static class TierBake
         {
             var root = Path.Combine(mapDir, "q", tier.Name);
             Console.WriteLine($"tier {tier.Name}");
+            // a re-bake starts clean: an older bake's PNGs (or textures the map no longer has) would linger otherwise
+            if (Directory.Exists(root)) Directory.Delete(root, true);
             Textures(mapDir, Path.Combine(root, "tex"), tier.Texture);
+            File.WriteAllText(Path.Combine(root, "tex.json"), new JsonObject { ["format"] = "webp", ["version"] = DateTime.UtcNow.ToString("yyyyMMddHHmmss") }.ToJsonString());
             Lighting(Load, mapName, mapDir, hiJson, Path.Combine(root, "lighting"), tier);
         }
         return 0;
@@ -68,15 +78,15 @@ static class TierBake
             if (!Directory.Exists(dir)) continue;
             foreach (var png in Directory.EnumerateFiles(dir, "*.png", SearchOption.AllDirectories))
             {
-                var rel = Path.GetRelativePath(mapDir, png);
+                var rel = Path.ChangeExtension(Path.GetRelativePath(mapDir, png), ".webp");
                 var dst = SafePath.OutFile(outRoot, rel);
                 Directory.CreateDirectory(Path.GetDirectoryName(dst)!);
                 using var src = SKBitmap.Decode(png);
                 if (src == null) continue;
-                if (src.Width <= max && src.Height <= max) { File.Copy(png, dst, true); n++; continue; }
+                if (src.Width <= max && src.Height <= max) { SaveWebp(src, dst, lossless: false); n++; continue; }
                 var s = (float)max / Math.Max(src.Width, src.Height);
                 using var small = src.Resize(new SKImageInfo(Math.Max(1, (int)(src.Width * s)), Math.Max(1, (int)(src.Height * s)), src.ColorType, src.AlphaType), new SKSamplingOptions(SKCubicResampler.Mitchell));
-                Save(small, dst);
+                SaveWebp(small, dst, lossless: false);
                 n++;
             }
         }
@@ -99,8 +109,11 @@ static class TierBake
             using var bmp = tex.GenerateBitmap();
             var hdr = name == "irradiance";
             using var small = Downsample(bmp, tier.Lightmap, hdr);
-            Save(small, Path.Combine(outDir, $"{name}.png"));
-            textures[name] = new JsonObject { ["file"] = $"{name}.png", ["format"] = hdr ? "rgbm" : "png", ["range"] = hdr ? RgbmRange : null, ["width"] = small.Width, ["height"] = small.Height };
+            // RGBM must stay exact (an error in its multiplier channel is scaled up to x16): the smaller lossless file.
+            // The directional / shadow maps were block-compressed in CS2 (DXT1 / BC7): high-quality lossy adds about
+            // what the source already lost
+            var file = hdr ? SaveSmallestLossless(small, outDir, name) : SaveWebp(small, Path.Combine(outDir, $"{name}.webp"), lossless: false, LightmapQuality);
+            textures[name] = new JsonObject { ["file"] = file, ["format"] = hdr ? "rgbm" : "png", ["range"] = hdr ? RgbmRange : null, ["width"] = small.Width, ["height"] = small.Height };
         }
         json["textures"] = textures;
         Console.WriteLine($"  lightmaps: {textures.Count} at <= {tier.Lightmap} px");
@@ -157,8 +170,7 @@ static class TierBake
                 {
                     using var face = tex.GenerateBitmap(depth: 0, face: (Texture.CubemapFace)f, mipLevel: 0);
                     using var small = Downsample(face, tier.Sky, true, srgb: !tex.IsHighDynamicRange);
-                    var file = $"sky/{hash}_{f}.png";
-                    Save(small, Path.Combine(outDir, file));
+                    var file = "sky/" + SaveSmallestLossless(small, Path.Combine(outDir, "sky"), $"{hash}_{f}");
                     faces.Add(file);
                 }
                 var d = new JsonObject { ["format"] = "rgbm-faces", ["range"] = RgbmRange, ["faces"] = faces, ["size"] = Math.Min(tier.Sky, tex.Width), ["cube"] = true,
@@ -212,10 +224,31 @@ static class TierBake
         return dst;
     }
 
-    static void Save(SKBitmap bmp, string path)
+    // lossless: the exact pixels; else lossy at quality (default TextureQuality) with exact alpha. Returns the file name
+    static string SaveWebp(SKBitmap bmp, string path, bool lossless, int quality = TextureQuality)
+    {
+        File.WriteAllBytes(path, EncodeWebp(bmp, lossless, quality));
+        return Path.GetFileName(path);
+    }
+
+    static byte[] EncodeWebp(SKBitmap bmp, bool lossless, int quality)
+    {
+        using var pixmap = bmp.PeekPixels();
+        var opts = new SKWebpEncoderOptions(lossless ? SKWebpEncoderCompression.Lossless : SKWebpEncoderCompression.Lossy, lossless ? 100 : quality);
+        using var data = pixmap.Encode(opts) ?? throw new InvalidOperationException("webp encode failed");
+        return data.ToArray();
+    }
+
+    // exact pixels in whichever is smaller, PNG or lossless WebP (noisy RGBM data often packs better as PNG).
+    // Returns the file name written into dir: <name>.png or <name>.webp
+    static string SaveSmallestLossless(SKBitmap bmp, string dir, string name)
     {
         using var img = SKImage.FromBitmap(bmp);
-        using var data = img.Encode(SKEncodedImageFormat.Png, 100);
-        File.WriteAllBytes(path, data.ToArray());
+        using var png = img.Encode(SKEncodedImageFormat.Png, 100);
+        var webp = EncodeWebp(bmp, true, 100);
+        var usePng = png.Size <= webp.Length;
+        var file = name + (usePng ? ".png" : ".webp");
+        File.WriteAllBytes(Path.Combine(dir, file), usePng ? png.ToArray() : webp);
+        return file;
     }
 }

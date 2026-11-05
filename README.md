@@ -34,6 +34,7 @@ CS2 and its workshop folder are found from Steam's library list (`node tools/ste
 | ze_dreamin | 3415958616 |
 | ze_visualizer | 3261434415 |
 | ze_offliner | 3559892707 (the ending) |
+| ze_neochrome | 3437506779 (Blue Sphere + the ending) |
 | ze_gris_p | 3633040749 (baked, no stages yet) |
 
 ## Database (runs and leaderboards)
@@ -489,7 +490,7 @@ Invite link and who is alive (with each player's ping). Change stage and Setting
     tint x brightnessscale
   - reflections (`env_cubemap` / `env_combined_light_probe_volume`, `SkyBake.cs`): the map's cubemap array, volumes by
     indoor level then size, edge-fade blending, box parallax, roughness mip, normalised by the cubemap's SH vs the lightmap
-  - quality tiers (`--tiers`, BAKING.md): medium / low copies with smaller textures and RGBM PNG lightmaps, so a GPU
+  - quality tiers (`--tiers`, BAKING.md): medium / low copies with smaller WebP textures and decoded lightmaps, so a GPU
     without BC6H/BC7 (phones) gets the map's lighting too; Auto picks low there
   - particle lights (`C_OP_RenderStandardLight`, MapEffects.lights): CS2's barn lights per pixel on the world and models,
     up to 16 a frame (brightest over distance first); also your viewmodel, your body and teammates (the same gather)

@@ -23,12 +23,17 @@ export const GLTF_TO_SOURCE = new THREE.Matrix4().set(
 );
 
 // A glb loader whose every request (the glb and the textures beside it) carries the map's version.
-// texBase: a quality tier's folder (maps/<map>/q/<tier>/tex/): the glbs' PNGs come from there instead
-function glbLoader(version, mapBase = '', texBase = '') {
+// tex: a quality tier's textures ({ base: maps/<map>/q/<tier>/tex/, webp, version }): the glbs' PNGs come from there
+// instead, as .webp when the tier's tex.json says so (lasers-bake --tiers), with the tier's own cache version
+function glbLoader(version, mapBase = '', tex = null) {
   const manager = new THREE.LoadingManager();
   manager.setURLModifier((url) => {
     if (/^(blob|data):/.test(url)) return url;
-    if (texBase) { const i = url.indexOf(mapBase); if (i >= 0 && /\.png$/i.test(url)) url = texBase + url.slice(i + mapBase.length); }
+    const i = tex ? url.indexOf(mapBase) : -1;
+    if (i >= 0 && /\.png$/i.test(url)) {
+      const rel = url.slice(i + mapBase.length);
+      return versioned(tex.base + (tex.webp ? rel.replace(/\.png$/i, '.webp') : rel), tex.version || version);
+    }
     return versioned(url, version);
   });
   const textures = new Map(); // one map's loads share it: see SharedTextures
@@ -80,11 +85,17 @@ export async function loadMap(name, onProgress = () => {}, opts = {}) {
   onProgress('manifest');
   // manifest.json says which version the rest is; everything after it is fetched as <file>?v=<version>, so it
   // can be cached as immutable and a rebake still reaches the browser
-  const manifest = await fetchJson(base + 'manifest.json', FRESH);
+  const tier = opts.tier === 'medium' || opts.tier === 'low' ? opts.tier : '';
+  // a tier's tex.json (newer bakes): its textures' format and version; an older bake has none (PNGs, the map's version)
+  const [manifest, texJson] = await Promise.all([
+    fetchJson(base + 'manifest.json', FRESH),
+    tier ? fetchJson(`${base}q/${tier}/tex.json`, FRESH).catch(() => null) : null,
+  ]);
   const version = manifest.version;
   const url = (rel) => versioned(base + rel, version);
-  const tier = opts.tier === 'medium' || opts.tier === 'low' ? opts.tier : '';
-  const loader = glbLoader(version, base, tier ? `${base}q/${tier}/tex/` : '');
+  const texVersion = typeof texJson?.version === 'string' && /^\d{1,20}$/.test(texJson.version) ? texJson.version : '';
+  const tex = tier ? { base: `${base}q/${tier}/tex/`, webp: texJson?.format === 'webp', version: texVersion } : null;
+  const loader = glbLoader(version, base, tex);
   onProgress('entities');
   // the big files (collision, the particle-trace collision): their bytes move the loading bar, which a round's
   // server also reads to tell a slow download from a stuck one (server/coop-round.js). The total isn't known up

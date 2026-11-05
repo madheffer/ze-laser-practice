@@ -40,10 +40,10 @@ export async function loadLightmaps(mapBase, renderer, log = () => {}, opts = {}
   const scale = Array.isArray(json.uvScale) && json.uvScale.length === 2 && json.uvScale.every((v) => typeof v === 'number' && v > 0 && v < 16) ? json.uvScale : [1, 1];
   const version = typeof json.version === 'string' && /^\d{1,20}$/.test(json.version) ? json.version : '';
   const specs = {};
-  const images = {}; // PNG lightmaps (a quality tier)
+  const images = {}; // PNG / WebP lightmaps (a quality tier)
   for (const name of NAMES) {
     const t = json.textures[name];
-    if ((t?.format === 'rgbm' || t?.format === 'png') && t.file === `${name}.png`) { images[name] = t; continue; }
+    if ((t?.format === 'rgbm' || t?.format === 'png') && (t.file === `${name}.png` || t.file === `${name}.webp`)) { images[name] = t; continue; } // PNG, or lossless WebP (newer bakes)
     const s = check(name, t);
     if (!s) continue;
     if (!renderer.extensions.has(s.ext)) { log(`lighting: this GPU can't take ${json.textures[name].format} (${s.ext}): fallback lighting`); return null; }
@@ -96,7 +96,7 @@ export async function loadLightmaps(mapBase, renderer, log = () => {}, opts = {}
     const d = await fetchJson(versioned(`${base}lighting/${v.file}`, version)).catch(() => null);
     if (d?.format === 'rgbm-faces' && Array.isArray(d.faces) && d.faces.length === 6) {
       const hash = v.file.slice(4, 12);
-      if (!d.faces.every((f, i) => f === `sky/${hash}_${i}.png`)) return;
+      if (!d.faces.every((f, i) => f === `sky/${hash}_${i}.png` || f === `sky/${hash}_${i}.webp`)) return;
       const faces = await Promise.all(d.faces.map((f) => pngImage(versioned(`${base}lighting/${f}`, version))));
       if (faces.some((f) => !f)) return;
       const num = (o) => Object.fromEntries(Object.entries(o && typeof o === 'object' ? o : {}).filter(([, x]) => typeof x === 'number' && Number.isFinite(x)));
