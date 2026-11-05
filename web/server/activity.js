@@ -25,13 +25,16 @@ const round1 = (v) => Math.round(v * 10) / 10;
 // a stored run (db/store.js shape) as the feed's row
 function feedItem(run) {
   const names = run.people.map((p) => p.name);
+  // ids[i]: names[i]'s SteamID (their public profile, players-http.js), or null for a guest
+  const ids = run.people.map((p) => p.steamId || null);
   if (run.kind === 'solo') {
     return { kind: 'solo', map: run.map, stage: run.stageName, mode: run.mode, result: run.result, time: round1(run.time),
-      hits: run.people[0]?.hits ?? null, names, cause: run.cause, at: run.finishedAt, replay: run.replay ?? null, views: run.views ?? 0 };
+      hits: run.people[0]?.hits ?? null, names, ids, cause: run.cause, at: run.finishedAt, replay: run.replay ?? null, views: run.views ?? 0 };
   }
   return { kind: run.kind, map: run.map, stage: run.stageName, mode: run.mode, result: run.result, time: round1(run.time),
-    players: run.players, room: run.roomName, names: names.slice(0, 8),
-    winners: run.people.filter((p) => p.won).map((p) => p.name).slice(0, 8), at: run.finishedAt };
+    players: run.players, room: run.roomName, names: names.slice(0, 8), ids: ids.slice(0, 8),
+    winners: run.people.filter((p) => p.won).map((p) => p.name).slice(0, 8),
+    winnerIds: run.people.filter((p) => p.won).map((p) => p.steamId || null).slice(0, 8), at: run.finishedAt };
 }
 
 // send(client, msg); findStage(map, id) -> scenarios.js's stage or null; stats() -> { online, rooms, rounds, playing };

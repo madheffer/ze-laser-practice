@@ -11,6 +11,7 @@ import { Backdrop, Strip, shotsOf } from './home-hero.js';
 import { HomeFeed } from './home-feed.js';
 import { account, onAccount, signOut } from '../app/account.js';
 import { steamButton } from './steam-button.js';
+import { Profile } from './profile.js';
 
 function el(tag, cls, t) { const e = document.createElement(tag); if (cls) e.className = cls; if (t != null) e.textContent = t; return e; }
 
@@ -27,8 +28,9 @@ export class Home {
     this.root = root;
     this.on = on;
     this.mapTitle = mapTitle;
-    this.feed = new HomeFeed({ net, mapTitle, onStats: (s) => this.stats(s), onWatch: (id) => on.watch(id) });
+    this.feed = new HomeFeed({ net, mapTitle, onStats: (s) => this.stats(s), onWatch: (id) => on.watch(id), onPlayer: (id) => this.showPlayer(id) });
     this.build();
+    this.profile = new Profile(root, { mapTitle, onWatch: (id) => on.watch(id) });
     onAccount(() => this.renderAccount());
   }
 
@@ -131,7 +133,20 @@ export class Home {
       const out = el('button', 'home-link', 'Sign out');
       out.type = 'button';
       out.addEventListener('click', () => signOut());
-      box.replaceChildren(el('span', 'home-user', account.user.name), out);
+      // you: opens your profile (ui/profile.js)
+      const who = el('button', 'home-who');
+      who.type = 'button';
+      who.title = 'Your profile';
+      who.append(el('span', 'home-user', account.user.name));
+      who.addEventListener('click', () => this.profile.show(account.user.steamId));
+      // their Steam avatar (app/account.js checked the URL: Steam's CDN only); none without the server's Steam API key
+      if (account.user.avatar) {
+        const img = el('img', 'home-avatar');
+        img.src = account.user.avatar; img.alt = ''; img.width = img.height = 28; img.referrerPolicy = 'no-referrer'; img.decoding = 'async';
+        img.addEventListener('error', () => img.remove());
+        who.prepend(img);
+      }
+      box.replaceChildren(who, out);
     } else {
       box.replaceChildren(steamButton({ size: 'small' }));
     }
@@ -158,6 +173,12 @@ export class Home {
 
   get open() { return !this.root.hidden; }
 
+  // a player's profile, over the home page (a ?player=<SteamID64> link, a name in the feed, your account)
+  showPlayer(steamId) {
+    if (!this.open) this.show();
+    this.profile.show(steamId);
+  }
+
   show() {
     this.root.hidden = false;
     document.body.classList.add('at-home');
@@ -171,6 +192,7 @@ export class Home {
 
   hide() {
     if (this.root.hidden) return;
+    this.profile.close();
     this.root.hidden = true;
     document.body.classList.remove('at-home');
     document.getElementById('menu')?.removeAttribute('inert');

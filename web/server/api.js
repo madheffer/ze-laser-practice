@@ -2,18 +2,21 @@
 // (db/store.js). The read-only part is here; sign-in is auth/routes.js, your runs and replays runs-http.js.
 //
 //   GET /api/leaderboard?map=<map>&stage=<stage id>&mode=normal|endless&kind=solo|coop|versus&limit=1..100
-//       -> { map, stage, mode, kind, rows: [{ rank, name, time, hits, at, verified, steam }] }
+//       -> { map, stage, mode, kind, rows: [{ rank, name, time, hits, at, verified, steam, steamId }] }
 //          each player's best ranked run (no cheat rules, not removed by the anti-cheat, normal = cleared),
 //          best first: normal = fastest then fewest hits, endless = longest survived. A signed-in player counts
-//          once by their SteamID (steam = true). verified = false: a solo run the player's page reported
+//          once by their SteamID (steam = true, steamId = their public profile; null for a guest).
+//          verified = false: a solo run the player's page reported
 //   GET /api/runs?limit=1..100
 //       -> { runs: [...] } newest first, the feed's runs (db/store.js's shape; a private room's runs have no people)
 //   /api/auth/*  auth/routes.js      /api/solo, /api/replays/*, /api/me/runs  runs-http.js
+//   /api/players/<SteamID64>  players-http.js (public profiles)
 import { isMapName } from '../src/lib/paths.js';
 import { BOARD_MAX } from './db/store.js';
 import { json } from './http-util.js';
 import { authRoutes } from './auth/routes.js';
 import { runRoutes } from './runs-http.js';
+import { playerRoutes } from './players-http.js';
 
 const MODES = new Set(['normal', 'endless']);
 const KINDS = new Set(['solo', 'coop', 'versus']);
@@ -24,14 +27,14 @@ const limitOf = (q, fallback) => {
   return Number.isInteger(n) && n >= 1 ? Math.min(n, BOARD_MAX) : fallback;
 };
 
-// a run as the public sees it: no SteamIDs
-const publicRun = (r) => ({ ...r, people: r.people.map(({ steamId, ...p }) => ({ ...p, steam: !!steamId })) });
+// a run as the public sees it: a signed-in player's SteamID is their public profile's (players-http.js)
+const publicRun = (r) => ({ ...r, people: r.people.map(({ steamId, ...p }) => ({ ...p, steam: !!steamId, steamId: steamId || null })) });
 
 // store: db/store.js's, or a promise for one; auth: auth/index.js's; feed() -> the activity feed (coop-relay.js)
 // Returns a (req, res, next) handler; next() for anything not /api/.
 export function apiHandler(store, { auth, feed = () => null, ipHeader = '' } = {}) {
   const ready = Promise.resolve(store);
-  let routes = null;
+  let routes = null, players = null;
   const routesFor = (s) => (routes ||= [
     authRoutes({ ...auth, store: s, ipHeader }),
     runRoutes({ store: s, sessions: auth.sessions, feed, ipHeader }),
@@ -43,6 +46,7 @@ export function apiHandler(store, { auth, feed = () => null, ipHeader = '' } = {
     try {
       const s = await ready;
       if (auth) for (const r of routesFor(s)) if (await r(req, res, url)) return;
+      if (await (players ||= playerRoutes({ store: s, ipHeader }))(req, res, url)) return;
       if (req.method !== 'GET') return json(res, 405, { error: 'GET only' });
       if (url.pathname === '/api/leaderboard') {
         const map = q.get('map'), stage = q.get('stage'), mode = q.get('mode') || 'normal', kind = q.get('kind') || 'solo';

@@ -7,6 +7,7 @@
 // only ever reach the DOM as text.
 import { cleanText } from '../lib/room-rules.js';
 import { isMapName } from '../lib/paths.js';
+import { isSteamId } from '../lib/steam.js';
 import { formatTime, ago } from '../lib/format.js';
 import { displayName } from './maps.js';
 import { sharesRuns, setSharesRuns } from '../app/activity.js';
@@ -23,32 +24,54 @@ function el(tag, cls, t) { const e = document.createElement(tag); if (cls) e.cla
 // one row off the wire, or null
 function cleanItem(x) {
   if (!x || typeof x !== 'object' || !Number.isInteger(x.id) || !KINDS.has(x.kind) || !RESULTS.has(x.result)) return null;
-  const names = (v) => (Array.isArray(v) ? v.slice(0, 8).map((n) => cleanText(n, 24)).filter(Boolean) : []);
+  // [{ name, id }]: id = the SteamID beside the name (ids[i]) when they were signed in, their profile's link
+  const people = (names, ids) => (Array.isArray(names) ? names.slice(0, 8) : [])
+    .map((n, i) => ({ name: cleanText(n, 24), id: Array.isArray(ids) && isSteamId(ids[i]) ? ids[i] : null }))
+    .filter((p) => p.name);
   return {
     id: x.id, at: Number.isFinite(x.at) ? x.at : Date.now(), kind: x.kind, result: x.result,
     map: isMapName(x.map) ? x.map : '', stage: cleanText(x.stage, 60) || 'a stage', mode: x.mode === 'endless' ? 'endless' : 'normal',
     time: Number.isFinite(x.time) && x.time >= 0 ? x.time : null, hits: Number.isInteger(x.hits) ? x.hits : null,
-    names: names(x.names), winners: names(x.winners), room: cleanText(x.room, 32), cause: cleanText(x.cause, 40),
+    names: people(x.names, x.ids), winners: people(x.winners, x.winnerIds), room: cleanText(x.room, 32), cause: cleanText(x.cause, 40),
     players: Number.isInteger(x.players) ? Math.max(1, Math.min(8, x.players)) : 1,
     replay: Number.isInteger(x.replay) && x.replay > 0 ? x.replay : null,
     views: Number.isInteger(x.views) && x.views > 0 ? x.views : 0,
   };
 }
 
-const list = (names, n) => (names.length <= 2 ? names.join(' & ') : `${names.slice(0, 2).join(', ')} +${(n || names.length) - 2}`);
+// who did it: { people: [{ name, id }] (at most two shown), sep, more (+N) }, or { text } for nobody named
+const list = (ps, n) => (ps.length <= 2 ? { people: ps, sep: ' & ', more: 0 } : { people: ps.slice(0, 2), sep: ', ', more: (n || ps.length) - 2 });
+const whoText = (w) => w.text ?? `${w.people.map((p) => p.name).join(w.sep)}${w.more ? ` +${w.more}` : ''}`;
+
+// who as nodes: a signed-in player's name is a link to their profile
+function whoNodes(w, onPlayer) {
+  if (w.text != null) return [el('b', 'hf-who', w.text)];
+  const out = [];
+  w.people.forEach((p, i) => {
+    if (i) out.push(w.sep);
+    if (!p.id) { out.push(el('b', 'hf-who', p.name)); return; }
+    const b = el('button', 'hf-who hf-who-link', p.name);
+    b.type = 'button';
+    b.title = `${p.name}'s profile`;
+    b.addEventListener('click', (ev) => { ev.stopPropagation(); onPlayer(p.id); });
+    out.push(b);
+  });
+  if (w.more) out.push(` +${w.more}`);
+  return out;
+}
 
 // a row's words: [who, verb, what] + a tone for its icon
 function describe(it) {
   const t = it.time != null ? formatTime(it.time) : '';
   if (it.kind === 'solo') {
-    const who = it.names[0] || 'Player';
+    const who = it.names[0] ? list(it.names.slice(0, 1)) : { text: 'Player' };
     if (it.result === 'win') return { tone: 'win', who, verb: 'cleared', what: it.stage, stat: t };
     if (it.result === 'over') return { tone: 'endless', who, verb: 'survived endless on', what: it.stage, stat: t };
     return { tone: 'lose', who, verb: 'died on', what: it.stage, stat: t, cause: it.cause };
   }
-  const squad = it.names.length ? list(it.names, it.players) : it.players > 1 ? `A private squad of ${it.players}` : 'A private room';
+  const squad = it.names.length ? list(it.names, it.players) : { text: it.players > 1 ? `A private squad of ${it.players}` : 'A private room' };
   if (it.kind === 'versus') {
-    if (it.result === 'win' && it.winners.length) return { tone: 'crown', who: it.winners[0], verb: 'won versus on', what: it.stage, stat: t };
+    if (it.result === 'win' && it.winners.length) return { tone: 'crown', who: list(it.winners.slice(0, 1)), verb: 'won versus on', what: it.stage, stat: t };
     if (it.result === 'win') return { tone: 'crown', who: squad, verb: 'finished versus on', what: it.stage, stat: t };
     return { tone: 'draw', who: squad, verb: 'drew on', what: it.stage, stat: t };
   }
@@ -69,12 +92,13 @@ const ICONS = { // constant SVG, never data
 
 export class HomeFeed {
   // net: CoopClient; mapTitle(name) -> display title; onStats(stats | null) for the header (null = offline);
-  // onWatch(replay id): watch a run's replay
-  constructor({ net, mapTitle, onStats, onWatch }) {
+  // onWatch(replay id): watch a run's replay; onPlayer(SteamID64): open a signed-in player's profile
+  constructor({ net, mapTitle, onStats, onWatch, onPlayer = () => {} }) {
     this.net = net;
     this.mapTitle = mapTitle;
     this.onStats = onStats;
     this.onWatch = onWatch;
+    this.onPlayer = onPlayer;
     this.history = new HomeHistory({ mapTitle, onWatch });
     this.rows = new Map(); // id -> { li, at, time }
     this.offset = 0; // our clock - the server's
@@ -191,7 +215,7 @@ export class HomeFeed {
     icon.innerHTML = ICONS[d.tone]; // a constant
     const body = el('div', 'hf-body');
     const line = el('p', 'hf-line');
-    line.append(el('b', 'hf-who', d.who), ` ${d.verb} `, el('b', 'hf-what', d.what));
+    line.append(...whoNodes(d.who, this.onPlayer), ` ${d.verb} `, el('b', 'hf-what', d.what));
     const meta = el('p', 'hf-meta');
     const bits = [it.map ? displayName(this.mapTitle(it.map)) : '', it.kind === 'solo' ? 'Solo' : it.kind === 'versus' ? 'Versus' : 'Co-op'];
     if (d.cause) bits.push(`to ${d.cause}`);
@@ -206,7 +230,7 @@ export class HomeFeed {
     // the replay, when it was shared: a play button at the row's end (and the row itself)
     const act = el('div', 'hf-act');
     if (it.replay) {
-      act.append(playButton(`Watch ${d.who}'s run on ${d.what}`, () => this.onWatch(it.replay)));
+      act.append(playButton(`Watch ${whoText(d.who)}'s run on ${d.what}`, () => this.onWatch(it.replay)));
       li.classList.add('has-replay');
       li.addEventListener('click', () => this.onWatch(it.replay));
     }

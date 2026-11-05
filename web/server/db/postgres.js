@@ -4,7 +4,7 @@
 import pg from 'pg';
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
-import { REPLAYS_KEPT, GUEST_DAYS, GUEST_KEPT, PINNED_MAX } from './store.js';
+import { REPLAYS_KEPT, GUEST_DAYS, GUEST_KEPT, PINNED_MAX, PROFILE_RECENT, PROFILE_BEST, byStage } from './store.js';
 import { fileURLToPath } from 'node:url';
 
 const MIGRATIONS = path.join(path.dirname(fileURLToPath(import.meta.url)), 'migrations');
@@ -133,7 +133,7 @@ export async function postgresStore(url, log) {
            ORDER BY ${PLAYER_KEY}, ${order}
          ) best ORDER BY ${order} LIMIT $5`,
         [map, stage, mode, kind, limit]);
-      return rows.map((r, i) => ({ rank: i + 1, name: r.name, time: r.time_s, hits: r.hits, at: r.finished_at.getTime(), verified: r.verified, steam: !!r.steam_id }));
+      return rows.map((r, i) => ({ rank: i + 1, name: r.name, time: r.time_s, hits: r.hits, at: r.finished_at.getTime(), verified: r.verified, steam: !!r.steam_id, steamId: r.steam_id || null }));
     },
 
     async upsertPlayer({ steamId, name, avatar = '' }) {
@@ -147,6 +147,43 @@ export async function postgresStore(url, log) {
       const { rows } = await pool.query('SELECT steam_id, name, avatar, created_at, seen_at FROM players WHERE steam_id = $1', [steamId]);
       const r = rows[0];
       return r ? { steamId: r.steam_id, name: r.name, avatar: r.avatar, createdAt: r.created_at.getTime(), seenAt: r.seen_at.getTime() } : null;
+    },
+
+    // store.js profile(): listed runs only, three reads on the run_players_steam index
+    async profile(steamId) {
+      const [{ rows: [t] }, { rows: best }, { rows: recent }] = await Promise.all([
+        pool.query(
+          `SELECT count(*)::int AS runs,
+                  count(*) FILTER (WHERE r.result = 'win' AND p.won AND NOT r.cheats)::int AS wins,
+                  count(DISTINCT (r.map, r.stage_id)) FILTER (WHERE r.mode = 'normal' AND r.result = 'win' AND p.won
+                    AND NOT r.cheats AND p.removed = '')::int AS cleared,
+                  count(*) FILTER (WHERE r.kind = 'solo')::int AS solo,
+                  count(*) FILTER (WHERE r.kind = 'coop')::int AS coop,
+                  count(*) FILTER (WHERE r.kind = 'versus')::int AS versus
+           FROM run_players p JOIN runs r ON r.id = p.run_id WHERE p.steam_id = $1 AND r.listed`, [steamId]),
+        // the best per map / stage / mode / kind, ordered as ORDER above (endless: longest; normal: fastest, fewest hits)
+        pool.query(
+          `SELECT DISTINCT ON (rr.map, rr.stage_id, rr.mode, rr.kind) rr.map, rr.stage_id, rr.stage_name, rr.mode, rr.kind,
+                  rr.time_s, rr.hits, rr.finished_at, rr.verified
+           FROM ranked_runs rr JOIN runs r ON r.id = rr.run_id
+           WHERE rr.steam_id = $1 AND r.listed
+           ORDER BY rr.map, rr.stage_id, rr.mode, rr.kind,
+                    CASE WHEN rr.mode = 'endless' THEN -rr.time_s ELSE rr.time_s END,
+                    CASE WHEN rr.mode = 'endless' THEN NULL ELSE rr.hits END ASC NULLS LAST, rr.finished_at`, [steamId]),
+        pool.query(
+          `SELECT r.id, r.kind, r.map, r.stage_name, r.mode, r.result, r.time_s, r.finished_at, p.won, p.hits, p.survived_s,
+                  rp.run_id AS replay_id, rp.views AS replay_views
+           FROM run_players p JOIN runs r ON r.id = p.run_id LEFT JOIN replays rp ON rp.run_id = r.id AND rp.public
+           WHERE p.steam_id = $1 AND r.listed ORDER BY r.id DESC LIMIT $2`, [steamId, PROFILE_RECENT]),
+      ]);
+      return {
+        totals: t,
+        best: best.map((r) => ({ map: r.map, stageId: r.stage_id, stageName: r.stage_name, mode: r.mode, kind: r.kind, time: r.time_s,
+          hits: r.hits, at: r.finished_at.getTime(), verified: r.verified })).sort(byStage).slice(0, PROFILE_BEST),
+        recent: recent.map((r) => ({ id: Number(r.id), kind: r.kind, map: r.map, stageName: r.stage_name, mode: r.mode, result: r.result,
+          time: r.time_s, won: r.won, hits: r.hits, survived: r.survived_s, at: r.finished_at.getTime(),
+          replay: r.replay_id != null ? Number(r.replay_id) : null, views: r.replay_views ?? 0 })),
+      };
     },
 
     async playerRuns(steamId, limit) {

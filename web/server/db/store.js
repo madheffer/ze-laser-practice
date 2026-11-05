@@ -9,6 +9,13 @@
 //   upsertPlayer({ steamId, name, avatar }) on every Steam sign-in: the account (created the first time)
 //   player(steamId)                         -> { steamId, name, avatar, createdAt, seenAt } | null
 //   playerRuns(steamId, limit)              a signed-in player's run history, newest first
+//   profile(steamId)                        their public profile, from listed runs only (never a private room's:
+//                                           those have no people; wins without cheat rules; cleared = distinct
+//                                           stages with a ranked clear): { totals: { runs, wins, cleared, solo, coop,
+//                                           versus }, best: [{ map, stageId, stageName, mode, kind, time, hits, at,
+//                                           verified }] (ranked rules, one per map/stage/mode/kind, byStage),
+//                                           recent: [{ id, kind, map, stageName, mode, result, time, won, hits,
+//                                           survived, at, replay: id when public | null, views }] newest first }
 //   getReplay(id)                           a run's replay: { runId, owner, public, meta, data (gzip), run } or null
 //   shareReplay(id, owner, on) -> bool      the owner shares (keeps) or unshares one of their replays
 //   addView(id)                             someone other than its owner watched it (runs-http.js dedupes)
@@ -30,6 +37,8 @@ export const REPLAYS_KEPT = 200;
 export const GUEST_DAYS = 14;
 export const GUEST_KEPT = 2000; // guests' replays kept in all (newest), whatever their age: one address can't fill the disk
 export const PINNED_MAX = 100; // replays one player can share for good
+export const PROFILE_RECENT = 20; // a profile's latest runs
+export const PROFILE_BEST = 200; // a profile's best times (one per map, stage, mode and kind)
 const MEMORY_KEEP = 5000; // runs kept by the memory store
 const MEMORY_REPLAYS = 300; // replays kept by the memory store
 
@@ -46,6 +55,11 @@ export function better(mode, a, b) {
   if (mode !== 'endless' && (a.hits ?? Infinity) !== (b.hits ?? Infinity)) return (a.hits ?? Infinity) - (b.hits ?? Infinity);
   return a.at - b.at;
 }
+
+// a profile's best times: by map, then stage, then normal before endless, solo before co-op before versus
+const KIND_ORDER = { solo: 0, coop: 1, versus: 2 };
+export const byStage = (a, b) => a.map.localeCompare(b.map) || a.stageName.localeCompare(b.stageName) || a.stageId.localeCompare(b.stageId)
+  || (a.mode === b.mode ? 0 : a.mode === 'normal' ? -1 : 1) || KIND_ORDER[a.kind] - KIND_ORDER[b.kind];
 
 export const playerKey = (p) => (p.steamId ? `steam:${p.steamId}` : `name:${p.name.toLowerCase()}`);
 
@@ -98,7 +112,7 @@ export function memoryStore() {
         for (const p of run.people) {
           const time = ranked(run, p);
           if (time == null) continue;
-          const row = { name: p.name, time, hits: p.hits, at: run.finishedAt, verified: run.verified, steam: !!p.steamId };
+          const row = { name: p.name, time, hits: p.hits, at: run.finishedAt, verified: run.verified, steam: !!p.steamId, steamId: p.steamId || null };
           const key = playerKey(p);
           const prev = best.get(key);
           if (!prev || better(mode, row, prev) < 0) best.set(key, row);
@@ -111,6 +125,33 @@ export function memoryStore() {
       players.set(steamId, { steamId, name, avatar, createdAt: prev?.createdAt ?? Date.now(), seenAt: Date.now() });
     },
     async player(steamId) { const p = players.get(steamId); return p ? { ...p } : null; },
+    async profile(steamId) {
+      const mine = []; // [run, their row], oldest first: listed runs only
+      for (const run of runs) {
+        const p = run.listed && run.people.find((x) => x.steamId === steamId);
+        if (p) mine.push([run, p]);
+      }
+      const totals = { runs: mine.length, wins: 0, cleared: 0, solo: 0, coop: 0, versus: 0 };
+      const cleared = new Set(), best = new Map();
+      for (const [run, p] of mine) {
+        totals[run.kind]++;
+        if (run.result === 'win' && p.won && !run.cheats) totals.wins++;
+        const time = ranked(run, p);
+        if (time == null) continue;
+        if (run.mode === 'normal') cleared.add(`${run.map}\n${run.stageId}`);
+        const row = { map: run.map, stageId: run.stageId, stageName: run.stageName, mode: run.mode, kind: run.kind, time, hits: p.hits, at: run.finishedAt, verified: run.verified };
+        const key = `${run.map}\n${run.stageId}\n${run.mode}\n${run.kind}`;
+        const prev = best.get(key);
+        if (!prev || better(run.mode, row, prev) < 0) best.set(key, row);
+      }
+      totals.cleared = cleared.size;
+      const recent = mine.slice(-PROFILE_RECENT).reverse().map(([run, p]) => {
+        const rp = replays.get(run.id);
+        return { id: run.id, kind: run.kind, map: run.map, stageName: run.stageName, mode: run.mode, result: run.result, time: run.time,
+          won: p.won, hits: p.hits, survived: p.survived, at: run.finishedAt, replay: rp?.public ? run.id : null, views: rp?.public ? rp.views : 0 };
+      });
+      return { totals, best: [...best.values()].sort(byStage).slice(0, PROFILE_BEST), recent };
+    },
     async playerRuns(steamId, limit) {
       const out = [];
       for (let i = runs.length - 1; i >= 0 && out.length < limit; i--) {

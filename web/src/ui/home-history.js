@@ -14,7 +14,7 @@ import { playButton, shareButton, viewsBadge } from './replay-buttons.js';
 
 function el(tag, cls, t) { const e = document.createElement(tag); if (cls) e.className = cls; if (t != null) e.textContent = t; return e; }
 
-const RESULT = { win: 'Cleared', lose: 'Failed', over: 'Endless', draw: 'Draw' };
+export const RESULT = { win: 'Cleared', lose: 'Failed', over: 'Endless', draw: 'Draw' };
 
 function cleanRun(x) {
   if (!x || typeof x !== 'object' || !Number.isInteger(x.id) || x.id < 1) return null;

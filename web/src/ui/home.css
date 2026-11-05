@@ -248,6 +248,7 @@
 /* ---- Steam account (ui/home.js), the feed's tabs, replay buttons and views (ui/home-feed.js, ui/home-history.js,
    ui/replay-buttons.js) */
 .home-account { display: flex; align-items: center; gap: 8px; }
+.home-avatar { width: 28px; height: 28px; border-radius: 6px; flex: none; object-fit: cover; background: #1a222c; box-shadow: 0 0 0 1px var(--line); }
 .home-user { font-size: 13px; font-weight: 600; color: var(--text); max-width: 16ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* tabs: an underlined strip under the title, the whole width */

@@ -1,9 +1,10 @@
 // Replays and the Steam account, wired into the page (main.js calls these): the replay bar, the end card's
-// "Watch replay", a shared link (?replay=<id>), and who is signed in (?signin=ok|failed after Steam sends you back).
+// "Watch replay", a shared link (?replay=<id>; ?player=<SteamID64> opens a profile), and who is signed in (?signin=ok|failed after Steam sends you back).
 import { G, $, log } from './state.js';
 import { ReplayBar } from '../ui/replay-bar.js';
 import { watchReplay, watchLastRun, togglePause, seekTo, setSpeed, cycleCam, stopReplay, replayClock, replayKey, isReplayId } from './replay.js';
 import { loadAccount } from './account.js';
+import { isSteamId } from '../lib/steam.js';
 
 export { replayKey };
 
@@ -34,6 +35,7 @@ export async function bootReplays() {
   if (signin === 'failed') log('Steam sign-in did not go through');
   await loadAccount();
   if (replay && isReplayId(replay)) await watchReplay(replay).catch(failed);
+  else if (isSteamId(url.searchParams.get('player'))) G.home?.showPlayer(url.searchParams.get('player')); // a profile link (ui/profile.js)
 }
 
 export const hasReplayLink = () => isReplayId(new URLSearchParams(location.search).get('replay'));
