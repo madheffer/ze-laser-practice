@@ -29,6 +29,27 @@ export function angleForward(a) {
   return [Math.cos(p) * Math.cos(y), Math.cos(p) * Math.sin(y), -Math.sin(p)];
 }
 
+// A camera's rotation from your view angles, as Source builds the view (AngleMatrix on the QAngle, roll 0): a pitch
+// past +-90 (an aim punch on top of looking straight up or down) rolls the view on over the top, never turns it round.
+// three's camera looks down its -Z with +Y up; Source's view frame is forward +X, left +Y, up +Z.
+const VIEW_BASIS = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().set(
+  0, 0, -1, 0,
+  -1, 0, 0, 0,
+  0, 1, 0, 0,
+  0, 0, 0, 1));
+export function viewQuat(pitch, yaw, q = new THREE.Quaternion()) {
+  return angleQuat([pitch, yaw, 0], q).multiply(VIEW_BASIS);
+}
+
+// The same direction with pitch inside [-90, 90] (pitch -99 at yaw y is pitch -81 at yaw y + 180): for a shot whose
+// punch went past vertical, which replays and the co-op server keep as a +-90 pitch.
+export function foldPitch(pitch, yaw) {
+  const p = ((((pitch + 180) % 360) + 360) % 360) - 180;
+  if (p < -90) return [-180 - p, yaw + 180];
+  if (p > 90) return [180 - p, yaw + 180];
+  return [p, yaw];
+}
+
 // ---- CS2 mathlib angle rules (server.dll 2026-09-23 build, read in Ghidra; Source's mathlib_base.cpp has the same
 // shapes). Angles are degrees, QAngle order [pitch, yaw, roll].
 

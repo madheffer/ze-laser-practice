@@ -47,6 +47,7 @@ const ARMS = 'agent:ctm_sas';
 // Hand-made motion (CS2 has none of this in the graph: bob and lag are client code). Inches / degrees.
 const BOB = { lat: 0.4, vert: 0.25, cycle: 0.98, refSpeed: 250 };    // CS:GO cl_bobamt_lat / _vert / cl_bobcycle
 const LAG = { scale: 0.35, max: 2.5, decay: 9 };                      // degrees of trail per degree turned
+const LAND_STEP = 1 / 120;                                            // the landing spring's integration step (s)
 
 export class Viewmodel {
   constructor(renderer) {
@@ -83,7 +84,10 @@ export class Viewmodel {
     this.scene.add(this.hemi, this.sun);
     this._envRT = null;
 
-    // motion state
+    this._resetMotion();
+  }
+
+  _resetMotion() {
     this._bobPhase = 0; this._bobAmt = 0;
     this._lagYaw = 0; this._lagPitch = 0;
     this._land = 0; this._landV = 0; this._airTime = 0; this._wasOnGround = true;
@@ -218,6 +222,7 @@ export class Viewmodel {
     this.reloading = false;
     this._deployed = false;
     this.recoil.reset();
+    this._resetMotion();                                  // no bob, trail or landing dip carried over from the last stage
     this.lastWeapon = weapon === 'knife' ? 'gun' : 'knife';
     this.setWeapon(weapon);
   }
@@ -334,8 +339,15 @@ export class Viewmodel {
     if (onGround && !this._wasOnGround) { this._landV -= Math.min(this._airTime, 1) * 30; }
     if (onGround) this._airTime = 0;
     this._wasOnGround = onGround;
-    this._landV += (-this._land * 180 - this._landV * 18) * dt;
-    this._land += this._landV * dt;
+    // The spring (stiffness 180, damping 18) in small steps: in one step of a long frame (a stage loading, a hitch:
+    // dt up to 0.25 s) the damping term overshoots (1 - 18 dt < -1) and it grows without bound, which flung the
+    // viewmodel camera to infinity and the knife and gun off screen until a reload.
+    for (let left = dt; left > 0; left -= LAND_STEP) {
+      const h = Math.min(left, LAND_STEP);
+      this._landV += (-this._land * 180 - this._landV * 18) * h;
+      this._land += this._landV * h;
+    }
+    if (!Number.isFinite(this._land) || !Number.isFinite(this._landV)) this._land = this._landV = 0;
   }
 
   // The motion is applied to the CAMERA, inverted: the graph rewrites every bone each frame, so the model

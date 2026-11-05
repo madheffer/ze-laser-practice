@@ -4,7 +4,7 @@ import { ConvexGeometry } from 'three/addons/geometries/ConvexGeometry.js';
 import { MapLighting } from './lighting.js';
 import { PostProcess, CS2_POST_GLSL } from './tonemap.js';
 import { GLTF_TO_SOURCE } from './assets.js';
-import { DEG, parseVec, angleForward, isParticleSystem } from './entities/index.js';
+import { DEG, parseVec, angleForward, viewQuat, isParticleSystem } from './entities/index.js';
 import { assetKey } from '../lib/paths.js';
 import { setFxCamera, fxShared } from '../fx/effects.js';
 import { sceneCopyWanted } from '../fx/particles/render/spritecard.js';
@@ -487,11 +487,12 @@ export class Renderer {
     c.matrix.compose(mid, q, new THREE.Vector3(1, Math.max(1, len), 1));
   }
 
+  // Built from the angles (Source's AngleMatrix), not lookAt + world up: with the aim punch on top of looking straight
+  // up, the view's pitch goes past -90 and lookAt would spin it 180 degrees; CS2's rolls on over the top
   setView(eye, yaw, pitch) {
     const cam = this.camera;
     cam.position.set(eye[0], eye[1], eye[2]);
-    const f = new THREE.Vector3(...angleForward([pitch, yaw, 0]));
-    cam.lookAt(cam.position.clone().add(f));
+    viewQuat(pitch, yaw, cam.quaternion);
   }
 
   // The world pass goes to a half-float HDR target and is tone-mapped once, as a whole frame, on the way to the screen

@@ -6,7 +6,7 @@ import { S, G } from './state.js';
 import { fireSound } from './weapon-sounds.js';
 import { rule } from './rules.js';
 import { rayHullEntry } from '../world/collision.js';
-import { angleForward } from '../world/entities/index.js';
+import { angleForward, foldPitch } from '../world/entities/index.js';
 import { stripPrefix } from '../lib/names.js';
 import { clamp } from '../lib/math.js';
 import { bossHittable, replayBossFire } from '../world/run-engine.js';
@@ -139,7 +139,8 @@ export function onShot(shot) {
   // it leaves along your view + the aim punch it was fired with (lib/recoil.js); a replay and the co-op server redo it
   // from that direction, so neither needs the recoil itself
   const p = shot.punch || [0, 0];
-  const yaw = player.yaw + p[1], pitch = Math.max(-89, Math.min(89, player.pitch + p[0]));
+  // CS2 doesn't clamp eye + punch: past straight up the shot goes on over the top, kept as a pitch inside +-90
+  const [pitch, yaw] = foldPitch(player.pitch + p[0], player.yaw + p[1]);
   run.rec?.shot(run.ticks, shot, yaw, pitch); // its replay redoes it on the same tick (app/replay-play.js)
   shootAs(shot, yaw, pitch);
 }
