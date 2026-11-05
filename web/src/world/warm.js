@@ -15,7 +15,7 @@
 import * as THREE from 'three';
 import { GLTF_TO_SOURCE } from './assets.js';
 import { cloneModel } from './anim.js';
-import { parseVec } from './entities/index.js';
+import { parseVec, isParticleSystem } from './entities/index.js';
 
 const MAX_MODELS = 80;
 const IDLE_TIMEOUT_MS = 250;
@@ -43,7 +43,7 @@ export function templateAssets(engine) {
       if (!kv.model) continue;
       let kind;
       if (cls === 'trigger_hurt') kind = 'hull';
-      else if (cls.startsWith('trigger_') || cls === 'info_particle_system') continue;
+      else if (cls.startsWith('trigger_') || isParticleSystem(cls)) continue;
       // render.js addEntity draws nothing for these
       else if (kv.rendermode === 'kRenderNone' || kv.rendermode === '10' || kv.renderamt === '0') continue;
       else kind = 'model';

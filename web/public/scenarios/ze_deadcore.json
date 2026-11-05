@@ -32,7 +32,8 @@
       "fastForward": 37.5,
       "win": {
         "target": "[PR#]a_nuke",
-        "input": "Enable"
+        "input": "Enable",
+        "survive": 1
       }
     },
     {
@@ -108,7 +109,8 @@
       "fastForward": 37.5,
       "win": {
         "target": "[PR#]b_nuke",
-        "input": "Enable"
+        "input": "Enable",
+        "survive": 1
       }
     },
     {
@@ -165,7 +167,7 @@
       "group": "Main stages",
       "name": "Stage B escape: lift and poles",
       "summary": "Ride the lift, dodge the pole waves",
-      "description": "b_boss_counter1 OnHitMin: the lift (b_escape_train) rises at +12 s, holds, b_escape_speedup sets speed 2 at +77 s while b_escape_pole_timer1 spawns pole waves every 1.35 s until +110 s; b_escape_push1 throws you up at +115.5 s. b_nuke at +130 s.",
+      "description": "b_boss_counter1 OnHitMin: the lift (b_escape_train) rises at +12 s, holds, b_escape_speedup sets speed 2 at +77 s while b_escape_pole_timer1 spawns pole waves every 1.35 s until +110 s; b_escape_push1 throws you up at +115.5 s. b_nuke at +130 s: be outside it.",
       "spawn": {
         "on": "[PR#]b_escape_train",
         "offset": [
@@ -189,7 +191,8 @@
       ],
       "win": {
         "target": "[PR#]b_nuke",
-        "input": "Enable"
+        "input": "Enable",
+        "survive": 1
       },
       "setup": [
         {
@@ -232,7 +235,8 @@
       "fastForward": 37.5,
       "win": {
         "target": "[PR#]c_nuke",
-        "input": "Enable"
+        "input": "Enable",
+        "survive": 1
       }
     },
     {
@@ -263,7 +267,8 @@
       "fastForward": 60,
       "win": {
         "target": "[PR#]c_dodge_spawntimer1",
-        "input": "Disable"
+        "input": "Disable",
+        "from": "[PR#]c_dodge_trigger"
       },
       "setup": [
         {
@@ -369,7 +374,8 @@
       ],
       "win": {
         "target": "[PR#]d_nuke",
-        "input": "Enable"
+        "input": "Enable",
+        "survive": 1
       }
     },
     {
@@ -415,6 +421,10 @@
         "yaw": 90
       },
       "start": [
+        {
+          "target": "[PR#]d_temp",
+          "input": "ForceSpawn"
+        },
         {
           "target": "[PR#]radiation_startrelay1",
           "input": "Trigger"
@@ -500,7 +510,7 @@
       "parent": "core",
       "name": "Core: altar lasers (1 wave)",
       "summary": "Jump the sweeping altar lasers",
-      "description": "8 altars (radiation_laser_temp1-8) rise and sweep a 2620-wide, 200-tall laser (300 damage, 150 per touch) while the ring turns; speed ramps 1 -> 0 over 6 s.",
+      "description": "8 altars (radiation_laser_temp1-8) rise and sweep a 2620-wide, 200-tall laser (300 damage, 150 per touch) while the ring turns; speed ramps 1 -> 0 over 6 s. The laser hurts only from 9.2 to 9.4 s after its altar spawns: where it stopped.",
       "spawn": {
         "origin": [
           0,
@@ -539,7 +549,7 @@
       "parent": "core",
       "name": "Core: altar lasers (2 waves)",
       "summary": "Two waves of altar lasers, both ways",
-      "description": "As laser1 twice: second wave 2 s later in the other direction (radiation_laser_rotaterev).",
+      "description": "As laser1 twice: second wave 2 s later in the other direction (radiation_laser_rotaterev). Each laser hurts only from 9.2 to 9.4 s after its altar spawns: where it stopped.",
       "spawn": {
         "origin": [
           0,
@@ -559,7 +569,7 @@
           "delay": 0.1
         }
       ],
-      "winAfter": 8,
+      "winAfter": 12,
       "setup": [
         {
           "target": "[PR#]des2",
@@ -1144,7 +1154,7 @@
           "delay": 0.1
         }
       ],
-      "winAfter": 7.9,
+      "winAfter": 11.5,
       "setup": [
         {
           "target": "[PR#]des2",
@@ -1183,7 +1193,7 @@
           "delay": 0.1
         }
       ],
-      "winAfter": 7.9,
+      "winAfter": 10.5,
       "setup": [
         {
           "target": "[PR#]des2",
@@ -1222,7 +1232,7 @@
           "delay": 0.1
         }
       ],
-      "winAfter": 7.9,
+      "winAfter": 12,
       "setup": [
         {
           "target": "[PR#]des2",
@@ -1261,7 +1271,7 @@
           "delay": 0.1
         }
       ],
-      "winAfter": 7,
+      "winAfter": 12.5,
       "setup": [
         {
           "target": "[PR#]des2",
@@ -1373,6 +1383,10 @@
       },
       "start": [
         {
+          "target": "[PR#]d_temp",
+          "input": "ForceSpawn"
+        },
+        {
           "target": "[PR#]escape_common_relay",
           "input": "Trigger"
         }
@@ -1388,7 +1402,7 @@
       "group": "Redcore",
       "name": "Final escape (Insane D)",
       "summary": "Insane escape: faster lasers and meteors",
-      "description": "escape_relay_ex: lasers every 2.5 s, escape_ex_meteor_detecttrigger meteors from +21 s, escape_ex_press_relay at +92 s. cc_red and invert start on, as the core leaves them; 1 round in 6 the music case picks \"prank D\" (music_d_ex_escape_prankd: both off at +1.3 s, \"Stage - D\", \"Just kidding\", the relay turns them back on at +13 s, red on top). d_nuke (+123 s) lives in Stage D's template (d_temp), which this drill doesn't spawn, so the win is the clock.",
+      "description": "escape_relay_ex: lasers every 2.5 s, escape_ex_meteor_detecttrigger meteors from +21 s, escape_ex_press_relay at +92 s. cc_red and invert start on, as the core leaves them; 1 round in 6 the music case picks \"prank D\" (music_d_ex_escape_prankd: both off at +1.3 s, \"Stage - D\", \"Just kidding\", the relay turns them back on at +13 s, red on top). The last platform (escape_platform_move7) carries you 1800 u forward from +116.6 s, out of d_nuke (+123 s): be on it.",
       "spawn": {
         "origin": [
           -5,
@@ -1398,6 +1412,10 @@
         "yaw": 90
       },
       "start": [
+        {
+          "target": "[PR#]d_temp",
+          "input": "ForceSpawn"
+        },
         {
           "target": "[PR#]cc_red",
           "input": "Enable"
@@ -1418,7 +1436,11 @@
         }
       ],
       "fastForward": 17.5,
-      "winAfter": 122
+      "win": {
+        "target": "[PR#]d_nuke",
+        "input": "Enable",
+        "survive": 1
+      }
     },
     {
       "id": "enemy1",

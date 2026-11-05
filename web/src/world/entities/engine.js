@@ -364,11 +364,11 @@ export class EntityEngine {
     this.warnOnce(`${e.cls}.${inp}`, `unhandled ${e.cls}.${input}`);
   }
 
-  // Watch (or swallow) inputs: fn(e, input) runs before every input; returning true swallows it. The last hook
-  // installed runs first. Scenarios use it for win / lose and endless mode's cancels.
+  // Watch (or swallow) inputs: fn(e, input, param, activator, caller) runs before every input; returning true swallows
+  // it. The last hook installed runs first. Scenarios use it for win / lose and endless mode's cancels.
   hookInput(fn) {
     const next = this.input.bind(this);
-    this.input = (e, input, ...rest) => (fn(e, input) ? undefined : next(e, input, ...rest));
+    this.input = (e, input, ...rest) => (fn(e, input, ...rest) ? undefined : next(e, input, ...rest));
   }
 
   addOutput(e, param) { addOutput(this, e, param); }

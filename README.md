@@ -8,7 +8,7 @@ the wave, the same chain of relays, cases, templates and movers that runs on a s
 ```
 bake/    lasers-bake: a CS2 workshop VPK -> a map folder (C#, ValveResourceFormat 20.1)
 web/     the player (Vite + three.js, plain ES modules)
-tools/   io-graph.mjs + sim.mjs (scenario authoring), index-maps.mjs (rebuild maps/index.json)
+tools/   io-graph.mjs + sim.mjs (scenario authoring), audit-stages.mjs (every stage checked headless), index-maps.mjs (rebuild maps/index.json)
 ```
 
 ## Run it locally
@@ -209,7 +209,11 @@ All coordinates are Source units (inches, Z up), except the glbs, which are VRF'
 ```
 
 `start` inputs fire 1 s after spawn. You win either after `winAfter` seconds, or when `win: {target, input}`
-is received. Fields we added (cybo's site ignores them):
+is received (`survive: s` on it: only if you are still alive s seconds later, for a nuke's `Enable`, ze_deadcore's
+endings; `from: name`: only when that entity sends it, ze_deadcore's dodge corridor end trigger, not the clock sending
+the same input). Check a map's stages with `node tools/audit-stages.mjs web/public/maps/<map>`: inputs to entities the
+stage never spawned, effects / models not baked, drills that end before their own attack hurts, and wins you'd get
+standing still. Fields we added (cybo's site ignores them):
 
 | Field | What |
 |---|---|

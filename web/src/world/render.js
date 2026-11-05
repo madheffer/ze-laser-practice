@@ -4,7 +4,7 @@ import { ConvexGeometry } from 'three/addons/geometries/ConvexGeometry.js';
 import { MapLighting } from './lighting.js';
 import { PostProcess, CS2_POST_GLSL } from './tonemap.js';
 import { GLTF_TO_SOURCE } from './assets.js';
-import { DEG, parseVec, angleForward } from './entities/index.js';
+import { DEG, parseVec, angleForward, isParticleSystem } from './entities/index.js';
 import { assetKey } from '../lib/paths.js';
 import { setFxCamera, fxShared } from '../fx/effects.js';
 import { sceneCopyWanted } from '../fx/particles/render/spritecard.js';
@@ -148,7 +148,7 @@ export class Renderer {
     group.matrixAutoUpdate = false;
     let any = false;
 
-    if (e.cls === 'info_particle_system' && map.effects?.has(kv.effect_name)) {
+    if (isParticleSystem(e.cls) && map.effects?.has(kv.effect_name)) {
       // the real effect (fx/particles): it lives in world space, under fxRoot, fed from this entity every frame
       any = true;
       this.track(map.effects.spawn(kv.effect_name, { seed: e.id })).then((inst) => {
@@ -156,7 +156,7 @@ export class Renderer {
         group.userData.fx = inst;
         this.fxRoot.add(inst.group);
       });
-    } else if (e.cls === 'info_particle_system') {
+    } else if (isParticleSystem(e.cls)) {
       // an older bake without fx/: the summary sprites
       const fx = map.particles?.[assetKey(kv.effect_name || '')];
       if (fx) {
@@ -455,7 +455,7 @@ export class Renderer {
   // a heal zone's material: the colour of a particle parented to it (mist's aura: pink), else a soft green
   healMaterial(e, map) {
     let color = new THREE.Color(0x7dffa0);
-    const fxEnt = [...e.children].find((c) => c.cls === 'info_particle_system');
+    const fxEnt = [...e.children].find((c) => isParticleSystem(c.cls));
     const fx = fxEnt && map.particles?.[assetKey(fxEnt.kv.effect_name || '')];
     // the more saturated of the particle's two colours (a pale one vanishes on a bright floor)
     const sat = (c) => (c?.length >= 3 ? Math.max(...c.slice(0, 3)) - Math.min(...c.slice(0, 3)) : -1);

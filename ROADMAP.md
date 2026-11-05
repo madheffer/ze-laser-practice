@@ -118,7 +118,16 @@ exact map-folder format so he can lift our maps straight into his site. See [REA
 - [ ] **Movement cvars from the map** — `run.cvars` has them (deadcore `sv_airaccelerate 20`, westersand `sv_friction 4` / `sv_accelerate 5`, its stage 5 `sv_airaccelerate 1337` / `sv_maxspeed 1000`); movement still uses CS2's defaults (rules.js moveSettings, shared with co-op)
 - [ ] **Play-test westersand + deadcore in the browser** — every stage was checked headless (sim) only; spawns, win/lose and the cubes' chase need a real run each (westersand's airship Gabranth chases with thrusters too; its `desert_ending` / `gabranth_tomb` windows are tight with default team fire)
 - [ ] **KeyValue origin on a parented entity** — we set the world position; Source sets the LOCAL origin (parent space). Matters for deadcore's `des2` after `SetParent` (c_escape: SetParent c_p13 @22, KeyValue origin @74.9); check against a live server
-- [ ] **info_world_layer** — ze_deadcore shows/hides world layers per stage; our collision has every layer at once
+- [ ] **info_world_layer** — ze_deadcore shows/hides world layers per stage; our collision has every layer at once.
+  The world glb names its meshes by layer (`n0_lr0..lr4`); deadcore's layers are separate regions (the core arena
+  shows above the escape, where CS2 hides it). `tools/audit-stages.mjs` lists every Show/Hide it skips
+- [ ] **env_particle_glow SetAlphaScale** — deadcore's Insane escape fades its platform glows; unhandled (the glow
+  stays at full alpha)
+- [ ] **deadcore's world glb misses a texture** — the 2026-11-06 re-bake referenced
+  `default_normal_tga_b3f4ec4c_orm_3598707198.png` without writing it, so `chunk-world.mjs` fails on the next re-bake
+  (the current chunks are the earlier run's, all their images present)
+- [ ] **func_rotating spin-up / spin-down rate** — ours is a guess (movers.js); check CS2's CFuncRotating against
+  server.dll (deadcore's altar lasers stop where the ramp leaves them, at a random time, so it changes where they fire)
 - [ ] **Physbox friction from data** — floor friction is μ 0.8 (an assumption: VPhysics surface data isn't in the bake)
 - [ ] **Map round rotation** — deadcore picks its stage set from `level_counter` (not in the baked entities) and `logic_auto` OnMapSpawn isn't fired, so stages start from their own relays
 - [ ] **BossHUD totals across segments** — westersand's bosses share one `Boss_Health` counter refilled per segment (6 segments); the HUD shows the current segment only

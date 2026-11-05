@@ -5,7 +5,8 @@
 //   const run = createRunEngine({ entities, hulls, bounds, animations, traceBox, scenario, mode, seed, humans, bossHp, items, hooks })
 //   hooks.attach(engine)    before the world spawns (renderer / sound / player hooks)
 //   hooks.silent(on)        a fast-forward replay starts / ends (the client mutes its sounds)
-//   hooks.win() / lose()    the scenario's win / lose input arrived (a disabled relay doesn't count)
+//   hooks.win() / lose()    the scenario's win / lose input arrived (a disabled relay doesn't count); a win with
+//                           `survive` sets run.winAt instead, and the caller wins there if still alive (winDue)
 //   hooks.place(spawn)      where the player starts ({ origin, yaw, pitch? }), before the `setup` inputs fire
 //   fits(origin, solids)    does a standing player fit there (world/movement.js standsFree): a spawn that doesn't
 //                           moves to the nearest spot that does (freeSpawn)
@@ -26,6 +27,9 @@ export const TICK = 1 / 64;
 // in. A stage that starts mid-map (fastForward) holds the map still for it, where the replay left it.
 export const COUNTDOWN = 3;
 // a replay recorded before its meta carried the countdown: mid-map stages had none, the others 1 s solo
+// the stage is won by the clock now: winAfter s since its start, or a `survive` win's moment (see hooks.win above)
+export const winDue = (run, winAfter) => run.started && !run.endless && (
+  (run.winAt != null && run.engine.time >= run.winAt) || (!!winAfter && run.engine.time - run.startTime >= winAfter));
 export const legacyCountdown = (scenario) => (scenario?.fastForward ? 0 : 1);
 const DAMAGE_PER_HIT = 30;
 const PERFECT_HITS_PER_HUMAN = 5;
@@ -57,10 +61,15 @@ export function createRunEngine({ entities, hulls, bounds, animations, traceBox,
   // relay ignores Trigger (the escape boss's death disables relay_fail before its corpse "triggers" it)
   const wins = inputMatcher(endless ? null : scenario?.win), loses = inputMatcher(scenario?.lose);
   if (wins.size || loses.size) {
-    engine.hookInput((e, input) => {
+    engine.hookInput((e, input, param, activator, caller) => {
       if (run.started && !(e.cls === 'logic_relay' && !e.enabled)) {
-        if (loses(e.key, input)) hooks.lose?.();
-        else if (wins(e.key, input)) hooks.win?.();
+        if (loses(e.key, input, caller?.key)) hooks.lose?.();
+        else {
+          const w = wins(e.key, input, caller?.key);
+          // a nuke's Enable (ze_deadcore's d_nuke) is the round's end, not the win: whoever it doesn't kill wins
+          if (w?.survive) run.winAt ??= engine.time + w.survive;
+          else if (w) hooks.win?.();
+        }
       }
       return false; // watched, never swallowed
     });

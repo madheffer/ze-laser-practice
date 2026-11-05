@@ -12,7 +12,7 @@
 //     and have a clear line from the player's eye to the boss.
 //   - the stage's own win / lose (the map's win input or winAfter), instead of trusting a client.
 // Violations are counted per kind; a few within two seconds and the player is out of the round.
-import { createRunEngine, hazardName, TICK, COUNTDOWN, startIfDue, mapRuns } from '../src/world/run-engine.js';
+import { createRunEngine, hazardName, TICK, COUNTDOWN, startIfDue, mapRuns, winDue } from '../src/world/run-engine.js';
 import { useItems } from '../src/world/items.js';
 import { CollisionWorld, makeTrace } from '../src/world/collision.js';
 import { bulletWorld, BULLET_MASK } from '../src/world/bullets.js';
@@ -191,7 +191,7 @@ export class PlayerCheck {
     }
     this.recordPast();
     if (run.started && run.endlessTick) run.endlessTick(TICK);
-    if (run.started && !run.endless && this.scenario?.winAfter && engine.time - run.startTime >= this.scenario.winAfter) this.onOutcome('win');
+    if (winDue(run, this.scenario?.winAfter)) this.onOutcome('win');
   }
 
   die(cause) {

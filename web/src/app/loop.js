@@ -10,7 +10,7 @@ import { applyPose, eventsAfter, eventsDuring } from './replay-play.js';
 import { replayView } from './replay-view.js';
 import { useItems as pressItems } from '../world/items.js';
 import { startScenario, hurtPlayer, healPlayer, finish, stageTime, landing } from './session.js';
-import { startIfDue, mapRuns } from '../world/run-engine.js';
+import { startIfDue, mapRuns, winDue } from '../world/run-engine.js';
 import { bossHudHtml } from '../ui/hud.js';
 import { formatTime, plural } from '../lib/format.js';
 import { getRecord } from './records.js';
@@ -213,7 +213,7 @@ function teamAndEnd(run) {
   trackSegments();
   if (run.started && engine.time - run.startTime >= 1) bossFire(CS.tick);
   if (run.started && run.endlessTick) run.endlessTick(CS.tick);
-  if (run.started && run.winAfter && engine.time - run.startTime >= run.winAfter) finish('win');
+  if (winDue(run, run.winAfter)) finish('win');
 }
 
 // CS footsteps: silent when walking (shift) or crouched, and below ~135 u/s

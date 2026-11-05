@@ -221,6 +221,13 @@ export function updateTriggers(engine, player) {
     const set = engine.byClass.get(cls);
     if (!set) continue;
     for (const e of set) {
+      // a fired trigger_once touches nothing more and goes 0.1 s later (Source's CTriggerMultiple: SetTouch(NULL), then
+      // SUB_Remove at curtime + 0.1), so outputs it sends itself still land: ze_deadcore's d_win_detecttrigger gets
+      // OnStartTouch > !self > FireUser1, the final escape's win
+      if (e.state.removeAt != null) {
+        if (engine.time + EPS >= e.state.removeAt) engine.kill(e);
+        continue;
+      }
       if (!e.enabled) {
         untouch(engine, e, events);
         // a disabled hurt touches nobody, so its next think hurts nobody and stops
@@ -243,7 +250,7 @@ export function updateTriggers(engine, player) {
         e.fireOutput('OnStartTouchAll', engine.playerEnt);
         if (cls === 'trigger_multiple' || cls === 'trigger_once') {
           e.fireOutput('OnTrigger', engine.playerEnt);
-          if (cls === 'trigger_once') engine.kill(e);
+          if (cls === 'trigger_once') e.state.removeAt = engine.time + 0.1; // kill() ends the touch then
           else e.state.nextTrigger = engine.time + multipleWait(e);
         }
         if (cls === 'trigger_hurt') e.state.hurtOnce = false; // a new touch counts as a new hit
