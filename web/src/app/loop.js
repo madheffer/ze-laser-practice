@@ -36,6 +36,8 @@ export function simulate(now) {
     return;
   }
   if (S.paused) return;
+  // solo: a stage's clock waits until the world around you is drawn (world/stream.js); a round never waits
+  if (!run.started && G.stream && !G.stream.ready(player.origin)) { lastSim = now; return; }
   const realDt = Math.min(0.1, (now - lastSim) / 1000);
   lastSim = now;
   acc += realDt * timescale();
@@ -50,6 +52,7 @@ export function simulate(now) {
 const MAX_CATCHUP = 320; // ticks per call (5 s): a long hidden tab catches up over a few calls
 let lastSim = performance.now();
 
+const camPos = [0, 0, 0];
 export let lastFrameAt = 0; // app/coop.js keeps a round going when frames stop (hidden or throttled tab)
 export function frame(now) {
   requestAnimationFrame(frame);
@@ -76,8 +79,10 @@ export function frame(now) {
   G.body?.update({ visible: tp, origin: o, yaw: player.yaw, ducked: player.ducked, duckAmount: player.duckAmount, onGround: player.onGround });
   G.peers?.update(S.run && S.mp ? S.run.t - S.mp.interpDelay : null, G.renderer.camera, spec?.id);
   G.renderer.showHitboxes = rule('hitboxes'); // a round's are the room's
+  G.stream?.update(G.renderer.camera.position.toArray(camPos), G.renderer.lighting?.viewDistance ?? Infinity); // the world's chunks around the camera (Source units)
   G.renderer.lighting?.update(engine, G.renderer.camera); // the map's fog (its own entities + I/O), far Z, the sky
   G.renderer.updateEntities(engine ? engine.time + (live ? acc : 0) : 0);
+  G.renderer.lighting?.setLights(S.map?.effects?.lights, G.renderer.camera); // particle lights, after the effects' update
   G.renderer.render();
   G.radar?.draw();
   const look = takeLookDelta();
@@ -87,6 +92,8 @@ export function frame(now) {
     G.vm.update(Math.max(1e-3, realDt) * timescale(), {
       speed: Math.hypot(player.velocity[0], player.velocity[1]), onGround: player.onGround, ducked: player.ducked, ...look,
     });
+    // the same particle lights as the world, at the world's pre-curve exposure (this pass is tone-mapped on its own)
+    G.vm.setParticleLights(G.renderer.lighting?.barnUniforms, G.renderer.camera, (G.renderer.post?.uniforms?.cs2Exposure?.value ?? 1) * 2.8);
     G.vm.render(G.renderer.camera.aspect);
   }
   G.audio.setListener(eye, player.yaw, player.pitch);
@@ -184,6 +191,10 @@ export function updateHud() {
   const bosses = [];
   for (const b of scenario?.bosses || []) { const s = bossStatus(b); if (s) bosses.push(s); }
   const sub = [];
+  if (G.stream && !run.started) {
+    const [have, need] = G.stream.progress(player.origin);
+    if (have < need) sub.push(`loading area ${have}/${need}`);
+  }
   if (run.hits) sub.push(plural(run.hits, 'hit'));
   if (player.gravityScale !== 1) sub.push(`gravity ${player.gravityScale}×`);
   if (timescale() !== 1) sub.push(`${timescale()}× speed`);

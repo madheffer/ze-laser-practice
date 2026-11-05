@@ -44,8 +44,10 @@ function swingTwist(q, axis, out) {
 }
 
 export class PlayerBody {
-  constructor(scene, { log = () => {} } = {}) {
+  // onModel(root): once loaded (main.js: the particle lights, world/lighting.js patchDynamic)
+  constructor(scene, { log = () => {}, onModel = null } = {}) {
     this.log = log;
+    this.onModel = onModel;
     this.place = new THREE.Group(); // feet at the origin, turned by yaw (Source units, Z up)
     this.place.visible = false;
     this.place.name = 'player-body';
@@ -93,6 +95,7 @@ export class PlayerBody {
     } catch (e) { this.log(`body: no twist constraints (${e.message})`); }
 
     try { this.knife = await this._loadKnife(); } catch (e) { this.log(`body: no knife (${e.message}), the body alone`); }
+    this.onModel?.(this.place);
     this.ready = true;
     this.log(`body: ctm_sas, ${this.joints.size} bones, ${this.twists.length} twist constraints${this.crouch ? ', crouch stance' : ''}`);
   }

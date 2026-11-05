@@ -11,6 +11,7 @@ import { fetchJson, fetchBuffer, FRESH } from '../lib/fetch.js';
 import { normaliseHulls } from './hulls.js';
 import { mapItems } from './items.js';
 import { MapEffects } from '../fx/effects.js';
+import { chunkList } from './stream.js';
 
 // VRF exports glTF in metres, Y up: gltf = (src.y, src.z, src.x) * 0.0254. This puts it back in Source units.
 export const GLTF_TO_SOURCE = new THREE.Matrix4().set(
@@ -77,8 +78,15 @@ export async function loadMap(name, onProgress = () => {}, opts = {}) {
 
   const { hulls, bounds } = normaliseHulls(hullsRaw);
 
-  onProgress('world');
-  const world = await loadGlb(loader, base + manifestPath(manifest.world, null), (p) => onProgress(`world ${Math.round(p * 100)}%`));
+  // the world in chunks streamed around the player (tools/chunk-world.mjs, world/stream.js), else the whole glb
+  const chunkJson = opts.chunks !== false && manifest.chunks === 'world/chunks.json' ? await fetchJson(url('world/chunks.json')).catch(() => null) : null;
+  const chunks = chunkJson ? chunkList(chunkJson) : [];
+  let world = null;
+  if (!chunks.length) {
+    onProgress('world');
+    world = await loadGlb(loader, base + manifestPath(manifest.world, null), (p) => onProgress(`world ${Math.round(p * 100)}%`));
+  }
+  const loadChunk = (file) => loadGlb(loader, base + file);
 
   const renderModels = new Set((Array.isArray(manifest.renderModels) ? manifest.renderModels : []).map(assetKey));
   const modelBase = base + manifestPath(manifest.models, 'models/');
@@ -99,7 +107,7 @@ export async function loadMap(name, onProgress = () => {}, opts = {}) {
   // the map's particle effects as the game has them (bake fx/), run by fx/particles; null for an older bake
   const effects = await MapEffects.load((rel) => url(rel), fetchJson);
   const radar = radarInfo(overview, (rel) => url(rel));
-  return { name, version, manifest, entities, collision, collisionFx, hulls, bounds, animations, world, getModel, particles: fx, items, radar, effects };
+  return { name, version, manifest, entities, collision, collisionFx, hulls, bounds, animations, world, chunks, loadChunk, getModel, particles: fx, items, radar, effects };
 }
 
 // (the loader adds ?v=)

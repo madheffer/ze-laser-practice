@@ -1,0 +1,12 @@
+{
+  "name": "lasers-tools",
+  "private": true,
+  "type": "module",
+  "description": "Node tools for baking and authoring (see BAKING.md); npm --prefix tools install",
+  "dependencies": {
+    "@gltf-transform/core": "4.1.0",
+    "@gltf-transform/extensions": "4.1.0",
+    "@gltf-transform/functions": "4.1.0",
+    "meshoptimizer": "0.22.0"
+  }
+}

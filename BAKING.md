@@ -21,10 +21,39 @@ It builds `bake/` (Release), then runs, per map:
 | `map` | `<vpk> web/public/maps` | manifest, entities, collision, hulls, glbs + textures (cut-out alpha put back), particles + `fx/`, sounds, `shots/`, `overview/` |
 | `lighting` | `--lighting <vpk> <map dir>` | `lighting/`: lightmaps (raw BC6H/BC7/DXT1/BC4 blocks), probes, tonemap + LUT (`post/`), skies, reflection cubemaps. The **high** tier |
 | `tiers` | `--tiers <vpk> <map dir>` | `q/medium/`, `q/low/`: smaller textures and PNG lightmaps any GPU can take |
+| `chunks` | `node tools/chunk-world.mjs <map dir>` | `world/chunk_<n>.glb` + `world/chunks.json`, and `"chunks"` in the manifest: the world streamed in pieces (below) |
 | `index` | `node tools/index-maps.mjs` | `web/public/maps/index.json` (the map picker) |
 
 `--steps lighting,tiers` runs only those, `--skip-build` uses the bake already built, `--cs2 <game/csgo>` if CS2
-isn't in a usual Steam library. Order matters: `tiers` reads `lighting/` and the textures the `map` step wrote.
+isn't in a usual Steam library. Order matters: `tiers` reads `lighting/` and the textures the `map` step wrote, and
+`chunks` must run after `map` (a re-bake rewrites the manifest without `"chunks"`, so the game falls back to the whole
+world glb until `chunks` runs again). `chunks` needs the tools' npm packages (`npm --prefix tools install`; the script
+runs it the first time).
+
+## World streaming (chunks)
+
+A world glb is one 7-200 MB file with hundreds to thousands of meshes (mist: 6,319 draw calls). `chunk-world.mjs`
+cuts it into 4096-unit cells and the game (`world/stream.js`) loads only the cells around you, nearest first, so a stage
+starts once its own area is in (mist's throne finale: about 6 MB of the world's 59 MB). A solo stage's clock
+waits for its area ("loading area n/m" on the HUD); a co-op round never waits (the server's clock), it just streams.
+
+Rendering only: collision, hulls, entities and logic are whole from the start, so the game plays the same 1:1
+whatever has loaded. Per chunk:
+
+- lightmapped meshes sharing a material are joined (they're lit per pixel from the lightmap, so joining can't change
+  their shading); a lightmapped mesh wider than 1.5 cells is cut by triangle into the cells it crosses
+- repeated props without a lightmap become GPU instances (mist: 5,896 copies of 85 meshes); the renderer splits each
+  batch by light probe volume per instance, so every copy is lit by the same volume as before
+- geometry is meshopt-compressed (normals / tangents quantised; positions and UVs stay float)
+- editor-only tool materials are dropped; blended (transparent) meshes stay apart so their draw order holds
+- textures stay the world's own PNGs (quality tiers swap them as before); the renderer keeps one material per vmat
+  across chunks, so a texture is uploaded once
+
+Result (draw calls where you stand, mist): 630 -> 64 at the CT spawn, 642 -> 56 in the dragon arena, 51 at the throne.
+Settings → Video → **World loading**: Auto (default: the 12,000-unit area first, then, one chunk at a time, whatever
+the map's far plane and fog let you see, so distant scenery is there as in CS2), Area only (slow PCs: distant scenery
+may be missing), Whole map. `?nochunks` in the URL loads
+the whole world glb instead (for comparisons). The world glb stays in the folder: lasers.cybo.dev reads it.
 
 Shared assets, once per checkout (not per map):
 

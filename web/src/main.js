@@ -36,19 +36,25 @@ import { Peers } from './world/peers.js';
 import { usableHeals } from './world/items.js';
 import { applyGamma } from './ui/gamma.js';
 import { loadLightmaps } from './world/lightmaps.js';
+import { WorldStream } from './world/stream.js';
+
+// what of a streamed world loads (settings.streamDistance: 1 auto = your area, then what the map lets you see;
+// 2 your area only; 0 the whole map)
+const streamMode = () => (settings.streamDistance === 0 ? 'all' : settings.streamDistance === 2 ? 'area' : 'auto');
 import { net, lobby, installCoop, hostStart, abortRound } from './app/coop.js';
 
 const canvas = $('#view');
 G.renderer = new Renderer(canvas);
 G.audio = new GameAudio();
 G.vm = new Viewmodel(G.renderer.renderer);
-G.body = new PlayerBody(G.renderer.scene, { log }); // third person (!tp): your own CT
+const litByParticles = (root) => G.renderer.lighting.patchDynamic(root); // the particle lights (world/lighting.js)
+G.body = new PlayerBody(G.renderer.scene, { log, onModel: litByParticles }); // third person (!tp): your own CT
 G.hud = new Hud($('#hud'));
 G.radar = new Radar($('#hud')); // the minimap (CS2's own radar) and the EntWatch-style item list under it
 G.itemHud = new ItemHud($('#hud'));
 G.overlay = new Overlay($('#overlay'));
 G.killfeed = new Killfeed($('#killfeed'));
-G.peers = new Peers(G.renderer.scene, { log }); // the other players in a co-op / versus round
+G.peers = new Peers(G.renderer.scene, { log, onModel: litByParticles }); // the other players in a co-op / versus round
 G.simulate = simulate;
 
 // ---- pause / resume
@@ -105,6 +111,7 @@ function applySettings() {
   applyGamma(settings.gamma); // r_fullscreen_gamma (ui/gamma.js)
   G.renderer.setQuality({ renderScale: settings.renderScale, msaa: settings.msaa });
   G.renderer.lighting.setOptions({ fog: settings.fog, reflections: settings.reflections });
+  G.stream?.setMode(streamMode());
 }
 
 // ---- weapons (CS2: 1 primary, 3 knife, Q last weapon, R reload)
@@ -154,7 +161,7 @@ async function openMap(name, fromRound = false) {
     endRun();
     // quality: the setting, or Auto (high with BC6H/BC7 on the GPU, low without); a tier the map wasn't baked at is high
     const tier = await pickTier(name);
-    S.map = await loadMap(name, progress, { tier });
+    S.map = await loadMap(name, progress, { tier, chunks: !new URLSearchParams(location.search).has('nochunks') }); // ?nochunks: the whole world glb (comparisons)
     // the map's own CS2 lighting and post-processing (lasers-bake --lighting; the old fixed lighting without it)
     progress('lighting');
     // off in the settings: none of it is downloaded, the simple lighting stays
@@ -162,7 +169,15 @@ async function openMap(name, fromRound = false) {
       .catch((e) => { log(`lighting: ${e.message || e}`); return null; });
     G.renderer.lighting.setMap(S.map.entities, lightmaps);
     await G.renderer.post.setMap(`maps/${name}/`, S.map.entities, lightmaps);
+    G.stream?.dispose();
+    G.stream = null;
     G.renderer.setWorld(S.map.world);
+    // a chunked world streams in around you (world/stream.js); the loop asks for what the camera needs
+    if (S.map.chunks.length) {
+      G.stream = new WorldStream(S.map.chunks, {
+        load: S.map.loadChunk, add: (scene) => G.renderer.addWorldChunk(scene), mode: streamMode(), log,
+      });
+    }
     G.radar.setMap(S.map.radar);
     S.world = new CollisionWorld(S.map.collision);
     if (S.map.effects) S.map.effects.trace = particleTrace(S.world, S.map.collisionFx);
@@ -257,6 +272,7 @@ $('#go-home').addEventListener('click', () => G.home.show());
 window.__lasers = {
   get engine() { return S.engine; }, get player() { return S.player; }, get run() { return S.run; }, get world() { return S.world; },
   get paused() { return S.paused; }, get renderer() { return G.renderer; }, get map() { return S.map; }, get vm() { return G.vm; }, get body() { return G.body; }, get audio() { return G.audio; }, get overlayOpen() { return G.overlay.open; },
+  get stream() { return G.stream; },
   startScenario, settings, scenarios: () => S.scenarios,
   coop: { net, lobby, get round() { return S.mp; }, peers: G.peers },
   // run the simulation n seconds synchronously (tests; a hidden tab gets no animation frames)

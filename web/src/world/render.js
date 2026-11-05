@@ -47,6 +47,7 @@ export class Renderer {
     this.scene.add(this.entRoot);
     this.visuals = new Map(); // entity -> Object3D
     this.anims = new PropAnimator(); // prop_dynamic sequences (world/anim.js)
+    this.loading = new Set(); // entity models / effects still loading (app/readiness.js waits for them)
     // real particle effects (fx/effects.js) draw in world space
     this.fxRoot = new THREE.Group();
     this.scene.add(this.fxRoot);
@@ -82,18 +83,42 @@ export class Renderer {
     this.camera.updateProjectionMatrix();
   }
 
+  // the whole world glb, or null for a streamed map (its chunks come through addWorldChunk)
   setWorld(scene) {
     this.worldRoot.clear();
+    this.worldMaterials = new Map(); // a streamed world's materials by name: one per vmat across every chunk
+    if (scene) this.addWorldChunk(scene);
+  }
+
+  // each chunk glb brings its own copy of the materials (and textures) it uses; the first copy of a material is
+  // kept and the rest dropped, so a texture is uploaded once however many chunks use it
+  sharedMaterial(m) {
+    if (!m?.name || !m.isMeshStandardMaterial) return m;
+    const key = `${m.name}|${m.transparent}|${m.alphaTest}|${m.side}|${m.vertexColors}`;
+    const have = this.worldMaterials.get(key);
+    if (!have) { this.worldMaterials.set(key, m); return m; }
+    if (have !== m) {
+      for (const k of ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'emissiveMap', 'alphaMap']) {
+        if (m[k] && m[k] !== have[k]) m[k].dispose();
+      }
+      m.dispose();
+    }
+    return have;
+  }
+
+  addWorldChunk(scene) {
     scene.traverse((o) => {
       if (o.isMesh) {
+        o.material = Array.isArray(o.material) ? o.material.map((m) => this.sharedMaterial(m)) : this.sharedMaterial(o.material);
         // VRF names tool-texture meshes after their material; hide the editor-only ones
         const mats = Array.isArray(o.material) ? o.material : [o.material];
         if (mats.some((m) => /tools?(trigger|clip|nodraw|skip|invisible|playerclip|blocklight|areaportal|sky)/i.test(m?.name || ''))) o.visible = false;
         for (const m of mats) if (m && m.transparent === false && m.alphaTest === 0 && m.map && /grate|fence|leaf|foliage|chain/i.test(m.name)) m.alphaTest = 0.5;
       }
     });
-    this.lighting.applyToWorld(scene); // the map's CS2 lightmap shading (world/lighting.js; nothing without a bake)
+    // in the world root first, so the probe volumes are matched in Source units (the root's glTF -> Source)
     this.worldRoot.add(scene);
+    this.lighting.applyToWorld(scene); // the map's CS2 lightmap shading (world/lighting.js; nothing without a bake)
   }
 
   clearEntities() {
@@ -103,6 +128,14 @@ export class Renderer {
   }
 
   // Build the visual for a freshly spawned entity.
+  // remember a load until it settles (app/readiness.js: a stage starts once nothing is left loading)
+  track(p) {
+    this.loading.add(p);
+    const done = () => this.loading.delete(p);
+    p.then(done, done);
+    return p;
+  }
+
   async addEntity(e, map) {
     const kv = e.kv;
     const group = new THREE.Group();
@@ -112,7 +145,7 @@ export class Renderer {
     if (e.cls === 'info_particle_system' && map.effects?.has(kv.effect_name)) {
       // the real effect (fx/particles): it lives in world space, under fxRoot, fed from this entity every frame
       any = true;
-      map.effects.spawn(kv.effect_name, { seed: e.id }).then((inst) => {
+      this.track(map.effects.spawn(kv.effect_name, { seed: e.id })).then((inst) => {
         if (!inst || !e.alive || this.visuals.get(e) !== group) return inst?.dispose();
         group.userData.fx = inst;
         this.fxRoot.add(inst.group);
@@ -179,7 +212,7 @@ export class Renderer {
         const p = map.getModel(e.model);
         if (p) {
           any = true;
-          p.then((scene) => {
+          this.track(p).then((scene) => {
             if (!scene || !e.alive) return;
             const inst = cloneModel(scene);
             this.anims.attach(e, inst);
@@ -198,10 +231,11 @@ export class Renderer {
             }
             group.add(holder);
             // probe-lit like the props (world/lighting.js): placed first, so the probe volume is picked where the
-            // entity is. UNSETTLED: a mover keeps the volume of where it spawned
+            // entity is; a mover picks again as it goes (updateEntities -> lighting.refreshProbes)
             group.matrix.copy(e.getWorld());
             group.updateMatrixWorld(true);
-            inst.traverse((o) => { if (o.isMesh) this.lighting?.applyProbes(o); });
+            const meshes = group.userData.probeMeshes = [];
+            inst.traverse((o) => { if (o.isMesh) { this.lighting?.applyProbes(o); meshes.push(o); } });
           });
         }
       }
@@ -358,6 +392,14 @@ export class Renderer {
   }
 
   updateEntities(time = 0) {
+    // entity models re-pick their light probe volume where they are now (CS2 looks a dynamic object's probes up
+    // where it stands): a few times a second, cheap while nothing changes volume
+    if ((this._probeTick = ((this._probeTick || 0) + 1) % 8) === 0 && this.lighting) {
+      for (const g of this.visuals.values()) {
+        if (!g.visible || !g.userData.probeMeshes) continue;
+        for (const m of g.userData.probeMeshes) this.lighting.refreshProbes(m);
+      }
+    }
     this.updateEffects(time - (this.delay || 0));
     this.anims.update(time - (this.delay || 0));
     if (this._sprite) {

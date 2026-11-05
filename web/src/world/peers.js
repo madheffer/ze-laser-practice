@@ -15,9 +15,10 @@ const TAG_HEIGHT = 84; // name tag this far above the feet
 const lerpAngle = (a, b, t) => a + ((((b - a) % 360) + 540) % 360 - 180) * t;
 
 export class Peers {
-  constructor(scene, { log = () => {} } = {}) {
+  constructor(scene, { log = () => {}, onModel = null } = {}) {
     this.scene = scene;
     this.log = log;
+    this.onModel = onModel; // handed to each body (world/body.js)
     this.list = new Map(); // id -> { name, samples: [], body, capsule, tag, alive }
     this.tags = document.createElement('div');
     this.tags.id = 'nametags';
@@ -51,7 +52,7 @@ export class Peers {
     this.tags.append(tag);
     const p = { name: m.name, samples: [], body: null, capsule, tag, alive: true };
     this.list.set(m.id, p);
-    const body = new PlayerBody(this.scene, { log: () => {} });
+    const body = new PlayerBody(this.scene, { log: () => {}, onModel: this.onModel });
     body.load().then(() => {
       if (this.list.get(m.id) !== p) { body.place.removeFromParent(); return; }
       p.body = body;

@@ -23,6 +23,7 @@ import './fp/cs2-shade.js';             // window.CS2Shade, which cs2-material.j
 import './fp/cs2-material.js';            // defines window.CS2Mat (Source 2 material semantics), used by fp/util.js
 import { FpSource } from './fp/fp.js';
 import { tickCs2Materials } from './fp/util.js';
+import { barnUniforms, patchBarns } from '../world/lighting.js';
 import { METRES_PER_INCH as IN } from './fp/three-kit.js';
 import { DEG } from '../world/entities/math.js';
 import { WEAPONS } from '../lib/weapons.js';
@@ -286,6 +287,7 @@ export class Viewmodel {
     s.updateCamera(cam);                         // sets fov + projection, places the eye at root_motion
     this._applyMotion(cam);
     cam.updateMatrixWorld();
+    this._placeParticleLights(cam);
     const r = this.renderer;
     const auto = r.autoClear;
     r.autoClear = false;
@@ -293,4 +295,34 @@ export class Viewmodel {
     r.render(this.scene, cam);
     r.autoClear = auto;
   }
+
+  // Particle lights on the knife / gun and arms (CS2 lights the viewmodel with them too), with the world's own barn
+  // gather (world/lighting.js patchBarns: colour x 1 / max(d^2, 1) x smoothstep(fade), 0 at the range) added to the
+  // viewmodel's materials from outside (fp/ is vpkstuff's, kept verbatim). `barns`: the world's packed, ranked set
+  // (Source space); `eye`: the world camera; `gain`: the world's pre-curve exposure (cs2Exposure x 2.8), since this
+  // pass is tone-mapped on its own. Each light is moved to where it is relative to your eye in this scene (metres),
+  // and the gather measures distances back in Source units (cs2BarnUnit), so range, fade and 1/d^2 are the world's.
+  setParticleLights(barns, eye, gain = 1) { this._barns = barns; this._eye = eye; this._barnGain = gain; }
+
+  _placeParticleLights(cam) {
+    const src = this._barns;
+    if (!src || !this._eye) return;
+    const u = this._vmBarns || (this._vmBarns = barnUniforms());
+    patchBarns(this.scene, u, this._barnDone || (this._barnDone = new WeakSet())); // new materials only
+    const n = src.cs2BarnCount.value;
+    const view = this._eye.matrixWorldInverse;
+    for (let i = 0; i < n; i++) {
+      // world (Source) -> the world camera's view space (inches) -> metres -> this camera's view -> this scene
+      u.cs2BarnPos.value[i].copy(src.cs2BarnPos.value[i]).applyMatrix4(view).multiplyScalar(IN_M).applyMatrix4(cam.matrixWorld);
+      u.cs2BarnAxis.value[i].copy(src.cs2BarnAxis.value[i]).transformDirection(view).transformDirection(cam.matrixWorld);
+      u.cs2BarnColor.value[i].copy(src.cs2BarnColor.value[i]);
+      u.cs2BarnShape.value[i].copy(src.cs2BarnShape.value[i]);
+      u.cs2BarnFade.value[i].copy(src.cs2BarnFade.value[i]);
+    }
+    u.cs2BarnCount.value = n;
+    u.cs2BarnUnit.value = 1 / IN_M;
+    u.cs2BarnGain.value = this._barnGain;
+  }
 }
+
+const IN_M = 0.0254;     // metres per Source unit (this scene is the glTF export's metres)

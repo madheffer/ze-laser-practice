@@ -371,7 +371,12 @@ are dimmed. If the owner leaves, the next oldest member owns the room.
     indoor level then size, edge-fade blending, box parallax, roughness mip, normalised by the cubemap's SH vs the lightmap
   - quality tiers (`--tiers`, BAKING.md): medium / low copies with smaller textures and RGBM PNG lightmaps, so a GPU
     without BC6H/BC7 (phones) gets the map's lighting too; Auto picks low there
+  - particle lights (`C_OP_RenderStandardLight`, MapEffects.lights): CS2's barn lights per pixel on the world and models,
+    up to 16 a frame (brightest over distance first); also your viewmodel, your body and teammates (the same gather)
   - not yet: bloom, auto exposure, per-area post volumes
+- **World streaming** (`tools/chunk-world.mjs`, `world/stream.js`, BAKING.md): the world loads in 4096-unit chunks around
+  you (a solo stage waits for its area), joined / instanced to cut draw calls; collision and entities are whole, so the
+  game plays the same. Video → World loading (Auto / Area only / Whole map); `?nochunks` loads the whole world glb
 - **Performance** (Settings → Video): render resolution, MSAA, fog, reflections (instant: uniforms, nothing recompiles),
   CS2 baked lighting off (skips the download) and Quality (Auto / High / Medium / Low, next map load).
 - **Cut-out alpha** (`AlphaBake.cs`, also `lasers-bake --alpha`): VRF 20.1's glTF exporter writes alpha-tested materials

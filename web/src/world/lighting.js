@@ -75,6 +75,9 @@ export class MapLighting {
     // reflections: the cube array (as a 2D array of faces) + one row of volume data per cubemap
     this.cubeUniforms = { cs2Cubes: { value: null }, cs2CubeVolumes: { value: null }, cs2CubeCount: { value: 0 }, cs2CubeMips: { value: new THREE.Vector2(0, 0) } };
     this.cubeCount = 0; // the map's; the uniform is 0 while reflections are off (the loop then costs nothing)
+    // particle lights (C_OP_RenderStandardLight as CS2's barn lights, fx/particles/render/lights.js), world space
+    this.barnUniforms = barnUniforms();
+    this._barnOrder = [];
     this.options = { fog: true, reflections: true };
     this._color = new THREE.Color(); this._fwd = new THREE.Vector3(); this._dir = new THREE.Vector3();
   }
@@ -83,6 +86,35 @@ export class MapLighting {
   setOptions({ fog = true, reflections = true } = {}) {
     this.options = { fog, reflections };
     this.cubeUniforms.cs2CubeCount.value = reflections ? this.cubeCount : 0;
+  }
+
+  // every frame: this frame's particle lights (MapEffects.lights, the lights.js contract) into the world and model
+  // shaders. Capped at MAX_LIGHTS, the ones that matter most where you are first: colour over the distance from the
+  // camera to the light's sphere squared (a light around you outranks a brighter one far away); out of range: none
+  setLights(lights, camera) {
+    const u = this.barnUniforms;
+    const list = Array.isArray(lights) ? lights : [];
+    const p = camera.position, order = this._barnOrder;
+    order.length = 0;
+    for (const l of list) {
+      if (!(l?.radius > 0) || !l.color || !l.position) continue;
+      const dx = l.position[0] - p.x, dy = l.position[1] - p.y, dz = l.position[2] - p.z;
+      const out = Math.max(1, Math.sqrt(dx * dx + dy * dy + dz * dz) - l.radius);
+      if (out > this.viewDistance + l.radius) continue;
+      l._rank = Math.max(l.color[0], l.color[1], l.color[2]) / (out * out);
+      order.push(l);
+    }
+    if (order.length > MAX_LIGHTS) order.sort((a, b) => b._rank - a._rank);
+    const n = Math.min(MAX_LIGHTS, order.length);
+    for (let i = 0; i < n; i++) {
+      const b = order[i];
+      u.cs2BarnPos.value[i].fromArray(b.position);
+      if (b.direction) u.cs2BarnAxis.value[i].fromArray(b.direction).normalize();
+      u.cs2BarnColor.value[i].fromArray(b.color);
+      u.cs2BarnShape.value[i].set(b.radius, b.cone ? b.cone.innerT : 1, b.cone ? b.cone.tanPhi : -1, b.specular ? 1 : 0);
+      u.cs2BarnFade.value[i].set(b.fade?.[0] ?? 4, b.fade?.[1] ?? -4 / b.radius);
+    }
+    u.cs2BarnCount.value = n;
   }
 
   // every frame: the fog the player sees now (the engine's fog entities), the view distance, the sky's fog
@@ -115,6 +147,12 @@ export class MapLighting {
     // farz: how far the world draws (the sky stays)
     const far = farz > 0 ? Math.max(256, Math.min(farz, this.defaultFar)) : this.defaultFar;
     if (camera.far !== far) { camera.far = far; camera.updateProjectionMatrix(); }
+    // how far anything can be seen: the far plane, or where the fog turns fully opaque (world/stream.js loads no
+    // farther). Gradient fog only counts without a height falloff (above it the fog can thin out again)
+    let see = far;
+    if (c && c.density >= 0.999 && c.end > 0) see = Math.min(see, c.end);
+    else if (g && g.startHeight === g.endHeight && g.opacity * g.weight >= 0.999 && g.end > 0) see = Math.min(see, g.end);
+    this.viewDistance = see;
     // the 2D sky: only the legacy controller fogs it (VRF Renderer: BackgroundFor(...).Render(LinearFog)), at the far plane
     const su = this.skyUniforms;
     if (c) {
@@ -298,31 +336,88 @@ export class MapLighting {
   // shares with a mesh without lightmap UVs stays as it was); the rest are lit by their light probe volume
   applyToWorld(root) {
     if (!this.lightmaps) return;
-    root.updateMatrixWorld(true);
-    root.traverse((o) => {
-      if (!o.isMesh) return;
-      if (!o.geometry?.attributes?.uv1) { this.applyProbes(o); return; }
+    root.updateWorldMatrix(true, true); // with its parents: the world root carries glTF -> Source
+    const meshes = [];
+    root.traverse((o) => { if (o.isMesh) meshes.push(o); }); // collected first: applyProbes may split instanced meshes
+    for (const o of meshes) {
+      if (!o.geometry?.attributes?.uv1) { this.applyProbes(o); continue; }
       const one = (m) => {
         if (!m || !m.isMeshStandardMaterial) return m;
         if (!this.patched.has(m)) this.patched.set(m, this.patch(m));
         return this.patched.get(m);
       };
       o.material = Array.isArray(o.material) ? o.material.map(one) : one(o.material);
-    });
+    }
   }
 
-  // a mesh without a lightmap (a prop, an entity's model): the probes of the smallest volume around its centre
+  // a mesh without a lightmap (a prop, an entity's model): the probes of the smallest volume around its centre.
+  // An instanced mesh (a chunk's repeated props, tools/chunk-world.mjs) goes by each instance's centre: it is split
+  // into one instanced mesh per volume, so every copy is lit as it would be on its own
   applyProbes(mesh) {
     if (!this.volumes.length || !mesh.geometry) return;
     if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox();
-    const c = mesh.geometry.boundingBox.getCenter(new THREE.Vector3()).applyMatrix4(mesh.matrixWorld);
+    const centre = mesh.geometry.boundingBox.getCenter(new THREE.Vector3());
+    if (mesh.isInstancedMesh) { this.splitInstances(mesh, centre); return; }
+    this.applyVolume(mesh, this.volumeAt(centre.applyMatrix4(mesh.matrixWorld)));
+  }
+
+  // the smallest probe volume around a world point (-1: none)
+  volumeAt(c) {
     let best = -1, bestSize = Infinity;
+    const l = this._local || (this._local = new THREE.Vector3());
     for (let i = 0; i < this.volumes.length; i++) {
       const v = this.volumes[i];
-      const l = c.clone().applyMatrix4(v.worldToLocal);
+      l.copy(c).applyMatrix4(v.worldToLocal);
       if (l.x < 0 || l.y < 0 || l.z < 0 || l.x > 1 || l.y > 1 || l.z > 1) continue;
       if (v.size < bestSize) { best = i; bestSize = v.size; }
     }
+    return best;
+  }
+
+  splitInstances(mesh, centre) {
+    const m = new THREE.Matrix4(), p = new THREE.Vector3();
+    const groups = new Map(); // volume -> instance indices
+    for (let i = 0; i < mesh.count; i++) {
+      mesh.getMatrixAt(i, m);
+      const v = this.volumeAt(p.copy(centre).applyMatrix4(m).applyMatrix4(mesh.matrixWorld));
+      if (!groups.has(v)) groups.set(v, []);
+      groups.get(v).push(i);
+    }
+    if (groups.size === 1) { this.applyVolume(mesh, groups.keys().next().value); return; }
+    const parent = mesh.parent;
+    for (const [v, list] of groups) {
+      const part = new THREE.InstancedMesh(mesh.geometry, mesh.material, list.length);
+      part.name = mesh.name;
+      part.matrix.copy(mesh.matrix); part.matrixAutoUpdate = mesh.matrixAutoUpdate;
+      part.position.copy(mesh.position); part.quaternion.copy(mesh.quaternion); part.scale.copy(mesh.scale);
+      part.visible = mesh.visible; part.castShadow = mesh.castShadow; part.receiveShadow = mesh.receiveShadow;
+      list.forEach((i, k) => { mesh.getMatrixAt(i, m); part.setMatrixAt(k, m); });
+      part.instanceMatrix.needsUpdate = true;
+      part.computeBoundingSphere();
+      parent?.add(part);
+      part.updateMatrixWorld(true);
+      this.applyVolume(part, v);
+    }
+    parent?.remove(mesh);
+  }
+
+  // an entity's model, again where it is now: the volume around its centre, and its material re-patched only when that
+  // changed (back to the unpatched material outside every volume)
+  refreshProbes(mesh) {
+    const base = mesh.userData.cs2Base;
+    if (!base || !this.volumes.length || mesh.isInstancedMesh) return;
+    if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox();
+    mesh.updateWorldMatrix(true, false);
+    const c = (this._c || (this._c = new THREE.Vector3()));
+    const v = this.volumeAt(mesh.geometry.boundingBox.getCenter(c).applyMatrix4(mesh.matrixWorld));
+    if (v === mesh.userData.cs2Vol) return;
+    mesh.material = base;
+    this.applyVolume(mesh, v);
+  }
+
+  applyVolume(mesh, best) {
+    if (mesh.userData.cs2Base === undefined) mesh.userData.cs2Base = mesh.material; // what refreshProbes re-patches from
+    mesh.userData.cs2Vol = best;
     if (best < 0) return; // outside every volume: the sky's ambient (the hemisphere light)
     const one = (m) => {
       if (!m || !m.isMeshStandardMaterial) return m;
@@ -333,6 +428,13 @@ export class MapLighting {
     mesh.material = Array.isArray(mesh.material) ? mesh.material.map(one) : one(mesh.material);
   }
 
+  // moving models lit by three's own lights (your third-person body, teammates): only the particle lights added
+  // (skinned too: the world position is taken after skinning). Each material is patched once
+  patchDynamic(root) {
+    this.dynPatched = this.dynPatched || new WeakSet();
+    patchBarns(root, this.barnUniforms, this.dynPatched);
+  }
+
   patchProbes(src, vol) {
     const m = src.clone();
     const uniforms = { cs2Probe: { value: vol.texture }, cs2ProbeWorldToLocal: { value: vol.worldToLocal }, cs2ProbeDims: { value: vol.dims } };
@@ -341,10 +443,12 @@ export class MapLighting {
       shader.vertexShader = worldPosVertex(shader.vertexShader);
       shader.fragmentShader = shader.fragmentShader
         .replace('#include <lightmap_pars_fragment>', `#include <lightmap_pars_fragment>\n${PROBE_PARS}\n${FOG_PARS}\n${CUBE_PARS(this.cubeUniforms.cs2CubeCount.value > 0)}`)
-        .replace('#include <lights_fragment_begin>', PROBE_SUN + LIGHTS_BEGIN_PATCHED)
+        .replace('#include <lights_fragment_begin>', PROBE_SUN + LIGHTS_BEGIN_PATCHED + BARN_GATHER)
         .replace('#include <lights_fragment_maps>', LIGHTS_MAPS_PROBES)
         .replace('#include <fog_fragment>', FOG_APPLY);
-    }, `cs2probef${this.cubeUniforms.cs2CubeCount.value > 0 ? 'c' : ''}`);
+      shader.fragmentShader = shader.fragmentShader.replace('#include <common>', `#include <common>\n${BARN_PARS}`);
+      Object.assign(shader.uniforms, this.barnUniforms);
+    }, `cs2probefb${this.cubeUniforms.cs2CubeCount.value > 0 ? 'c' : ''}`);
     return m;
   }
 
@@ -359,10 +463,12 @@ export class MapLighting {
       shader.vertexShader = worldPosVertex(shader.vertexShader);
       shader.fragmentShader = shader.fragmentShader
         .replace('#include <lightmap_pars_fragment>', `#include <lightmap_pars_fragment>\n${PARS(hasDir, hasShadow)}\nvarying vec3 vCs2World;\n${FOG_PARS}\n${CUBE_PARS(this.cubeUniforms.cs2CubeCount.value > 0)}`)
-        .replace('#include <lights_fragment_begin>', SUN_VISIBILITY + LIGHTS_BEGIN_PATCHED)
+        .replace('#include <lights_fragment_begin>', SUN_VISIBILITY + LIGHTS_BEGIN_PATCHED + BARN_GATHER)
         .replace('#include <lights_fragment_maps>', LIGHTS_MAPS_CS2)
         .replace('#include <fog_fragment>', FOG_APPLY);
-    }, `cs2lm${hasDir ? 'd' : ''}${hasShadow ? 's' : ''}f${this.cubeUniforms.cs2CubeCount.value > 0 ? 'c' : ''}`);
+      shader.fragmentShader = shader.fragmentShader.replace('#include <common>', `#include <common>\n${BARN_PARS}`);
+      Object.assign(shader.uniforms, this.barnUniforms);
+    }, `cs2lm${hasDir ? 'd' : ''}${hasShadow ? 's' : ''}fb${this.cubeUniforms.cs2CubeCount.value > 0 ? 'c' : ''}`);
     return m;
   }
 }
@@ -441,6 +547,87 @@ const ANCHOR = 'getDirectionalLightInfo( directionalLight, directLight );';
 if (!BEGIN.includes(ANCHOR)) console.warn('lighting: three.js lights_fragment_begin changed; the sun is unmasked');
 const LIGHTS_BEGIN_PATCHED = BEGIN.replace(ANCHOR, `${ANCHOR}\n\t\tdirectLight.color *= cs2SunVis;`);
 
+// ---- particle lights: CS2's barn lights (scenesystem converts every particle light to one; contract and sources in
+// fx/particles/render/lights.js). Per pixel at distance d from the light, in world (Source) space:
+//   I = colour * 1 / max(d^2, 1) * smoothstep(0, 1, fade.x + fade.y * d)        (full 1/d^2 to 0.75 R, 0 at R)
+// times the cone for a spot. Diffuse x N.L x albedo (x pi against three's Lambert / pi, as the sun: CS2's diffuse has
+// no 1/pi; UNSETTLED whether csgo_complex divides a barn by pi); specular only for lights that render it
+export const MAX_LIGHTS = 16;
+
+// a barn light set's uniforms. unit: Source units per scene unit (1 in the world; the viewmodel's scene is metres);
+// gain: a colour scale (1 in the world; the viewmodel pass is tone-mapped on its own, so it carries the exposure)
+export function barnUniforms() {
+  const vec = (n, C) => Array.from({ length: n }, () => new C());
+  return {
+    cs2BarnCount: { value: 0 }, cs2BarnPos: { value: vec(MAX_LIGHTS, THREE.Vector3) }, cs2BarnAxis: { value: vec(MAX_LIGHTS, THREE.Vector3) },
+    cs2BarnColor: { value: vec(MAX_LIGHTS, THREE.Vector3) }, cs2BarnShape: { value: vec(MAX_LIGHTS, THREE.Vector4) },
+    cs2BarnFade: { value: vec(MAX_LIGHTS, THREE.Vector2) }, cs2BarnUnit: { value: 1 }, cs2BarnGain: { value: 1 },
+  };
+}
+
+// add the barn gather to every lit three material under root (once each: `done`), lit by `uniforms`
+export function patchBarns(root, uniforms, done) {
+  root.traverse((o) => {
+    if (!o.isMesh) return;
+    for (const m of Array.isArray(o.material) ? o.material : [o.material]) {
+      if (!m || done.has(m) || !(m.isMeshStandardMaterial || m.isMeshPhongMaterial || m.isMeshLambertMaterial)) continue;
+      done.add(m);
+      chainBeforeCompile(m, (shader) => {
+        Object.assign(shader.uniforms, uniforms);
+        shader.vertexShader = worldPosVertex(shader.vertexShader);
+        shader.fragmentShader = shader.fragmentShader
+          .replace('#include <common>', `#include <common>\nvarying vec3 vCs2World;\n${BARN_PARS}`)
+          .replace('#include <lights_fragment_begin>', `#include <lights_fragment_begin>\n${BARN_GATHER}`);
+      }, 'cs2barn');
+      m.needsUpdate = true;
+    }
+  });
+}
+
+const BARN_PARS = `
+uniform int cs2BarnCount;
+uniform vec3 cs2BarnPos[ ${MAX_LIGHTS} ];
+uniform vec3 cs2BarnAxis[ ${MAX_LIGHTS} ];
+uniform vec3 cs2BarnColor[ ${MAX_LIGHTS} ];
+uniform vec4 cs2BarnShape[ ${MAX_LIGHTS} ]; // range, inner t, tan(phi) (< 0: point), renders specular
+uniform vec2 cs2BarnFade[ ${MAX_LIGHTS} ];
+uniform float cs2BarnUnit; // Source units per scene unit
+uniform float cs2BarnGain;
+vec3 cs2Barn( int i, vec3 p, out vec3 toLight ) {
+  vec3 v = ( p - cs2BarnPos[ i ] ) * cs2BarnUnit; // in Source units: the range, fade and 1/d^2 are
+  float d = length( v );
+  toLight = d > 0.0 ? -v / d : vec3( 0.0, 0.0, 1.0 );
+  vec4 s = cs2BarnShape[ i ];
+  if ( d >= s.x ) return vec3( 0.0 );
+  float t = clamp( cs2BarnFade[ i ].x + cs2BarnFade[ i ].y * d, 0.0, 1.0 );
+  float fall = t * t * ( 3.0 - 2.0 * t ) / max( d * d, 1.0 );
+  float cone = 1.0;
+  if ( s.z >= 0.0 ) {
+    float z = dot( v, cs2BarnAxis[ i ] );
+    float c = z / max( d, 1e-6 );
+    float r = sqrt( max( 0.0, 1.0 - c * c ) ) / max( c, 1e-6 ) / s.z;
+    float e = clamp( ( 1.0 - r ) / max( 1.0 - s.y, 1e-6 ), 0.0, 1.0 );
+    cone = ( z < 1.0 || r > 1.0 ) ? 0.0 : ( s.y < 1.0 ? e * e * ( 3.0 - 2.0 * e ) : 1.0 );
+  }
+  return cs2BarnColor[ i ] * cs2BarnGain * fall * cone;
+}
+`;
+const BARN_GATHER = `
+#if defined( RE_Direct )
+for ( int bi = 0; bi < ${MAX_LIGHTS}; bi ++ ) {
+  if ( bi >= cs2BarnCount ) break;
+  vec3 cs2Tl;
+  vec3 cs2I = cs2Barn( bi, vCs2World, cs2Tl ) * PI;
+  if ( dot( cs2I, cs2I ) <= 0.0 ) continue;
+  directLight.color = cs2I;
+  directLight.direction = normalize( ( viewMatrix * vec4( cs2Tl, 0.0 ) ).xyz );
+  directLight.visible = true;
+  if ( cs2BarnShape[ bi ].w > 0.5 ) RE_Direct( directLight, geometryPosition, geometryNormal, geometryViewDir, geometryClearcoatNormal, material, reflectedLight );
+  else reflectedLight.directDiffuse += saturate( dot( geometryNormal, directLight.direction ) ) * cs2I * BRDF_Lambert( material.diffuseColor );
+}
+#endif
+`;
+
 // lights_fragment_maps: the lightmap is the whole indirect diffuse (what the light loop put in irradiance, the
 // fallback hemisphere, is dropped); the stock environment's specular is darkened toward the lightmap's brightness
 // (CS2's cubemap normalisation, which in CS2 can only darken)
@@ -515,7 +702,12 @@ const LIGHTS_MAPS_PROBES = `
 // the vertex's world position, for fog (and the probes)
 function worldPosVertex(vs) {
   return vs.replace('#include <common>', '#include <common>\nvarying vec3 vCs2World;')
-    .replace('#include <project_vertex>', '#include <project_vertex>\nvCs2World = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz;');
+    .replace('#include <project_vertex>', `#include <project_vertex>
+#ifdef USE_INSTANCING
+vCs2World = ( modelMatrix * instanceMatrix * vec4( transformed, 1.0 ) ).xyz;
+#else
+vCs2World = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz;
+#endif`);
 }
 
 // the controller's colour now: fogblend leans it from the secondary colour toward the primary by how much you look

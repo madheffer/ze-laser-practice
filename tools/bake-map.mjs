@@ -5,7 +5,7 @@
 //   node tools/bake-map.mjs <workshop id | .vpk | baked map name> [more ...] [options]
 //   node tools/bake-map.mjs --all                       re-bake every map in web/public/maps (from its manifest's source)
 //
-//   --steps map,lighting,tiers,index   only these steps (default: all four, in this order)
+//   --steps map,lighting,tiers,chunks,index   only these steps (default: all five, in this order)
 //   --skip-build                       use the lasers-bake already built
 //   --cs2 <game/csgo>                  CS2's game folder (default: lasers-bake finds it)
 //   --workshop <content/730>           where workshop ids are looked up (default D:/Steam/steamapps/workshop/content/730)
@@ -14,6 +14,7 @@
 //   map       the full bake: entities, collision, hulls, glbs + textures (cut-out alpha), particles, sounds, shots, radar
 //   lighting  the map's CS2 lighting: lightmaps, probes, tonemap / LUT, skies, reflection cubemaps (high tier)
 //   tiers     medium + low quality copies (q/medium, q/low: smaller textures, PNG lightmaps any GPU can take)
+//   chunks    the world split into streamed chunks, fewer draw calls (tools/chunk-world.mjs; needs tools' npm packages)
 //   index     web/public/maps/index.json (the map picker)
 import fs from 'node:fs';
 import path from 'node:path';
@@ -23,7 +24,7 @@ import { isMapName } from '../web/src/lib/paths.js';
 
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const mapsDir = path.join(repo, 'web', 'public', 'maps');
-const STEPS = ['map', 'lighting', 'tiers', 'index'];
+const STEPS = ['map', 'lighting', 'tiers', 'chunks', 'index'];
 
 const opts = { steps: STEPS, build: true, cs2: null, workshop: 'D:/Steam/steamapps/workshop/content/730', all: false };
 const targets = [];
@@ -45,7 +46,7 @@ if (opts.all) for (const m of bakedMaps()) targets.push(m.name);
 if (!targets.length && !(opts.steps.length === 1 && opts.steps[0] === 'index')) usage(2);
 
 function usage(code) {
-  console.log(fs.readFileSync(fileURLToPath(import.meta.url), 'utf8').split('\n').slice(1, 17).map((l) => l.replace(/^\/\/ ?/, '')).join('\n'));
+  console.log(fs.readFileSync(fileURLToPath(import.meta.url), 'utf8').split('\n').slice(1, 18).map((l) => l.replace(/^\/\/ ?/, '')).join('\n'));
   process.exit(code);
 }
 
@@ -100,7 +101,7 @@ function exePath() {
   return fail('lasers-bake isn\'t built (drop --skip-build)');
 }
 
-const needsBake = opts.steps.some((s) => s !== 'index');
+const needsBake = opts.steps.some((s) => s === 'map' || s === 'lighting' || s === 'tiers');
 if (needsBake && opts.build) run('dotnet', ['build', path.join(repo, 'bake'), '-c', 'Release', '--nologo', '-v', 'q']);
 const exe = needsBake ? exePath() : null;
 const cs2 = opts.cs2 ? ['--cs2', path.resolve(opts.cs2)] : [];
@@ -112,12 +113,21 @@ for (const t of targets) {
   // the folder this VPK baked to: the manifest whose source is this VPK (the map name comes from inside the VPK)
   const norm = (p) => path.resolve(p).toLowerCase();
   const baked = bakedMaps().find((m) => m.source && norm(m.source) === norm(vpk));
-  const later = opts.steps.filter((s) => s === 'lighting' || s === 'tiers');
+  const later = opts.steps.filter((s) => s === 'lighting' || s === 'tiers' || s === 'chunks');
   if (!later.length) continue;
   if (!baked) fail(`${t}: no map folder in ${mapsDir} came from ${vpk}; run the map step first`);
   const dir = path.join(mapsDir, baked.name);
   if (opts.steps.includes('lighting')) run(exe, ['--lighting', vpk, dir]);
   if (opts.steps.includes('tiers')) run(exe, ['--tiers', vpk, dir]);
+  if (opts.steps.includes('chunks')) {
+    // tools' own packages (glTF-Transform, meshoptimizer), once; a fixed command, so the shell is safe here
+    if (!fs.existsSync(path.join(repo, 'tools', 'node_modules', '@gltf-transform', 'core'))) {
+      console.log('\n> npm install (tools)');
+      const r = spawnSync('npm install --no-audit --no-fund', { stdio: 'inherit', cwd: path.join(repo, 'tools'), shell: true });
+      if (r.status !== 0) fail('npm install (tools) failed');
+    }
+    run(process.execPath, [path.join(repo, 'tools', 'chunk-world.mjs'), dir]);
+  }
 }
 
 if (opts.steps.includes('index')) run(process.execPath, [path.join(repo, 'tools', 'index-maps.mjs')]);
