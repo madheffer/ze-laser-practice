@@ -5,6 +5,13 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { GLTF_TO_SOURCE } from './assets.js';
 import { DEG, parseVec, angleForward } from './entities/index.js';
 import { assetKey } from '../lib/paths.js';
+import { setFxCamera } from '../fx/effects.js';
+
+// an entity's world transform as a particle control point: position and its forward / left / up axes
+function cpFrom(ent) {
+  const m = ent.getWorld().elements;
+  return { position: [m[12], m[13], m[14]], forward: [m[0], m[1], m[2]], left: [m[4], m[5], m[6]], up: [m[8], m[9], m[10]] };
+}
 
 // Particle systems one entity may draw (children included): a map's particles.json is data, and an effect
 // listing many children, 4 levels deep, would otherwise multiply into millions of sprites.
@@ -37,6 +44,10 @@ export class Renderer {
     this.entRoot = new THREE.Group();
     this.scene.add(this.entRoot);
     this.visuals = new Map(); // entity -> Object3D
+    // real particle effects (fx/effects.js) draw in world space
+    this.fxRoot = new THREE.Group();
+    this.scene.add(this.fxRoot);
+    this.fxClock = null;
     this.hullGeo = new Map(); // model -> [BufferGeometry]
     this.fxGeo = new Map(); // effect summary -> BufferGeometry
     this.showHitboxes = false;
@@ -75,8 +86,9 @@ export class Renderer {
   }
 
   clearEntities() {
-    for (const v of this.visuals.values()) this.entRoot.remove(v);
+    for (const v of this.visuals.values()) { this.entRoot.remove(v); v.userData.fx?.dispose(); }
     this.visuals.clear();
+    this.fxClock = null;
   }
 
   // Build the visual for a freshly spawned entity.
@@ -86,12 +98,33 @@ export class Renderer {
     group.matrixAutoUpdate = false;
     let any = false;
 
-    if (e.cls === 'info_particle_system') {
+    if (e.cls === 'info_particle_system' && map.effects?.has(kv.effect_name)) {
+      // the real effect (fx/particles): it lives in world space, under fxRoot, fed from this entity every frame
+      any = true;
+      map.effects.spawn(kv.effect_name, { seed: e.id }).then((inst) => {
+        if (!inst || !e.alive || this.visuals.get(e) !== group) return inst?.dispose();
+        group.userData.fx = inst;
+        this.fxRoot.add(inst.group);
+      });
+    } else if (e.cls === 'info_particle_system') {
+      // an older bake without fx/: the summary sprites
       const fx = map.particles?.[assetKey(kv.effect_name || '')];
       if (fx) {
         this.addParticle(group, fx, map, 0, { left: MAX_FX_PER_ENTITY });
         any = true;
       }
+    } else if (e.cls === 'env_laser' && /\.spr$/i.test(String(kv.texture || ''))) {
+      // a CS:GO sprite (.spr): Source 2 has no sprite resources, so CS2 draws no beam for it (its damage stays,
+      // beams.js); maps that wanted it seen add a particle beam between the same points (ze_dreamin's laser_*_fix)
+    } else if (e.cls === 'env_laser') {
+      const width = Math.max(2, Number(kv.width) || 8);
+      const rc = String(kv.rendercolor || '255 40 40').replace(/[[\],]/g, ' ').trim().split(/\s+/).map(Number);
+      const mat = new THREE.MeshBasicMaterial({ color: new THREE.Color((rc[0] || 255) / 255, (rc[1] || 0) / 255, (rc[2] || 0) / 255), transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false });
+      const beam = new THREE.Mesh(new THREE.CylinderGeometry(width / 4, width / 4, 1, 8, 1, true), mat);
+      beam.userData.kind = 'beam';
+      beam.matrixAutoUpdate = false;
+      group.add(beam);
+      any = true;
     } else if (e.cls === 'trigger_hurt') {
       // hitboxes, shown with H; what you see in game is the particles parented next to them
       const hulls = map.hulls[e.model];
@@ -105,6 +138,19 @@ export class Renderer {
             if (pts.length >= 4) geos.push(new ConvexGeometry(pts));
           }
           this.hullGeo.set(e.model, geos);
+        }
+        // a heal zone (negative damage: mist's Cleansing Aura) is drawn for everyone, as the area to stand in. CS2 shows
+        // it with particles spread over the area; ours are summarised to a point, so the zone's own volume stands in.
+        const heal = Number(kv.damage) < 0;
+        for (const geo of heal ? this.hullGeo.get(e.model) : []) {
+          const mat = this.healMaterial(e, map);
+          const zone = new THREE.Mesh(geo, mat);
+          zone.userData.kind = 'heal';
+          group.add(zone);
+          // and its outline, so the edge reads on a bright floor too
+          const edge = new THREE.LineSegments(new THREE.EdgesGeometry(geo, 30), new THREE.LineBasicMaterial({ color: mat.color, transparent: true, opacity: 0.9 }));
+          edge.userData.kind = 'heal';
+          group.add(edge);
         }
         for (const geo of this.hullGeo.get(e.model)) {
           const glow = new THREE.Mesh(geo, this.laserMat);
@@ -229,6 +275,7 @@ export class Renderer {
     // with simulated ping the entity stays on screen until its death reaches you
     if (this.delay > 0) { v.userData.died = e.engine.time; return; }
     this.entRoot.remove(v); this.visuals.delete(e);
+    v.userData.fx?.dispose();
   }
 
   // ---- simulated ping -------------------------------------------------------------------------------
@@ -266,7 +313,32 @@ export class Renderer {
     return h[0];
   }
 
+  // Real particle effects (fx/effects.js): each frame, the entity's control points (0 = itself, n = what its cpoint<n>
+  // names), on while the map has it started (Start / Stop / DestroyImmediately set state.active), stepped by the
+  // frame's share of simulation time.
+  updateEffects(time) {
+    const dt = this.fxClock == null ? 0 : Math.max(0, Math.min(0.1, time - this.fxClock));
+    this.fxClock = time;
+    setFxCamera(this.camera);
+    const camPos = [this.camera.position.x, this.camera.position.y, this.camera.position.z];
+    for (const [e, g] of this.visuals) {
+      const inst = g.userData.fx;
+      if (!inst) continue;
+      // control point n: the entity its cpoint<n> names (cpoint0 too: ze_dreamin's beams set it), CP 0 defaults to itself
+      const cps = [cpFrom(e)];
+      for (let i = 0; i <= 63; i++) {
+        const name = e.kv[`cpoint${i}`];
+        if (!name) continue;
+        const t = e.engine.findOne(name);
+        if (t) cps[i] = cpFrom(t);
+      }
+      inst.update(dt, { cps, active: !!(e.alive && e.state.active), camPos });
+      inst.group.visible = e.visible !== false;
+    }
+  }
+
   updateEntities(time = 0) {
+    this.updateEffects(time - (this.delay || 0));
     if (this._sprite) {
       this._sprite.uniforms.uTime.value = performance.now() / 1000;
       // point size in pixels per world unit at distance 1
@@ -285,7 +357,8 @@ export class Renderer {
         g.matrixWorldNeedsUpdate = true;
         for (const c of g.children) {
           const k = c.userData.kind;
-          if (k === 'fx') c.visible = s.fx;
+          if (k === 'fx' || k === 'beam') c.visible = s.fx;
+          else if (k === 'heal') c.visible = s.en;
           else if (k === 'hurt' || k === 'hitbox') c.visible = s.en && this.showHitboxes;
         }
         continue;
@@ -297,10 +370,38 @@ export class Renderer {
       for (const c of g.children) {
         const k = c.userData.kind;
         if (k === 'fx') c.visible = !!e.state.active;
+        else if (k === 'beam') this.placeBeam(c, e);
+        else if (k === 'heal') c.visible = e.enabled;
         else if (k === 'hurt') c.visible = e.enabled && this.showHitboxes;
         else if (k === 'hitbox') c.visible = e.enabled && this.showHitboxes;
       }
     }
+  }
+
+  // a heal zone's material: the colour of a particle parented to it (mist's aura: pink), else a soft green
+  healMaterial(e, map) {
+    let color = new THREE.Color(0x7dffa0);
+    const fxEnt = [...e.children].find((c) => c.cls === 'info_particle_system');
+    const fx = fxEnt && map.particles?.[assetKey(fxEnt.kv.effect_name || '')];
+    // the more saturated of the particle's two colours (a pale one vanishes on a bright floor)
+    const sat = (c) => (c?.length >= 3 ? Math.max(...c.slice(0, 3)) - Math.min(...c.slice(0, 3)) : -1);
+    const c = sat(fx?.colorMin) > sat(fx?.colorMax) ? fx.colorMin : fx?.colorMax;
+    if (c?.length >= 3) color = new THREE.Color(c[0] / 255, c[1] / 255, c[2] / 255);
+    // outside faces only: teammates see the zone around the holder, inside it your view stays clear
+    return new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.35, depthWrite: false, side: THREE.FrontSide });
+  }
+
+  // an env_laser's beam (beams.js keeps beamStart / beamEnd in world space) as a cylinder in the laser's group
+  placeBeam(c, e) {
+    const a = e.state.beamStart, b = e.state.beamEnd;
+    c.visible = !!(e.state.active && a && b);
+    if (!c.visible) return;
+    const inv = e.getWorld().clone().invert();
+    const pa = new THREE.Vector3(...a).applyMatrix4(inv), pb = new THREE.Vector3(...b).applyMatrix4(inv);
+    const len = pa.distanceTo(pb);
+    const mid = pa.clone().add(pb).multiplyScalar(0.5);
+    const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), pb.clone().sub(pa).normalize());
+    c.matrix.compose(mid, q, new THREE.Vector3(1, Math.max(1, len), 1));
   }
 
   setView(eye, yaw, pitch) {
@@ -310,7 +411,31 @@ export class Renderer {
     cam.lookAt(cam.position.clone().add(f));
   }
 
+  // The world pass goes to a half-float HDR target and is tone-mapped once, as a whole frame, on the way to the screen
+  // (CS2 renders HDR and tone-maps the frame). Particle shaders write HDR values (an overbright beam is meant to be
+  // hot, not clipped white), so drawing them straight to the 8-bit canvas blew them out. The curve is the ACES the
+  // world materials already used per material, so the world looks as before.
   render() {
-    this.renderer.render(this.scene, this.camera);
+    const r = this.renderer;
+    const size = r.getDrawingBufferSize(this._size || (this._size = new THREE.Vector2()));
+    if (!this.hdr) {
+      this.hdr = new THREE.WebGLRenderTarget(size.x, size.y, { type: THREE.HalfFloatType, samples: 4 });
+      const mat = new THREE.ShaderMaterial({
+        uniforms: { tHdr: { value: this.hdr.texture } },
+        vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
+        fragmentShader: `// three prepends its tone-mapping functions (toneMapped material, drawn to the screen)
+uniform sampler2D tHdr; varying vec2 vUv;
+void main() { vec3 c = ACESFilmicToneMapping(max(texture2D(tHdr, vUv).rgb, vec3(0.0))); gl_FragColor = sRGBTransferOETF(vec4(clamp(c, 0.0, 1.0), 1.0)); }`,
+        depthTest: false, depthWrite: false, // (toneMapped stays true: three then feeds toneMappingExposure)
+      });
+      this.blitScene = new THREE.Scene();
+      this.blitScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), mat));
+      this.blitCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    }
+    if (this.hdr.width !== size.x || this.hdr.height !== size.y) this.hdr.setSize(size.x, size.y);
+    r.setRenderTarget(this.hdr);
+    r.render(this.scene, this.camera);
+    r.setRenderTarget(null);
+    r.render(this.blitScene, this.blitCam);
   }
 }

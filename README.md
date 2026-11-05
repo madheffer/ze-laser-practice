@@ -263,6 +263,12 @@ are dimmed. If the owner leaves, the next oldest member owns the room.
   `repeat` re-fires a drill every N s, `noBossDamage` keeps a boss (and its attacks) alive. You play until you die.
 - **Records** (`app/records.js`): personal bests per map/stage/mode in this browser (fastest clear + fewest hits;
   longest endless). Online leaderboards are on the roadmap.
+- **Gamma** (Settings → Video & camera, 1–2.5, default 2): CS2's `r_fullscreen_gamma`, "Screen Gamma (only in fullscreen
+  modes)" in `rendersystemdx11.dll`, a hardware gamma ramp over the finished frame (CS2's default 2.2; lower is
+  brighter: each channel goes to value^(gamma/2.2)). Here it is an SVG gamma filter over the game's layers (`ui/gamma.js`).
+- **Baked lighting** (in progress): `lasers-bake --lighting <workshop.vpk> web/public/maps/<map>` writes the map's CS2
+  lightmaps to `lighting/` (irradiance BC6H, directional irradiance DXT1, the sun's shadow mask BC7/BC4) as their GPU
+  blocks byte for byte, plus `lighting.json` (lightmap versions, the UV scale for the world glb's `TEXCOORD_1`).
 - **Simulated ping** (0–500 ms, slider + exact number): your movement stays predicted, the map's entities (and their
   sounds) are drawn from a history that many ms behind the simulation, so you react as late as on a server at that ping.
 

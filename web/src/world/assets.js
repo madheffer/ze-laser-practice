@@ -10,6 +10,7 @@ import { mapName, safeRelPath, assetKey, versioned } from '../lib/paths.js';
 import { fetchJson, fetchBuffer, FRESH } from '../lib/fetch.js';
 import { normaliseHulls } from './hulls.js';
 import { mapItems } from './items.js';
+import { MapEffects } from '../fx/effects.js';
 
 // VRF exports glTF in metres, Y up: gltf = (src.y, src.z, src.x) * 0.0254. This puts it back in Source units.
 export const GLTF_TO_SOURCE = new THREE.Matrix4().set(
@@ -83,8 +84,10 @@ export async function loadMap(name, onProgress = () => {}) {
   const fx = Object.create(null);
   for (const [k, v] of Object.entries(particles || {})) fx[assetKey(k)] = v;
   const items = mapItems(entities, entwatch); // world/items.js: the map's EntWatch items, heals marked
+  // the map's particle effects as the game has them (bake fx/), run by fx/particles; null for an older bake
+  const effects = await MapEffects.load((rel) => url(rel), fetchJson);
   const radar = radarInfo(overview, (rel) => url(rel));
-  return { name, version, manifest, entities, collision, hulls, bounds, world, getModel, particles: fx, items, radar };
+  return { name, version, manifest, entities, collision, hulls, bounds, world, getModel, particles: fx, items, radar, effects };
 }
 
 // (the loader adds ?v=)

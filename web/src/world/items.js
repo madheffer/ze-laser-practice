@@ -60,6 +60,7 @@ export function mapItems(entities, entwatch) {
       weapon: findName(w.kv.targetname || ''), button: button ? findName(button.kv.targetname || '') : null,
       spawn: tplOfLump.get(w.lump)?.kv.targetname || null,
       mode: timing.mode || 0, cooldown: timing.cooldown || 0, maxuses: timing.maxuses || 0,
+      usable: !!button, // a heal with no button (gris: its heal runs in the map's cs_script) can't be held here
       zombie, heal: !zombie && (HEAL_NAME.test(it.name) || HEAL_NAME.test(key(w.kv.targetname)) || HEAL_NAME.test(key(tplOfLump.get(w.lump)?.kv.targetname)) || healsInData(w.lump)),
     });
   }
@@ -94,6 +95,10 @@ export function itemState(it, now) {
   if (now < it.readyAt) return String(Math.ceil(it.readyAt - now));
   return usesLimited ? `${it.maxuses - it.uses}/${it.maxuses}` : 'R';
 }
+
+// The heals a human can carry here: a heal item with a button (gris's heal runs in its cs_script: not holdable).
+// Every heal is a group aura (one holder, the others gather round) until a scenario says otherwise.
+export const usableHeals = (items) => (items || []).filter((it) => it.heal && it.usable);
 
 // One use as EntWatch counts it: false if it's used up / cooling down (the press is blocked), else the use is spent.
 // Also how a co-op round tracks a teammate's item for the item HUD (app/coop.js).

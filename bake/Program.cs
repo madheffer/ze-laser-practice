@@ -53,6 +53,13 @@ public static class Program
             // lasers-bake --shots <workshop.vpk> <web/public/maps/<name>>: only the map's screenshots (ShotsBake.cs)
             return ShotsBake.Run(Path.GetFullPath(args[1]), Path.GetFullPath(args[2]));
         }
+        if (args.Length >= 3 && args[0] == "--fx")
+        {
+            // lasers-bake --fx <workshop.vpk> <web/public/maps/<name>> [--cs2 <game/csgo>]: only the particle effects (ParticleBake.cs)
+            string? fxCs2 = null;
+            for (var i = 3; i < args.Length; i++) if (args[i] == "--cs2" && i + 1 < args.Length) fxCs2 = args[++i];
+            return ParticleBake.Run(Path.GetFullPath(args[1]), Path.GetFullPath(args[2]), fxCs2 ?? FindCs2());
+        }
         if (args.Length >= 3 && args[0] == "--scan")
         {
             // lasers-bake --scan <workshop/content/730> <out.json>: rank a local library for laser maps (LibraryScan.cs)
@@ -62,6 +69,11 @@ public static class Program
         {
             // lasers-bake --overview <workshop.vpk> <web/public/maps/<name>>: only the map's radar (OverviewBake.cs)
             return OverviewBake.Run(Path.GetFullPath(args[1]), Path.GetFullPath(args[2]));
+        }
+        if (args.Length >= 3 && args[0] == "--lighting")
+        {
+            // lasers-bake --lighting <workshop.vpk> <web/public/maps/<name>>: the map's baked CS2 lighting (LightingBake.cs)
+            return LightingBake.Run(Path.GetFullPath(args[1]), Path.GetFullPath(args[2]));
         }
         if (args.Length >= 2 && args[0] == "--player")
         {
@@ -92,7 +104,7 @@ public static class Program
         return 0;
     }
 
-    static string? FindCs2()
+    internal static string? FindCs2()
     {
         foreach (var lib in new[] { @"D:\Steam", @"C:\Program Files (x86)\Steam", @"D:\SteamLibrary", @"E:\SteamLibrary" })
         {
@@ -215,6 +227,8 @@ sealed class Baker(string input, string outRoot, string? cs2, bool textures)
         }
         File.WriteAllText(Path.Combine(outDir, "particles.json"), particles.ToJsonString(Json));
         Log($"particles: {particles.Count} effects");
+        // 3c. fx/: the effects themselves (every system + texture) for the particle runtime (ParticleBake.cs)
+        ParticleBake.Write(loader, effects, outDir, Log, missing);
 
         // 4. glbs: the static world, then each entity model on its own (the player places and moves them).
         var exporter = new GltfModelExporter(loader)

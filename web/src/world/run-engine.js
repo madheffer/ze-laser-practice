@@ -52,6 +52,12 @@ export function createRunEngine({ entities, hulls, bounds, traceBox, scenario, m
   }
   if (endless) run.endlessTick = installEndless(engine, scenario, run.fireStart);
 
+  // items: the map items (world/items.js mapItems entries) this player holds. Handed over BEFORE the replay, as a holder
+  // carries them through the whole round: the map's own item rules during the replay reach them (mist: relay_escape
+  // disables the heal at +80 s, the throne re-enables it; relay_dragon locks the others). Solo: the map's heals when the
+  // heal option is on (app/items.js heldItems); in a room whatever the room gave this player.
+  run.items = giveItems(engine, Array.isArray(items) ? items : []);
+
   // Later stages start by replaying the map's own sequence up to that point, silently, then placing you.
   if (scenario?.fastForward) {
     run.ffStart = engine.time;
@@ -73,9 +79,6 @@ export function createRunEngine({ entities, hulls, bounds, traceBox, scenario, m
   for (const s of scenario?.setup || []) engine.fire(s.target, s.input, s.param || '', s.delay || 0, engine.playerEnt, null);
   // player.name: the targetname the map gives a human before this point (westersand's spawn room: "None")
   if (scenario?.player?.name) { engine.playerEnt.name = String(scenario.player.name); engine.playerEnt.key = nameKey(scenario.player.name); }
-  // items: the map items (world/items.js mapItems entries) this player holds from the start: solo the map's heals
-  // when the heal option is on (app/items.js heldItems), in a room whatever the room gave this player
-  run.items = giveItems(engine, Array.isArray(items) ? items : []);
   return run;
 }
 

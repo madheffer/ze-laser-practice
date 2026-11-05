@@ -18,6 +18,7 @@ import './classes/brushes.js';
 import './classes/fx.js';
 import './classes/physics.js';
 import './classes/server.js';
+import './classes/beams.js';
 
 // Limits on what a map's data can make the engine do (a map is untrusted). Far above any real map:
 // ze_mist_p peaks at ~2000 live entities in a firestorm wave and ~20 simulated humans.

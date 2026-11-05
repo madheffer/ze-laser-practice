@@ -7,7 +7,7 @@ import { useItems as press } from '../world/items.js';
 
 export function heldItems() {
   if (S.mp) return S.mp.heldItems?.() || [];
-  return settings.healItem ? (S.map?.items || []).filter((it) => it.heal) : [];
+  return settings.healItem ? (S.map?.items || []).filter((it) => it.heal && it.usable) : [];
 }
 
 export function useItems() {

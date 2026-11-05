@@ -32,6 +32,8 @@ import { Lobby } from './ui/lobby.js';
 import { Home } from './ui/home.js';
 import { installActivity } from './app/activity.js';
 import { Peers } from './world/peers.js';
+import { usableHeals } from './world/items.js';
+import { applyGamma } from './ui/gamma.js';
 import { net, lobby, installCoop, hostStart, abortRound } from './app/coop.js';
 
 const canvas = $('#view');
@@ -98,6 +100,7 @@ function applySettings() {
   G.renderer.delay = settings.ping / 1000;
   if (S.engine) S.engine.humans = rule('humans');
   G.audio.setVolumes({ sfx: settings.sfx, music: settings.music });
+  applyGamma(settings.gamma); // r_fullscreen_gamma (ui/gamma.js)
 }
 
 // ---- weapons (CS2: 1 primary, 3 knife, Q last weapon, R reload)
@@ -204,6 +207,7 @@ G.selectMap = async (name) => {
 G.lobby = new Lobby($('#lobby'), {
   net, state: lobby, getMap: () => S.map?.name || '',
   mapTitle: (name) => S.mapIndex.find((m) => m.name === name)?.title || name,
+  hasHeal: () => usableHeals(S.map?.items).length > 0,
 });
 installCoop();
 installActivity(net);
@@ -226,7 +230,7 @@ $('#go-home').addEventListener('click', () => G.home.show());
 // console handle for debugging and automated checks
 window.__lasers = {
   get engine() { return S.engine; }, get player() { return S.player; }, get run() { return S.run; }, get world() { return S.world; },
-  get paused() { return S.paused; }, get vm() { return G.vm; }, get body() { return G.body; }, get audio() { return G.audio; }, get overlayOpen() { return G.overlay.open; },
+  get paused() { return S.paused; }, get renderer() { return G.renderer; }, get map() { return S.map; }, get vm() { return G.vm; }, get body() { return G.body; }, get audio() { return G.audio; }, get overlayOpen() { return G.overlay.open; },
   startScenario, settings, scenarios: () => S.scenarios,
   coop: { net, lobby, get round() { return S.mp; }, peers: G.peers },
   // run the simulation n seconds synchronously (tests; a hidden tab gets no animation frames)

@@ -17,7 +17,7 @@ import { bossTargets, applyBossDamage } from './bosses.js';
 import { showRoundEnd } from './coop-end.js';
 import { isMapName } from '../lib/paths.js';
 import { lastFrameAt } from './loop.js';
-import { itemState, spendUse } from '../world/items.js';
+import { itemState, spendUse, usableHeals } from '../world/items.js';
 
 export const net = new CoopClient();
 export const lobby = { busy: false }; // busy = a round is on that you're not in (you'll be in the next one)
@@ -41,7 +41,7 @@ class Round {
     this.leader = d.leader;
     this.holders = d.holders; // who started with the map's heal (the room's choice)
     // teammates' items, for the item HUD: the same EntWatch bookkeeping as yours, from their presses
-    const heals = (S.map?.items || []).filter((it) => it.heal);
+    const heals = usableHeals(S.map?.items);
     this.peerItems = new Map(d.holders.filter((id) => id !== net.you).map((id) => [id, heals.map((it) => ({ ...it, uses: 0, readyAt: 0 }))]));
     this.players = new Map(d.roster.map((m) => [m.id, { id: m.id, name: m.name, alive: true, deadAt: null, hits: 0 }]));
     this.me = net.you;
@@ -57,7 +57,7 @@ class Round {
   get isHost() { return net.isHost; } // the room owner (Play again on the end card)
 
   // ---- items (app/items.js, ui/itemhud.js)
-  heldItems() { return this.holders.includes(this.me) ? (S.map?.items || []).filter((it) => it.heal) : []; }
+  heldItems() { return this.holders.includes(this.me) ? usableHeals(S.map?.items) : []; }
   myName() { return this.name(this.me); }
   itemRows() {
     const now = S.engine?.time ?? 0, rows = [];

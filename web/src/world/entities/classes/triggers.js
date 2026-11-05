@@ -84,6 +84,8 @@ function hurtThink(engine, e, inside, events) {
 // Hurt events raised outside updateTriggers (a trigger killed or disabled under you ends its touch during the
 // I/O queue); they go out with the next updateTriggers.
 function pending(engine) { return (engine._triggerEvents ||= []); }
+// an event for the player from outside a trigger (beams.js: env_laser / point_hurt), delivered with the next updateTriggers
+export function queueEvent(engine, ev) { pending(engine).push(ev); }
 
 export function untouch(engine, e, events = pending(engine)) {
   if (engine.touching.has(e)) {

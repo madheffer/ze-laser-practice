@@ -54,8 +54,8 @@ function range(label, min, max, step, value, fmt = (v) => String(v)) {
 }
 
 // settings: the starting values; mode: 'create' | 'edit'; owner name for the placeholder; players: [{ id, name }] in
-// the room (who can carry the heal; a new room picks a holder once people are in it)
-export function roomForm(settings, { mode, ownerName, members = 1, players = [], onSubmit, onCancel }) {
+// the room (who can carry the heal); heal: the loaded map has a heal a human can carry (else no Heal picker)
+export function roomForm(settings, { mode, ownerName, members = 1, players = [], heal: healOn = false, onSubmit, onCancel }) {
   const s = cleanSettings(settings, members);
   const r = s.rules;
   const form = el('form', 'room-form', { novalidate: '' });
@@ -108,16 +108,18 @@ export function roomForm(settings, { mode, ownerName, members = 1, players = [],
   const heal = el('select', '', { id: healId });
   const syncHeal = () => {
     const keep = heal.value || String(r.heal);
-    const opts = [['none', 'Nobody'], ['all', kind.value === 'versus' ? 'Everyone (their own)' : 'Everyone']];
-    if (kind.value !== 'versus') for (const p of players) opts.push([String(p.id), p.name]);
+    // co-op: one holder (the aura heals whoever gathers round them); versus: each run is its own, so everyone or nobody
+    const opts = kind.value === 'versus' ? [['none', 'Nobody'], ['all', 'Everyone (their own)']]
+      : [['none', 'Nobody'], ['random', 'Random player'], ...players.map((p) => [String(p.id), p.name])];
     heal.replaceChildren(...opts.map(([v, t]) => { const o = el('option'); o.value = v; o.textContent = t; return o; }));
     heal.value = opts.some(([v]) => v === keep) ? keep : 'none';
   };
   kind.el.addEventListener('change', syncHeal);
   syncHeal();
   healLabel.append('Heal item', heal);
-  const healHint = text('small', 'rf-hint', mode === 'create' ? "The map's own heal, E to use. Pick one player for it once people have joined." : "The map's own heal (mist: Cleansing Aura), E to use. Versus: everyone or nobody.");
-  bosses.append(humans.el, bossHp.el, autoFire.el, perfect.el, fall.el, healLabel, healHint);
+  const healHint = text('small', 'rf-hint', "The map's own heal aura, E to use: one player carries it and the group gathers round (random = picked each round). Versus: everyone their own, or nobody.");
+  bosses.append(humans.el, bossHp.el, autoFire.el, perfect.el, fall.el);
+  if (healOn) bosses.append(healLabel, healHint);
 
   // ---- cheats
   const cheats = el('fieldset', 'card cheats');
@@ -145,12 +147,12 @@ export function roomForm(settings, { mode, ownerName, members = 1, players = [],
   const read = () => cleanSettings({
     name: name.value, public: vis.value === 'public', kind: kind.value, max: Number(max.value),
     rules: { humans: humans.value, bossHp: bossHp.value, autoFire: autoFire.value, perfectTeam: perfect.value, fallDamage: fall.value,
-      heal: heal.value === 'none' || heal.value === 'all' ? heal.value : Number(heal.value), god: god.value, hitboxes: hitboxes.value, autoBhop: bhop.value },
+      heal: !healOn ? r.heal : ['none', 'all', 'random'].includes(heal.value) ? heal.value : Number(heal.value), god: god.value, hitboxes: hitboxes.value, autoBhop: bhop.value },
   }, members);
   form.addEventListener('submit', (ev) => { ev.preventDefault(); onSubmit(read()); });
   cancel.addEventListener('click', () => onCancel());
   reset.addEventListener('click', () => {
-    const fresh = roomForm({ ...SETTINGS_DEFAULTS, name: name.value, public: vis.value === 'public', kind: kind.value, max: Number(max.value), rules: RULE_DEFAULTS }, { mode, ownerName, members, players, onSubmit, onCancel });
+    const fresh = roomForm({ ...SETTINGS_DEFAULTS, name: name.value, public: vis.value === 'public', kind: kind.value, max: Number(max.value), rules: RULE_DEFAULTS }, { mode, ownerName, members, players, heal: healOn, onSubmit, onCancel });
     form.replaceWith(fresh);
     fresh.querySelector('button[type=submit]')?.focus();
   });

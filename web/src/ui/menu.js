@@ -173,7 +173,7 @@ function personalBest(id) {
 // The map's heal option: only on a map that has a heal item (world/items.js: EntWatch / the map's data), named after it.
 // You hold it from the stage start and E uses it; the map's own logic decides where it works (mist: not in the escape).
 function healToggle() {
-  const heals = (S.map?.items || []).filter((it) => it.heal);
+  const heals = (S.map?.items || []).filter((it) => it.heal && it.usable);
   if (!heals.length) return null;
   const it = heals[0];
   const label = el('label', 'heal-toggle');

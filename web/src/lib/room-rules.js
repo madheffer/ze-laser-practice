@@ -14,8 +14,9 @@ export const CHEATS = ['god', 'hitboxes', 'autoBhop'];
 export const RULE_DEFAULTS = Object.freeze({
   humans: 20, bossHp: 100, autoFire: true, perfectTeam: false, fallDamage: false,
   god: false, hitboxes: false, autoBhop: false,
-  // who carries the map's heal item (world/items.js heals): 'none', 'all', or one player's id (co-op only; versus is
-  // all or none, so nobody starts with an edge)
+  // who carries the map's heal item (world/items.js usableHeals). Co-op: 'none', 'random' (one player, from the round's
+  // seed) or a player's id: a heal is an aura the group gathers round, so ONE human holds it, as on a server.
+  // Versus: 'none' or 'all' (everyone their own: each versus run is separate, so an aura heals only its holder)
   heal: 'none',
 });
 const RANGES = { humans: [1, 64], bossHp: [1, 100] };
@@ -36,7 +37,7 @@ export function cleanRules(r) {
     if (!Object.hasOwn(r, k)) continue;
     const d = RULE_DEFAULTS[k], v = r[k];
     if (typeof d === 'boolean' && typeof v === 'boolean') out[k] = v;
-    else if (k === 'heal') out.heal = v === 'all' || v === 'none' ? v : Number.isInteger(v) && v > 0 ? v : 'none';
+    else if (k === 'heal') out.heal = ['none', 'all', 'random'].includes(v) ? v : Number.isInteger(v) && v > 0 ? v : 'none';
     else if (typeof d === 'number' && typeof v === 'number' && Number.isFinite(v)) {
       const [lo, hi] = RANGES[k];
       out[k] = Math.round(Math.min(hi, Math.max(lo, v)));
@@ -51,7 +52,8 @@ export function cleanSettings(s, members = 1) {
   const max = Number.isInteger(o.max) ? o.max : SETTINGS_DEFAULTS.max;
   const kind = ROOM_KINDS.includes(o.kind) ? o.kind : SETTINGS_DEFAULTS.kind;
   const rules = cleanRules(o.rules);
-  if (kind === 'versus' && typeof rules.heal === 'number') rules.heal = 'all';
+  if (kind === 'versus' && rules.heal !== 'none') rules.heal = 'all';
+  if (kind !== 'versus' && rules.heal === 'all') rules.heal = 'random';
   return {
     name: cleanText(o.name, 32),
     public: o.public === true,
@@ -61,9 +63,12 @@ export function cleanSettings(s, members = 1) {
   };
 }
 
-// the round's item holders: the room's heal setting against who is in the round
-export function healHolders(heal, ids) {
+// the round's heal holders: the room's setting against who is in the round ('random': one of them, picked from the
+// round's seed, so it is the same pick wherever it's worked out)
+export function healHolders(heal, ids, seed = 0) {
+  if (!ids.length) return [];
   if (heal === 'all') return [...ids];
+  if (heal === 'random') return [[...ids].sort((a, b) => a - b)[Math.abs(seed | 0) % ids.length]];
   return typeof heal === 'number' && ids.includes(heal) ? [heal] : [];
 }
 

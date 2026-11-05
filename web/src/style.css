@@ -42,3 +42,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); c
 #flash.on { opacity: 1; transition: none; }
 
 /* the menu: ui/menu.css; touch controls: ui/touch.css */
+
+/* r_fullscreen_gamma (ui/gamma.js): the game's layers through the gamma ramp */
+.cs-gamma { filter: url(#cs-gamma); }
+.gamma-defs { position: absolute; width: 0; height: 0; overflow: hidden; pointer-events: none; }

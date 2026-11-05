@@ -7,6 +7,7 @@
 // bossHp: % of that boss HP to actually fight through; autoFire: the other humans shoot the boss
 // sfx / music: game sound and CS2's `snd_musicvolume`, 0-1 each
 // thirdPerson / tpDist: CS2Fixes' third person (cs2f_thirdperson_distance_default 65, _min 15, _max 150)
+// gamma: CS2's r_fullscreen_gamma (ui/gamma.js; CS2's default is 2.2, lower = brighter); 2 here by default
 import { $ } from '../lib/dom.js';
 import { clamp } from '../lib/math.js';
 import { loadJson, saveJson } from '../lib/storage.js';
@@ -22,13 +23,14 @@ export const DEFAULTS = {
   perfectTeam: false, // true = the other humans never stop shooting (the old fast kill)
   ping: 0, // simulated round trip in ms (0-500): the map's entities are drawn this late (see render.js record())
   thirdPerson: false, tpDist: 65,
+  gamma: 2,
   touchSens: 1, touchCrouch: false, // phone / tablet: look speed multiplier, crouch as a toggle instead of hold
 };
 
 // Allowed range per numeric setting; a saved value outside it is clamped (the menu can't produce one).
 const RANGES = {
   sens: [0.001, 100], timescale: [0.01, 4], humans: [1, 64], bossHp: [1, 100], ping: [0, 500],
-  sfx: [0, 1], music: [0, 1], tpDist: [15, 150], touchSens: [0.2, 3],
+  sfx: [0, 1], music: [0, 1], tpDist: [15, 150], gamma: [1, 2.5], touchSens: [0.2, 3],
 };
 const DROPPED = new Set(['myaw', 'fov', 'stamina', 'volume']);
 const FORBIDDEN = new Set(['__proto__', 'constructor', 'prototype']);
@@ -87,6 +89,7 @@ export function bindSettings(onChange) {
   bind('#touchsens', 'touchSens', (v) => `${v.toFixed(1)}×`);
   bindPair('#ping', '#ping-num', 'ping', 0, 500, onChange);
   bindPair('#tpdist', '#tpdist-num', 'tpDist', 15, 150, onChange);
+  bindPair('#gamma', '#gamma-num', 'gamma', 1, 2.5, onChange, 0.05);
   // 0-1 like CS2's console values: game sound (the menu's #volume pair, labelled SFX) and `snd_musicvolume`
   bindPair('#volume', '#volume-num', 'sfx', 0, 1, onChange, 0.01);
   bindPair('#musicvol', '#musicvol-num', 'music', 0, 1, onChange, 0.01);

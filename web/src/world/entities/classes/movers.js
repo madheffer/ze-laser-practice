@@ -334,3 +334,4 @@ const trackTrain = register('func_tracktrain', {
   },
 });
 register('func_train', trackTrain);
+register('func_tanktrain', trackTrain); // the same path_track rider (CS2 CFuncTankTrain); ze_dreamin's line lasers ride one

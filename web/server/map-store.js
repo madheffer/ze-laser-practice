@@ -7,7 +7,7 @@ import path from 'node:path';
 import { isMapName } from '../src/lib/paths.js';
 import { normaliseHulls } from '../src/world/hulls.js';
 import { TriangleBVH } from '../src/world/collision.js';
-import { mapItems } from '../src/world/items.js';
+import { mapItems, usableHeals } from '../src/world/items.js';
 
 const KEEP = 3;
 
@@ -31,7 +31,7 @@ export function mapStore(dir) {
       const { hulls, bounds } = normaliseHulls(hullsRaw);
       const tris = new Float32Array(col.buffer.slice(col.byteOffset, col.byteOffset + col.byteLength));
       // the map's EntWatch items, as the browser reads them (world/items.js): a round's heal holders get its heals
-      return { map, entities, hulls, bounds, bvh: new TriangleBVH(tris), heals: mapItems(entities, entwatch).filter((it) => it.heal) };
+      return { map, entities, hulls, bounds, bvh: new TriangleBVH(tris), heals: usableHeals(mapItems(entities, entwatch)) };
     })();
     p.catch(() => cache.delete(map));
     cache.set(map, p);
