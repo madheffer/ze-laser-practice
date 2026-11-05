@@ -64,6 +64,8 @@ dotnet build bake -c Release        # then see README "Run it locally" for the b
   are audible: keep the game paused (audio is silent while paused) and never leave test values saved in their
   settings (`localStorage['lasers.settings']`).
 - **Bash heredocs can mangle backslashes on Windows Git Bash** (`\\` -> `\`): write scripts with the Write tool.
+- **Deploy: [deploy/README.md](deploy/README.md).** `git push box main` builds the image on the box (`lasers:latest`,
+  log `~/lasers-build.log`); then laser-game is deployed in Helm's UI. A push without the build is invisible to Helm.
 - **Commit explicitly** (`git add <files>`, never `-A`), confirm `git diff --cached --name-only` first.
   GitHub repos default **private**; ask before creating or pushing one.
 - Platform: built on Windows (PowerShell + Git Bash). CS2 and its workshop maps are found from Steam's library list

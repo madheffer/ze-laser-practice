@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# The box's deploy: a push to main builds the site's image, which Helm's laser-game bundle runs (lasers:latest).
+# Installed as the bare repo's hook on the box (deploy/README.md):
+#   dev@192.168.20.32:repos/ze-laser-practice.git/hooks/post-receive
+# The build runs in the background so the push returns at once; its log: ~/lasers-build.log. Once it finishes, Helm
+# shows a new build for laser-game: deploy it there (putting a build live stays Helm's / the operator's).
+set -euo pipefail
+
+LOG="$HOME/lasers-build.log"
+REPO="$(pwd)"
+sha=""
+while read -r _old new ref; do
+  [ "$ref" = "refs/heads/main" ] && [ "$new" != "0000000000000000000000000000000000000000" ] && sha="$new"
+done
+[ -n "$sha" ] || exit 0
+
+echo "lasers: building ${sha:0:7} in the background (log: ~/lasers-build.log)"
+nohup bash -c '
+  set -euo pipefail
+  sha="$1"; repo="$2"
+  exec 9>"$HOME/.lasers-build.lock"
+  flock 9 # one build at a time; a newer push waits, then builds its own commit
+  # a newer push already queued behind us builds the newer commit: skip a stale one
+  [ "$(git --git-dir="$repo" rev-parse refs/heads/main)" = "$sha" ] || { echo "$(date -Is) ${sha:0:7}: skipped, main moved on"; exit 0; }
+  dir="$(mktemp -d)"
+  trap "rm -rf \"$dir\"" EXIT
+  echo "$(date -Is) ${sha:0:7}: building"
+  git --git-dir="$repo" archive "$sha" web | tar -x -C "$dir"
+  docker build -q -t "lasers:${sha:0:12}" -t lasers:latest \
+    --label "org.opencontainers.image.revision=$sha" "$dir/web"
+  echo "$(date -Is) ${sha:0:7}: built lasers:latest, deploy it in Helm (laser-game)"
+' _ "$sha" "$REPO" >>"$LOG" 2>&1 </dev/null &
