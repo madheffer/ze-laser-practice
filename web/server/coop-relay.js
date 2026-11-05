@@ -48,6 +48,14 @@ function sameOrigin(req) {
   try { return new URL(origin).host === req.headers.host; } catch { return false; }
 }
 
+// The address the per-address cap counts. Behind a reverse proxy / tunnel every socket comes from the proxy, so
+// the host names the header that proxy sets to the real client (ipHeader, e.g. cf-connecting-ip). Only set it when
+// a proxy you run always sets that header: otherwise a client could send any value. Never logged or sent anywhere.
+function clientAddress(req, ipHeader) {
+  const fromProxy = ipHeader ? String(req.headers[ipHeader] || '').split(',')[0].trim().slice(0, 64) : '';
+  return fromProxy || req.socket.remoteAddress || '';
+}
+
 // a name nobody else in the room has: "Bob", "Bob (2)"
 function uniqueName(room, name, self) {
   const taken = new Set(room.members.filter((m) => m !== self).map((m) => m.name));
@@ -57,7 +65,7 @@ function uniqueName(room, name, self) {
 }
 
 // store: db/store.js's run store (or a promise for one): every finished run is written there
-export function attachCoopRelay(httpServer, { log = () => {}, store = openStore({ log }), scenariosDir = path.resolve(HERE, '../public/scenarios'), mapsDir = path.resolve(HERE, '../public/maps') } = {}) {
+export function attachCoopRelay(httpServer, { log = () => {}, store = openStore({ log }), ipHeader = '', scenariosDir = path.resolve(HERE, '../public/scenarios'), mapsDir = path.resolve(HERE, '../public/maps') } = {}) {
   const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_FRAME, perMessageDeflate: false });
   const rooms = new Map(); // code -> room
   const perAddress = new Map();
@@ -201,7 +209,7 @@ export function attachCoopRelay(httpServer, { log = () => {}, store = openStore(
   }
 
   wss.on('connection', (ws, req) => {
-    const addr = req.socket.remoteAddress || '';
+    const addr = clientAddress(req, ipHeader);
     const c = { id: nextId++, name: 'Player', ws, room: null, windowAt: Date.now(), count: 0, listAt: 0, addr };
     ws.isAlive = true;
     ws.on('pong', () => { ws.isAlive = true; });
@@ -236,7 +244,7 @@ export function attachCoopRelay(httpServer, { log = () => {}, store = openStore(
 
   httpServer.on('upgrade', (req, socket, head) => {
     if ((req.url || '').split('?')[0] !== PATH) return; // Vite's own HMR socket and anything else
-    const addr = req.socket.remoteAddress || '';
+    const addr = clientAddress(req, ipHeader);
     if (!sameOrigin(req) || (perAddress.get(addr) || 0) >= PER_ADDRESS) {
       socket.write('HTTP/1.1 403 Forbidden\r\n\r\n'); socket.destroy(); return;
     }

@@ -1,21 +1,16 @@
 import { defineConfig, loadEnv } from 'vite';
 import { fileURLToPath } from 'node:url';
 import { coopRelayPlugin } from './server/coop-relay.js';
+import { CSP, CSP_HEADER, IMMUTABLE_CACHE, isImmutable } from './server/http-policy.js';
 
 // The run store's database (server/db/store.js): DATABASE_URL from the environment, else from web/.env
 // (gitignored). Server-side only: it is not a VITE_ variable, so it never reaches the page.
 process.env.DATABASE_URL ??= loadEnv('', fileURLToPath(new URL('.', import.meta.url)), 'DATABASE_').DATABASE_URL;
 
-// Baked maps and sounds never change under a given URL: the loader adds ?v=<version> to every one of them
-// (lib/paths.js versioned()). So the browser may keep them for a year and a reload reads them from disk
-// instead of re-downloading ~100+ MB. /weapons/ and /panorama/ are fetched without a version (the vendored
-// fp/ engine, CSS url()s), so they keep normal revalidation.
-const IMMUTABLE = /^\/(maps|sounds)\//;
+// versioned maps + sounds are cached for a year (server/http-policy.js)
 function longCacheForAssets() {
   const handler = (req, res, next) => {
-    const path = (req.url || '').split('?')[0];
-    const versioned = /[?&]v=/.test(req.url || '');
-    if (IMMUTABLE.test(path) && versioned) res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    if (isImmutable(req.url)) res.setHeader('Cache-Control', IMMUTABLE_CACHE);
     next();
   };
   return {
@@ -25,24 +20,8 @@ function longCacheForAssets() {
   };
 }
 
-// Content-Security-Policy for built pages. Not in dev: Vite's dev server injects <style> tags and a websocket.
-//   'wasm-unsafe-eval'           three's meshopt decoder
-//   style-src-attr 'unsafe-inline'  the style="--src:url(...)" attributes the HUD builds for its icons
-// frame-ancestors is header-only; hosts should also send it (and the same policy) as a response header.
-export const CSP = [
-  "default-src 'none'",
-  "script-src 'self' 'wasm-unsafe-eval'",
-  "style-src 'self'",
-  "style-src-attr 'unsafe-inline'",
-  "img-src 'self' blob: data:",
-  "font-src 'self'",
-  "connect-src 'self' blob: data:",
-  "media-src 'self' blob:",
-  "worker-src 'self' blob:",
-  "base-uri 'none'",
-  "form-action 'none'",
-  "object-src 'none'",
-].join('; ');
+// Content-Security-Policy (server/http-policy.js): a <meta> in built pages (not in dev: Vite's dev server injects
+// <style> tags and a websocket)
 function cspInBuild() {
   return {
     name: 'csp-meta',
@@ -55,7 +34,7 @@ function cspHeaderInPreview() {
   return {
     name: 'csp-header-preview',
     configurePreviewServer(server) {
-      server.middlewares.use((req, res, next) => { res.setHeader('Content-Security-Policy', `${CSP}; frame-ancestors 'none'`); next(); });
+      server.middlewares.use((req, res, next) => { res.setHeader('Content-Security-Policy', CSP_HEADER); next(); });
     },
   };
 }

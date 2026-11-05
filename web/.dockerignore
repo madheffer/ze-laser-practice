@@ -1,0 +1,11 @@
+# the image builds from source; baked content is mounted at /assets, never copied in
+node_modules
+dist
+.env
+.env.*
+public/maps
+public/sounds
+public/weapons
+public/panorama
+public/player
+*.log
