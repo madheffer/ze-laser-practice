@@ -113,6 +113,14 @@ export class Viewmodel {
     }
   }
 
+  // A load that failed (a file missing on the host for a while, a dropped connection) is tried again rather than
+  // leaving the hands gone for the rest of the page's life: app/session.js calls this at every stage start.
+  retryLoad() {
+    if (this.ready || !this.loadError || this._retrying) return;
+    this.loadError = null;
+    this._retrying = this.load().catch(() => {}).finally(() => { this._retrying = null; });
+  }
+
   get gun() { return GUNS[this.gunName]; }
 
   // one chassis's viewmodel (CS2's arms + the weapon + its graph), loaded once and kept

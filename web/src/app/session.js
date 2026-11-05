@@ -175,6 +175,7 @@ export function startScenario(i, mode = 'normal') {
   const gun = S.replay ? S.replay.meta.gun : DEFAULT_GUN;
   if (S.replay) S.replay.gunName = gun;
   G.vm.reset(scenario?.weapon || 'knife', gun);
+  G.vm.retryLoad(); // hands that failed to load before (weapons/viewmodel.js): this stage tries them again
   G.hud.showWeapons(G.vm.weapon, G.vm.gunName);
   G.menu.update();
 }
