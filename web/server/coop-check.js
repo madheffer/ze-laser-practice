@@ -11,14 +11,13 @@
 //     its swing rate and reach) and have a clear line from the player's eye to the boss.
 //   - the stage's own win / lose (the map's win input or winAfter), instead of trusting a client.
 // Violations are counted per kind; a few within two seconds and the player is out of the round.
-import { createRunEngine, hazardName, TICK } from '../src/world/run-engine.js';
+import { createRunEngine, hazardName, TICK, COUNTDOWN, startIfDue, mapRuns } from '../src/world/run-engine.js';
 import { useItems } from '../src/world/items.js';
 import { CollisionWorld, makeTrace } from '../src/world/collision.js';
 import { bulletWorld, BULLET_MASK } from '../src/world/bullets.js';
-import { CS } from '../src/world/movement.js';
+import { CS, standsFree } from '../src/world/movement.js';
 import { WEAPONS } from '../src/lib/weapons.js';
 
-const COUNTDOWN = 3; // s before a stage starts in a round (app/session.js startAt)
 const MAX_AXIS_SPEED = 3500 * 1.05; // CS2 clamps each velocity axis to sv_maxvelocity 3500
 const BOOST_TICKS = 32; // after a push / map velocity: half a second of extra speed allowance, no fly check
 const STRIKES = 3, STRIKE_WINDOW = 128; // this many of one kind within 2 s = out
@@ -36,7 +35,8 @@ const len3 = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 export class PlayerCheck {
   // assets: map-store's; scenario: the stage's full entry (or null for free roam)
   // items: the map items this player holds from the start (a round's heal holders)
-  constructor({ assets, scenario, mode, seed, rules, items = [], onDeath, onOutcome, onCheat, log = () => {} }) {
+  // countdown: seconds from the spawn to the stage start (a solo replay passes the one it was recorded with)
+  constructor({ assets, scenario, mode, seed, rules, items = [], countdown = COUNTDOWN, onDeath, onOutcome, onCheat, log = () => {} }) {
     this.scenario = scenario;
     this.rules = rules;
     this.onDeath = onDeath; this.onOutcome = onOutcome; this.onCheat = onCheat; this.log = log;
@@ -59,6 +59,8 @@ export class PlayerCheck {
     this.run = createRunEngine({
       entities: assets.entities, hulls: assets.hulls, bounds: assets.bounds, animations: assets.animations,
       traceBox: (s, e, h) => this.world.traceBox(s, e, h, undefined, true),
+      // the client's spawn test (app/session.js): the same spot, so the spawn check below agrees
+      fits: (o, solids) => standsFree(this.world, o, solids), countdown,
       scenario, mode, seed, humans: rules.humans, bossHp: rules.bossHp, items,
       hooks: {
         attach(engine) {
@@ -82,7 +84,6 @@ export class PlayerCheck {
       },
     });
     this.engine = this.run.engine;
-    this.startAt = scenario ? COUNTDOWN : Infinity;
   }
 
   // a push or a map-set velocity: that much extra speed is allowed (and gravity may be fought) for a while
@@ -130,10 +131,10 @@ export class PlayerCheck {
     const { engine, run } = this;
     this.ticks++;
     this.t += TICK;
-    if (!run.started && this.t >= this.startAt) { run.started = true; run.startTime = engine.time; run.fireStart(); }
+    startIfDue(run, this.t); // the countdown (world/run-engine.js), as the client's loop.js step
     // an item press between ticks k and k + 1 is queued for the next engine tick, on the client too
     while (this.uses.length && this.uses[0] < this.ticks) { this.uses.shift(); if (run.items?.length && run.started) useItems(engine, run.items); }
-    engine.tick(TICK);
+    if (mapRuns(run)) engine.tick(TICK); // a mid-map stage holds still through its countdown
     while (this.bd.length && this.bd[0].tick <= this.ticks) {
       for (const [id, dmg, n, team] of this.bd.shift().hits) {
         const e = engine.ents[id - 1]?.id === id ? engine.ents[id - 1] : engine.ents.find((x) => x.id === id);

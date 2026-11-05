@@ -22,6 +22,8 @@ export const ALIASES = {
   'hurt.fall': 'Player.DamageFall',
   'hurt.burn': 'Player.BurnDamage',
   'death': 'Player.Death',
+  // the stage countdown's 3, 2, 1 (app/loop.js): CS2's Premier map pick/ban last-seconds tick
+  'countdown.tick': 'UI.Premier.CounterTimer',
 };
 
 // A soundevents.json -> Map(lower-case name -> def). The map's carries the map's version; the stock one is

@@ -9,10 +9,9 @@
 //     all dead = wiped; versus = the last one alive wins.
 // Players only ever talk to the server, so nobody learns anyone else's address.
 import { cleanText, healHolders } from '../src/lib/room-rules.js';
-import { TICK } from '../src/world/run-engine.js';
+import { TICK, COUNTDOWN } from '../src/world/run-engine.js'; // COUNTDOWN: s a round's run waits before the stage starts
 import { PlayerCheck } from './coop-check.js';
 
-const COUNTDOWN = 3; // s: a round's run waits this long before the stage starts (app/session.js startAt)
 // The round's clock starts only when every player has loaded the stage and drawn it (their 'ready'), so a slow
 // device (a phone streaming the world) never meets the lasers on a black screen. Who holds the rest up for too long
 // is left out (tick): once at least half of the players are ready, the others get a grace period of
@@ -43,7 +42,7 @@ export class Round {
     this.loadT0 = Date.now();
     this.halfAt = null; // when half of the players were first ready (the stragglers' grace starts)
     this.waitAt = 0; this.waitDirty = false;
-    this.countdown = stage.fastForward ? 0 : COUNTDOWN;
+    this.countdown = COUNTDOWN; // a mid-map stage too: it holds still through it (world/run-engine.js)
     this.dmg = new Map();
     this.clockAt = 0; this.bossAt = 0;
     this.ended = false;

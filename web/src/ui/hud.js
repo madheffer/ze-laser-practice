@@ -35,6 +35,7 @@ export class Hud {
       <div class="hud-stage"><div class="hud-title"></div><div class="hud-timer"></div><div class="hud-sub"></div></div>
       <div class="hud-boss"></div>
       <div class="hud-spec"></div>
+      <div class="hud-countdown" aria-live="polite"></div>
       <div class="hud-money"><span class="money-digits">$0</span>${icon(ICONS.cart, 'money-cart')}</div>
       <div class="hud-ha">
         <div class="hud-ha-half left">
@@ -71,7 +72,7 @@ export class Hud {
     root.dataset.team = team;
     const q = (s) => root.querySelector(s);
     this.el = {
-      title: q('.hud-title'), timer: q('.hud-timer'), sub: q('.hud-sub'), boss: q('.hud-boss'), spec: q('.hud-spec'),
+      title: q('.hud-title'), timer: q('.hud-timer'), sub: q('.hud-sub'), boss: q('.hud-boss'), spec: q('.hud-spec'), countdown: q('.hud-countdown'),
       money: q('.money-digits'), ha: q('.hud-ha'), hp: q('.hud-ha-big.hp'), hpBar: q('.hp-bar i'),
       armor: q('.hud-ha-armor'), armorLabel: q('.hud-ha-armor-label'), armorIcon: q('.armor-icon'),
       wpn: q('.hud-wpn-main'), clip: q('.hud-ha-big.clip'), clipBar: q('.clip-bar i'), reserve: q('.hud-wpn-reserve'),
@@ -99,6 +100,9 @@ export class Hud {
     set('timer', e.timer, v.timer || '');
     set('sub', e.sub, v.sub || '');
     set('spec', e.spec, v.spectate || ''); // dead in a round: who you are watching
+    // the stage's countdown (world/run-engine.js COUNTDOWN): 3, 2, 1 big in the middle, each number popping in
+    const cd = v.countdown ? String(v.countdown) : '';
+    if (this.last.countdown !== cd) { this.last.countdown = cd; e.countdown.textContent = cd; if (cd) replayClass(e.countdown, 'tick'); }
     set('money', e.money, `$${v.money ?? 16000}`);
     const hp = Math.max(0, Math.ceil(v.hp));
     set('hp', e.hp, v.god ? '∞' : thousands(hp));

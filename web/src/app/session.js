@@ -3,7 +3,8 @@
 // hand the result to the end card (and the records).
 import * as THREE from 'three';
 import { DEG } from '../world/entities/index.js';
-import { createRunEngine, hazardName as hazardText } from '../world/run-engine.js';
+import { createRunEngine, hazardName as hazardText, COUNTDOWN, legacyCountdown, freeSpawn } from '../world/run-engine.js';
+import { standsFree } from '../world/movement.js';
 import { heldItems } from './items.js';
 import { prepareStage } from './readiness.js';
 import { S, G, log } from './state.js';
@@ -41,8 +42,8 @@ export function startScenario(i, mode = 'normal') {
   // cs2f_free_armor 2); scenario.player can override health/armor/gravity for a stage that starts mid-map.
   const hp0 = scenario?.player?.health ?? 100;
   const run = S.run = {
-    // a round counts down 3 s, so a guest has time to click in (their run starts without a click)
-    t: 0, ticks: 0, startAt: scenario ? (S.mp ? 3.0 : 1.0) : Infinity, started: false, hp: hp0, maxHp: hp0,
+    // startAt: world/run-engine.js (COUNTDOWN, 3 s solo and in a round; a replay plays its own)
+    t: 0, ticks: 0, started: false, hp: hp0, maxHp: hp0,
     armor: scenario?.player?.armor ?? 100, helmet: true,
     hits: 0, done: false, result: '', mode: endless ? 'endless' : 'normal', endless,
     winAfter: endless ? null : scenario?.winAfter, fireAcc: 0, myHits: 0, myDamage: 0, noFall: false, bossPeak: new Map(),
@@ -74,6 +75,8 @@ export function startScenario(i, mode = 'normal') {
   createRunEngine({
     entities: map.entities, hulls: map.hulls, bounds: map.bounds, animations: map.animations,
     traceBox: (s, e, h) => S.world.traceBox(s, e, h, undefined, true),
+    fits: (o, solids) => standsFree(S.world, o, solids), // never spawn inside the floor or a moving brush
+    countdown: S.replay ? (S.replay.meta.countdown ?? legacyCountdown(scenario)) : COUNTDOWN,
     scenario, mode, seed: run.seed,
     humans: rule('humans'), bossHp: rule('bossHp'), items: heldItems(), run,
     // kept on the run: a replay's seek mutes the map the same way (app/replay.js)
@@ -96,7 +99,7 @@ export function startScenario(i, mode = 'normal') {
           if (settings.ping > 0) setTimeout(() => { if (S.engine === engine) G.audio.onSound(ev); }, settings.ping);
           else G.audio.onSound(ev);
         });
-        engine.onTeleportPlayer = (o, yaw) => player.teleport(o, yaw ?? player.yaw);
+        engine.onTeleportPlayer = (o, yaw) => player.teleport(landing(o), yaw ?? player.yaw);
         engine.playerMatrix = () => new THREE.Matrix4().compose(
           new THREE.Vector3(...player.origin),
           new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), player.yaw * DEG),
@@ -151,7 +154,7 @@ export function startScenario(i, mode = 'normal') {
   // your solo runs on a stage are recorded for their replay (app/replay-record.js), never a round's or a replay's
   if (scenario && !S.mp && !S.replay) {
     run.rec = new ReplayRecorder({
-      seed: run.seed, map: map.name, mapVersion: map.version || '', stage: scenario.id, mode: run.mode,
+      seed: run.seed, map: map.name, mapVersion: map.version || '', stage: scenario.id, mode: run.mode, countdown: run.startAt,
       weapon: scenario.weapon || 'knife',
       rules: { humans: rule('humans'), bossHp: rule('bossHp'), autoFire: rule('autoFire'), perfectTeam: rule('perfectTeam'), fallDamage: rule('fallDamage'), healItem: !!settings.healItem },
     });
@@ -159,6 +162,14 @@ export function startScenario(i, mode = 'normal') {
   G.vm.reset(scenario?.weapon || 'knife');
   G.hud.showWeapons(G.vm.weapon);
   G.menu.update();
+}
+
+// Where a map teleport lands you: its destination, or the nearest spot a player fits when that is inside something
+// (dreamin's boss_des, where its Crystal stages begin, sits 8 u inside the arena floor's brush): the spawn's rule
+// (world/run-engine.js freeSpawn). The server's check allows a landing this close (coop-check.js TELEPORT_SLACK).
+export function landing(origin) {
+  const solids = S.engine ? S.engine.solids() : [];
+  return freeSpawn(origin, (o) => standsFree(S.world, o, solids));
 }
 
 export function stageTime() {

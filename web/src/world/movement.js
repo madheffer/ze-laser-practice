@@ -37,6 +37,16 @@ export const CS = {
   staminaRecovery: 60,
 };
 
+// Does a standing player (feet at origin) fit in the world there, moving brushes (engine.solids()) included: where a
+// spawn may go (world/run-engine.js freeSpawn), the same test in the browser and on the co-op server.
+const standTrace = makeTrace();
+export function standsFree(world, origin, solids) {
+  world.dynamic = solids;
+  const h = [CS.halfWidth, CS.halfWidth, CS.standHeight / 2];
+  const c = [origin[0], origin[1], origin[2] + CS.standHeight / 2];
+  return !world.traceBox(c, c, h, standTrace).startSolid;
+}
+
 const v3 = (x = 0, y = 0, z = 0) => [x, y, z];
 const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 

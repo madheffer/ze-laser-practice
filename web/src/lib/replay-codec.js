@@ -145,6 +145,8 @@ export function cleanMeta(m) {
     stage: m.stage,
     mode: m.mode === 'endless' ? 'endless' : 'normal',
     weapon: m.weapon === 'gun' ? 'gun' : 'knife',
+    // s from the spawn to the stage's start (world/run-engine.js COUNTDOWN); absent in older replays (legacyCountdown)
+    ...(Number.isFinite(m.countdown) ? { countdown: num(m.countdown, 0, 10, 3) } : {}),
     rules: {
       humans: Math.round(num(rules.humans, 1, 64, 20)), bossHp: Math.round(num(rules.bossHp, 1, 100, 100)),
       autoFire: rules.autoFire !== false, perfectTeam: rules.perfectTeam === true, fallDamage: rules.fallDamage === true,

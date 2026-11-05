@@ -9,7 +9,8 @@ import { bossFire, bossStatus, bossShown, trackSegments, shootAs } from './bosse
 import { applyPose, eventsAfter, eventsDuring } from './replay-play.js';
 import { replayView } from './replay-view.js';
 import { useItems as pressItems } from '../world/items.js';
-import { startScenario, fireStart, hurtPlayer, healPlayer, finish, stageTime } from './session.js';
+import { startScenario, hurtPlayer, healPlayer, finish, stageTime, landing } from './session.js';
+import { startIfDue, mapRuns } from '../world/run-engine.js';
 import { bossHudHtml } from '../ui/hud.js';
 import { formatTime, plural } from '../lib/format.js';
 import { getRecord } from './records.js';
@@ -120,15 +121,16 @@ export function step() {
   run.ticks++;
   // a replay: what the player did between the last tick and this one (shots, E), as they did it
   if (S.replay) eventsAfter(run.ticks - 1, { shoot: replayShot, use: () => { if (run.items?.length && run.started) pressItems(engine, run.items); } });
-  if (!run.started && run.t >= run.startAt) {
-    run.started = true;
-    run.startTime = engine.time;
-    run.startTick = run.ticks; // a replay's clock (app/replay.js)
-    fireStart();
+  // the countdown (world/run-engine.js COUNTDOWN): the stage starts once it is over
+  if (startIfDue(run, run.t)) run.startTick = run.ticks; // a replay's clock (app/replay.js)
+  else if (!run.started && Number.isFinite(run.startAt)) {
+    // its 3, 2, 1, heard as well as seen (ui/hud.js): CS2's map-pick tick on each new number (not while a replay seeks)
+    const n = Math.ceil(run.startAt - run.t - 1e-6);
+    if (n !== run.countdownShown && n >= 1 && n <= 3) { run.countdownShown = n; if (!S.replay?.fast) G.audio.play('countdown.tick'); }
   }
   // a spectator's map keeps running (lasers, the boss, the end), without them in it
   if (run.spectating) {
-    engine.tick(CS.tick);
+    if (mapRuns(run)) engine.tick(CS.tick); // a mid-map stage holds still through its countdown
     G.renderer.record(engine.time);
     world.dynamic = engine.solids();
     teamAndEnd(run);
@@ -136,7 +138,7 @@ export function step() {
   }
   const ground = player.groundEntity && player.groundEntity.alive ? player.groundEntity : null;
   const groundBefore = ground ? ground.getWorld().clone() : null;
-  engine.tick(CS.tick);
+  if (mapRuns(run)) engine.tick(CS.tick); // a mid-map stage holds still through its countdown
   G.renderer.record(engine.time);
   if (ground) player.ride(ground, groundBefore, ground.getWorld());
   world.dynamic = engine.solids();
@@ -167,7 +169,7 @@ export function step() {
       // destination's (porter research 07 §2.2); a fall into a teleport lands still carrying its fall speed
       const turn = ((ev.yaw ?? player.yaw) - player.yaw) * Math.PI / 180;
       const [vx, vy, vz] = player.velocity;
-      player.teleport(ev.origin, ev.yaw);
+      player.teleport(landing(ev.origin), ev.yaw); // never into the floor or a brush (session.js landing)
       player.velocity = [vx * Math.cos(turn) - vy * Math.sin(turn), vx * Math.sin(turn) + vy * Math.cos(turn), vz];
       // the map sent a human into the zombie cage (world/entities/classes/triggers.js zombieCages): on a server the
       // zombies there infect you. Solo or in a round it is a death (a round makes you a spectator: session.finish)
@@ -238,6 +240,8 @@ export function updateHud() {
   G.hud.update({
     title: (S.replay ? 'REPLAY · ' : '') + (scenario ? scenario.name + (run.endless ? ' · ENDLESS' : '') : 'Free roam'),
     timer: scenario ? (t < 0 ? `starts in ${(-t).toFixed(1)}` : formatTime(t)) : '',
+    // 3, 2, 1 big in the middle once the clock runs: loaded and drawn, and in a round everyone in (the server's go)
+    countdown: scenario && t < 0 && run.ready && (!S.mp || run.go) ? Math.ceil(-t - 1e-6) : 0,
     sub: sub.join(' · '),
     hp: run.spectating ? (S.mp?.spectateView()?.hp ?? 0) : run.hp, god: godMode(), armor: run.armor,
     spectate: run.spectating ? S.mp?.spectateLabel() : '',

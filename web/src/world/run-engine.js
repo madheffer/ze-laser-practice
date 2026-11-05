@@ -7,8 +7,13 @@
 //   hooks.silent(on)        a fast-forward replay starts / ends (the client mutes its sounds)
 //   hooks.win() / lose()    the scenario's win / lose input arrived (a disabled relay doesn't count)
 //   hooks.place(spawn)      where the player starts ({ origin, yaw, pitch? }), before the `setup` inputs fire
+//   fits(origin, solids)    does a standing player fit there (world/movement.js standsFree): a spawn that doesn't
+//                           moves to the nearest spot that does (freeSpawn)
+//   countdown               seconds from the spawn to the stage's start (COUNTDOWN; a replay passes its own)
 // Fills and returns `run` (the caller's run object, or a new one) with
-//   { engine, endless, fireStart(), endlessTick, ffStart, started, startTime, fireAcc, cvars }.
+//   { engine, endless, fireStart(), endlessTick, ffStart, started, startAt, preFired, startTime, fireAcc, cvars }.
+// Each tick before the start: startIfDue(run, t) starts the stage once its clock reaches startAt, and the map only
+// ticks while mapRuns(run) (a mid-map stage stands still through its countdown).
 import { EntityEngine, parseVec } from './entities/index.js';
 import { mapCvars } from './entities/classes/server.js';
 import { giveItems } from './items.js';
@@ -17,10 +22,15 @@ import { inputMatcher, nameKey, stripPrefix } from '../lib/names.js';
 import { own } from '../lib/storage.js';
 
 export const TICK = 1 / 64;
+// s from the spawn to the stage's start, solo and in a round: time to look around, and for a round's guests to click
+// in. A stage that starts mid-map (fastForward) holds the map still for it, where the replay left it.
+export const COUNTDOWN = 3;
+// a replay recorded before its meta carried the countdown: mid-map stages had none, the others 1 s solo
+export const legacyCountdown = (scenario) => (scenario?.fastForward ? 0 : 1);
 const DAMAGE_PER_HIT = 30;
 const PERFECT_HITS_PER_HUMAN = 5;
 
-export function createRunEngine({ entities, hulls, bounds, animations, traceBox, scenario, mode = 'normal', seed, humans = 20, bossHp = 100, items = [], hooks = {}, run: into = {} }) {
+export function createRunEngine({ entities, hulls, bounds, animations, traceBox, fits = null, countdown = COUNTDOWN, scenario, mode = 'normal', seed, humans = 20, bossHp = 100, items = [], hooks = {}, run: into = {} }) {
   const endless = mode === 'endless' && !!scenario?.endless;
   const engine = new EntityEngine(entities, { hulls, bounds, animations }, { seed });
   // physboxes (world/entities/classes/physics.js) slide along the static world only
@@ -29,7 +39,10 @@ export function createRunEngine({ entities, hulls, bounds, animations, traceBox,
   hooks.attach?.(engine);
   engine.spawnWorld();
 
-  const run = Object.assign(into, { engine, endless, started: false, startTime: 0, ffStart: undefined, fireAcc: 0, endlessTick: null });
+  const run = Object.assign(into, {
+    engine, endless, started: false, startTime: 0, ffStart: undefined, fireAcc: 0, endlessTick: null,
+    startAt: scenario ? Math.max(0, countdown) : Infinity, preFired: false,
+  });
   // the map's server cvars: what it sets as it loads, then any point_servercommand during the run. Fall damage is
   // sv_falldamage_scale: 0 on GFL unless the map turns it on (for an area) itself
   run.cvars = mapCvars(engine);
@@ -69,11 +82,14 @@ export function createRunEngine({ entities, hulls, bounds, animations, traceBox,
     // "hold": push everything the map still has queued back by N s, so you get time to look around
     if (scenario.hold) for (const q of engine.queue) q.t += scenario.hold;
     hooks.silent?.(false);
-    run.started = true;
-    run.startTime = engine.time;
+    // its start inputs went in at the replay's start: the countdown only holds the map still (startIfDue)
+    run.preFired = true;
+    if (run.startAt <= 0) { run.started = true; run.startTime = engine.time; }
   }
 
-  hooks.place?.(spawnPoint(engine, scenario));
+  const spawn = spawnPoint(engine, scenario);
+  if (fits) { const solids = engine.solids(); spawn.origin = freeSpawn(spawn.origin, (o) => fits(o, solids)); }
+  hooks.place?.(spawn);
   // `setup`: inputs that put the map where its own sequence would be by now, for a stage that starts past the relays
   // that do it (ze_deadcore's drills move des2, its catch-all fall destination, where the map keeps it for that part)
   for (const s of scenario?.setup || []) engine.fire(s.target, s.input, s.param || '', s.delay || 0, engine.playerEnt, null);
@@ -127,6 +143,41 @@ export function spawnPoint(engine, scenario) {
   }
   return { origin: [spawn.origin[0], spawn.origin[1], spawn.origin[2] + 1], yaw: spawn.yaw ?? 0, pitch: spawn.pitch };
 }
+
+// A spawn the player doesn't fit at (a point under a floor the bake has since moved, deadcore's b_full; inside a
+// platform's solid box, a_boss) moves to the nearest spot that fits: straight up first (a floor or a lid above),
+// then around at that height, nearest first, 2 u above where it first fits. Nowhere within 640 u: left as it was.
+const FREE_UP = 640, FREE_RINGS = [16, 32, 48, 64, 96, 128, 192, 256];
+export function freeSpawn(origin, fits) {
+  if (fits(origin)) return origin;
+  const at = (dx, dy, dz) => [origin[0] + dx, origin[1] + dy, origin[2] + dz];
+  const lift = (o) => { const up = [o[0], o[1], o[2] + 2]; return fits(up) ? up : o; };
+  let ring = 0;
+  for (let dz = 2; dz <= FREE_UP; dz += 2) {
+    if (fits(at(0, 0, dz))) return lift(at(0, 0, dz));
+    // a ring at the same height once going up has come as far as its radius
+    while (ring < FREE_RINGS.length && FREE_RINGS[ring] <= dz) {
+      const r = FREE_RINGS[ring++];
+      for (let k = 0; k < 16; k++) {
+        const o = at(r * Math.cos(k * Math.PI / 8), r * Math.sin(k * Math.PI / 8), 0);
+        if (fits(o)) return lift(o);
+      }
+    }
+  }
+  return origin;
+}
+
+// Each tick before the stage has started (client loop.js, server coop-check.js): its start once the run's clock t
+// reaches startAt. A mid-map stage fired its start inputs before its replay, so it only starts the clock.
+export function startIfDue(run, t) {
+  if (run.started || t < run.startAt) return false;
+  run.started = true;
+  run.startTime = run.engine.time;
+  if (!run.preFired) run.fireStart();
+  return true;
+}
+// does the map tick this tick: not while a mid-map stage counts down (it waits where its replay left it)
+export const mapRuns = (run) => run.started || !run.preFired;
 
 // What killed you, in words: the scenario's own name for it, or the entity name tidied up
 // (hurt_finalbullet&0042 -> "finalbullet"). The kill feed's text, on the client and the server alike.

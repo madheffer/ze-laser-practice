@@ -104,3 +104,9 @@ body.touch-playing .hud-ws { display: none; }
 .hud-spec { position: absolute; left: 50%; top: calc(70 * var(--u)); transform: translateX(-50%); font: 700 calc(16 * var(--u)) 'Stratum2', sans-serif; letter-spacing: 0.06em; text-transform: uppercase; color: #fff; text-shadow: 0 1px 3px #000; }
 .hud-spec:empty { display: none; }
 .hud-spec { background: rgba(0, 0, 0, 0.45); padding: calc(6 * var(--u)) calc(16 * var(--u)); border-radius: calc(4 * var(--u)); }
+/* the stage countdown (ui/hud.js): 3, 2, 1 above the crosshair, each number popping in */
+.hud-countdown { position: absolute; left: 50%; top: 32%; transform: translate(-50%, -50%); font: 700 calc(72 * var(--u)) 'Stratum2', sans-serif; color: #fff; text-shadow: 0 2px 8px rgba(0, 0, 0, 0.8); pointer-events: none; }
+.hud-countdown:empty { display: none; }
+.hud-countdown.tick { animation: hud-countdown-pop 0.35s ease-out; }
+@keyframes hud-countdown-pop { from { transform: translate(-50%, -50%) scale(1.5); opacity: 0.2; } to { transform: translate(-50%, -50%) scale(1); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .hud-countdown.tick { animation: none; } }

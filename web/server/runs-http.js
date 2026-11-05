@@ -35,7 +35,8 @@ export function checkReplay(upload, { map, stageId, mode, time }) {
     if (!gz.length || gz.length > GZIP_MAX) return null;
     const raw = zlib.gunzipSync(gz, { maxOutputLength: MAX_BYTES });
     const d = decodeReplay(new Uint8Array(raw.buffer, raw.byteOffset, raw.length));
-    // the recording covers the run: the stage time, plus the 1 s countdown unless the stage starts mid-map
+    // the recording covers the run: the stage time, plus its countdown (meta.countdown: 3 s, world/run-engine.js
+    // COUNTDOWN; older replays 1 s, none mid-map)
     if (d.n * TICK < time - 1 || d.n * TICK > time + 4) return null;
     meta.ticks = d.n;
     return { data: gz, meta };

@@ -43,6 +43,7 @@ static class SoundBake
         "soundevents/game_sounds_weapons.vsndevts_c",
         "soundevents/game_sounds_player.vsndevts_c",
         "soundevents/game_sounds_footsteps.vsndevts_c",
+        "soundevents/game_sounds_ui.vsndevts_c",
     ];
     static readonly string[] StockEvents =
     [
@@ -50,6 +51,8 @@ static class SoundBake
         "Weapon_AK47.Draw", "Weapon_AK47.Single", "Weapon_AK47.Clipout", "Weapon_AK47.Clipin", "Weapon_AK47.BoltPull",
         "Default.WalkJump", "CT_Concrete.StepLeft", "Land_Concrete.StepLeft", "CT_Default.StepLeft", "Land_Default.StepLeft",
         "Player.DamageBody.Victim", "Player.DamageFall", "Player.BurnDamage", "Player.Death",
+        // the stage countdown's 3, 2, 1: Premier map pick/ban's last-seconds tick (panorama/scripts/popups/popup_premier_pick_ban)
+        "UI.Premier.CounterTimer",
     ];
 
     /// The map's events (every vsndevts_c in its packages) + the stock events its entities name (outDir's
