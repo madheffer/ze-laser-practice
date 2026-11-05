@@ -63,8 +63,9 @@ export class Renderer {
   }
 
   // performance settings: render resolution (x the screen's pixel ratio) and MSAA on the HDR target
-  setQuality({ renderScale = 1, msaa = true } = {}) {
-    const ratio = Math.min(window.devicePixelRatio, 2) * Math.min(1, Math.max(0.25, renderScale));
+  // pixelCap: the most of the screen's pixel ratio to draw at (phones are 3x; app/graphics.js Low draws at 1x)
+  setQuality({ renderScale = 1, msaa = true, pixelCap = 2 } = {}) {
+    const ratio = Math.min(window.devicePixelRatio, Math.max(0.5, pixelCap)) * Math.min(1, Math.max(0.25, renderScale));
     if (Math.abs(this.renderer.getPixelRatio() - ratio) > 1e-3) { this.renderer.setPixelRatio(ratio); this.resize(); }
     if (this.msaa !== msaa) { this.msaa = msaa; if (this.hdr) { this.hdr.dispose(); this.hdr = null; this.blitScene = null; } }
   }

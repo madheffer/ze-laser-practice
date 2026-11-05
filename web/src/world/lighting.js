@@ -73,7 +73,11 @@ export class MapLighting {
     };
     this.defaultFar = null;
     // reflections: the cube array (as a 2D array of faces) + one row of volume data per cubemap
-    this.cubeUniforms = { cs2Cubes: { value: null }, cs2CubeVolumes: { value: null }, cs2CubeCount: { value: 0 }, cs2CubeMips: { value: new THREE.Vector2(0, 0) } };
+    this.cubeUniforms = { cs2Cubes: { value: null }, cs2CubeVolumes: { value: null }, cs2CubeCount: { value: 0 }, cs2CubeMips: { value: new THREE.Vector2(0, 0) },
+      // the volumes the camera can see this frame (cullCubes), as rows of cs2CubeVolumes in priority order
+      cs2CubeOrder: { value: null }, cs2CubeVisible: { value: 0 } };
+    this.cubeBoxes = []; // each volume's world box (its edge-fade padding included), row order
+    this._frustum = new THREE.Frustum(); this._viewProj = new THREE.Matrix4();
     this.cubeCount = 0; // the map's; the uniform is 0 while reflections are off (the loop then costs nothing)
     // particle lights (C_OP_RenderStandardLight as CS2's barn lights, fx/particles/render/lights.js), world space
     this.barnUniforms = barnUniforms();
@@ -83,9 +87,12 @@ export class MapLighting {
   }
 
   // performance settings, instant: fog and reflections are uniforms, so nothing recompiles
-  setOptions({ fog = true, reflections = true } = {}) {
-    this.options = { fog, reflections };
+  // particleLights: effects lighting the world (setLights; off = none, the shaders' light loop then costs nothing)
+  setOptions({ fog = true, reflections = true, particleLights = true } = {}) {
+    this.options = { fog, reflections, particleLights };
     this.cubeUniforms.cs2CubeCount.value = reflections ? this.cubeCount : 0;
+    if (!reflections) this.cubeUniforms.cs2CubeVisible.value = 0;
+    this._cubeKey = null; // re-cull on the next frame
   }
 
   // every frame: this frame's particle lights (MapEffects.lights, the lights.js contract) into the world and model
@@ -93,7 +100,7 @@ export class MapLighting {
   // camera to the light's sphere squared (a light around you outranks a brighter one far away); out of range: none
   setLights(lights, camera) {
     const u = this.barnUniforms;
-    const list = Array.isArray(lights) ? lights : [];
+    const list = Array.isArray(lights) && this.options.particleLights !== false ? lights : [];
     const p = camera.position, order = this._barnOrder;
     order.length = 0;
     for (const l of list) {
@@ -117,9 +124,29 @@ export class MapLighting {
     u.cs2BarnCount.value = n;
   }
 
+  // Every frame: the reflection volumes the camera can see, in their priority order, for the shader to loop over.
+  // A pixel only takes a cubemap whose box holds it, and a box outside the view holds no visible pixel, so the
+  // picture is the same as looping over every volume; westersand has 73, and that loop was most of a frame.
+  cullCubes(camera) {
+    const cu = this.cubeUniforms, order = cu.cs2CubeOrder.value;
+    if (!order || !this.options.reflections) { cu.cs2CubeVisible.value = 0; return; }
+    camera.updateMatrixWorld();
+    this._viewProj.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+    this._frustum.setFromProjectionMatrix(this._viewProj);
+    const data = order.image.data;
+    let n = 0, key = '';
+    for (let r = 0; r < this.cubeBoxes.length; r++) {
+      if (!this._frustum.intersectsBox(this.cubeBoxes[r])) continue;
+      data[n++] = r; key += r + ',';
+    }
+    cu.cs2CubeVisible.value = n;
+    if (key !== this._cubeKey) { this._cubeKey = key; order.needsUpdate = true; }
+  }
+
   // every frame: the fog the player sees now (the engine's fog entities), the view distance, the sky's fog
   update(engine, camera) {
     if (this.defaultFar == null) this.defaultFar = camera.far;
+    this.cullCubes(camera);
     const fog = this.options.fog && engine?.fogState ? engine.fogState() : { controller: null, gradient: null };
     const u = this.fogUniforms;
     const g = fog.gradient, c = fog.controller?.on ? fog.controller : null;
@@ -205,8 +232,9 @@ export class MapLighting {
   // level first, then the smaller volume, then array_index)
   setCubemaps(ents, cm) {
     const cu = this.cubeUniforms;
-    cu.cs2Cubes.value?.dispose(); cu.cs2CubeVolumes.value?.dispose();
+    cu.cs2Cubes.value?.dispose(); cu.cs2CubeVolumes.value?.dispose(); cu.cs2CubeOrder.value?.dispose();
     cu.cs2Cubes.value = null; cu.cs2CubeVolumes.value = null; cu.cs2CubeCount.value = 0; this.cubeCount = 0;
+    cu.cs2CubeOrder.value = null; cu.cs2CubeVisible.value = 0; this.cubeBoxes = []; this._cubeKey = null;
     if (!cm) return;
     const layers = cm.faces; // depth x 6
     const tex = new THREE.CompressedArrayTexture(cm.mips.map((m) => ({ data: cm.data.subarray(m.offset, m.offset + m.bytes), width: m.width, height: m.height })),
@@ -245,7 +273,7 @@ export class MapLighting {
         shv = [lin.x, lin.y, lin.z, c0];
       }
       const size = (hi[0] - lo[0]) * (hi[1] - lo[1]) * (hi[2] - lo[2]);
-      vols.push({ indoor: kvNum(kv.indoor_outdoor_level, 0), size, idx, worldToLocal, lo, hi, fade, shv });
+      vols.push({ indoor: kvNum(kv.indoor_outdoor_level, 0), size, idx, ent, worldToLocal, lo, hi, fade, shv });
     }
     vols.sort((x, y) => (y.indoor - x.indoor) || (x.size - y.size) || (x.idx - y.idx));
     if (!vols.length) { tex.dispose(); return; }
@@ -267,6 +295,12 @@ export class MapLighting {
     cu.cs2CubeVolumes.value = vt;
     this.cubeCount = vols.length;
     cu.cs2CubeCount.value = this.options.reflections ? vols.length : 0;
+    // the shader's padded local box (lo - 0.1 .. hi + 0.1), placed in the world: what cullCubes tests
+    this.cubeBoxes = vols.map((v) => new THREE.Box3(new THREE.Vector3(...v.lo).subScalar(0.1), new THREE.Vector3(...v.hi).addScalar(0.1)).applyMatrix4(v.ent));
+    const order = new THREE.DataTexture(new Float32Array(vols.length), vols.length, 1, THREE.RedFormat, THREE.FloatType);
+    order.minFilter = order.magFilter = THREE.NearestFilter;
+    cu.cs2CubeOrder.value = order;
+    this._cubeKey = null;
     // the mip chain as CS2 counts it (the bake may have skipped the top mips)
     cu.cs2CubeMips.value.set(cm.levels, cm.skipped);
   }
@@ -777,6 +811,8 @@ const CUBE_PARS = (on) => !on ? '' : `
 uniform highp sampler2DArray cs2Cubes;      // layer = array_index * 6 + face (+X -X +Y -Y +Z -Z)
 uniform highp sampler2D cs2CubeVolumes;     // 7 texels per volume, in priority order
 uniform int cs2CubeCount;
+uniform highp sampler2D cs2CubeOrder;       // the volumes in view this frame (rows of cs2CubeVolumes, by priority)
+uniform int cs2CubeVisible;
 uniform vec2 cs2CubeMips;                   // CS2's mip count, mips the bake skipped
 // a cube direction (as GL picks the face) -> the face's layer offset and uv
 vec3 cs2CubeFace( vec3 d ) {
@@ -800,8 +836,9 @@ vec3 cs2EnvSpecular( vec3 posWS, vec3 normalVS, vec3 viewVS, float roughness, fl
   float lod = max( 0.0, sqrt( roughness ) * ( cs2CubeMips.x - 2.0 ) - cs2CubeMips.y );
   vec3 env = vec3( 0.0 ); float envLuma = 0.0; float total = 0.01;
   // bounded by the uniform, not a constant: a constant bound gets fully unrolled by ANGLE's D3D compiler
-  for ( int i = 0; i < cs2CubeCount; i++ ) {
+  for ( int k = 0; k < cs2CubeVisible; k++ ) {
     if ( total > 0.99 ) break;
+    int i = int( texelFetch( cs2CubeOrder, ivec2( k, 0 ), 0 ).r );
     mat3x4 w2l = mat3x4( cs2Vol( i, 0 ), cs2Vol( i, 1 ), cs2Vol( i, 2 ) );
     vec3 lp = vec4( posWS, 1.0 ) * w2l;
     vec4 mn = cs2Vol( i, 3 ); vec3 mx = cs2Vol( i, 4 ).xyz; vec3 inv = cs2Vol( i, 5 ).xyz;

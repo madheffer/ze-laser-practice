@@ -19,6 +19,7 @@ import { S, G, $, log } from './app/state.js';
 import { replayClass } from './lib/dom.js';
 import { isMapName } from './lib/paths.js';
 import { settings, bindSettings, FOV } from './app/settings.js';
+import { installGraphics } from './ui/graphics-ui.js';
 import { rule } from './app/rules.js';
 import { startScenario, endRun } from './app/session.js';
 import { frame, step, simulate, resetClock, updateHud } from './app/loop.js';
@@ -131,8 +132,8 @@ function applySettings() {
   if (S.engine) S.engine.humans = rule('humans');
   G.audio.setVolumes({ sfx: settings.sfx, music: settings.music });
   applyGamma(settings.gamma); // r_fullscreen_gamma (ui/gamma.js)
-  G.renderer.setQuality({ renderScale: settings.renderScale, msaa: settings.msaa });
-  G.renderer.lighting.setOptions({ fog: settings.fog, reflections: settings.reflections });
+  G.renderer.setQuality({ renderScale: settings.renderScale, msaa: settings.msaa, pixelCap: settings.pixelCap });
+  G.renderer.lighting.setOptions({ fog: settings.fog, reflections: settings.reflections, particleLights: settings.particleLights });
   G.stream?.setMode(streamMode());
 }
 
@@ -291,6 +292,8 @@ G.loadStage = loadStage;
 
 async function init() {
   bindSettings(applySettings);
+  // graphics presets (ui/graphics-ui.js): above the map list and in Video; Auto follows this device
+  installGraphics({ gl: G.renderer.renderer.getContext(), apply: applySettings, mapLoaded: () => !!S.map?.loaded });
   applySettings();
   G.vm.load().catch((e) => log(`viewmodel: ${e.message || e}`));
   const idx = await loadMapIndex().catch(() => ({ maps: [] }));

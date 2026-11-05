@@ -28,6 +28,10 @@ export const DEFAULTS = {
   // performance (Video): render resolution (x the screen's pixel ratio, capped at 2), MSAA, and the CS2 lighting
   // pieces. Fog / reflections switch instantly; baked lighting + quality apply when a map loads (quality 0 = auto)
   renderScale: 1, msaa: true, fog: true, reflections: true, bakedLighting: true, quality: 0,
+  // graphics: the preset those knobs come from (app/graphics.js): 'auto' follows the device, 'custom' after a hand
+  // change. pixelCap: the screen pixel ratio render resolution multiplies (phones are 3x). particleLights: effects
+  // lighting the world. graphicsChosen: the player picked a preset (the map list stops asking)
+  graphics: 'auto', pixelCap: 2, particleLights: true, graphicsChosen: false,
   streamDistance: 1, // a streamed world (world/stream.js): 1 auto (area, then what can be seen), 2 area only, 0 the whole map
   touchSens: 1, touchCrouch: false, // phone / tablet: look speed multiplier, crouch as a toggle instead of hold
 };
@@ -35,9 +39,11 @@ export const DEFAULTS = {
 // Allowed range per numeric setting; a saved value outside it is clamped (the menu can't produce one).
 const RANGES = {
   sens: [0.001, 100], timescale: [0.01, 4], humans: [1, 64], bossHp: [1, 100], ping: [0, 500],
-  sfx: [0, 1], music: [0, 1], tpDist: [15, 150], gamma: [1, 2.5], renderScale: [0.25, 1], quality: [0, 3], streamDistance: [0, 2], touchSens: [0.2, 3],
+  sfx: [0, 1], music: [0, 1], tpDist: [15, 150], gamma: [1, 2.5], renderScale: [0.25, 1], pixelCap: [0.5, 3], quality: [0, 3], streamDistance: [0, 2], touchSens: [0.2, 3],
 };
 const DROPPED = new Set(['myaw', 'fov', 'stamina', 'volume']);
+// string settings: one of these values
+const CHOICES = { graphics: ['auto', 'low', 'medium', 'high', 'custom'] };
 const FORBIDDEN = new Set(['__proto__', 'constructor', 'prototype']);
 
 const KEY = 'lasers.settings';
@@ -53,6 +59,7 @@ export function sanitizeSettings(saved) {
       const d = DEFAULTS[k];
       if (typeof d === 'boolean' && typeof v === 'boolean') out[k] = v;
       else if (typeof d === 'number' && typeof v === 'number' && Number.isFinite(v)) out[k] = RANGES[k] ? clamp(v, ...RANGES[k]) : v;
+      else if (typeof d === 'string' && CHOICES[k]?.includes(v)) out[k] = v;
     } else if (typeof v === 'boolean' || (typeof v === 'number' && Number.isFinite(v)) || (typeof v === 'string' && v.length <= 200)) {
       out[k] = v;
     }
@@ -61,12 +68,16 @@ export function sanitizeSettings(saved) {
 }
 
 // Saved settings from before a default changed get it once: v2 turned the team's boss fire off by default.
-const SETTINGS_VERSION = 2;
+const SETTINGS_VERSION = 3;
 function migrate(saved) {
   if (!saved || typeof saved !== 'object') return {};
   const v = Number.isInteger(saved.settingsVersion) ? saved.settingsVersion : 1;
   const out = { ...saved, settingsVersion: SETTINGS_VERSION };
   if (v < 2) delete out.autoFire;
+  // v3 added graphics presets (app/graphics.js): someone who already set a performance knob keeps it, as 'custom'
+  if (v < 3 && ['renderScale', 'msaa', 'fog', 'reflections', 'bakedLighting', 'quality', 'streamDistance'].some((k) => k in saved)) {
+    out.graphics = 'custom'; out.graphicsChosen = true;
+  }
   return out;
 }
 

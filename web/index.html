@@ -98,7 +98,7 @@
               <label class="field">Render resolution <output id="renderscale-v"></output><small>The biggest performance setting: lower draws fewer pixels</small><input id="renderscale" type="range" min="0.25" max="1" step="0.05"></label>
               <label class="chk"><input id="msaa" type="checkbox"><span>Anti-aliasing <small>MSAA 4x</small></span></label>
               <label class="chk"><input id="fog" type="checkbox"><span>Fog <small>The map's own fog</small></span></label>
-              <label class="chk"><input id="reflections" type="checkbox"><span>Reflections <small>The map's reflection cubemaps (~7% of a frame)</small></span></label>
+              <label class="chk"><input id="reflections" type="checkbox"><span>Reflections <small>The map's reflection cubemaps (only the ones in view are drawn)</small></span></label>
               <label class="chk"><input id="bakedlighting" type="checkbox"><span>CS2 baked lighting <small>The map's own lightmaps, probes and sky; off = simple lighting, smaller downloads. Next map load</small></span></label>
               <label class="field">Quality <small>Texture and lighting detail; Auto picks for your GPU. Next map load</small><select id="quality"><option value="0">Auto</option><option value="3">High</option><option value="2">Medium</option><option value="1">Low</option></select></label>
               <label class="field">World loading <small>Auto: your area first, then what the map lets you see. Area only: less to download and draw, distant scenery may be missing. Gameplay is the same either way</small><select id="streamdistance"><option value="1">Auto</option><option value="2">Area only</option><option value="0">Whole map</option></select></label>
