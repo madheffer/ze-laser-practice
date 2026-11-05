@@ -9,7 +9,7 @@ import { cleanSettings, cleanText } from '../lib/room-rules.js';
 import { isMapName } from '../lib/paths.js';
 
 export const ROOM_CODE = /^[A-Z]{4}$/;
-const GAME = new Set(['start', 's', 'dead', 'bd', 'clock', 'leader', 'end']);
+const GAME = new Set(['start', 's', 'dead', 'bd', 'clock', 'leader', 'end', 'use']);
 
 export class CoopClient {
   constructor() {
@@ -65,6 +65,10 @@ export class CoopClient {
   join(name, code) { this.send({ t: 'hello', name }); this.send({ t: 'join', code: String(code).toUpperCase() }); }
   rename(name) { if (this.ws?.readyState === 1) this.send({ t: 'hello', name }); }
   list() { this.send({ t: 'list' }); }
+  // the home page's live feed (server/activity.js): 'feed' (the recent rows + numbers), then 'act' / 'stats' pushes
+  watchFeed(on = true) { if (on || this.ws?.readyState === 1) this.send({ t: 'feed', on }); }
+  // your own solo run, for the feed (only while connected: a finished run never opens a socket by itself)
+  reportSolo(run) { if (this.ws?.readyState === 1) this.ws.send(JSON.stringify({ t: 'solo', ...run })); }
   setSettings(settings) { if (this.isHost) this.send({ t: 'settings', settings }); }
   setMap(map) { if (this.isHost && isMapName(map)) this.send({ t: 'map', map }); }
   kick(id) { if (this.isHost) this.send({ t: 'kick', id }); }
@@ -99,6 +103,7 @@ export class CoopClient {
       case 'list': this.emit('list', Array.isArray(m.rooms) ? m.rooms.slice(0, 100).map(cleanListing).filter(Boolean) : []); break;
       case 'kicked': this.room = null; this.emit('left', 'kicked'); break;
       case 'left': break; // our own leave, already handled
+      case 'feed': case 'act': case 'stats': this.emit(m.t, m); break; // untrusted: ui/home-feed.js cleans it
       case 'error': this.emit('error', cleanText(m.msg, 120) || 'error'); break;
       default: if (this.room && GAME.has(m.t)) this.emit('game', m);
     }

@@ -1,0 +1,1910 @@
+{
+  "map": "ze_ffxii_westersand_v8",
+  "title": "FFXII Westersand",
+  "description": "Slayerdragon & Noctali's Final Fantasy XII escape: the desert and its volcano hall dragon, the tomb with Belias and Gabranth, and the airship with Gabranth again and the Chaos laser fight. Five stages cycle (normal, tomb, epic, god, zombie mode) with an insane difficulty on top.",
+  "scenarios": [
+    {
+      "id": "chaos",
+      "group": "Most played",
+      "featured": true,
+      "name": "Chaos – laser boss",
+      "description": "The airship finale's Chaos fight. A random laser (low, mid or high) fires down the deck every 1.2 s until Chaos dies: jump the low and mid ones, crouch the high one. 380 hits per segment at 20 humans (50 + 16.5 per human, from the map's HP trigger), 6 segments; the 25 s Holy hit takes off 9 × 125.",
+      "spawn": {
+        "origin": [
+          5900,
+          -6016,
+          7746
+        ],
+        "yaw": 180
+      },
+      "start": [
+        {
+          "target": "[PR#]Temp_Maker",
+          "input": "Keyvalue",
+          "param": "targetname Map_Maker"
+        },
+        {
+          "target": "[PR#]S_Boss_Temp",
+          "input": "FireUser1"
+        },
+        {
+          "target": "[PR#]Boss_Health_Init",
+          "input": "FireUser1"
+        },
+        {
+          "target": "[PR#]Ship_Temp",
+          "input": "ForceSpawn"
+        },
+        {
+          "target": "[PR#]Guard_Temp_Boss",
+          "input": "Kill"
+        },
+        {
+          "target": "[PR#]Side_Temp",
+          "input": "Kill"
+        },
+        {
+          "target": "[PR#]Chaos_Temp",
+          "input": "ForceSpawn"
+        },
+        {
+          "target": "[PR#]Chaos_Hp_To_Boss",
+          "input": "Enable",
+          "delay": 0.1
+        },
+        {
+          "target": "[PR#]Last_Chaos_Summon_Move",
+          "input": "Open",
+          "delay": 0.1
+        }
+      ],
+      "fastForward": 0.3,
+      "bosses": [
+        {
+          "target": "[PR#]Chaos_Armor",
+          "name": "Chaos",
+          "counter": "[PR#]Boss_Health",
+          "counterMode": "hits"
+        }
+      ],
+      "win": {
+        "target": "[PR#]Chaos_Trigger_End",
+        "input": "Trigger"
+      },
+      "player": {
+        "health": 250,
+        "name": "None"
+      },
+      "hazards": {
+        "Chaos_Laser_Dam": "a Chaos laser",
+        "Chaos_Laser_DamUp": "a high Chaos laser",
+        "Chaos_Laser_Dam2": "a Chaos laser",
+        "Chaos_Hurt": "the fall",
+        "Nuke_Trigger": "the nuke",
+        "Ship_Hurt_Void": "the fall",
+        "Ehe_Laser_Up_Dam": "a high laser",
+        "Ehe_Laser_Down_Dam": "a low laser",
+        "Fireball_Hurt": "a fireball",
+        "Ehe_Dragon_Hurt": "the dragon",
+        "Drag_Hurt": "the dragon",
+        "Choc_Hurt": "the chocobos",
+        "Boss_Fire_Left": "the dragon's fire",
+        "Boss_Fire_Right": "the dragon's fire",
+        "Boss_Electro": "the electro floor",
+        "Boss_S_Firenova": "the fire nova",
+        "Boss_Meteor_Kill": "the meteor",
+        "Boss_Armor_Kill": "the dragon",
+        "Pillar_Hurt": "the lava",
+        "Nuke_Volcano": "Holy (time ran out)",
+        "Belias_Hurt_Fire": "the entrance fire",
+        "Belias_UHurt_Fire": "Belias's fire",
+        "Belias_Exp_Tri": "the explosion",
+        "Firewave_Hurt": "a firewave",
+        "Firewave_2_Hurt": "a firewave",
+        "Tile_Hurt": "a falling tile",
+        "Judge_Hurt": "Gabranth",
+        "Judge_Hurt_Niggers": "Gabranth's fire",
+        "Tomb_Laser_Up_Dam": "a high laser",
+        "Tomb_Laser_Down_Dam": "a low laser",
+        "Tomb_Void_Hurt": "the fall",
+        "Guard_Boss_Point_Hurt": "Gabranth",
+        "Side_Attack_Hurt1": "a summon",
+        "Side_Attack_Hurt3": "a summon",
+        "Side_Attack_Hurt4": "a summon",
+        "Ultimate_Summon_Hurt": "the ultimate summon",
+        "Chaos_Summon_Meteor_Hurt": "a meteor",
+        "Belias_Summon_Hurt": "a summon",
+        "SETH_Chaos_Metor_Damage": "a meteor",
+        "Lightning_Hurt": "lightning",
+        "Firenova_Hurt": "a fire nova",
+        "Electro_Hurt": "electro"
+      },
+      "childrenTitle": "Drills",
+      "endless": {
+        "noBossDamage": true
+      }
+    },
+    {
+      "id": "chaos_lasers",
+      "parent": "chaos",
+      "name": "Laser stream only",
+      "description": "Chaos's laser timer with no HP to shoot: a random low / mid / high laser every 1.2 s for 40 s.",
+      "spawn": {
+        "origin": [
+          5900,
+          -6016,
+          7746
+        ],
+        "yaw": 180
+      },
+      "start": [
+        {
+          "target": "[PR#]Temp_Maker",
+          "input": "Keyvalue",
+          "param": "targetname Map_Maker"
+        },
+        {
+          "target": "[PR#]S_Boss_Temp",
+          "input": "FireUser1"
+        },
+        {
+          "target": "[PR#]Boss_Health_Init",
+          "input": "FireUser1"
+        },
+        {
+          "target": "[PR#]Chaos_Temp",
+          "input": "ForceSpawn"
+        },
+        {
+          "target": "[PR#]Chaos_Timer",
+          "input": "Enable",
+          "delay": 1.5
+        }
+      ],
+      "fastForward": 0.3,
+      "winAfter": 42,
+      "player": {
+        "health": 250,
+        "name": "None"
+      },
+      "hazards": {
+        "Chaos_Laser_Dam": "a Chaos laser",
+        "Chaos_Laser_DamUp": "a high Chaos laser",
+        "Chaos_Laser_Dam2": "a Chaos laser",
+        "Chaos_Hurt": "the fall",
+        "Nuke_Trigger": "the nuke",
+        "Ship_Hurt_Void": "the fall",
+        "Ehe_Laser_Up_Dam": "a high laser",
+        "Ehe_Laser_Down_Dam": "a low laser",
+        "Fireball_Hurt": "a fireball",
+        "Ehe_Dragon_Hurt": "the dragon",
+        "Drag_Hurt": "the dragon",
+        "Choc_Hurt": "the chocobos",
+        "Boss_Fire_Left": "the dragon's fire",
+        "Boss_Fire_Right": "the dragon's fire",
+        "Boss_Electro": "the electro floor",
+        "Boss_S_Firenova": "the fire nova",
+        "Boss_Meteor_Kill": "the meteor",
+        "Boss_Armor_Kill": "the dragon",
+        "Pillar_Hurt": "the lava",
+        "Nuke_Volcano": "Holy (time ran out)",
+        "Belias_Hurt_Fire": "the entrance fire",
+        "Belias_UHurt_Fire": "Belias's fire",
+        "Belias_Exp_Tri": "the explosion",
+        "Firewave_Hurt": "a firewave",
+        "Firewave_2_Hurt": "a firewave",
+        "Tile_Hurt": "a falling tile",
+        "Judge_Hurt": "Gabranth",
+        "Judge_Hurt_Niggers": "Gabranth's fire",
+        "Tomb_Laser_Up_Dam": "a high laser",
+        "Tomb_Laser_Down_Dam": "a low laser",
+        "Tomb_Void_Hurt": "the fall",
+        "Guard_Boss_Point_Hurt": "Gabranth",
+        "Side_Attack_Hurt1": "a summon",
+        "Side_Attack_Hurt3": "a summon",
+        "Side_Attack_Hurt4": "a summon",
+        "Ultimate_Summon_Hurt": "the ultimate summon",
+        "Chaos_Summon_Meteor_Hurt": "a meteor",
+        "Belias_Summon_Hurt": "a summon",
+        "SETH_Chaos_Metor_Damage": "a meteor",
+        "Lightning_Hurt": "lightning",
+        "Firenova_Hurt": "a fire nova",
+        "Electro_Hurt": "electro"
+      },
+      "endless": {}
+    },
+    {
+      "id": "desert_dragon",
+      "group": "Act 1 – Desert",
+      "name": "Dragon – desert hall",
+      "description": "The stage-1 dragon in the volcano hall. An attack every 7 s (fire on the left or right half, electro floor, lure, wind, heal, water) and a fire nova or meteor after every 4th. 50 + 43 HP per human per segment, 6 segments; 80 s after it lands Holy goes off, and 20 s later the hall is nuked if it still lives. You start in the hall door (its HP trigger) 4 s before it closes; anyone still in the corridor at 54 s is sent to the zombie cage.",
+      "spawn": {
+        "origin": [
+          -2816,
+          -8920,
+          514
+        ],
+        "yaw": -90
+      },
+      "start": [
+        {
+          "target": "[PR#]Temp_Maker",
+          "input": "Keyvalue",
+          "param": "targetname Map_Maker"
+        },
+        {
+          "target": "[PR#]S_Boss_Temp",
+          "input": "FireUser1"
+        },
+        {
+          "target": "[PR#]Boss_Health_Init",
+          "input": "FireUser1"
+        },
+        {
+          "target": "[PR#]Waterfall_Temp",
+          "input": "ForceSpawn"
+        },
+        {
+          "target": "[PR#]Desert_Button",
+          "input": "FireUser1"
+        }
+      ],
+      "fastForward": 44,
+      "bosses": [
+        {
+          "target": "[PR#]Boss_Break",
+          "name": "Dragon",
+          "counter": "[PR#]Boss_Health",
+          "counterMode": "hits"
+        }
+      ],
+      "win": {
+        "target": "[PR#]Boss_Trigger_End",
+        "input": "Trigger"
+      },
+      "lose": {
+        "target": "[PR#]Nuke_Volcano",
+        "input": "Enable"
+      },
+      "player": {
+        "health": 250,
+        "name": "None"
+      },
+      "hazards": {
+        "Chaos_Laser_Dam": "a Chaos laser",
+        "Chaos_Laser_DamUp": "a high Chaos laser",
+        "Chaos_Laser_Dam2": "a Chaos laser",
+        "Chaos_Hurt": "the fall",
+        "Nuke_Trigger": "the nuke",
+        "Ship_Hurt_Void": "the fall",
+        "Ehe_Laser_Up_Dam": "a high laser",
+        "Ehe_Laser_Down_Dam": "a low laser",
+        "Fireball_Hurt": "a fireball",
+        "Ehe_Dragon_Hurt": "the dragon",
+        "Drag_Hurt": "the dragon",
+        "Choc_Hurt": "the chocobos",
+        "Boss_Fire_Left": "the dragon's fire",
+        "Boss_Fire_Right": "the dragon's fire",
+        "Boss_Electro": "the electro floor",
+        "Boss_S_Firenova": "the fire nova",
+        "Boss_Meteor_Kill": "the meteor",
+        "Boss_Armor_Kill": "the dragon",
+        "Pillar_Hurt": "the lava",
+        "Nuke_Volcano": "Holy (time ran out)",
+        "Belias_Hurt_Fire": "the entrance fire",
+        "Belias_UHurt_Fire": "Belias's fire",
+        "Belias_Exp_Tri": "the explosion",
+        "Firewave_Hurt": "a firewave",
+        "Firewave_2_Hurt": "a firewave",
+        "Tile_Hurt": "a falling tile",
+        "Judge_Hurt": "Gabranth",
+        "Judge_Hurt_Niggers": "Gabranth's fire",
+        "Tomb_Laser_Up_Dam": "a high laser",
+        "Tomb_Laser_Down_Dam": "a low laser",
+        "Tomb_Void_Hurt": "the fall",
+        "Guard_Boss_Point_Hurt": "Gabranth",
+        "Side_Attack_Hurt1": "a summon",
+        "Side_Attack_Hurt3": "a summon",
+        "Side_Attack_Hurt4": "a summon",
+        "Ultimate_Summon_Hurt": "the ultimate summon",
+        "Chaos_Summon_Meteor_Hurt": "a meteor",
+        "Belias_Summon_Hurt": "a summon",
+        "SETH_Chaos_Metor_Damage": "a meteor",
+        "Lightning_Hurt": "lightning",
+        "Firenova_Hurt": "a fire nova",
+        "Electro_Hurt": "electro"
+      },
+      "childrenTitle": "Single attacks",
+      "endless": {
+        "noBossDamage": true
+      }
+    },
+    {
+      "id": "dragon_fire",
+      "name": "Fire – one half",
+      "description": "Fire on the right half of the hall (0.2–5 s, 30/s): get to the other side.",
+      "parent": "desert_dragon",
+      "spawn": {
+        "origin": [
+          -3040,
+          -9500,
+          514
+        ],
+        "yaw": -90
+      },
+      "start": [
+        {
+          "target": "[PR#]Temp_Maker",
+          "input": "Keyvalue",
+          "param": "targetname Map_Maker"
+        },
+        {
+          "target": "[PR#]S_Boss_Temp",
+          "input": "FireUser1"
+        },
+        {
+          "target": "[PR#]Boss_Health_Init",
+          "input": "FireUser1"
+        },
+        {
+          "target": "[PR#]Boss_Temp",
+          "input": "ForceSpawn"
+        },
+        {
+          "target": "[PR#]Boss_Attack_NormalCase",
+          "input": "InValue",
+          "param": "Fire - right",
+          "delay": 1
+        }
+      ],
+      "winAfter": 8,
+      "player": {
+        "health": 250,
+        "name": "None"
+      },
+      "hazards": {
+        "Chaos_Laser_Dam": "a Chaos laser",
+        "Chaos_Laser_DamUp": "a high Chaos laser",
+        "Chaos_Laser_Dam2": "a Chaos laser",
+        "Chaos_Hurt": "the fall",
+        "Nuke_Trigger": "the nuke",
+        "Ship_Hurt_Void": "the fall",
+        "Ehe_Laser_Up_Dam": "a high laser",
+        "Ehe_Laser_Down_Dam": "a low laser",
+        "Fireball_Hurt": "a fireball",
+        "Ehe_Dragon_Hurt": "the dragon",
+        "Drag_Hurt": "the dragon",
+        "Choc_Hurt": "the chocobos",
+        "Boss_Fire_Left": "the dragon's fire",
+        "Boss_Fire_Right": "the dragon's fire",
+        "Boss_Electro": "the electro floor",
+        "Boss_S_Firenova": "the fire nova",
+        "Boss_Meteor_Kill": "the meteor",
+        "Boss_Armor_Kill": "the dragon",
+        "Pillar_Hurt": "the lava",
+        "Nuke_Volcano": "Holy (time ran out)",
+        "Belias_Hurt_Fire": "the entrance fire",
+        "Belias_UHurt_Fire": "Belias's fire",
+        "Belias_Exp_Tri": "the explosion",
+        "Firewave_Hurt": "a firewave",
+        "Firewave_2_Hurt": "a firewave",
+        "Tile_Hurt": "a falling tile",
+        "Judge_Hurt": "Gabranth",
+        "Judge_Hurt_Niggers": "Gabranth's fire",
+        "Tomb_Laser_Up_Dam": "a high laser",
+        "Tomb_Laser_Down_Dam": "a low laser",
+        "Tomb_Void_Hurt": "the fall",
+        "Guard_Boss_Point_Hurt": "Gabranth",
+        "Side_Attack_Hurt1": "a summon",
+        "Side_Attack_Hurt3": "a summon",
+        "Side_Attack_Hurt4": "a summon",
+        "Ultimate_Summon_Hurt": "the ultimate summon",
+        "Chaos_Summon_Meteor_Hurt": "a meteor",
+        "Belias_Summon_Hurt": "a summon",
+        "SETH_Chaos_Metor_Damage": "a meteor",
+        "Lightning_Hurt": "lightning",
+        "Firenova_Hurt": "a fire nova",
+        "Electro_Hurt": "electro"
+      }
+    },
+    {
+      "id": "dragon_electro",
+      "name": "Electro floor",
+      "description": "The electro floor (0.2–5 s, 25/s) starts 59 u above the floor: crouch.",
+      "parent": "desert_dragon",
+      "spawn": {
+        "origin": [
+          -3040,
+          -9500,
+          514
+        ],
+        "yaw": -90
+      },
+      "start": [
+        {
+          "target": "[PR#]Temp_Maker",
+          "input": "Keyvalue",
+          "param": "targetname Map_Maker"
+        },
+        {
+          "target": "[PR#]S_Boss_Temp",
+          "input": "FireUser1"
+        },
+        {
+          "target": "[PR#]Boss_Health_Init",
+          "input": "FireUser1"
+        },
+        {
+          "target": "[PR#]Boss_Temp",
+          "input": "ForceSpawn"
+        },
+        {
+          "target": "[PR#]Boss_Attack_NormalCase",
+          "input": "InValue",
+          "param": "Electro",
+          "delay": 1
+        }
+      ],
+      "winAfter": 8,
+      "player": {
+        "health": 250,
+        "name": "None"
+      },
+      "hazards": {
+        "Chaos_Laser_Dam": "a Chaos laser",
+        "Chaos_Laser_DamUp": "a high Chaos laser",
+        "Chaos_Laser_Dam2": "a Chaos laser",
+        "Chaos_Hurt": "the fall",
+        "Nuke_Trigger": "the nuke",
+        "Ship_Hurt_Void": "the fall",
+        "Ehe_Laser_Up_Dam": "a high laser",
+        "Ehe_Laser_Down_Dam": "a low laser",
+        "Fireball_Hurt": "a fireball",
+        "Ehe_Dragon_Hurt": "the dragon",
+        "Drag_Hurt": "the dragon",
+        "Choc_Hurt": "the chocobos",
+        "Boss_Fire_Left": "the dragon's fire",
+        "Boss_Fire_Right": "the dragon's fire",
+        "Boss_Electro": "the electro floor",
+        "Boss_S_Firenova": "the fire nova",
+        "Boss_Meteor_Kill": "the meteor",
+        "Boss_Armor_Kill": "the dragon",
+        "Pillar_Hurt": "the lava",
+        "Nuke_Volcano": "Holy (time ran out)",
+        "Belias_Hurt_Fire": "the entrance fire",
+        "Belias_UHurt_Fire": "Belias's fire",
+        "Belias_Exp_Tri": "the explosion",
+        "Firewave_Hurt": "a firewave",
+        "Firewave_2_Hurt": "a firewave",
+        "Tile_Hurt": "a falling tile",
+        "Judge_Hurt": "Gabranth",
+        "Judge_Hurt_Niggers": "Gabranth's fire",
+        "Tomb_Laser_Up_Dam": "a high laser",
+        "Tomb_Laser_Down_Dam": "a low laser",
+        "Tomb_Void_Hurt": "the fall",
+        "Guard_Boss_Point_Hurt": "Gabranth",
+        "Side_Attack_Hurt1": "a summon",
+        "Side_Attack_Hurt3": "a summon",
+        "Side_Attack_Hurt4": "a summon",
+        "Ultimate_Summon_Hurt": "the ultimate summon",
+        "Chaos_Summon_Meteor_Hurt": "a meteor",
+        "Belias_Summon_Hurt": "a summon",
+        "SETH_Chaos_Metor_Damage": "a meteor",
+        "Lightning_Hurt": "lightning",
+        "Firenova_Hurt": "a fire nova",
+        "Electro_Hurt": "electro"
+      }
+    },
+    {
+      "id": "desert_ending",
+      "group": "Act 1 – Desert",
+      "name": "Desert ending – dragon and guard lasers",
+      "description": "The 80 s hold at the end of the stage-1 road. A dragon wakes at 12 s and crawls down the road (touching it kills): kill it within 20 s (50 + 15 HP per human, 6 segments) or Holy nukes everyone. Fireballs roll down the road. At 74–76 s the guard fires 3 random lasers across the end platform (low: jump, high: crouch); the end trigger opens at 80 s.",
+      "spawn": {
+        "origin": [
+          -1408,
+          -2016,
+          2050
+        ],
+        "yaw": 90
+      },
+      "start": [
+        {
+          "target": "[PR#]Temp_Maker",
+          "input": "Keyvalue",
+          "param": "targetname Map_Maker"
+        },
+        {
+          "target": "[PR#]S_Boss_Temp",
+          "input": "FireUser1"
+        },
+        {
+          "target": "[PR#]Boss_Health_Init",
+          "input": "FireUser1"
+        },
+        {
+          "target": "[PR#]ZE_Hard_Ending",
+          "input": "AddOutput",
+          "param": "OnStartTouch>Ehe_Guard>FireUser1>>71>1"
+        },
+        {
+          "target": "[PR#]ZE_Hard_Ending",
+          "input": "Enable"
+        }
+      ],
+      "fastForward": 0.3,
+      "bosses": [
+        {
+          "target": "[PR#]Ehe_Dragon_Break",
+          "name": "Dragon",
+          "counter": "[PR#]Boss_Health",
+          "counterMode": "hits"
+        }
+      ],
+      "win": {
+        "target": "[PR#]Level_Counter_Progress",
+        "input": "GetValue"
+      },
+      "lose": {
+        "target": "[PR#]Nuke_Trigger",
+        "input": "Enable"
+      },
+      "player": {
+        "health": 250,
+        "name": "None"
+      },
+      "hazards": {
+        "Chaos_Laser_Dam": "a Chaos laser",
+        "Chaos_Laser_DamUp": "a high Chaos laser",
+        "Chaos_Laser_Dam2": "a Chaos laser",
+        "Chaos_Hurt": "the fall",
+        "Nuke_Trigger": "the nuke",
+        "Ship_Hurt_Void": "the fall",
+        "Ehe_Laser_Up_Dam": "a high laser",
+        "Ehe_Laser_Down_Dam": "a low laser",
+        "Fireball_Hurt": "a fireball",
+        "Ehe_Dragon_Hurt": "the dragon",
+        "Drag_Hurt": "the dragon",
+        "Choc_Hurt": "the chocobos",
+        "Boss_Fire_Left": "the dragon's fire",
+        "Boss_Fire_Right": "the dragon's fire",
+        "Boss_Electro": "the electro floor",
+        "Boss_S_Firenova": "the fire nova",
+        "Boss_Meteor_Kill": "the meteor",
+        "Boss_Armor_Kill": "the dragon",
+        "Pillar_Hurt": "the lava",
+        "Nuke_Volcano": "Holy (time ran out)",
+        "Belias_Hurt_Fire": "the entrance fire",
+        "Belias_UHurt_Fire": "Belias's fire",
+        "Belias_Exp_Tri": "the explosion",
+        "Firewave_Hurt": "a firewave",
+        "Firewave_2_Hurt": "a firewave",
+        "Tile_Hurt": "a falling tile",
+        "Judge_Hurt": "Gabranth",
+        "Judge_Hurt_Niggers": "Gabranth's fire",
+        "Tomb_Laser_Up_Dam": "a high laser",
+        "Tomb_Laser_Down_Dam": "a low laser",
+        "Tomb_Void_Hurt": "the fall",
+        "Guard_Boss_Point_Hurt": "Gabranth",
+        "Side_Attack_Hurt1": "a summon",
+        "Side_Attack_Hurt3": "a summon",
+        "Side_Attack_Hurt4": "a summon",
+        "Ultimate_Summon_Hurt": "the ultimate summon",
+        "Chaos_Summon_Meteor_Hurt": "a meteor",
+        "Belias_Summon_Hurt": "a summon",
+        "SETH_Chaos_Metor_Damage": "a meteor",
+        "Lightning_Hurt": "lightning",
+        "Firenova_Hurt": "a fire nova",
+        "Electro_Hurt": "electro"
+      },
+      "childrenTitle": "Drills"
+    },
+    {
+      "id": "desert_guard_lasers",
+      "parent": "desert_ending",
+      "name": "Guard lasers",
+      "description": "The guard's 3 random lasers at 3, 4 and 5 s, sweeping the end platform at 1300 u/s. Low ones (39–47 u up): jump. High ones (59–99 u): crouch.",
+      "spawn": {
+        "origin": [
+          -1408,
+          4960,
+          2306
+        ],
+        "yaw": -90
+      },
+      "start": [
+        {
+          "target": "[PR#]Temp_Maker",
+          "input": "Keyvalue",
+          "param": "targetname Map_Maker"
+        },
+        {
+          "target": "[PR#]S_Boss_Temp",
+          "input": "FireUser1"
+        },
+        {
+          "target": "[PR#]Boss_Health_Init",
+          "input": "FireUser1"
+        },
+        {
+          "target": "[PR#]Ehe_Dragon_Temp",
+          "input": "ForceSpawn"
+        },
+        {
+          "target": "[PR#]Ehe_Guard",
+          "input": "FireUser1",
+          "delay": 0.5
+        }
+      ],
+      "fastForward": 0.3,
+      "winAfter": 8,
+      "player": {
+        "health": 250,
+        "name": "None"
+      },
+      "hazards": {
+        "Chaos_Laser_Dam": "a Chaos laser",
+        "Chaos_Laser_DamUp": "a high Chaos laser",
+        "Chaos_Laser_Dam2": "a Chaos laser",
+        "Chaos_Hurt": "the fall",
+        "Nuke_Trigger": "the nuke",
+        "Ship_Hurt_Void": "the fall",
+        "Ehe_Laser_Up_Dam": "a high laser",
+        "Ehe_Laser_Down_Dam": "a low laser",
+        "Fireball_Hurt": "a fireball",
+        "Ehe_Dragon_Hurt": "the dragon",
+        "Drag_Hurt": "the dragon",
+        "Choc_Hurt": "the chocobos",
+        "Boss_Fire_Left": "the dragon's fire",
+        "Boss_Fire_Right": "the dragon's fire",
+        "Boss_Electro": "the electro floor",
+        "Boss_S_Firenova": "the fire nova",
+        "Boss_Meteor_Kill": "the meteor",
+        "Boss_Armor_Kill": "the dragon",
+        "Pillar_Hurt": "the lava",
+        "Nuke_Volcano": "Holy (time ran out)",
+        "Belias_Hurt_Fire": "the entrance fire",
+        "Belias_UHurt_Fire": "Belias's fire",
+        "Belias_Exp_Tri": "the explosion",
+        "Firewave_Hurt": "a firewave",
+        "Firewave_2_Hurt": "a firewave",
+        "Tile_Hurt": "a falling tile",
+        "Judge_Hurt": "Gabranth",
+        "Judge_Hurt_Niggers": "Gabranth's fire",
+        "Tomb_Laser_Up_Dam": "a high laser",
+        "Tomb_Laser_Down_Dam": "a low laser",
+        "Tomb_Void_Hurt": "the fall",
+        "Guard_Boss_Point_Hurt": "Gabranth",
+        "Side_Attack_Hurt1": "a summon",
+        "Side_Attack_Hurt3": "a summon",
+        "Side_Attack_Hurt4": "a summon",
+        "Ultimate_Summon_Hurt": "the ultimate summon",
+        "Chaos_Summon_Meteor_Hurt": "a meteor",
+        "Belias_Summon_Hurt": "a summon",
+        "SETH_Chaos_Metor_Damage": "a meteor",
+        "Lightning_Hurt": "lightning",
+        "Firenova_Hurt": "a fire nova",
+        "Electro_Hurt": "electro"
+      },
+      "endless": {}
+    },
+    {
+      "id": "desert_guard_lasers_insane",
+      "parent": "desert_ending",
+      "name": "Guard lasers (insane)",
+      "description": "The insane version: lasers at 3, 3.85 and 4.7 s, sped up to 1400 u/s.",
+      "spawn": {
+        "origin": [
+          -1408,
+          4960,
+          2306
+        ],
+        "yaw": -90
+      },
+      "start": [
+        {
+          "target": "[PR#]Temp_Maker",
+          "input": "Keyvalue",
+          "param": "targetname Map_Maker"
+        },
+        {
+          "target": "[PR#]S_Boss_Temp",
+          "input": "FireUser1"
+        },
+        {
+          "target": "[PR#]Boss_Health_Init",
+          "input": "FireUser1"
+        },
+        {
+          "target": "[PR#]Ehe_Dragon_Temp",
+          "input": "ForceSpawn"
+        },
+        {
+          "target": "[PR#]Ehe_Guard",
+          "input": "FireUser2",
+          "delay": 0.5
+        }
+      ],
+      "fastForward": 0.3,
+      "winAfter": 8,
+      "player": {
+        "health": 250,
+        "name": "None"
+      },
+      "hazards": {
+        "Chaos_Laser_Dam": "a Chaos laser",
+        "Chaos_Laser_DamUp": "a high Chaos laser",
+        "Chaos_Laser_Dam2": "a Chaos laser",
+        "Chaos_Hurt": "the fall",
+        "Nuke_Trigger": "the nuke",
+        "Ship_Hurt_Void": "the fall",
+        "Ehe_Laser_Up_Dam": "a high laser",
+        "Ehe_Laser_Down_Dam": "a low laser",
+        "Fireball_Hurt": "a fireball",
+        "Ehe_Dragon_Hurt": "the dragon",
+        "Drag_Hurt": "the dragon",
+        "Choc_Hurt": "the chocobos",
+        "Boss_Fire_Left": "the dragon's fire",
+        "Boss_Fire_Right": "the dragon's fire",
+        "Boss_Electro": "the electro floor",
+        "Boss_S_Firenova": "the fire nova",
+        "Boss_Meteor_Kill": "the meteor",
+        "Boss_Armor_Kill": "the dragon",
+        "Pillar_Hurt": "the lava",
+        "Nuke_Volcano": "Holy (time ran out)",
+        "Belias_Hurt_Fire": "the entrance fire",
+        "Belias_UHurt_Fire": "Belias's fire",
+        "Belias_Exp_Tri": "the explosion",
+        "Firewave_Hurt": "a firewave",
+        "Firewave_2_Hurt": "a firewave",
+        "Tile_Hurt": "a falling tile",
+        "Judge_Hurt": "Gabranth",
+        "Judge_Hurt_Niggers": "Gabranth's fire",
+        "Tomb_Laser_Up_Dam": "a high laser",
+        "Tomb_Laser_Down_Dam": "a low laser",
+        "Tomb_Void_Hurt": "the fall",
+        "Guard_Boss_Point_Hurt": "Gabranth",
+        "Side_Attack_Hurt1": "a summon",
+        "Side_Attack_Hurt3": "a summon",
+        "Side_Attack_Hurt4": "a summon",
+        "Ultimate_Summon_Hurt": "the ultimate summon",
+        "Chaos_Summon_Meteor_Hurt": "a meteor",
+        "Belias_Summon_Hurt": "a summon",
+        "SETH_Chaos_Metor_Damage": "a meteor",
+        "Lightning_Hurt": "lightning",
+        "Firenova_Hurt": "a fire nova",
+        "Electro_Hurt": "electro"
+      },
+      "endless": {}
+    },
+    {
+      "id": "belias",
+      "group": "Act 2 – Tomb",
+      "name": "Belias",
+      "description": "The tomb's fire esper. The fight starts 10 s after the first human enters. Every 5 s a random attack (firewave sweep either way, a lure into an explosion, falling tiles), and a random firewave every 2 s between. At 1 segment left he goes critical for 20 s (immune) and the attacks speed up. 50 + 43 HP per human per segment, 6 segments.",
+      "spawn": {
+        "origin": [
+          6110,
+          8704,
+          -3454
+        ],
+        "yaw": 0
+      },
+      "start": [
+        {
+          "target": "[PR#]Temp_Maker",
+          "input": "Keyvalue",
+          "param": "targetname Map_Maker"
+        },
+        {
+          "target": "[PR#]S_Boss_Temp",
+          "input": "FireUser1"
+        },
+        {
+          "target": "[PR#]Boss_Health_Init",
+          "input": "FireUser1"
+        },
+        {
+          "target": "[PR#]Belias_Temp",
+          "input": "ForceSpawn"
+        }
+      ],
+      "fastForward": 0.3,
+      "bosses": [
+        {
+          "target": "[PR#]Belias_Break",
+          "name": "Belias",
+          "counter": "[PR#]Boss_Health",
+          "counterMode": "hits"
+        }
+      ],
+      "win": {
+        "target": "[PR#]Belias_Trigger_End",
+        "input": "Trigger"
+      },
+      "player": {
+        "health": 250,
+        "name": "None"
+      },
+      "hazards": {
+        "Chaos_Laser_Dam": "a Chaos laser",
+        "Chaos_Laser_DamUp": "a high Chaos laser",
+        "Chaos_Laser_Dam2": "a Chaos laser",
+        "Chaos_Hurt": "the fall",
+        "Nuke_Trigger": "the nuke",
+        "Ship_Hurt_Void": "the fall",
+        "Ehe_Laser_Up_Dam": "a high laser",
+        "Ehe_Laser_Down_Dam": "a low laser",
+        "Fireball_Hurt": "a fireball",
+        "Ehe_Dragon_Hurt": "the dragon",
+        "Drag_Hurt": "the dragon",
+        "Choc_Hurt": "the chocobos",
+        "Boss_Fire_Left": "the dragon's fire",
+        "Boss_Fire_Right": "the dragon's fire",
+        "Boss_Electro": "the electro floor",
+        "Boss_S_Firenova": "the fire nova",
+        "Boss_Meteor_Kill": "the meteor",
+        "Boss_Armor_Kill": "the dragon",
+        "Pillar_Hurt": "the lava",
+        "Nuke_Volcano": "Holy (time ran out)",
+        "Belias_Hurt_Fire": "the entrance fire",
+        "Belias_UHurt_Fire": "Belias's fire",
+        "Belias_Exp_Tri": "the explosion",
+        "Firewave_Hurt": "a firewave",
+        "Firewave_2_Hurt": "a firewave",
+        "Tile_Hurt": "a falling tile",
+        "Judge_Hurt": "Gabranth",
+        "Judge_Hurt_Niggers": "Gabranth's fire",
+        "Tomb_Laser_Up_Dam": "a high laser",
+        "Tomb_Laser_Down_Dam": "a low laser",
+        "Tomb_Void_Hurt": "the fall",
+        "Guard_Boss_Point_Hurt": "Gabranth",
+        "Side_Attack_Hurt1": "a summon",
+        "Side_Attack_Hurt3": "a summon",
+        "Side_Attack_Hurt4": "a summon",
+        "Ultimate_Summon_Hurt": "the ultimate summon",
+        "Chaos_Summon_Meteor_Hurt": "a meteor",
+        "Belias_Summon_Hurt": "a summon",
+        "SETH_Chaos_Metor_Damage": "a meteor",
+        "Lightning_Hurt": "lightning",
+        "Firenova_Hurt": "a fire nova",
+        "Electro_Hurt": "electro"
+      },
+      "childrenTitle": "Single attacks",
+      "endless": {
+        "noBossDamage": true
+      }
+    },
+    {
+      "id": "belias_sweep",
+      "name": "Firewave sweep",
+      "description": "Eight firewaves, one every 0.15 s, sweeping across the arena.",
+      "parent": "belias",
+      "spawn": {
+        "origin": [
+          6600,
+          8704,
+          -3582
+        ],
+        "yaw": 0
+      },
+      "start": [
+        {
+          "target": "[PR#]Temp_Maker",
+          "input": "Keyvalue",
+          "param": "targetname Map_Maker"
+        },
+        {
+          "target": "[PR#]S_Boss_Temp",
+          "input": "FireUser1"
+        },
+        {
+          "target": "[PR#]Boss_Health_Init",
+          "input": "FireUser1"
+        },
+        {
+          "target": "[PR#]Belias_Temp",
+          "input": "ForceSpawn"
+        },
+        {
+          "target": "[PR#]Belias_UHurt_Fire",
+          "input": "Enable",
+          "delay": 0.1
+        },
+        {
+          "target": "[PR#]Belias_Hurt_Fire",
+          "input": "Enable",
+          "delay": 0.1
+        },
+        {
+          "target": "[PR#]Belias_Attack_Case",
+          "input": "InValue",
+          "param": "PlayerOn",
+          "delay": 1
+        }
+      ],
+      "fastForward": 0.3,
+      "winAfter": 6,
+      "player": {
+        "health": 250,
+        "name": "None"
+      },
+      "hazards": {
+        "Chaos_Laser_Dam": "a Chaos laser",
+        "Chaos_Laser_DamUp": "a high Chaos laser",
+        "Chaos_Laser_Dam2": "a Chaos laser",
+        "Chaos_Hurt": "the fall",
+        "Nuke_Trigger": "the nuke",
+        "Ship_Hurt_Void": "the fall",
+        "Ehe_Laser_Up_Dam": "a high laser",
+        "Ehe_Laser_Down_Dam": "a low laser",
+        "Fireball_Hurt": "a fireball",
+        "Ehe_Dragon_Hurt": "the dragon",
+        "Drag_Hurt": "the dragon",
+        "Choc_Hurt": "the chocobos",
+        "Boss_Fire_Left": "the dragon's fire",
+        "Boss_Fire_Right": "the dragon's fire",
+        "Boss_Electro": "the electro floor",
+        "Boss_S_Firenova": "the fire nova",
+        "Boss_Meteor_Kill": "the meteor",
+        "Boss_Armor_Kill": "the dragon",
+        "Pillar_Hurt": "the lava",
+        "Nuke_Volcano": "Holy (time ran out)",
+        "Belias_Hurt_Fire": "the entrance fire",
+        "Belias_UHurt_Fire": "Belias's fire",
+        "Belias_Exp_Tri": "the explosion",
+        "Firewave_Hurt": "a firewave",
+        "Firewave_2_Hurt": "a firewave",
+        "Tile_Hurt": "a falling tile",
+        "Judge_Hurt": "Gabranth",
+        "Judge_Hurt_Niggers": "Gabranth's fire",
+        "Tomb_Laser_Up_Dam": "a high laser",
+        "Tomb_Laser_Down_Dam": "a low laser",
+        "Tomb_Void_Hurt": "the fall",
+        "Guard_Boss_Point_Hurt": "Gabranth",
+        "Side_Attack_Hurt1": "a summon",
+        "Side_Attack_Hurt3": "a summon",
+        "Side_Attack_Hurt4": "a summon",
+        "Ultimate_Summon_Hurt": "the ultimate summon",
+        "Chaos_Summon_Meteor_Hurt": "a meteor",
+        "Belias_Summon_Hurt": "a summon",
+        "SETH_Chaos_Metor_Damage": "a meteor",
+        "Lightning_Hurt": "lightning",
+        "Firenova_Hurt": "a fire nova",
+        "Electro_Hurt": "electro"
+      },
+      "endless": {}
+    },
+    {
+      "id": "belias_sweep_back",
+      "name": "Firewave sweep (other way)",
+      "description": "The same sweep from the far side.",
+      "parent": "belias",
+      "spawn": {
+        "origin": [
+          6600,
+          8704,
+          -3582
+        ],
+        "yaw": 0
+      },
+      "start": [
+        {
+          "target": "[PR#]Temp_Maker",
+          "input": "Keyvalue",
+          "param": "targetname Map_Maker"
+        },
+        {
+          "target": "[PR#]S_Boss_Temp",
+          "input": "FireUser1"
+        },
+        {
+          "target": "[PR#]Boss_Health_Init",
+          "input": "FireUser1"
+        },
+        {
+          "target": "[PR#]Belias_Temp",
+          "input": "ForceSpawn"
+        },
+        {
+          "target": "[PR#]Belias_UHurt_Fire",
+          "input": "Enable",
+          "delay": 0.1
+        },
+        {
+          "target": "[PR#]Belias_Hurt_Fire",
+          "input": "Enable",
+          "delay": 0.1
+        },
+        {
+          "target": "[PR#]Belias_Firewave_Case_2",
+          "input": "InValue",
+          "param": "8",
+          "delay": 1.01
+        },
+        {
+          "target": "[PR#]Belias_Firewave_Case_2",
+          "input": "InValue",
+          "param": "7",
+          "delay": 1.16
+        },
+        {
+          "target": "[PR#]Belias_Firewave_Case_2",
+          "input": "InValue",
+          "param": "6",
+          "delay": 1.31
+        },
+        {
+          "target": "[PR#]Belias_Firewave_Case_2",
+          "input": "InValue",
+          "param": "5",
+          "delay": 1.46
+        },
+        {
+          "target": "[PR#]Belias_Firewave_Case_2",
+          "input": "InValue",
+          "param": "4",
+          "delay": 1.6099999999999999
+        },
+        {
+          "target": "[PR#]Belias_Firewave_Case_2",
+          "input": "InValue",
+          "param": "3",
+          "delay": 1.76
+        },
+        {
+          "target": "[PR#]Belias_Firewave_Case_2",
+          "input": "InValue",
+          "param": "2",
+          "delay": 1.91
+        },
+        {
+          "target": "[PR#]Belias_Firewave_Case_2",
+          "input": "InValue",
+          "param": "1",
+          "delay": 2.06
+        }
+      ],
+      "fastForward": 0.3,
+      "winAfter": 6,
+      "player": {
+        "health": 250,
+        "name": "None"
+      },
+      "hazards": {
+        "Chaos_Laser_Dam": "a Chaos laser",
+        "Chaos_Laser_DamUp": "a high Chaos laser",
+        "Chaos_Laser_Dam2": "a Chaos laser",
+        "Chaos_Hurt": "the fall",
+        "Nuke_Trigger": "the nuke",
+        "Ship_Hurt_Void": "the fall",
+        "Ehe_Laser_Up_Dam": "a high laser",
+        "Ehe_Laser_Down_Dam": "a low laser",
+        "Fireball_Hurt": "a fireball",
+        "Ehe_Dragon_Hurt": "the dragon",
+        "Drag_Hurt": "the dragon",
+        "Choc_Hurt": "the chocobos",
+        "Boss_Fire_Left": "the dragon's fire",
+        "Boss_Fire_Right": "the dragon's fire",
+        "Boss_Electro": "the electro floor",
+        "Boss_S_Firenova": "the fire nova",
+        "Boss_Meteor_Kill": "the meteor",
+        "Boss_Armor_Kill": "the dragon",
+        "Pillar_Hurt": "the lava",
+        "Nuke_Volcano": "Holy (time ran out)",
+        "Belias_Hurt_Fire": "the entrance fire",
+        "Belias_UHurt_Fire": "Belias's fire",
+        "Belias_Exp_Tri": "the explosion",
+        "Firewave_Hurt": "a firewave",
+        "Firewave_2_Hurt": "a firewave",
+        "Tile_Hurt": "a falling tile",
+        "Judge_Hurt": "Gabranth",
+        "Judge_Hurt_Niggers": "Gabranth's fire",
+        "Tomb_Laser_Up_Dam": "a high laser",
+        "Tomb_Laser_Down_Dam": "a low laser",
+        "Tomb_Void_Hurt": "the fall",
+        "Guard_Boss_Point_Hurt": "Gabranth",
+        "Side_Attack_Hurt1": "a summon",
+        "Side_Attack_Hurt3": "a summon",
+        "Side_Attack_Hurt4": "a summon",
+        "Ultimate_Summon_Hurt": "the ultimate summon",
+        "Chaos_Summon_Meteor_Hurt": "a meteor",
+        "Belias_Summon_Hurt": "a summon",
+        "SETH_Chaos_Metor_Damage": "a meteor",
+        "Lightning_Hurt": "lightning",
+        "Firenova_Hurt": "a fire nova",
+        "Electro_Hurt": "electro"
+      },
+      "endless": {}
+    },
+    {
+      "id": "belias_lure",
+      "name": "Lure + explosion",
+      "description": "A 3.5 s pull toward Belias, then three explosions in front of him at 4.25 s.",
+      "parent": "belias",
+      "spawn": {
+        "origin": [
+          6600,
+          8704,
+          -3582
+        ],
+        "yaw": 0
+      },
+      "start": [
+        {
+          "target": "[PR#]Temp_Maker",
+          "input": "Keyvalue",
+          "param": "targetname Map_Maker"
+        },
+        {
+          "target": "[PR#]S_Boss_Temp",
+          "input": "FireUser1"
+        },
+        {
+          "target": "[PR#]Boss_Health_Init",
+          "input": "FireUser1"
+        },
+        {
+          "target": "[PR#]Belias_Temp",
+          "input": "ForceSpawn"
+        },
+        {
+          "target": "[PR#]Belias_UHurt_Fire",
+          "input": "Enable",
+          "delay": 0.1
+        },
+        {
+          "target": "[PR#]Belias_Hurt_Fire",
+          "input": "Enable",
+          "delay": 0.1
+        },
+        {
+          "target": "[PR#]Belias_Attack_Case",
+          "input": "InValue",
+          "param": "PlayerOff",
+          "delay": 1
+        }
+      ],
+      "fastForward": 0.3,
+      "winAfter": 7,
+      "player": {
+        "health": 250,
+        "name": "None"
+      },
+      "hazards": {
+        "Chaos_Laser_Dam": "a Chaos laser",
+        "Chaos_Laser_DamUp": "a high Chaos laser",
+        "Chaos_Laser_Dam2": "a Chaos laser",
+        "Chaos_Hurt": "the fall",
+        "Nuke_Trigger": "the nuke",
+        "Ship_Hurt_Void": "the fall",
+        "Ehe_Laser_Up_Dam": "a high laser",
+        "Ehe_Laser_Down_Dam": "a low laser",
+        "Fireball_Hurt": "a fireball",
+        "Ehe_Dragon_Hurt": "the dragon",
+        "Drag_Hurt": "the dragon",
+        "Choc_Hurt": "the chocobos",
+        "Boss_Fire_Left": "the dragon's fire",
+        "Boss_Fire_Right": "the dragon's fire",
+        "Boss_Electro": "the electro floor",
+        "Boss_S_Firenova": "the fire nova",
+        "Boss_Meteor_Kill": "the meteor",
+        "Boss_Armor_Kill": "the dragon",
+        "Pillar_Hurt": "the lava",
+        "Nuke_Volcano": "Holy (time ran out)",
+        "Belias_Hurt_Fire": "the entrance fire",
+        "Belias_UHurt_Fire": "Belias's fire",
+        "Belias_Exp_Tri": "the explosion",
+        "Firewave_Hurt": "a firewave",
+        "Firewave_2_Hurt": "a firewave",
+        "Tile_Hurt": "a falling tile",
+        "Judge_Hurt": "Gabranth",
+        "Judge_Hurt_Niggers": "Gabranth's fire",
+        "Tomb_Laser_Up_Dam": "a high laser",
+        "Tomb_Laser_Down_Dam": "a low laser",
+        "Tomb_Void_Hurt": "the fall",
+        "Guard_Boss_Point_Hurt": "Gabranth",
+        "Side_Attack_Hurt1": "a summon",
+        "Side_Attack_Hurt3": "a summon",
+        "Side_Attack_Hurt4": "a summon",
+        "Ultimate_Summon_Hurt": "the ultimate summon",
+        "Chaos_Summon_Meteor_Hurt": "a meteor",
+        "Belias_Summon_Hurt": "a summon",
+        "SETH_Chaos_Metor_Damage": "a meteor",
+        "Lightning_Hurt": "lightning",
+        "Firenova_Hurt": "a fire nova",
+        "Electro_Hurt": "electro"
+      },
+      "endless": {}
+    },
+    {
+      "id": "belias_tiles",
+      "name": "Falling tiles",
+      "description": "Eight random tiles of the 12 drop from the ceiling over 1 s.",
+      "parent": "belias",
+      "spawn": {
+        "origin": [
+          6600,
+          8704,
+          -3582
+        ],
+        "yaw": 0
+      },
+      "start": [
+        {
+          "target": "[PR#]Temp_Maker",
+          "input": "Keyvalue",
+          "param": "targetname Map_Maker"
+        },
+        {
+          "target": "[PR#]S_Boss_Temp",
+          "input": "FireUser1"
+        },
+        {
+          "target": "[PR#]Boss_Health_Init",
+          "input": "FireUser1"
+        },
+        {
+          "target": "[PR#]Belias_Temp",
+          "input": "ForceSpawn"
+        },
+        {
+          "target": "[PR#]Belias_UHurt_Fire",
+          "input": "Enable",
+          "delay": 0.1
+        },
+        {
+          "target": "[PR#]Belias_Hurt_Fire",
+          "input": "Enable",
+          "delay": 0.1
+        },
+        {
+          "target": "[PR#]Belias_Tile_Case",
+          "input": "PickRandomShuffle",
+          "delay": 1.01
+        },
+        {
+          "target": "[PR#]Belias_Tile_Case",
+          "input": "PickRandomShuffle",
+          "delay": 1.15
+        },
+        {
+          "target": "[PR#]Belias_Tile_Case",
+          "input": "PickRandomShuffle",
+          "delay": 1.3
+        },
+        {
+          "target": "[PR#]Belias_Tile_Case",
+          "input": "PickRandomShuffle",
+          "delay": 1.45
+        },
+        {
+          "target": "[PR#]Belias_Tile_Case",
+          "input": "PickRandomShuffle",
+          "delay": 1.6
+        },
+        {
+          "target": "[PR#]Belias_Tile_Case",
+          "input": "PickRandomShuffle",
+          "delay": 1.75
+        },
+        {
+          "target": "[PR#]Belias_Tile_Case",
+          "input": "PickRandomShuffle",
+          "delay": 1.9
+        },
+        {
+          "target": "[PR#]Belias_Tile_Case",
+          "input": "PickRandomShuffle",
+          "delay": 2.05
+        }
+      ],
+      "fastForward": 0.3,
+      "winAfter": 6,
+      "player": {
+        "health": 250,
+        "name": "None"
+      },
+      "hazards": {
+        "Chaos_Laser_Dam": "a Chaos laser",
+        "Chaos_Laser_DamUp": "a high Chaos laser",
+        "Chaos_Laser_Dam2": "a Chaos laser",
+        "Chaos_Hurt": "the fall",
+        "Nuke_Trigger": "the nuke",
+        "Ship_Hurt_Void": "the fall",
+        "Ehe_Laser_Up_Dam": "a high laser",
+        "Ehe_Laser_Down_Dam": "a low laser",
+        "Fireball_Hurt": "a fireball",
+        "Ehe_Dragon_Hurt": "the dragon",
+        "Drag_Hurt": "the dragon",
+        "Choc_Hurt": "the chocobos",
+        "Boss_Fire_Left": "the dragon's fire",
+        "Boss_Fire_Right": "the dragon's fire",
+        "Boss_Electro": "the electro floor",
+        "Boss_S_Firenova": "the fire nova",
+        "Boss_Meteor_Kill": "the meteor",
+        "Boss_Armor_Kill": "the dragon",
+        "Pillar_Hurt": "the lava",
+        "Nuke_Volcano": "Holy (time ran out)",
+        "Belias_Hurt_Fire": "the entrance fire",
+        "Belias_UHurt_Fire": "Belias's fire",
+        "Belias_Exp_Tri": "the explosion",
+        "Firewave_Hurt": "a firewave",
+        "Firewave_2_Hurt": "a firewave",
+        "Tile_Hurt": "a falling tile",
+        "Judge_Hurt": "Gabranth",
+        "Judge_Hurt_Niggers": "Gabranth's fire",
+        "Tomb_Laser_Up_Dam": "a high laser",
+        "Tomb_Laser_Down_Dam": "a low laser",
+        "Tomb_Void_Hurt": "the fall",
+        "Guard_Boss_Point_Hurt": "Gabranth",
+        "Side_Attack_Hurt1": "a summon",
+        "Side_Attack_Hurt3": "a summon",
+        "Side_Attack_Hurt4": "a summon",
+        "Ultimate_Summon_Hurt": "the ultimate summon",
+        "Chaos_Summon_Meteor_Hurt": "a meteor",
+        "Belias_Summon_Hurt": "a summon",
+        "SETH_Chaos_Metor_Damage": "a meteor",
+        "Lightning_Hurt": "lightning",
+        "Firenova_Hurt": "a fire nova",
+        "Electro_Hurt": "electro"
+      },
+      "endless": {}
+    },
+    {
+      "id": "belias_xzone",
+      "name": "Critical: the X-zone",
+      "description": "Belias at his last segment: 3 s in, everyone in the arena is teleported to the X-zone, where Belias's fire (600 damage on touch) rolls through and explosions go off for 17 s, then you are sent back to the arena.",
+      "parent": "belias",
+      "spawn": {
+        "origin": [
+          6600,
+          8704,
+          -3582
+        ],
+        "yaw": 0
+      },
+      "start": [
+        {
+          "target": "[PR#]Temp_Maker",
+          "input": "Keyvalue",
+          "param": "targetname Map_Maker"
+        },
+        {
+          "target": "[PR#]S_Boss_Temp",
+          "input": "FireUser1"
+        },
+        {
+          "target": "[PR#]Boss_Health_Init",
+          "input": "FireUser1"
+        },
+        {
+          "target": "[PR#]Belias_Temp",
+          "input": "ForceSpawn"
+        },
+        {
+          "target": "[PR#]Belias_UHurt_Fire",
+          "input": "Enable",
+          "delay": 0.1
+        },
+        {
+          "target": "[PR#]Belias_Hurt_Fire",
+          "input": "Enable",
+          "delay": 0.1
+        },
+        {
+          "target": "[PR#]Xzone_Fix_Sit",
+          "input": "Enable",
+          "delay": 1
+        },
+        {
+          "target": "[PR#]Belias_Trigger_Critical",
+          "input": "Trigger",
+          "delay": 1
+        }
+      ],
+      "fastForward": 0.3,
+      "winAfter": 23,
+      "player": {
+        "health": 250,
+        "name": "None"
+      },
+      "hazards": {
+        "Chaos_Laser_Dam": "a Chaos laser",
+        "Chaos_Laser_DamUp": "a high Chaos laser",
+        "Chaos_Laser_Dam2": "a Chaos laser",
+        "Chaos_Hurt": "the fall",
+        "Nuke_Trigger": "the nuke",
+        "Ship_Hurt_Void": "the fall",
+        "Ehe_Laser_Up_Dam": "a high laser",
+        "Ehe_Laser_Down_Dam": "a low laser",
+        "Fireball_Hurt": "a fireball",
+        "Ehe_Dragon_Hurt": "the dragon",
+        "Drag_Hurt": "the dragon",
+        "Choc_Hurt": "the chocobos",
+        "Boss_Fire_Left": "the dragon's fire",
+        "Boss_Fire_Right": "the dragon's fire",
+        "Boss_Electro": "the electro floor",
+        "Boss_S_Firenova": "the fire nova",
+        "Boss_Meteor_Kill": "the meteor",
+        "Boss_Armor_Kill": "the dragon",
+        "Pillar_Hurt": "the lava",
+        "Nuke_Volcano": "Holy (time ran out)",
+        "Belias_Hurt_Fire": "the entrance fire",
+        "Belias_UHurt_Fire": "Belias's fire",
+        "Belias_Exp_Tri": "the explosion",
+        "Firewave_Hurt": "a firewave",
+        "Firewave_2_Hurt": "a firewave",
+        "Tile_Hurt": "a falling tile",
+        "Judge_Hurt": "Gabranth",
+        "Judge_Hurt_Niggers": "Gabranth's fire",
+        "Tomb_Laser_Up_Dam": "a high laser",
+        "Tomb_Laser_Down_Dam": "a low laser",
+        "Tomb_Void_Hurt": "the fall",
+        "Guard_Boss_Point_Hurt": "Gabranth",
+        "Side_Attack_Hurt1": "a summon",
+        "Side_Attack_Hurt3": "a summon",
+        "Side_Attack_Hurt4": "a summon",
+        "Ultimate_Summon_Hurt": "the ultimate summon",
+        "Chaos_Summon_Meteor_Hurt": "a meteor",
+        "Belias_Summon_Hurt": "a summon",
+        "SETH_Chaos_Metor_Damage": "a meteor",
+        "Lightning_Hurt": "lightning",
+        "Firenova_Hurt": "a fire nova",
+        "Electro_Hurt": "electro"
+      },
+      "endless": {}
+    },
+    {
+      "id": "gabranth_tomb",
+      "group": "Act 2 – Tomb",
+      "name": "Gabranth – tomb chase",
+      "description": "99 s after Belias falls, Gabranth charges down the tomb corridor (350 u/s, touching him kills). Kill him before he reaches the end, about 10 s, or the tomb is nuked. 5 + 6 HP per human per segment (125 at 20 humans), 6 segments. On death he fires one last laser down the corridor.",
+      "spawn": {
+        "origin": [
+          -1500,
+          8704,
+          -2046
+        ],
+        "yaw": 180
+      },
+      "start": [
+        {
+          "target": "[PR#]Temp_Maker",
+          "input": "Keyvalue",
+          "param": "targetname Map_Maker"
+        },
+        {
+          "target": "[PR#]S_Boss_Temp",
+          "input": "FireUser1"
+        },
+        {
+          "target": "[PR#]Boss_Health_Init",
+          "input": "FireUser1"
+        },
+        {
+          "target": "[PR#]Boss_Health_Init",
+          "input": "SetValue",
+          "param": "5",
+          "delay": 0.05
+        },
+        {
+          "target": "[PR#]Tomb_Temp",
+          "input": "ForceSpawn"
+        },
+        {
+          "target": "[PR#]Judge_Trigger",
+          "input": "Enable",
+          "delay": 0.1
+        },
+        {
+          "target": "[PR#]Judge_Temp",
+          "input": "ForceSpawn",
+          "delay": 1.5
+        }
+      ],
+      "fastForward": 0.3,
+      "bosses": [
+        {
+          "target": "[PR#]Judge_Armor",
+          "name": "Gabranth",
+          "counter": "[PR#]Boss_Health",
+          "counterMode": "hits"
+        }
+      ],
+      "win": {
+        "target": "[PR#]Judge_Trigger_End",
+        "input": "Trigger"
+      },
+      "lose": {
+        "target": "[PR#]Nuke_Trigger",
+        "input": "Enable"
+      },
+      "player": {
+        "health": 250,
+        "name": "None"
+      },
+      "hazards": {
+        "Chaos_Laser_Dam": "a Chaos laser",
+        "Chaos_Laser_DamUp": "a high Chaos laser",
+        "Chaos_Laser_Dam2": "a Chaos laser",
+        "Chaos_Hurt": "the fall",
+        "Nuke_Trigger": "the nuke",
+        "Ship_Hurt_Void": "the fall",
+        "Ehe_Laser_Up_Dam": "a high laser",
+        "Ehe_Laser_Down_Dam": "a low laser",
+        "Fireball_Hurt": "a fireball",
+        "Ehe_Dragon_Hurt": "the dragon",
+        "Drag_Hurt": "the dragon",
+        "Choc_Hurt": "the chocobos",
+        "Boss_Fire_Left": "the dragon's fire",
+        "Boss_Fire_Right": "the dragon's fire",
+        "Boss_Electro": "the electro floor",
+        "Boss_S_Firenova": "the fire nova",
+        "Boss_Meteor_Kill": "the meteor",
+        "Boss_Armor_Kill": "the dragon",
+        "Pillar_Hurt": "the lava",
+        "Nuke_Volcano": "Holy (time ran out)",
+        "Belias_Hurt_Fire": "the entrance fire",
+        "Belias_UHurt_Fire": "Belias's fire",
+        "Belias_Exp_Tri": "the explosion",
+        "Firewave_Hurt": "a firewave",
+        "Firewave_2_Hurt": "a firewave",
+        "Tile_Hurt": "a falling tile",
+        "Judge_Hurt": "Gabranth",
+        "Judge_Hurt_Niggers": "Gabranth's fire",
+        "Tomb_Laser_Up_Dam": "a high laser",
+        "Tomb_Laser_Down_Dam": "a low laser",
+        "Tomb_Void_Hurt": "the fall",
+        "Guard_Boss_Point_Hurt": "Gabranth",
+        "Side_Attack_Hurt1": "a summon",
+        "Side_Attack_Hurt3": "a summon",
+        "Side_Attack_Hurt4": "a summon",
+        "Ultimate_Summon_Hurt": "the ultimate summon",
+        "Chaos_Summon_Meteor_Hurt": "a meteor",
+        "Belias_Summon_Hurt": "a summon",
+        "SETH_Chaos_Metor_Damage": "a meteor",
+        "Lightning_Hurt": "lightning",
+        "Firenova_Hurt": "a fire nova",
+        "Electro_Hurt": "electro"
+      },
+      "childrenTitle": "Drills"
+    },
+    {
+      "id": "gabranth_last_laser",
+      "parent": "gabranth_tomb",
+      "name": "Last laser",
+      "description": "Gabranth's parting shot: one random laser (low: jump, high: crouch) down the corridor at 2000 u/s.",
+      "spawn": {
+        "origin": [
+          -1500,
+          8704,
+          -2046
+        ],
+        "yaw": 180
+      },
+      "start": [
+        {
+          "target": "[PR#]Temp_Maker",
+          "input": "Keyvalue",
+          "param": "targetname Map_Maker"
+        },
+        {
+          "target": "[PR#]S_Boss_Temp",
+          "input": "FireUser1"
+        },
+        {
+          "target": "[PR#]Boss_Health_Init",
+          "input": "FireUser1"
+        },
+        {
+          "target": "[PR#]Judge_Temp",
+          "input": "ForceSpawn"
+        },
+        {
+          "target": "[PR#]Judge_Move",
+          "input": "Kill",
+          "delay": 0.1
+        },
+        {
+          "target": "[PR#]Judge_Random_Laser",
+          "input": "PickRandom",
+          "delay": 1
+        }
+      ],
+      "fastForward": 0.3,
+      "winAfter": 6,
+      "player": {
+        "health": 250,
+        "name": "None"
+      },
+      "hazards": {
+        "Chaos_Laser_Dam": "a Chaos laser",
+        "Chaos_Laser_DamUp": "a high Chaos laser",
+        "Chaos_Laser_Dam2": "a Chaos laser",
+        "Chaos_Hurt": "the fall",
+        "Nuke_Trigger": "the nuke",
+        "Ship_Hurt_Void": "the fall",
+        "Ehe_Laser_Up_Dam": "a high laser",
+        "Ehe_Laser_Down_Dam": "a low laser",
+        "Fireball_Hurt": "a fireball",
+        "Ehe_Dragon_Hurt": "the dragon",
+        "Drag_Hurt": "the dragon",
+        "Choc_Hurt": "the chocobos",
+        "Boss_Fire_Left": "the dragon's fire",
+        "Boss_Fire_Right": "the dragon's fire",
+        "Boss_Electro": "the electro floor",
+        "Boss_S_Firenova": "the fire nova",
+        "Boss_Meteor_Kill": "the meteor",
+        "Boss_Armor_Kill": "the dragon",
+        "Pillar_Hurt": "the lava",
+        "Nuke_Volcano": "Holy (time ran out)",
+        "Belias_Hurt_Fire": "the entrance fire",
+        "Belias_UHurt_Fire": "Belias's fire",
+        "Belias_Exp_Tri": "the explosion",
+        "Firewave_Hurt": "a firewave",
+        "Firewave_2_Hurt": "a firewave",
+        "Tile_Hurt": "a falling tile",
+        "Judge_Hurt": "Gabranth",
+        "Judge_Hurt_Niggers": "Gabranth's fire",
+        "Tomb_Laser_Up_Dam": "a high laser",
+        "Tomb_Laser_Down_Dam": "a low laser",
+        "Tomb_Void_Hurt": "the fall",
+        "Guard_Boss_Point_Hurt": "Gabranth",
+        "Side_Attack_Hurt1": "a summon",
+        "Side_Attack_Hurt3": "a summon",
+        "Side_Attack_Hurt4": "a summon",
+        "Ultimate_Summon_Hurt": "the ultimate summon",
+        "Chaos_Summon_Meteor_Hurt": "a meteor",
+        "Belias_Summon_Hurt": "a summon",
+        "SETH_Chaos_Metor_Damage": "a meteor",
+        "Lightning_Hurt": "lightning",
+        "Firenova_Hurt": "a fire nova",
+        "Electro_Hurt": "electro"
+      },
+      "endless": {}
+    },
+    {
+      "id": "guard_gabranth",
+      "group": "Act 3 – Airship",
+      "name": "Gabranth – airship boss",
+      "description": "The airship's Gabranth (Epic, normal difficulty): he chases the team round the ring (120-damage touch) while a random summon attack lands every 10.5 s. 50 + 30 HP per human per segment, 6 segments.",
+      "spawn": {
+        "origin": [
+          12420,
+          -6400,
+          6402
+        ],
+        "yaw": 0
+      },
+      "start": [
+        {
+          "target": "[PR#]Temp_Maker",
+          "input": "Keyvalue",
+          "param": "targetname Map_Maker"
+        },
+        {
+          "target": "[PR#]S_Boss_Temp",
+          "input": "FireUser1"
+        },
+        {
+          "target": "[PR#]Boss_Health_Init",
+          "input": "FireUser1"
+        },
+        {
+          "target": "[PR#]Level_Counter_Shit_System",
+          "input": "Add",
+          "param": "5"
+        },
+        {
+          "target": "[PR#]Level_Counter_Shit_System",
+          "input": "GetValue",
+          "delay": 0.01
+        },
+        {
+          "target": "[PR#]Ship_Temp",
+          "input": "ForceSpawn",
+          "delay": 0.05
+        },
+        {
+          "target": "[PR#]Chaos_Temp",
+          "input": "Kill",
+          "delay": 0.05
+        },
+        {
+          "target": "[PR#]Guard_Temp_Boss",
+          "input": "FireUser1",
+          "delay": 0.1
+        },
+        {
+          "target": "[PR#]Side_Temp",
+          "input": "FireUser1",
+          "delay": 0.1
+        }
+      ],
+      "fastForward": 0.3,
+      "bosses": [
+        {
+          "target": "[PR#]Guard_Boss_Break",
+          "name": "Gabranth",
+          "counter": "[PR#]Boss_Health",
+          "counterMode": "hits"
+        }
+      ],
+      "win": {
+        "target": "[PR#]Guard_Boss_Trigger_End",
+        "input": "Trigger"
+      },
+      "player": {
+        "health": 250,
+        "name": "None"
+      },
+      "hazards": {
+        "Chaos_Laser_Dam": "a Chaos laser",
+        "Chaos_Laser_DamUp": "a high Chaos laser",
+        "Chaos_Laser_Dam2": "a Chaos laser",
+        "Chaos_Hurt": "the fall",
+        "Nuke_Trigger": "the nuke",
+        "Ship_Hurt_Void": "the fall",
+        "Ehe_Laser_Up_Dam": "a high laser",
+        "Ehe_Laser_Down_Dam": "a low laser",
+        "Fireball_Hurt": "a fireball",
+        "Ehe_Dragon_Hurt": "the dragon",
+        "Drag_Hurt": "the dragon",
+        "Choc_Hurt": "the chocobos",
+        "Boss_Fire_Left": "the dragon's fire",
+        "Boss_Fire_Right": "the dragon's fire",
+        "Boss_Electro": "the electro floor",
+        "Boss_S_Firenova": "the fire nova",
+        "Boss_Meteor_Kill": "the meteor",
+        "Boss_Armor_Kill": "the dragon",
+        "Pillar_Hurt": "the lava",
+        "Nuke_Volcano": "Holy (time ran out)",
+        "Belias_Hurt_Fire": "the entrance fire",
+        "Belias_UHurt_Fire": "Belias's fire",
+        "Belias_Exp_Tri": "the explosion",
+        "Firewave_Hurt": "a firewave",
+        "Firewave_2_Hurt": "a firewave",
+        "Tile_Hurt": "a falling tile",
+        "Judge_Hurt": "Gabranth",
+        "Judge_Hurt_Niggers": "Gabranth's fire",
+        "Tomb_Laser_Up_Dam": "a high laser",
+        "Tomb_Laser_Down_Dam": "a low laser",
+        "Tomb_Void_Hurt": "the fall",
+        "Guard_Boss_Point_Hurt": "Gabranth",
+        "Side_Attack_Hurt1": "a summon",
+        "Side_Attack_Hurt3": "a summon",
+        "Side_Attack_Hurt4": "a summon",
+        "Ultimate_Summon_Hurt": "the ultimate summon",
+        "Chaos_Summon_Meteor_Hurt": "a meteor",
+        "Belias_Summon_Hurt": "a summon",
+        "SETH_Chaos_Metor_Damage": "a meteor",
+        "Lightning_Hurt": "lightning",
+        "Firenova_Hurt": "a fire nova",
+        "Electro_Hurt": "electro"
+      }
+    },
+    {
+      "id": "airship_ending",
+      "group": "Act 3 – Airship",
+      "full": true,
+      "name": "Chaos → plate escape (Epic ending)",
+      "description": "Chaos fight, then the run to the plate under it (Chaos_End_Epic): the plate rises 5 s after the first human reaches it and the airship is nuked 3.5 s later. The plate is across the void from the deck: jump the stepping stones. Win on the plate.",
+      "spawn": {
+        "origin": [
+          5900,
+          -6016,
+          7746
+        ],
+        "yaw": 180
+      },
+      "start": [
+        {
+          "target": "[PR#]Temp_Maker",
+          "input": "Keyvalue",
+          "param": "targetname Map_Maker"
+        },
+        {
+          "target": "[PR#]S_Boss_Temp",
+          "input": "FireUser1"
+        },
+        {
+          "target": "[PR#]Boss_Health_Init",
+          "input": "FireUser1"
+        },
+        {
+          "target": "[PR#]Ship_Temp",
+          "input": "ForceSpawn"
+        },
+        {
+          "target": "[PR#]Guard_Temp_Boss",
+          "input": "Kill"
+        },
+        {
+          "target": "[PR#]Side_Temp",
+          "input": "Kill"
+        },
+        {
+          "target": "[PR#]Chaos_Temp",
+          "input": "ForceSpawn"
+        },
+        {
+          "target": "[PR#]Chaos_Hp_To_Boss",
+          "input": "Enable",
+          "delay": 0.1
+        },
+        {
+          "target": "[PR#]Last_Chaos_Summon_Move",
+          "input": "Open",
+          "delay": 0.1
+        }
+      ],
+      "fastForward": 0.3,
+      "bosses": [
+        {
+          "target": "[PR#]Chaos_Armor",
+          "name": "Chaos",
+          "counter": "[PR#]Boss_Health",
+          "counterMode": "hits"
+        }
+      ],
+      "win": {
+        "target": "[PR#]Level_Counter_Progress",
+        "input": "GetValue"
+      },
+      "lose": {
+        "target": "[PR#]Nuke_Trigger",
+        "input": "Enable"
+      },
+      "player": {
+        "health": 250,
+        "name": "None"
+      },
+      "hazards": {
+        "Chaos_Laser_Dam": "a Chaos laser",
+        "Chaos_Laser_DamUp": "a high Chaos laser",
+        "Chaos_Laser_Dam2": "a Chaos laser",
+        "Chaos_Hurt": "the fall",
+        "Nuke_Trigger": "the nuke",
+        "Ship_Hurt_Void": "the fall",
+        "Ehe_Laser_Up_Dam": "a high laser",
+        "Ehe_Laser_Down_Dam": "a low laser",
+        "Fireball_Hurt": "a fireball",
+        "Ehe_Dragon_Hurt": "the dragon",
+        "Drag_Hurt": "the dragon",
+        "Choc_Hurt": "the chocobos",
+        "Boss_Fire_Left": "the dragon's fire",
+        "Boss_Fire_Right": "the dragon's fire",
+        "Boss_Electro": "the electro floor",
+        "Boss_S_Firenova": "the fire nova",
+        "Boss_Meteor_Kill": "the meteor",
+        "Boss_Armor_Kill": "the dragon",
+        "Pillar_Hurt": "the lava",
+        "Nuke_Volcano": "Holy (time ran out)",
+        "Belias_Hurt_Fire": "the entrance fire",
+        "Belias_UHurt_Fire": "Belias's fire",
+        "Belias_Exp_Tri": "the explosion",
+        "Firewave_Hurt": "a firewave",
+        "Firewave_2_Hurt": "a firewave",
+        "Tile_Hurt": "a falling tile",
+        "Judge_Hurt": "Gabranth",
+        "Judge_Hurt_Niggers": "Gabranth's fire",
+        "Tomb_Laser_Up_Dam": "a high laser",
+        "Tomb_Laser_Down_Dam": "a low laser",
+        "Tomb_Void_Hurt": "the fall",
+        "Guard_Boss_Point_Hurt": "Gabranth",
+        "Side_Attack_Hurt1": "a summon",
+        "Side_Attack_Hurt3": "a summon",
+        "Side_Attack_Hurt4": "a summon",
+        "Ultimate_Summon_Hurt": "the ultimate summon",
+        "Chaos_Summon_Meteor_Hurt": "a meteor",
+        "Belias_Summon_Hurt": "a summon",
+        "SETH_Chaos_Metor_Damage": "a meteor",
+        "Lightning_Hurt": "lightning",
+        "Firenova_Hurt": "a fire nova",
+        "Electro_Hurt": "electro"
+      }
+    }
+  ],
+  "workshop": "3363745150"
+}

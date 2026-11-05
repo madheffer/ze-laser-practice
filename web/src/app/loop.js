@@ -78,6 +78,7 @@ export function frame(now) {
   G.renderer.showHitboxes = rule('hitboxes'); // a round's are the room's
   G.renderer.updateEntities(engine ? engine.time + (live ? acc : 0) : 0);
   G.renderer.render();
+  G.radar?.draw();
   const look = takeLookDelta();
   G.vm.visible = !tp && !S.run?.spectating;
   if (S.run) {
@@ -117,10 +118,12 @@ export function step() {
   G.renderer.record(engine.time);
   if (ground) player.ride(ground, groundBefore, ground.getWorld());
   world.dynamic = engine.solids();
-  const inp = window.__lasersInput?.(run.t) || (S.locked ? readInput() : { forward: 0, side: 0, jump: false, duck: false, walk: false });
+  // window.__lasersInput drives the player in tests: solo only (no bots in a round)
+  const inp = (!S.mp && window.__lasersInput?.(run.t)) || (S.locked ? readInput() : { forward: 0, side: 0, jump: false, duck: false, walk: false });
   player.maxSpeed = G.vm.weapon === 'knife' ? 250 : 215; // CS2: knife 250, AK-47 215
   const before = player.origin;
   player.tick(inp, moveSettings());
+  S.mp?.record(run.ticks, player); // a round's server replays your run from these (the anti-cheat)
   footsteps(inp, before);
 
   for (const ev of engine.updateTriggers(player)) {
@@ -130,7 +133,16 @@ export function step() {
     } else if (ev.type === 'heal' && run.started && !run.done) {
       healPlayer(ev.amount);
     } else if (ev.type === 'teleport') {
+      // CS2 trigger_teleport without a landmark keeps your momentum, turned with you from your facing to the
+      // destination's (porter research 07 §2.2); a fall into a teleport lands still carrying its fall speed
+      const turn = ((ev.yaw ?? player.yaw) - player.yaw) * Math.PI / 180;
+      const [vx, vy, vz] = player.velocity;
       player.teleport(ev.origin, ev.yaw);
+      player.velocity = [vx * Math.cos(turn) - vy * Math.sin(turn), vx * Math.sin(turn) + vy * Math.cos(turn), vz];
+      // the map sent a human into the zombie cage (world/entities/classes/triggers.js zombieCages): on a server the
+      // zombies there infect you. Solo or in a round it is a death (a round makes you a spectator: session.finish)
+      // (humans only: a zombie-side player, engine.playerEnt.team 2, belongs there; team filters read the same field)
+      if (ev.cage && engine.playerEnt.team === 3 && run.started && !run.done && !godMode()) { run.killedBy = 'cage'; finish('dead'); }
     } else if (ev.type === 'push') {
       for (let i = 0; i < 3; i++) player.baseVelocity[i] += ev.dir[i] * ev.speed;
     }
@@ -166,6 +178,7 @@ function footsteps(inp, before) {
 export function updateHud() {
   const { run, scenario, player } = S;
   if (!run) return;
+  G.itemHud?.update();
   const t = run.started ? stageTime() : -(run.startAt - run.t);
   const bosses = [];
   for (const b of scenario?.bosses || []) { const s = bossStatus(b); if (s) bosses.push(s); }

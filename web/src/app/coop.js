@@ -17,6 +17,7 @@ import { bossTargets, applyBossDamage } from './bosses.js';
 import { showRoundEnd } from './coop-end.js';
 import { isMapName } from '../lib/paths.js';
 import { lastFrameAt } from './loop.js';
+import { itemState, spendUse } from '../world/items.js';
 
 export const net = new CoopClient();
 export const lobby = { busy: false }; // busy = a round is on that you're not in (you'll be in the next one)
@@ -24,10 +25,12 @@ export const lobby = { busy: false }; // busy = a round is on that you're not in
 const STATE_MS = 50; // 20 Hz
 const BOSS_MS = 100;
 const MAX_HITS = 2000; // per boss message entry
+const MAX_SAMPLES = 100; // ticks per state message (the server takes up to 160; frames are capped at 8 KB)
 
 const num = (v, lo, hi) => typeof v === 'number' && Number.isFinite(v) && v >= lo && v <= hi;
 const vec = (v, lim) => Array.isArray(v) && v.length === 3 && v.every((x) => num(x, -lim, lim));
 const r1 = (v) => Math.round(v * 10) / 10;
+const r3 = (v) => Math.round(v * 1000) / 1000;
 
 class Round {
   constructor(d) {
@@ -36,17 +39,35 @@ class Round {
     this.rules = d.rules;
     this.mode = d.mode;
     this.leader = d.leader;
+    this.holders = d.holders; // who started with the map's heal (the room's choice)
+    // teammates' items, for the item HUD: the same EntWatch bookkeeping as yours, from their presses
+    const heals = (S.map?.items || []).filter((it) => it.heal);
+    this.peerItems = new Map(d.holders.filter((id) => id !== net.you).map((id) => [id, heals.map((it) => ({ ...it, uses: 0, readyAt: 0 }))]));
     this.players = new Map(d.roster.map((m) => [m.id, { id: m.id, name: m.name, alive: true, deadAt: null, hits: 0 }]));
     this.me = net.you;
     this.ended = false;
     this.interpDelay = 0.1; // others are drawn this far in the past (s), between two of their states
     this.sendAt = 0; this.bossAt = 0;
     this.hitOut = new Map(); this.teamOut = new Map();
+    this.ticks = []; this.tick0 = 0; // your positions since the last send: tick tick0, tick0 + 1, ...
     this.specId = null;
     this.lastAliveSaid = false;
   }
 
   get isHost() { return net.isHost; } // the room owner (Play again on the end card)
+
+  // ---- items (app/items.js, ui/itemhud.js)
+  heldItems() { return this.holders.includes(this.me) ? (S.map?.items || []).filter((it) => it.heal) : []; }
+  myName() { return this.name(this.me); }
+  itemRows() {
+    const now = S.engine?.time ?? 0, rows = [];
+    for (const [id, items] of this.peerItems) {
+      if (!this.players.get(id)?.alive) continue;
+      for (const it of items) rows.push({ state: itemState(it, now), short: it.shortname || it.name, color: it.color, holder: this.name(id) });
+    }
+    return rows;
+  }
+  peerUsed(id) { const now = S.engine?.time ?? 0; for (const it of this.peerItems.get(id) || []) spendUse(it, now); }
   get isLeader() { return this.leader === this.me; } // carries the simulated team's fire
   get alive() { return [...this.players.values()].filter((p) => p.alive); }
   name(id) { return this.players.get(id)?.name || net.member(id)?.name || 'Player'; }
@@ -57,24 +78,46 @@ class Round {
   died(cause) {
     const p = this.players.get(this.me);
     if (!p || !p.alive || this.ended) return;
+    this.sendTicks(); // your last positions first: the server's copy reaches the same death (with its own count)
     net.game({ t: 'dead', r: this.r, by: cause, at: stageTime(), hits: S.run.hits });
     // the server stamps it and tells everyone (us too); until then we're already spectating
   }
 
-  outcome(result) { if (!this.ended) net.game({ t: 'outcome', r: this.r, result }); }
+  // you used your map item (E) after tick k: the server's copy presses it before tick k + 1, as yours does
+  used(k) { if (!this.ended && !S.run?.spectating) { this.sendTicks(); net.game({ t: 'use', r: this.r, k }); } }
+
+  // your AK reload started: the server's shot check holds your next rounds until it's done
+  reloaded() { if (!this.ended && !S.run?.spectating) net.game({ t: 'reload', r: this.r }); }
+
+  // the stage's clear / fail: the server's own copy of the run decides it, so nothing is sent
+  outcome() {}
+
+  // every tick: where you stood (what your map's triggers saw), for the server's copy of your run
+  record(k, player) {
+    if (this.ended || S.run?.spectating) return;
+    if (!this.ticks.length) this.tick0 = k;
+    const o = player.origin; // to 1/1000 u: small frames, and far finer than any trigger edge
+    this.ticks.push([r3(o[0]), r3(o[1]), r3(o[2]), player.ducked ? 1 : 0]);
+  }
 
   pump(now) {
     const run = S.run;
     if (!run || run.done || this.ended) return;
-    if (now - this.sendAt >= STATE_MS) {
-      this.sendAt = now;
-      const p = S.player;
-      net.game({ t: 's', r: this.r, at: run.t, o: p.origin.map(r1), yaw: r1(p.yaw), pitch: r1(p.pitch), duck: Math.round(p.duckAmount * 100) / 100, hp: Math.max(0, Math.round(run.hp)), hits: run.hits });
-    }
+    if (now - this.sendAt >= STATE_MS && this.ticks.length) { this.sendAt = now; this.sendTicks(); }
     if (now - this.bossAt >= BOSS_MS) {
       this.bossAt = now;
       if (this.hitOut.size) net.game({ t: 'hit', r: this.r, h: drain(this.hitOut) });
       if (this.teamOut.size) net.game({ t: 'hit', r: this.r, team: true, h: drain(this.teamOut) });
+    }
+  }
+
+  // your recorded ticks to the server, up to MAX_SAMPLES a message (a tab catching up sends several)
+  sendTicks() {
+    const p = S.player;
+    while (this.ticks.length) {
+      const part = this.ticks.splice(0, MAX_SAMPLES);
+      net.game({ t: 's', r: this.r, k: this.tick0, p: part, yaw: r1(p.yaw), pitch: r1(p.pitch) });
+      this.tick0 += part.length;
     }
   }
 
@@ -158,6 +201,7 @@ async function onStart(d) {
   const start = {
     r: d.r, map: d.map, stage: d.stage == null ? null : cleanText(d.stage, 80), mode: d.mode, kind: d.kind,
     rules: { ...cleanRules(d.rules), seed: d.seed }, roster, leader: Number.isInteger(d.leader) ? d.leader : 0,
+    holders: Array.isArray(d.holders) ? d.holders.filter((id) => roster.some((m) => m.id === id)) : [],
   };
   if (S.map?.name !== start.map) {
     try { await G.selectMap(start.map); } catch (e) { G.lobby.note(`Could not load ${start.map}: ${e.message || e}`); return; }
@@ -186,12 +230,18 @@ function onGame(d) {
       G.peers.push(d.from, { t: d.at, o: d.o, yaw: d.yaw, pitch: d.pitch, duck: d.duck, hp: num(d.hp, 0, 1e6) ? d.hp : 0 });
       break;
     case 'clock':
-      // keep our run on the round's clock: half the gap each time, so one late frame can't jerk the world around
-      if (run && !run.done && num(d.at, 0, 1e6)) { const drift = d.at - run.t; if (Math.abs(drift) > 0.04) run.wall0 -= drift * 500; }
+      // keep our run on the round's clock: half the gap each time, so one late frame can't jerk the world around.
+      // Compare with where our clock SAYS the run should be, not run.t: in a throttled tab run.t lags until the
+      // next catch-up, and pulling the clock forward by that lag would run us ahead of the server
+      if (run && !run.done && num(d.at, 0, 1e6)) {
+        const drift = d.at - (performance.now() - run.wall0) / 1000;
+        if (Math.abs(drift) > 0.04) run.wall0 -= drift * 500;
+      }
       break;
     case 'dead': if (Number.isInteger(d.id)) mp.markDead(d.id, cleanText(d.by, 40) || 'the map', num(d.at, 0, 1e6) ? d.at : stageTime(), cleanText(d.note, 30)); break;
     case 'bd': if (!mp.ended) applyHits(d.h); break;
     case 'leader': if (Number.isInteger(d.id)) mp.leader = d.id; break;
+    case 'use': if (Number.isInteger(d.id) && !mp.ended) mp.peerUsed(d.id); break;
     case 'end': if (Array.isArray(d.stats) && Array.isArray(d.winners)) mp.applyEnd(cleanEnd(d)); break;
   }
 }

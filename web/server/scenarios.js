@@ -1,5 +1,6 @@
-// The stage files the server reads to check a round start (a real stage, endless only where the stage has it)
-// and to name it in the public room list. The same files the game loads (web/public/scenarios/<map>.json).
+// The stage files the server reads to check a round start (a real stage, endless only where the stage has it),
+// to name it in the public room list, and (`full`) for the anti-cheat's own copy of the run. The same files the
+// game loads (web/public/scenarios/<map>.json).
 import { readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { isMapName } from '../src/lib/paths.js';
@@ -19,9 +20,9 @@ export function scenarioStore(dir) {
         cache.set(map, hit);
       } catch { return null; }
     }
-    if (stageId == null) return { id: null, name: 'Free roam', endless: false, fastForward: 0 };
+    if (stageId == null) return { id: null, name: 'Free roam', endless: false, fastForward: 0, full: null };
     const s = hit.list.find((x) => x && x.id === stageId);
     if (!s) return null;
-    return { id: s.id, name: String(s.name || s.id).slice(0, 60), endless: !!s.endless, fastForward: Number(s.fastForward) || 0 };
+    return { id: s.id, name: String(s.name || s.id).slice(0, 60), endless: !!s.endless, fastForward: Number(s.fastForward) || 0, full: s };
   };
 }

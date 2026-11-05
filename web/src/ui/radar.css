@@ -1,0 +1,16 @@
+/* The minimap (ui/radar.js) top left like CS2's, the item HUD (ui/itemhud.js) under it; the stage title moves right of
+   the radar when there is one. Sizes in the HUD's --u (ui/hud.css). */
+.hud-radar { position: absolute; left: calc(14 * var(--u)); top: calc(14 * var(--u)); width: calc(300 * var(--u)); height: calc(300 * var(--u)); pointer-events: none; }
+.hud-radar canvas { width: 100%; height: 100%; display: block; }
+.hud-radar[hidden] { display: none; }
+#hud.has-radar .hud-stage { left: calc(330 * var(--u)); }
+
+.hud-items {
+  position: absolute; left: calc(14 * var(--u)); top: calc(326 * var(--u)); pointer-events: none;
+  font: 600 calc(19 * var(--u)) / 1.35 'Stratum2', 'Segoe UI', sans-serif; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
+}
+#hud:not(.has-radar) .hud-items { top: calc(120 * var(--u)); }
+.hud-items[hidden] { display: none; }
+.it-row { display: flex; align-items: baseline; gap: calc(8 * var(--u)); white-space: nowrap; }
+.it-state { min-width: calc(26 * var(--u)); text-align: right; color: #fff; font-variant-numeric: tabular-nums; }
+.it-holder { color: #e8edf2; opacity: 0.9; }

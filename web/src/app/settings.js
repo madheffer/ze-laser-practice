@@ -17,6 +17,7 @@ export const FOV = 90; // CS2's horizontal FOV at 4:3, fixed
 export const DEFAULTS = {
   sens: 2.0, autoBhop: false, god: false, hitboxes: false, timescale: 1,
   humans: 20, bossHp: 100, autoFire: true, fallDamage: false, fullscreen: true,
+  healItem: false, // hold the map's heal item (EntWatch / map data: mist's Cleansing Aura, westersand's Heal Magick), E to use it
   sfx: 0.5, music: 0.5,
   perfectTeam: false, // true = the other humans never stop shooting (the old fast kill)
   ping: 0, // simulated round trip in ms (0-500): the map's entities are drawn this late (see render.js record())

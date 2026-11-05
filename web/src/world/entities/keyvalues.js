@@ -25,12 +25,27 @@ export function addOutput(engine, e, param) {
   if (k === 'speed' && e.state.speed != null) e.state.speed = num(rest);
 }
 
+// CS2's KeyValues input: "key value key value ...", a vector key taking its three numbers (ze_gris_p: 379 of them,
+// e.g. the stage 4 boss's under-platform hurt sends a falling human back up with KeyValues(origin x y z)).
+const VECTOR_KEYS = new Set(['origin', 'angles', 'basevelocity', 'absvelocity', 'velocity', 'rendercolor', 'scales', 'movedir']);
+export function splitKeyValues(param) {
+  const t = String(param ?? '').trim().split(/\s+/).filter(Boolean);
+  const out = [];
+  for (let i = 0; i < t.length;) {
+    const k = t[i++];
+    if (i >= t.length) break;
+    if (VECTOR_KEYS.has(k.toLowerCase())) { out.push(`${k} ${t.slice(i, i + 3).join(' ')}`); i += 3; } else out.push(`${k} ${t[i++]}`);
+  }
+  return out;
+}
+
 // Inputs aimed at you. Maps change a human's gravity, speed and health this way: ze_mist_p's escape-boss
 // trigger sets "gravity 0.1", its boss door sets 180 max health.
 export function playerInput(engine, q) {
   const inp = q.input.toLowerCase();
   const P = engine.player; // { setHealth, setMaxHealth, setGravity, setSpeed, setVelocity, setDamageFilter }
   const me = engine.playerEnt;
+  if (inp === 'keyvalues') { for (const kv of splitKeyValues(q.param)) playerInput(engine, { ...q, input: 'KeyValue', param: kv }); return; }
   if (inp === 'addoutput' || inp === 'keyvalue') {
     const m = /^\s*(\S+)\s+(.+)$/.exec(q.param || '');
     if (!m) return;

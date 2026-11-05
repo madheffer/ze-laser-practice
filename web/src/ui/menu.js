@@ -1,12 +1,15 @@
-// The menu, which doubles as the pause screen: a top bar (title, Play | Settings tabs, map, Resume / Restart),
-// the stage picker (a card grid: the featured stage on top, a boss's single attacks folded under it, endless and
-// personal bests on each card) and the settings (index.html; app/settings.js binds them by id).
+// The menu, which doubles as the pause screen: a top bar (title, Play | Settings tabs, Maps / current map,
+// Resume / Restart), the Play tab's two views (the map picker, ui/maps.js; then the picked map's stages, one
+// section per part of the map with a jump bar, a boss's single attacks folded under it, endless and personal
+// bests on each card) and the settings (index.html; app/settings.js binds them by id).
 import './menu.css';
 import { S, G } from '../app/state.js';
 import { $, esc } from '../lib/dom.js';
 import { formatTime } from '../lib/format.js';
 import { getRecord } from '../app/records.js';
 import { syncPlayState } from '../app/input.js';
+import { displayName } from './maps.js';
+import { settings, saveSettings } from '../app/settings.js';
 
 const LONG_DESC = 110; // characters: past this a card gets a "more" toggle (and the full text as its tooltip)
 
@@ -19,11 +22,25 @@ function el(tag, cls, attrs = {}) {
 }
 
 export class Menu {
-  constructor({ onPick, onResume, onRestart }) {
+  constructor({ onPick, onResume, onRestart, onMaps }) {
     this.onPick = onPick;
+    this.view = 'maps';
     $('#resume').addEventListener('click', () => onResume());
     $('#restart').addEventListener('click', () => onRestart());
-    installTabs($('#menu .tabs'));
+    $('#maps-back').addEventListener('click', () => onMaps());
+    this.selectTab = installTabs($('#menu .tabs'));
+  }
+
+  // The Play tab's view: 'maps' (the picker) or 'stages' (the loaded map's parts). Picking a view also brings
+  // the Play tab forward.
+  show(view) {
+    this.view = view;
+    $('#maps').hidden = view !== 'maps';
+    $('#stages').hidden = view !== 'stages';
+    $('#maps-back').hidden = view !== 'stages';
+    $('#map-name').textContent = view === 'stages' && S.map ? S.map.name : '';
+    this.selectTab($('#tab-play'));
+    $('#menu .tab-panels').scrollTop = 0;
   }
 
   // Show the menu when paused (and no end card is up); Resume only when there is a run to go back to. This runs
@@ -41,7 +58,9 @@ export class Menu {
     if (opening && live) $('#resume').focus({ preventScroll: true });
   }
 
-  build() {
+  // The loaded map's stages: a header (title, what the map is, a jump bar of its parts), then one section per
+  // part (a scenario's group, in file order), free roam last.
+  build(info = {}) {
     const list = $('#scenarios');
     list.replaceChildren();
     const byParent = new Map();
@@ -50,12 +69,45 @@ export class Menu {
       if (!byParent.has(p)) byParent.set(p, []);
       byParent.get(p).push(i);
     });
-    // one flowing grid: the group shows as each card's kicker, so single-card groups don't leave empty rows
+    const parts = [];
     for (const i of byParent.get('') || []) {
-      const kids = byParent.get(S.scenarios[i].id) || [];
-      list.append(kids.length ? this.family(i, kids) : this.card(i));
+      const g = String(S.scenarios[i].group || 'Stages');
+      let p = parts.find((x) => x.name === g);
+      if (!p) parts.push((p = { name: g, items: [] }));
+      p.items.push(i);
     }
-    list.append(this.card(-1));
+    parts.push({ name: 'Explore', items: [-1] });
+
+    const head = $('#map-head');
+    head.replaceChildren();
+    const title = el('h2', 'map-title');
+    title.textContent = displayName(info.title || S.map.name);
+    const sub = el('p', 'map-sub');
+    sub.textContent = info.description || S.map.name;
+    const nav = el('nav', 'part-nav', { 'aria-label': 'Parts of the map' });
+    head.append(title, sub, nav);
+    const heal = healToggle();
+    if (heal) head.append(heal);
+
+    parts.forEach((p, n) => {
+      const id = `part-${n}`;
+      const sec = el('section', 'part-sec', { id, 'aria-labelledby': id + '-h' });
+      const h = el('h3', 'part-h', { id: id + '-h' });
+      const count = p.items.reduce((k, i) => k + 1 + (i >= 0 ? (byParent.get(S.scenarios[i].id) || []).length : 0), 0);
+      h.innerHTML = `${esc(p.name)}<small>${count}</small>`;
+      const grid = el('div', 'part-grid');
+      for (const i of p.items) {
+        const kids = i >= 0 ? byParent.get(S.scenarios[i].id) || [] : [];
+        grid.append(kids.length ? this.family(i, kids) : this.card(i));
+      }
+      sec.append(h, grid);
+      list.append(sec);
+      const jump = el('button', 'part-jump', { type: 'button' });
+      jump.textContent = p.name;
+      jump.addEventListener('click', () => sec.scrollIntoView({ block: 'start', behavior: 'smooth' }));
+      nav.append(jump);
+    });
+    if (parts.length <= 2) nav.hidden = true; // one part + free roam: nothing to jump between
   }
 
   // A boss and its single attacks, folded (a native <details>, so it is keyboard and screen-reader friendly).
@@ -88,8 +140,7 @@ export class Menu {
     if (desc) main.title = desc;
     const tags = i < 0 ? [] : [s.featured && 'popular', s.bosses?.length && 'boss', s.full && 'full run'].filter(Boolean);
     const pb = i < 0 ? '' : personalBest(s.id);
-    const kicker = !child && s.group ? `<span class="stage-kicker">${esc(s.group)}</span>` : '';
-    main.innerHTML = kicker + `<b>${esc(s.name)}${tags.length ? `<span class="tags">${tags.map((t) => `<i>${esc(t)}</i>`).join('')}</span>` : ''}</b>`
+    main.innerHTML = `<b>${esc(s.name)}${tags.length ? `<span class="tags">${tags.map((t) => `<i>${esc(t)}</i>`).join('')}</span>` : ''}</b>`
       + (desc ? `<span class="stage-desc">${esc(desc)}</span>` : '')
       + (pb ? `<span class="stage-pb">${esc(pb)}</span>` : '');
     main.addEventListener('click', () => this.onPick(i, 'normal'));
@@ -119,6 +170,23 @@ function personalBest(id) {
   return [best ? `best ${formatTime(best.time)}` : '', bestE ? `endless ${formatTime(bestE.time)}` : ''].filter(Boolean).join(' · ');
 }
 
+// The map's heal option: only on a map that has a heal item (world/items.js: EntWatch / the map's data), named after it.
+// You hold it from the stage start and E uses it; the map's own logic decides where it works (mist: not in the escape).
+function healToggle() {
+  const heals = (S.map?.items || []).filter((it) => it.heal);
+  if (!heals.length) return null;
+  const it = heals[0];
+  const label = el('label', 'heal-toggle');
+  const box = el('input', '', { type: 'checkbox' });
+  box.checked = !!settings.healItem;
+  box.addEventListener('change', () => { settings.healItem = box.checked; saveSettings(); });
+  const text = el('span');
+  text.innerHTML = `Hold the heal: <b>${esc(it.name)}</b> <kbd class="kb">E</kbd>`
+    + `<small>${it.cooldown ? `${esc(it.cooldown)} s cooldown · ` : ''}works where the map allows it (bosses, finales)</small>`;
+  label.append(box, text);
+  return label;
+}
+
 // WAI-ARIA tabs: click, or arrow keys / Home / End, select a tab and show its panel.
 function installTabs(list) {
   const tabs = [...list.querySelectorAll('[role=tab]')];
@@ -140,4 +208,5 @@ function installTabs(list) {
     ev.preventDefault();
     select(tabs[(to + tabs.length) % tabs.length], true);
   });
+  return (tab) => select(tab, false);
 }

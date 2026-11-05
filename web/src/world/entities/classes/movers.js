@@ -66,6 +66,65 @@ register('func_door', {
   },
 });
 
+// func_door_rotating: swings `distance` degrees about its Z axis (spawnflags 64: X, 128: Y; 2 reverses) at `speed`
+// degrees/s, in the parent's space; the same open / close / wait rules as func_door (Source CRotDoor)
+register('func_door_rotating', {
+  solid: (e) => !(num(e.kv.spawnflags) & 8),
+  spawn(e) {
+    const sf = num(e.kv.spawnflags);
+    const s = e.state;
+    s.axis = sf & 64 ? new THREE.Vector3(1, 0, 0) : sf & 128 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(0, 0, 1);
+    s.deg = num(e.kv.distance, 90) * (sf & 2 ? -1 : 1);
+    s.q0 = e.quat.clone();
+    s.speed = Math.abs(num(e.kv.speed, 100));
+    s.pos = s.target = num(e.kv.spawnpos) === 1 || (sf & 1) ? 1 : 0;
+    if (s.pos) e.quat.copy(s.q0).multiply(new THREE.Quaternion().setFromAxisAngle(s.axis, s.deg * DEG));
+  },
+  input(e, inp, p, act) {
+    const s = e.state;
+    const open = () => { if (!s.locked && s.target !== 1) { s.target = 1; e.fireOutput('OnOpen', act); s.activator = act; } };
+    const close = () => { if (s.target !== 0) { s.target = 0; e.fireOutput('OnClose', act); s.activator = act; } };
+    switch (inp) {
+      case 'open': open(); return true;
+      case 'close': close(); return true;
+      case 'toggle': (s.target === 1 ? close : open)(); return true;
+      case 'lock': s.locked = true; return true;
+      case 'unlock': s.locked = false; return true;
+      case 'setspeed': s.speed = Math.abs(num(p)); return true;
+    }
+  },
+  think(e, dt) {
+    const s = e.state;
+    if (s.pos === s.target) return;
+    s.pos = approach(s.pos, s.target, s.deg ? (s.speed * dt) / Math.abs(s.deg) : 1);
+    e.quat.copy(s.q0).multiply(new THREE.Quaternion().setFromAxisAngle(s.axis, s.deg * s.pos * DEG));
+    e.engine.moved(e);
+    if (s.pos !== s.target) return;
+    if (s.target === 1) {
+      e.fireOutput('OnFullyOpen', s.activator);
+      const wait = num(e.kv.wait, 4);
+      if (wait >= 0 && !(num(e.kv.spawnflags) & 32)) e.engine.fire(e, 'Close', '', wait, e, e);
+    } else e.fireOutput('OnFullyClosed', s.activator);
+  },
+});
+
+// func_button: the map's item buttons (mist's Cleansing Aura is a func_button on the item's weapon). Press / Use
+// (app/items.js presses it for you on E) fires OnPressed unless locked; Lock / Unlock / PressOut as Source has them.
+// No movement or sounds: item buttons are invisible.
+register('func_button', {
+  input(e, inp, p, act) {
+    const s = e.state;
+    switch (inp) {
+      case 'press': case 'use': case 'pressin':
+        if (s.locked) { e.fireOutput('OnUseLocked', act); return true; }
+        e.fireOutput('OnPressed', act); e.fireOutput('OnIn', act); return true;
+      case 'pressout': e.fireOutput('OnOut', act); return true;
+      case 'lock': s.locked = true; return true;
+      case 'unlock': s.locked = false; return true;
+    }
+  },
+});
+
 register('func_movelinear', {
   solid: (e) => !(num(e.kv.spawnflags) & 8),
   spawn(e) {

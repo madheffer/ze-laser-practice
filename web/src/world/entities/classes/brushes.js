@@ -2,6 +2,7 @@
 // (func_brush, func_wall_toggle). Damage itself is EntityEngine.damage / breakEntity.
 import { register } from '../registry.js';
 import { num } from '../math.js';
+import { physboxThink } from './physics.js';
 
 // Breakables and physboxes carry health. Bosses are usually one of these: players shoot it, and the map
 // reads OnHealthChanged (health as a 0..1 fraction of max) or OnDamaged to count segments/hits.
@@ -22,13 +23,30 @@ const breakable = register('func_breakable', {
       case 'break': e.engine.breakEntity(e, act); return true;
       case 'sethealth': s.health = num(p); e.engine.healthChanged(e, act); return true;
       case 'addhealth': s.health += num(p); e.engine.healthChanged(e, act); return true;
-      case 'removehealth': e.engine.damage(e, num(p), act); return true;
-      case 'setmass': case 'enablemotion': case 'disablemotion': case 'wake': case 'sleep': return true;
+      case 'removehealth': e.engine.damage(e, num(p), act, { unfiltered: true }); return true; // the map's own: no filter
+      case 'enablemotion': s.frozen = false; s.awake = true; return true;
+      case 'disablemotion': s.frozen = true; return true;
+      case 'wake': s.awake = true; return true;
+      case 'sleep': s.awake = false; return true;
+      case 'setmass': return true;
+      case 'setdamagefilter': e.kv.damagefilter = p; return true;
     }
   },
 });
-register('func_physbox', breakable);
-register('func_physbox_multiplayer', breakable);
+// physboxes also move (classes/physics.js): asleep at spawn, woken by a thruster or Wake / EnableMotion
+// (Source physobj.h: SF_PHYSBOX_ASLEEP 4096, SF_PHYSBOX_MOTIONDISABLED 32768)
+const physbox = {
+  ...breakable,
+  spawn(e) {
+    breakable.spawn(e);
+    const sf = num(e.kv.spawnflags);
+    e.state.awake = !(sf & 4096);
+    e.state.frozen = !!(sf & 32768);
+  },
+  think: physboxThink,
+};
+register('func_physbox', physbox);
+register('func_physbox_multiplayer', physbox);
 register('prop_physics_override', breakable);
 register('prop_dynamic_override', { input: breakable.input, spawn: breakable.spawn });
 

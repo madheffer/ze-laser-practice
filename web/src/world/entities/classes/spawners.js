@@ -31,7 +31,7 @@ register('env_entity_maker', {
     if (inp === 'forcespawnatactivatororigin' && act) {
       const t = tpl();
       if (t) {
-        const m = poseMatrix(act.worldOrigin?.() || act.origin, rotationOf(e.getWorld()));
+        const m = poseMatrix(act.worldOrigin(), rotationOf(e.getWorld()));
         e.engine.spawnTemplate(t, m, act, e);
       }
       return true;

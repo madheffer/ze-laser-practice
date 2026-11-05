@@ -25,22 +25,12 @@ import { FpSource } from './fp/fp.js';
 import { tickCs2Materials } from './fp/util.js';
 import { METRES_PER_INCH as IN } from './fp/three-kit.js';
 import { DEG } from '../world/entities/math.js';
+import { WEAPONS } from '../lib/weapons.js';
 
 const FP_BASE = `${import.meta.env?.BASE_URL ?? '/'}weapons/fp/`;
 
-// CS2 numbers (scripts/weapons.vdata, and CS:GO's knife code where CS2 still behaves the same).
-// AK-47: m_nDamage 36, m_flCycleTime 0.1 (600 RPM), m_bIsFullAuto, m_flRange 8192, m_flDeployDuration 1.0.
-// Knife (CSKnife::SwingOrStab): slash refires 0.4 s after a miss, 40 damage on the first swing and 25 on a
-// follow-up (a swing within 0.4 s of the refire time); stab 65, refires 1.0 s. Range 48 slash, 32 stab.
-const CS = {
-  // clip 30, reserve 90 (kept full: ZE servers run CS2Fixes cs2f_infinite_reserve_ammo 1), reload 2.43 s
-  gun: { chassis: 'rifle_ak', deploy: 1.0, cycle: 0.1, damage: 36, range: 8192, clip: 30, reserve: 90, reload: 2.43 },
-  knife: {
-    chassis: 'knife_default_ct', deploy: 1.0,
-    slash: { cycle: 0.4, cycle2: 0.4, first: 40, follow: 25, range: 48 },
-    stab: { cycle: 1.0, cycle2: 1.0, damage: 65, range: 32 },
-  },
-};
+// CS2's numbers for the AK-47 and the knife: lib/weapons.js (the co-op server checks shots against them too)
+const CS = WEAPONS;
 // The knife graph's attack types (fp.js uses the same two): we never know at fire time whether the swing
 // hit, so the miss swings play.
 const KNIFE_LIGHT = 'attack_knife_lightmiss';

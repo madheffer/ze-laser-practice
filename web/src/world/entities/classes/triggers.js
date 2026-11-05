@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { boxTouchesHull } from '../../collision.js';
 import { register } from '../registry.js';
 import { DEG, num, bool, parseVec, angleForward } from '../math.js';
+import { nameMatches } from '../../../lib/names.js';
 
 const triggerBase = {
   input(e, inp, p, act) {
@@ -98,10 +99,17 @@ export function untouch(engine, e, events = pending(engine)) {
 // ------------------------------------------------------------------ filters
 
 export function passesFilter(engine, e) {
-  const fname = e.kv.filtername;
+  return filterPasses(engine, e.kv.filtername);
+}
+
+// Does the named filter let the player (a human, team 3) through? No filter / an unknown one passes. Used for trigger
+// filternames and for breakables' damagefilter (the shots are always a human's: yours or the simulated team's).
+// Name filters test the player's current targetname, which the map sets (westersand's spawn room names every
+// human "None", deadcore's meteors tag their target): a scenario starting past those sets it with player.name.
+export function filterPasses(engine, fname, depth = 0) {
   if (!fname) return true;
   const f = engine.findOne(fname);
-  if (!f) return true;
+  if (!f || depth > 8) return true; // a filter_multi loop is the map's bug, not a reason to hang
   const neg = bool(f.kv.negated);
   let pass = true;
   if (f.cls === 'filter_activator_team') pass = num(f.kv.filterteam) === engine.playerEnt.team;
@@ -109,9 +117,104 @@ export function passesFilter(engine, e) {
   else if (f.cls === 'filter_activator_context') {
     const want = String(f.kv.responsecontext || '').split(':')[0].toLowerCase();
     pass = !!engine.playerEnt.contexts?.has(want);
-  }
-  else return true; // name filters: a training run treats you as the human those lasers are for
+  } else if (f.cls === 'filter_activator_name') {
+    pass = nameMatches(f.kv.filtername, engine.playerEnt.name);
+  } else if (f.cls === 'filter_multi') {
+    // filtertype 0: all of filter01..05 must pass (AND), 1: any (OR); unset slots don't count
+    const subs = [1, 2, 3, 4, 5].map((i) => f.kv[`filter0${i}`]).filter(Boolean);
+    const results = subs.map((s) => filterPasses(engine, s, depth + 1));
+    pass = num(f.kv.filtertype) === 1 ? results.some(Boolean) : results.every(Boolean);
+  } else return true;
   return neg ? !pass : pass;
+}
+
+// ------------------------------------------------------------------ zombie cages
+
+// Where the map keeps zombies: a teleport destination counts as a zombie cage when the map's own wiring and its naming
+// agree, i.e. a zombie-only trigger_teleport (filter_activator_team 2) aims there, statically or through a runtime
+// "KeyValue target X", AND its name says so (zombie / cage / zm). Both, because zombies are also sent to where the
+// humans are (westersand's TD_Tomb, TD_Ship_Middle: zombie-filtered AND unfiltered teleports, ordinary names).
+// A human the map sends into a cage (mist's tp_hellarea, westersand's Teleport_Vulcano sweeping stragglers) is
+// infected there on a server: the session counts it as a death. Falls split by team (mist's tp_dragonfall_ct /
+// _t, deadcore's des2 that the map keeps moving onto the boss platform) never come here for a human.
+const CAGE_NAME = /zombie|cage|(^|[^a-z])zm([^a-z]|$)/i;
+export function zombieCages(engine) {
+  if (engine._cages) return engine._cages;
+  const all = Object.values(engine.lumps).flat();
+  const key = (n) => String(n || '').replace(/^\[PR#\]/i, '').toLowerCase();
+  const filters = new Map(all.filter((d) => /^filter_/.test(d.kv.classname)).map((d) => [key(d.kv.targetname), d.kv]));
+  const zombieOnly = (fname) => {
+    const f = filters.get(key(fname));
+    return !!f && f.classname === 'filter_activator_team' && num(f.filterteam) === 2 && !bool(f.negated);
+  };
+  const zTriggers = new Set();
+  const targets = new Set();
+  for (const d of all) {
+    if (d.kv.classname !== 'trigger_teleport' || !zombieOnly(d.kv.filtername)) continue;
+    zTriggers.add(key(d.kv.targetname));
+    if (d.kv.target) targets.add(key(d.kv.target));
+  }
+  for (const d of all) for (const c of d.io || []) {
+    const m = /^\s*target\s+(\S+)/i.exec(c.param || '');
+    if (m && /^(keyvalue|addoutput)$/i.test(c.input) && zTriggers.has(key(c.target))) targets.add(key(m[1]));
+  }
+  engine._cages = new Set([...targets].filter((t) => CAGE_NAME.test(t)));
+  return engine._cages;
+}
+
+// game_zone_player: CountPlayersInZone fires OnPlayerInZone / OnPlayerOutZone once per player (you), activator =
+// that player, then PlayersInCount / PlayersOutCount with the counts (ze_deadcore's Insane D tests who is outside)
+register('game_zone_player', {
+  input(e, inp) {
+    if (inp !== 'countplayersinzone') return false;
+    const ph = e.engine.playerHull;
+    const inside = !!ph && (e.hulls() || []).some((hull) => boxTouchesHull(ph.c, ph.h, hull));
+    const P = e.engine.playerEnt;
+    e.fireOutput(inside ? 'OnPlayerInZone' : 'OnPlayerOutZone', P);
+    e.fireOutput('PlayersInCount', P, inside ? 1 : 0);
+    e.fireOutput('PlayersOutCount', P, inside ? 0 : 1);
+    return true;
+  },
+});
+
+// env_explosion.Explode (Source CEnvExplosion): radius = iRadiusOverride or iMagnitude × 2.5, damage falls off
+// linearly to 0 at the radius, only with a clear world line to you; spawnflags 1 = no damage, without 2
+// (repeatable) it is removed after exploding. Blast damage: armor isn't applied, as for the map's other damage
+// (README "What the map does to you").
+register('env_explosion', {
+  input(e, inp) {
+    if (inp !== 'explode') return false;
+    const engine = e.engine;
+    const sf = num(e.kv.spawnflags);
+    const mag = num(e.kv.imagnitude, 100);
+    const radius = num(e.kv.iradiusoverride) > 0 ? num(e.kv.iradiusoverride) : mag * 2.5;
+    const ph = engine.playerHull;
+    if (!(sf & 1) && ph && mag > 0 && radius > 0) {
+      const o = e.worldOrigin();
+      const d = Math.hypot(ph.c[0] - o[0], ph.c[1] - o[1], ph.c[2] - o[2]);
+      const clear = !engine.traceBox || engine.traceBox(o, ph.c, [0, 0, 0]).fraction >= 0.999;
+      const dmg = mag * (1 - d / radius);
+      if (d < radius && clear && dmg > 0) pending(engine).push({ type: 'hurt', ent: e, damage: dmg, first: true });
+    }
+    if (!(sf & 2)) engine.kill(e);
+    return true;
+  },
+});
+
+// filter_*.TestActivator: OnPass / OnFail for the activator (always you: the only player here)
+const filterTest = {
+  input(e, inp, p, act) {
+    if (inp !== 'testactivator') return false;
+    e.fireOutput(filterPasses(e.engine, e.name) ? 'OnPass' : 'OnFail', act);
+    return true;
+  },
+};
+for (const k of ['filter_activator_team', 'filter_activator_class', 'filter_activator_context', 'filter_activator_name', 'filter_multi']) register(k, filterTest);
+
+// trigger_multiple's re-fire interval: its `wait`, and 0 means 0.2 s (Source SDK CTriggerMultiple::Spawn)
+function multipleWait(e) {
+  const w = num(e.kv.wait, 0.2);
+  return w > 0 ? w : w < 0 ? Infinity : 0.2; // negative: fires once per touch
 }
 
 // ------------------------------------------------------------------ per tick
@@ -120,6 +223,7 @@ export function passesFilter(engine, e) {
 export function updateTriggers(engine, player) {
   const c = player.centre();
   const h = player.half();
+  engine.playerHull = { c, h }; // for game_zone_player's CountPlayersInZone (an input, between ticks)
   const events = pending(engine).splice(0);
   for (const cls of TOUCH_CLASSES) {
     const set = engine.byClass.get(cls);
@@ -145,14 +249,22 @@ export function updateTriggers(engine, player) {
         if (cls === 'trigger_multiple' || cls === 'trigger_once') {
           e.fireOutput('OnTrigger', engine.playerEnt);
           if (cls === 'trigger_once') engine.kill(e);
+          else e.state.nextTrigger = engine.time + multipleWait(e);
         }
         if (cls === 'trigger_hurt') e.state.hurtOnce = false; // a new touch counts as a new hit
         if (cls === 'trigger_teleport') {
           const dest = engine.findOne(e.kv.target);
-          if (dest) events.push({ type: 'teleport', origin: dest.worldOrigin(), yaw: new THREE.Euler().setFromQuaternion(new THREE.Quaternion().setFromRotationMatrix(dest.getWorld()), 'ZYX').z / DEG });
+          // CS2 takes the first destination with that name (porter research 07 §2.2); `cage`: a zombie cage, the
+          // session makes that a death for a human
+          if (dest) events.push({ type: 'teleport', origin: dest.worldOrigin(), yaw: new THREE.Euler().setFromQuaternion(new THREE.Quaternion().setFromRotationMatrix(dest.getWorld()), 'ZYX').z / DEG, trigger: e, dest, cage: zombieCages(engine).has(dest.key) });
         }
       } else if (!inside && was) {
         untouch(engine, e, events);
+      } else if (inside && cls === 'trigger_multiple' && engine.time + EPS >= (e.state.nextTrigger ?? 0)) {
+        // Source's CTriggerMultiple touches every frame and re-fires OnTrigger each `wait` while you stay inside
+        // (ze_deadcore's cube thrusters stay on this way, ze_mist_p's dragon keeps turning to its target)
+        e.fireOutput('OnTrigger', engine.playerEnt);
+        e.state.nextTrigger = engine.time + multipleWait(e);
       }
       if (cls === 'trigger_hurt') {
         const s = e.state;

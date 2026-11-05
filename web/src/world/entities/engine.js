@@ -8,7 +8,7 @@ import * as THREE from 'three';
 import { C } from './registry.js';
 import { Entity, stripName } from './entity.js';
 import { ONE, parseVec, angleQuat, mulberry32, poseMatrix } from './math.js';
-import { addOutput, playerInput } from './keyvalues.js';
+import { addOutput, playerInput, splitKeyValues } from './keyvalues.js';
 import { emptyBounds, growBounds } from '../../lib/math.js';
 import * as triggers from './classes/triggers.js';
 import './classes/logic.js';
@@ -16,6 +16,8 @@ import './classes/spawners.js';
 import './classes/movers.js';
 import './classes/brushes.js';
 import './classes/fx.js';
+import './classes/physics.js';
+import './classes/server.js';
 
 // Limits on what a map's data can make the engine do (a map is untrusted). Far above any real map:
 // ze_mist_p peaks at ~2000 live entities in a firestorm wave and ~20 simulated humans.
@@ -56,10 +58,23 @@ export class EntityEngine {
     this.warned = new Set();
     this.moveStamps = new WeakMap();
     this.touching = new Set();
-    this.listeners = { spawn: [], kill: [], hit: [], log: [], sound: [] };
-    this.playerEnt = { name: '!player', key: '!player', cls: 'player', team: 3, alive: true };
+    this.listeners = { spawn: [], kill: [], hit: [], log: [], sound: [], cvar: [] };
+    // The player as an I/O target / activator. worldOrigin() so "at the activator / at !player" spawns work, and
+    // getWorld() + children so SetParent(!activator) makes an entity follow you (westersand's Xzone marker). The
+    // session sets playerMatrix (a THREE.Matrix4, or anything with column-major `elements`); without one, e.g.
+    // headless with no --player, the player is at the map origin.
+    const engine = this;
+    this.playerEnt = {
+      name: '!player', key: '!player', cls: 'player', team: 3, alive: true, parent: null, children: new Set(),
+      getWorld() {
+        const m = engine.playerMatrix?.();
+        return m?.isMatrix4 ? m : new THREE.Matrix4().fromArray(m?.elements || new THREE.Matrix4().elements);
+      },
+      worldOrigin() { const e = this.getWorld().elements; return [e[12], e[13], e[14]]; },
+    };
     this.templateLumps = new Set();
     this.humans = 1;
+    this.traceBox = null; // (start, end, halfExtents) -> trace against the static world; session.js sets it (physics.js)
 
     // Lumps a point_template points at are templates: they only exist when something spawns them.
     const lumpKeys = new Map(Object.keys(this.lumps).map((k) => [k.toLowerCase(), k]));
@@ -169,7 +184,8 @@ export class EntityEngine {
     if (e.parent) e.parent.children.delete(e);
     this.byKey.get(e.key)?.delete(e);
     this.byClass.get(e.cls)?.delete(e);
-    this.cancelPending(e);
+    // no cancelPending here: in Source a removed entity's queued outputs still fire (a trigger_once is removed on
+    // touch and its delayed outputs run after); only the CancelPending input drops them
     this.untouch(e);
     this.emit('kill', e);
   }
@@ -183,10 +199,12 @@ export class EntityEngine {
 
   // A hit for `amount` (one bullet). Breakables die at 0; physboxes only break when told to, because ZE
   // bosses count their segments with OnHealthChanged and get topped back up by the map.
-  damage(e, amount, activator) {
+  damage(e, amount, activator, { unfiltered = false } = {}) {
     if (!e.alive || !C[e.cls] || e.state.health == null) return;
     const s = e.state;
     if (s.max <= 1 && s.health <= 0 && e.cls === 'func_breakable') return; // health 0 = unbreakable
+    // a damage filter that keeps humans out (ze_deadcore's cube cores until the cube wakes up: SetDamageFilter human)
+    if (!unfiltered && !triggers.filterPasses(this, e.kv.damagefilter)) return;
     s.health -= amount;
     e.fireOutput('OnDamaged', activator);
     this.healthChanged(e, activator);
@@ -224,6 +242,8 @@ export class EntityEngine {
     if (low === '!activator') return activator ? [activator] : [];
     if (low === '!player' || low === '!pvsplayer') return [this.playerEnt];
     const key = stripName(p);
+    // the player renamed by the map (AddOutput targetname on !activator: ze_deadcore's meteors tag their target)
+    if (key === this.playerEnt.key) return [this.playerEnt];
     if (key.endsWith('*')) {
       const pre = key.slice(0, -1);
       const out = [];
@@ -266,7 +286,14 @@ export class EntityEngine {
     this.queue = this.queue.filter((q) => q.caller !== e);
   }
 
+  // Run fn after `delay` seconds of engine time, in order with the map's own queued inputs (app/items.js: a pickup
+  // just after the item spawns). Follows fast-forward and pauses, unlike setTimeout.
+  after(delay, fn) {
+    this.queue.push({ t: this.time + delay, o: this.order++, fn });
+  }
+
   dispatch(q) {
+    if (q.fn) { q.fn(); return; }
     const targets = q.target instanceof Entity ? [q.target] : this.find(q.target, q.caller, q.activator);
     if (!targets.length) return;
     for (const t of targets) {
@@ -284,6 +311,9 @@ export class EntityEngine {
     switch (inp) {
       case 'kill': this.kill(e); return;
       case 'killhierarchy': this.kill(e); return;
+      // a prop's Break (westersand's hall pillars); breakables have their own (classes/brushes.js)
+      case 'break': this.breakEntity(e, activator); return;
+      case 'lock': case 'unlock': e.state.locked = inp === 'lock'; return; // buttons: no player use here
       case 'fireuser1': case 'fireuser2': case 'fireuser3': case 'fireuser4':
         e.fireOutput('OnUser' + inp.slice(-1), activator); return;
       case 'enable': e.enabled = true; return;
@@ -293,6 +323,7 @@ export class EntityEngine {
       case 'clearparent': e.setParent(null); return;
       case 'setparentattachment': case 'setparentattachmentmaintainoffset': return;
       case 'addoutput': case 'keyvalue': this.addOutput(e, param); return;
+      case 'keyvalues': for (const kv of splitKeyValues(param)) this.addOutput(e, kv); return;
       case 'setlocalorigin': e.pos.set(...parseVec(param)); this.moved(e); return;
       case 'setlocalangles': angleQuat(parseVec(param), e.quat); this.moved(e); return;
       case 'setabsorigin': {
@@ -358,6 +389,8 @@ export class EntityEngine {
 
   tick(dt) {
     this.time += dt;
+    // entities parented to the player follow it: their cached world matrices / hulls go stale as you move
+    if (this.playerEnt.children.size) this.moved(this.playerEnt);
     // events due this tick, in order; events fired with 0 delay during dispatch also run this tick
     let guard = 0;
     for (;;) {
@@ -368,13 +401,14 @@ export class EntityEngine {
       }
       if (best < 0) break;
       const q = this.queue.splice(best, 1)[0];
-      this.dispatch(q);
+      // a map input the engine trips over is logged once and skipped, never the end of the run
+      try { this.dispatch(q); } catch (err) { this.warnOnce(`err:${String(q.input).toLowerCase()}`, `input ${q.input} on ${q.target?.name || q.target} failed: ${err?.message || err}`); }
       if (++guard > 20000) { this.warnOnce('loop', 'I/O loop: over 20000 events in one tick'); this.queue = []; break; }
     }
     for (const e of this.ents) {
       if (!e.alive) continue;
       const th = C[e.cls]?.think;
-      if (th) th(e, dt);
+      if (th) { try { th(e, dt); } catch (err) { this.warnOnce(`think:${e.cls}`, `${e.cls} think failed: ${err?.message || err}`); } }
     }
     // drop dead entities now and then
     if (this.ents.length > 4000 && this.ents.some((e) => !e.alive)) this.ents = this.ents.filter((e) => e.alive);

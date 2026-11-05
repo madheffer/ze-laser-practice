@@ -19,12 +19,15 @@
   <div id="overlay"></div>
   <!-- co-op / versus: the kill feed (ui/killfeed.js) -->
   <div id="killfeed"></div>
+  <!-- the home page (ui/home.js): over the menu until you pick a way in -->
+  <div id="home" hidden></div>
 
   <!-- The menu doubles as the pause screen (ui/menu.js). Settings controls are bound by id in app/settings.js. -->
   <div id="menu">
     <div class="panel" role="dialog" aria-modal="true" aria-labelledby="menu-title">
       <header class="topbar">
         <div class="brand">
+          <button id="go-home" class="ghost home-btn" type="button" aria-label="Home" title="Home"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 7.5L8 3l5.5 4.5M4 6.5V13h3V9.5h2V13h3V6.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg></button>
           <h1 id="menu-title">ZE LASER PRACTICE</h1>
           <span class="tag">v0.2</span>
         </div>
@@ -32,9 +35,10 @@
           <button role="tab" id="tab-play" aria-controls="panel-play" aria-selected="true">Play</button>
           <button role="tab" id="tab-settings" aria-controls="panel-settings" aria-selected="false" tabindex="-1">Settings</button>
         </div>
-        <label class="map-pick"><span>Map</span>
-          <select id="map"></select>
-        </label>
+        <div class="map-pick">
+          <button id="maps-back" class="ghost back" type="button" hidden aria-label="Back to the map list">Maps</button>
+          <span id="map-name" class="map-name"></span>
+        </div>
         <div class="actions">
           <button id="restart" class="ghost" hidden>Restart <kbd class="kb">Backspace</kbd></button>
           <button id="resume" class="primary" hidden>Resume <kbd class="kb">Esc</kbd></button>
@@ -43,9 +47,14 @@
 
       <div class="tab-panels">
         <section id="panel-play" role="tabpanel" aria-labelledby="tab-play">
-          <!-- co-op rooms (ui/lobby.js) -->
+          <!-- co-op rooms (ui/lobby.js), over both views -->
           <div id="lobby"></div>
+          <!-- two views (ui/maps.js, ui/menu.js): the map list first, then the picked map's parts and stages -->
+          <div id="maps" class="map-grid" aria-label="Maps"></div>
+          <div id="stages" hidden>
+            <header id="map-head" class="map-head"></header>
           <div id="scenarios"></div>
+          </div>
         </section>
 
         <section id="panel-settings" role="tabpanel" aria-labelledby="tab-settings" hidden>
@@ -63,7 +72,7 @@
                 <span class="pair"><input id="ping" type="range" min="0" max="500" step="1"><span class="num"><input id="ping-num" type="number" min="0" max="500" step="1" inputmode="numeric">ms</span></span>
               </label>
               <label class="chk"><input id="bhop" type="checkbox"><span>Auto bunnyhop</span></label>
-              <label class="chk"><input id="falldmg" type="checkbox"><span>Fall damage</span></label>
+              <label class="chk"><input id="falldmg" type="checkbox"><span>Fall damage everywhere <small>Off = only where the map turns it on (sv_falldamage_scale), as on GFL</small></span></label>
               <label class="chk"><input id="god" type="checkbox"><span>God mode <kbd class="kb">G</kbd></span></label>
               <label class="chk"><input id="hitboxes" type="checkbox"><span>Show laser hitboxes <kbd class="kb">H</kbd></span></label>
             </fieldset>
@@ -105,6 +114,7 @@
                 <dt>Mouse 1 / 2</dt><dd>Shoot, slash / stab</dd>
                 <dt>1 / 3 / Q</dt><dd>AK-47 / knife / last weapon</dd>
                 <dt>R / F</dt><dd>Reload / inspect</dd>
+                <dt>E</dt><dd>Use your map item (the heal, when you hold it)</dd>
                 <dt>Backspace</dt><dd>Restart</dd>
                 <dt>T / H / G</dt><dd>Slow-mo / hitboxes / god</dd>
                 <dt>Esc</dt><dd>Menu</dd>

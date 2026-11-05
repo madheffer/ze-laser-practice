@@ -1,0 +1,1584 @@
+{
+  "map": "ze_deadcore",
+  "title": "ze_deadcore",
+  "description": "A climb through four stages (A, B, C, D / Insane D) to the radiation core: block trains, cube mini bosses, dodge corridors, rising escapes, then the core's altar lasers, presses, beams, link lasers, balls and meteors.",
+  "scenarios": [
+    {
+      "id": "a_full",
+      "group": "Stage A",
+      "full": true,
+      "name": "Stage A (full)",
+      "description": "From the a_t1 teleport (des1) through the four holds (40/30/30/30 s) with three mini-boss cubes, the train boss and the lift. Win when a human reaches a_win_detecttrigger (a_nuke.Enable).",
+      "spawn": {
+        "origin": [
+          -605,
+          -5997,
+          65
+        ],
+        "yaw": 0
+      },
+      "start": [
+        {
+          "target": "[PR#]stage_a_relay",
+          "input": "Trigger"
+        },
+        {
+          "target": "[PR#]s_prelay1",
+          "input": "Trigger",
+          "delay": 2.9
+        }
+      ],
+      "fastForward": 37.5,
+      "win": {
+        "target": "[PR#]a_nuke",
+        "input": "Enable"
+      }
+    },
+    {
+      "id": "a_boss",
+      "group": "Stage A",
+      "name": "Stage A boss: block train",
+      "description": "a_boss_relay1: you ride a_boss_p1_train 14000 u west at 200 u/s (starts at +4 s, 70 s). Every 4.8 s a_boss_case1/2 slide one 570-unit block in from each side (a_boss_b1-6, 999999 damage) and pull the previous one back. Blocks are removed at +70 s.",
+      "spawn": {
+        "on": "[PR#]a_boss_p1",
+        "offset": [
+          0,
+          0,
+          -246
+        ],
+        "yaw": 180
+      },
+      "start": [
+        {
+          "target": "[PR#]stage_a_relay",
+          "input": "Trigger"
+        },
+        {
+          "target": "[PR#]a_boss_relay1",
+          "input": "Trigger",
+          "delay": 0.1
+        }
+      ],
+      "winAfter": 75,
+      "setup": [
+        {
+          "target": "[PR#]des2",
+          "input": "ClearParent"
+        },
+        {
+          "target": "[PR#]des2",
+          "input": "SetParent",
+          "param": "[PR#]a_boss_p1"
+        },
+        {
+          "target": "[PR#]des2",
+          "input": "KeyValue",
+          "param": "origin 14463 1836 4624"
+        }
+      ]
+    },
+    {
+      "id": "b_full",
+      "group": "Stage B",
+      "full": true,
+      "name": "Stage B (full)",
+      "description": "From the b_t1 teleport through the holds, the cube boss (20 enemy4 kills or 112 s) and the pole escape. Win when a human reaches b_win_detecttrigger (b_nuke.Enable).",
+      "spawn": {
+        "origin": [
+          11247,
+          -9519,
+          -247
+        ],
+        "yaw": 180
+      },
+      "start": [
+        {
+          "target": "[PR#]stage_b_relay",
+          "input": "Trigger"
+        },
+        {
+          "target": "[PR#]s_prelay1",
+          "input": "Trigger",
+          "delay": 2.9
+        }
+      ],
+      "fastForward": 37.5,
+      "win": {
+        "target": "[PR#]b_nuke",
+        "input": "Enable"
+      }
+    },
+    {
+      "id": "b_boss",
+      "group": "Stage B",
+      "name": "Stage B boss: enemy4 cubes",
+      "description": "b_boss_relay1: three enemy4 cubes spawn at +5/6/7 s on the 2x6 grid (enemy4_maker1-12); each kill (1500 HP, no per-human scaling) spawns another and takes 1 off b_boss_counter1 (20). Cubes chase scanned humans and every 7 s stop and fire one of three floor patterns (2 s warning, 4 s of 40-damage hurt). The counter is forced to 0 at +112 s.",
+      "spawn": {
+        "origin": [
+          -9707,
+          -372,
+          1218
+        ],
+        "yaw": 90
+      },
+      "start": [
+        {
+          "target": "[PR#]stage_b_relay",
+          "input": "Trigger"
+        },
+        {
+          "target": "[PR#]b_boss_relay1",
+          "input": "Trigger",
+          "delay": 0.1
+        }
+      ],
+      "bosses": [
+        {
+          "target": "[PR#]enemy4_core1*",
+          "name": "Cubes left",
+          "counter": "[PR#]b_boss_counter1",
+          "counterMode": "hits"
+        }
+      ],
+      "win": {
+        "target": "[PR#]b_escape_train",
+        "input": "Open"
+      },
+      "setup": [
+        {
+          "target": "[PR#]des2",
+          "input": "ClearParent"
+        },
+        {
+          "target": "[PR#]des2",
+          "input": "KeyValue",
+          "param": "origin -7393 -1270 3661"
+        }
+      ]
+    },
+    {
+      "id": "b_escape",
+      "group": "Stage B",
+      "name": "Stage B escape: lift and poles",
+      "description": "b_boss_counter1 OnHitMin: the lift (b_escape_train) rises at +12 s, holds, b_escape_speedup sets speed 2 at +77 s while b_escape_pole_timer1 spawns pole waves every 1.35 s until +110 s; b_escape_push1 throws you up at +115.5 s. b_nuke at +130 s.",
+      "spawn": {
+        "on": "[PR#]b_escape_train",
+        "offset": [
+          0,
+          0,
+          16
+        ],
+        "yaw": 0
+      },
+      "start": [
+        {
+          "target": "[PR#]stage_b_relay",
+          "input": "Trigger"
+        },
+        {
+          "target": "[PR#]b_boss_counter1",
+          "input": "Subtract",
+          "param": "999",
+          "delay": 0.1
+        }
+      ],
+      "win": {
+        "target": "[PR#]b_nuke",
+        "input": "Enable"
+      },
+      "setup": [
+        {
+          "target": "[PR#]des2",
+          "input": "ClearParent"
+        },
+        {
+          "target": "[PR#]des2",
+          "input": "KeyValue",
+          "param": "origin -10012 -1268 1220"
+        }
+      ]
+    },
+    {
+      "id": "c_full",
+      "group": "Stage C",
+      "full": true,
+      "name": "Stage C (full)",
+      "description": "From the c_t1 teleport: holds, 11 crystals (500 HP each) to break, the dodge corridor and the falling-block escape. Win at c_win_detecttrigger (c_nuke.Enable).",
+      "spawn": {
+        "origin": [
+          10761,
+          -4741,
+          -2184
+        ],
+        "yaw": 90
+      },
+      "start": [
+        {
+          "target": "[PR#]stage_c_relay",
+          "input": "Trigger"
+        },
+        {
+          "target": "[PR#]s_prelay1",
+          "input": "Trigger",
+          "delay": 2.9
+        }
+      ],
+      "fastForward": 37.5,
+      "win": {
+        "target": "[PR#]c_nuke",
+        "input": "Enable"
+      }
+    },
+    {
+      "id": "c_dodge",
+      "group": "Stage C",
+      "name": "Stage C boss: dodge corridor",
+      "description": "c_escape_relay1 +60 s puts you at des1. From +65 s c_dodge_spawntimer1 (1 s) spawns one block from each of two rows (4 + 5 makers at y -12278); each rises then sweeps +y 9756 u at 1200 u/s with a 400-damage hurt. Reach c_dodge_trigger at y -11255 to stop the spawns.",
+      "spawn": {
+        "origin": [
+          13649,
+          -1852,
+          1682
+        ],
+        "yaw": 270
+      },
+      "start": [
+        {
+          "target": "[PR#]stage_c_relay",
+          "input": "Trigger"
+        },
+        {
+          "target": "[PR#]c_escape_relay1",
+          "input": "Trigger",
+          "delay": 0.1
+        }
+      ],
+      "fastForward": 60,
+      "win": {
+        "target": "[PR#]c_dodge_spawntimer1",
+        "input": "Disable"
+      },
+      "setup": [
+        {
+          "target": "[PR#]des2",
+          "input": "ClearParent"
+        },
+        {
+          "target": "[PR#]des2",
+          "input": "KeyValue",
+          "param": "origin 13649 -1852 1723"
+        }
+      ]
+    },
+    {
+      "id": "c_escape",
+      "group": "Stage C",
+      "name": "Stage C escape: rising platforms and blocks",
+      "description": "c_escape_relay1 +148 s: c_escape_timer1 spawns rising platforms every 1.29 s and from +152 s c_escape_block_timer1 fires one of 24 block makers every 0.2 s (0.1 s from +186 s): 128-unit blocks, 999999 damage, moving 6700 u at 2000 u/s. Spawns stop at +201/202 s.",
+      "spawn": {
+        "origin": [
+          -8528,
+          -12976,
+          4936
+        ],
+        "yaw": 0
+      },
+      "start": [
+        {
+          "target": "[PR#]stage_c_relay",
+          "input": "Trigger"
+        },
+        {
+          "target": "[PR#]c_escape_relay1",
+          "input": "Trigger",
+          "delay": 0.1
+        }
+      ],
+      "fastForward": 148,
+      "win": {
+        "target": "[PR#]c_nuke",
+        "input": "Enable"
+      }
+    },
+    {
+      "id": "d_way",
+      "group": "Stage D / Insane D",
+      "full": true,
+      "name": "Stage D: the way to the core",
+      "description": "d_p1 lowers you 9000 u; d_relay1 then runs 210 s of holds and lifts (d_p2-d_p4, d_t2/d_t3 teleports) with four mini-boss cubes, d_meteor_detecttrigger meteors on every human and the 50-damage radiation floor (d_trigger). Ends when radiation_startrelay1 fires.",
+      "spawn": {
+        "at": "[PR#]des1",
+        "yaw": 0
+      },
+      "start": [
+        {
+          "target": "[PR#]stage_d_relay",
+          "input": "Trigger"
+        },
+        {
+          "target": "[PR#]s_prelay1",
+          "input": "Trigger",
+          "delay": 2.9
+        }
+      ],
+      "fastForward": 37.5,
+      "win": {
+        "target": "[PR#]radiation_startrelay1",
+        "input": "Trigger"
+      }
+    },
+    {
+      "id": "dex_way",
+      "group": "Stage D / Insane D",
+      "full": true,
+      "name": "Insane D: the way to the core",
+      "description": "stage_d_ex_relay: as Stage D, but 12 s after d_ex_relay d_ex_hp_trigger.CountPlayersInZone drains every human outside the zone to 1 HP over 18 s (d_ex_hp_filter: 90, 80 ... 1; game_zone_player is not implemented yet), the cubes are four enemy2 with 6500 HP and the core runs radiation_attackrelay4 (insane attacks + huge meteor).",
+      "spawn": {
+        "at": "[PR#]des1",
+        "yaw": 0
+      },
+      "start": [
+        {
+          "target": "[PR#]stage_d_ex_relay",
+          "input": "Trigger"
+        },
+        {
+          "target": "[PR#]s_prelay1",
+          "input": "Trigger",
+          "delay": 2.9
+        }
+      ],
+      "fastForward": 37.5,
+      "win": {
+        "target": "[PR#]radiation_ex_startrelay1",
+        "input": "Trigger"
+      }
+    },
+    {
+      "id": "core",
+      "group": "Core",
+      "full": true,
+      "name": "Radiation core (normal)",
+      "description": "10 segments of 300 + 41 x humans hits (radiation_target OnHealthChanged -> radiation_hpcounter.Subtract 1; radiation_hptrigger adds 41 per human each segment). Attacks every 8-17 s: phase 1 (attackcase1), phase 2 after 3 segments, phase 3 after 6. Damageable from +25 s; at +164 s the timeover hurt (20) is enabled.",
+      "spawn": {
+        "origin": [
+          0,
+          -2096,
+          8102
+        ],
+        "yaw": 90
+      },
+      "start": [
+        {
+          "target": "[PR#]radiation_startrelay1",
+          "input": "Trigger"
+        }
+      ],
+      "bosses": [
+        {
+          "target": "[PR#]radiation_target",
+          "name": "Radiation core",
+          "counter": "[PR#]radiation_hpcounter",
+          "counterMode": "hits"
+        }
+      ],
+      "win": {
+        "target": "[PR#]escape_common_relay",
+        "input": "Trigger"
+      },
+      "featured": true,
+      "setup": [
+        {
+          "target": "[PR#]des2",
+          "input": "ClearParent"
+        },
+        {
+          "target": "[PR#]des2",
+          "input": "KeyValue",
+          "param": "origin 0 -960 9962"
+        }
+      ]
+    },
+    {
+      "id": "core_insane",
+      "group": "Core",
+      "name": "Radiation core (Insane D)",
+      "description": "radiation_ex_startrelay1: 10 segments of 300 + 56 x humans hits (stage_d_ex_relay adds +15 per human), attacks from radiation_attackcase4 (laser2, press4, beam2, link4, ball_4, meteor4, huge meteor) every 4-15 s.",
+      "spawn": {
+        "origin": [
+          0,
+          -2096,
+          8102
+        ],
+        "yaw": 90
+      },
+      "start": [
+        {
+          "target": "[PR#]stage_d_ex_relay",
+          "input": "Trigger"
+        },
+        {
+          "target": "[PR#]radiation_ex_startrelay1",
+          "input": "Trigger",
+          "delay": 1.1
+        }
+      ],
+      "bosses": [
+        {
+          "target": "[PR#]radiation_target",
+          "name": "Radiation core",
+          "counter": "[PR#]radiation_hpcounter",
+          "counterMode": "hits"
+        }
+      ],
+      "win": {
+        "target": "[PR#]escape_common_relay",
+        "input": "Trigger"
+      },
+      "setup": [
+        {
+          "target": "[PR#]des2",
+          "input": "ClearParent"
+        },
+        {
+          "target": "[PR#]des2",
+          "input": "KeyValue",
+          "param": "origin 0 -960 9962"
+        }
+      ]
+    },
+    {
+      "id": "core_laser1",
+      "group": "Core",
+      "parent": "core",
+      "name": "Core: altar lasers (1 wave)",
+      "description": "8 altars (radiation_laser_temp1-8) rise and sweep a 2620-wide, 200-tall laser (300 damage, 150 per touch) while the ring turns; speed ramps 1 -> 0 over 6 s.",
+      "spawn": {
+        "origin": [
+          0,
+          -2096,
+          8102
+        ],
+        "yaw": 90
+      },
+      "start": [
+        {
+          "target": "[PR#]radiation_attackrelay1",
+          "input": "Disable"
+        },
+        {
+          "target": "[PR#]radiation_laser1_relay",
+          "input": "Trigger",
+          "delay": 0.1
+        }
+      ],
+      "winAfter": 10,
+      "setup": [
+        {
+          "target": "[PR#]des2",
+          "input": "ClearParent"
+        },
+        {
+          "target": "[PR#]des2",
+          "input": "KeyValue",
+          "param": "origin 0 -960 9962"
+        }
+      ]
+    },
+    {
+      "id": "core_laser2",
+      "group": "Core",
+      "parent": "core",
+      "name": "Core: altar lasers (2 waves)",
+      "description": "As laser1 twice: second wave 2 s later in the other direction (radiation_laser_rotaterev).",
+      "spawn": {
+        "origin": [
+          0,
+          -2096,
+          8102
+        ],
+        "yaw": 90
+      },
+      "start": [
+        {
+          "target": "[PR#]radiation_attackrelay1",
+          "input": "Disable"
+        },
+        {
+          "target": "[PR#]radiation_laser2_relay",
+          "input": "Trigger",
+          "delay": 0.1
+        }
+      ],
+      "winAfter": 8,
+      "setup": [
+        {
+          "target": "[PR#]des2",
+          "input": "ClearParent"
+        },
+        {
+          "target": "[PR#]des2",
+          "input": "KeyValue",
+          "param": "origin 0 -960 9962"
+        }
+      ]
+    },
+    {
+      "id": "core_press1",
+      "group": "Core",
+      "parent": "core",
+      "name": "Core: press (1 layer)",
+      "description": "radiation_press1_core1 rises at 2000 u/s from +0.35 s; 1 of the 5 press patterns (radiation_press1_case1) spawn on it, their 999999-damage hurts are live from +6.95 s; it returns at 1200 u/s at +7 s.",
+      "spawn": {
+        "origin": [
+          0,
+          -2096,
+          8102
+        ],
+        "yaw": 90
+      },
+      "start": [
+        {
+          "target": "[PR#]radiation_attackrelay1",
+          "input": "Disable"
+        },
+        {
+          "target": "[PR#]radiation_press1_relay",
+          "input": "Trigger",
+          "delay": 0.1
+        }
+      ],
+      "winAfter": 11.5,
+      "setup": [
+        {
+          "target": "[PR#]des2",
+          "input": "ClearParent"
+        },
+        {
+          "target": "[PR#]des2",
+          "input": "KeyValue",
+          "param": "origin 0 -960 9962"
+        }
+      ]
+    },
+    {
+      "id": "core_press2",
+      "group": "Core",
+      "parent": "core",
+      "name": "Core: press (2 layers)",
+      "description": "radiation_press1_core1 rises at 2000 u/s from +0.35 s; 2 of the 5 press patterns (radiation_press1_case1) spawn on it, their 999999-damage hurts are live from +6.95 s; it returns at 1200 u/s at +7 s.",
+      "spawn": {
+        "origin": [
+          0,
+          -2096,
+          8102
+        ],
+        "yaw": 90
+      },
+      "start": [
+        {
+          "target": "[PR#]radiation_attackrelay1",
+          "input": "Disable"
+        },
+        {
+          "target": "[PR#]radiation_press2_relay",
+          "input": "Trigger",
+          "delay": 0.1
+        }
+      ],
+      "winAfter": 11.5,
+      "setup": [
+        {
+          "target": "[PR#]des2",
+          "input": "ClearParent"
+        },
+        {
+          "target": "[PR#]des2",
+          "input": "KeyValue",
+          "param": "origin 0 -960 9962"
+        }
+      ]
+    },
+    {
+      "id": "core_press3",
+      "group": "Core",
+      "parent": "core",
+      "name": "Core: press (3 layers)",
+      "description": "radiation_press1_core1 rises at 2000 u/s from +0.35 s; 3 of the 5 press patterns (radiation_press1_case1) spawn on it, their 999999-damage hurts are live from +6.95 s; it returns at 1200 u/s at +7 s.",
+      "spawn": {
+        "origin": [
+          0,
+          -2096,
+          8102
+        ],
+        "yaw": 90
+      },
+      "start": [
+        {
+          "target": "[PR#]radiation_attackrelay1",
+          "input": "Disable"
+        },
+        {
+          "target": "[PR#]radiation_press3_relay",
+          "input": "Trigger",
+          "delay": 0.1
+        }
+      ],
+      "winAfter": 11.5,
+      "setup": [
+        {
+          "target": "[PR#]des2",
+          "input": "ClearParent"
+        },
+        {
+          "target": "[PR#]des2",
+          "input": "KeyValue",
+          "param": "origin 0 -960 9962"
+        }
+      ]
+    },
+    {
+      "id": "core_press4",
+      "group": "Core",
+      "parent": "core",
+      "name": "Core: press (4 layers)",
+      "description": "radiation_press1_core1 rises at 2000 u/s from +0.35 s; 4 of the 5 press patterns (radiation_press1_case1) spawn on it, their 999999-damage hurts are live from +6.95 s; it returns at 1200 u/s at +8 s.",
+      "spawn": {
+        "origin": [
+          0,
+          -2096,
+          8102
+        ],
+        "yaw": 90
+      },
+      "start": [
+        {
+          "target": "[PR#]radiation_attackrelay1",
+          "input": "Disable"
+        },
+        {
+          "target": "[PR#]radiation_press4_relay",
+          "input": "Trigger",
+          "delay": 0.1
+        }
+      ],
+      "winAfter": 12.5,
+      "setup": [
+        {
+          "target": "[PR#]des2",
+          "input": "ClearParent"
+        },
+        {
+          "target": "[PR#]des2",
+          "input": "KeyValue",
+          "param": "origin 0 -960 9962"
+        }
+      ]
+    },
+    {
+      "id": "core_beam1",
+      "group": "Core",
+      "parent": "core",
+      "name": "Core: beams (slow)",
+      "description": "radiation_beam_timer1 spawns a beam every 0.2 s for 10 s from the spinning radiation_beam_rotate1 (440 deg/s); each beam opens left/right and travels for 2.7 s, 20 damage (10 per touch).",
+      "spawn": {
+        "origin": [
+          0,
+          -2096,
+          8102
+        ],
+        "yaw": 90
+      },
+      "start": [
+        {
+          "target": "[PR#]radiation_attackrelay1",
+          "input": "Disable"
+        },
+        {
+          "target": "[PR#]radiation_beam1_relay",
+          "input": "Trigger",
+          "delay": 0.1
+        }
+      ],
+      "winAfter": 10,
+      "setup": [
+        {
+          "target": "[PR#]des2",
+          "input": "ClearParent"
+        },
+        {
+          "target": "[PR#]des2",
+          "input": "KeyValue",
+          "param": "origin 0 -960 9962"
+        }
+      ]
+    },
+    {
+      "id": "core_beam2",
+      "group": "Core",
+      "parent": "core",
+      "name": "Core: beams (fast)",
+      "description": "As beam1 with radiation_beam_timer2: a beam every 0.1 s.",
+      "spawn": {
+        "origin": [
+          0,
+          -2096,
+          8102
+        ],
+        "yaw": 90
+      },
+      "start": [
+        {
+          "target": "[PR#]radiation_attackrelay1",
+          "input": "Disable"
+        },
+        {
+          "target": "[PR#]radiation_beam2_relay",
+          "input": "Trigger",
+          "delay": 0.1
+        }
+      ],
+      "winAfter": 10,
+      "setup": [
+        {
+          "target": "[PR#]des2",
+          "input": "ClearParent"
+        },
+        {
+          "target": "[PR#]des2",
+          "input": "KeyValue",
+          "param": "origin 0 -960 9962"
+        }
+      ]
+    },
+    {
+      "id": "core_link1",
+      "group": "Core",
+      "parent": "core",
+      "name": "Core: link lasers 1",
+      "description": "radiation_link_basemove1 rises 1700 u; from +4 s two 2243-long link lasers (z +-152 around the link, 20 damage) spin (link rotate speed 0.33, base ramps to 1) until +14 s.",
+      "spawn": {
+        "origin": [
+          0,
+          -2096,
+          8102
+        ],
+        "yaw": 90
+      },
+      "start": [
+        {
+          "target": "[PR#]radiation_attackrelay1",
+          "input": "Disable"
+        },
+        {
+          "target": "[PR#]radiation_link_relay1",
+          "input": "Trigger",
+          "delay": 0.1
+        }
+      ],
+      "winAfter": 14,
+      "setup": [
+        {
+          "target": "[PR#]des2",
+          "input": "ClearParent"
+        },
+        {
+          "target": "[PR#]des2",
+          "input": "KeyValue",
+          "param": "origin 0 -960 9962"
+        }
+      ]
+    },
+    {
+      "id": "core_link2",
+      "group": "Core",
+      "parent": "core",
+      "name": "Core: link lasers 2",
+      "description": "radiation_link_basemove1 rises 1700 u; from +4 s two 2243-long link lasers (z +-152 around the link, 20 damage) spin (link rotate speed 0.66, base ramps to 1) until +14 s.",
+      "spawn": {
+        "origin": [
+          0,
+          -2096,
+          8102
+        ],
+        "yaw": 90
+      },
+      "start": [
+        {
+          "target": "[PR#]radiation_attackrelay1",
+          "input": "Disable"
+        },
+        {
+          "target": "[PR#]radiation_link_relay2",
+          "input": "Trigger",
+          "delay": 0.1
+        }
+      ],
+      "winAfter": 14,
+      "setup": [
+        {
+          "target": "[PR#]des2",
+          "input": "ClearParent"
+        },
+        {
+          "target": "[PR#]des2",
+          "input": "KeyValue",
+          "param": "origin 0 -960 9962"
+        }
+      ]
+    },
+    {
+      "id": "core_link3",
+      "group": "Core",
+      "parent": "core",
+      "name": "Core: link lasers 3",
+      "description": "radiation_link_basemove1 rises 1700 u; from +4 s two 2243-long link lasers (z +-152 around the link, 20 damage) spin (link rotate speed 0.66, base ramps to 1) until +14 s.",
+      "spawn": {
+        "origin": [
+          0,
+          -2096,
+          8102
+        ],
+        "yaw": 90
+      },
+      "start": [
+        {
+          "target": "[PR#]radiation_attackrelay1",
+          "input": "Disable"
+        },
+        {
+          "target": "[PR#]radiation_link_relay3",
+          "input": "Trigger",
+          "delay": 0.1
+        }
+      ],
+      "winAfter": 12,
+      "setup": [
+        {
+          "target": "[PR#]des2",
+          "input": "ClearParent"
+        },
+        {
+          "target": "[PR#]des2",
+          "input": "KeyValue",
+          "param": "origin 0 -960 9962"
+        }
+      ]
+    },
+    {
+      "id": "core_link4",
+      "group": "Core",
+      "parent": "core",
+      "name": "Core: link lasers 4",
+      "description": "radiation_link_basemove1 rises 1700 u; from +4 s two 2243-long link lasers (z +-152 around the link, 20 damage) spin (link rotate speed 1, base ramps to 1) until +14 s.",
+      "spawn": {
+        "origin": [
+          0,
+          -2096,
+          8102
+        ],
+        "yaw": 90
+      },
+      "start": [
+        {
+          "target": "[PR#]radiation_attackrelay1",
+          "input": "Disable"
+        },
+        {
+          "target": "[PR#]radiation_link_relay4",
+          "input": "Trigger",
+          "delay": 0.1
+        }
+      ],
+      "winAfter": 12,
+      "setup": [
+        {
+          "target": "[PR#]des2",
+          "input": "ClearParent"
+        },
+        {
+          "target": "[PR#]des2",
+          "input": "KeyValue",
+          "param": "origin 0 -960 9962"
+        }
+      ]
+    },
+    {
+      "id": "core_ball1",
+      "group": "Core",
+      "parent": "core",
+      "name": "Core: balls (1 wave)",
+      "description": "All 16 radiation_ball_maker spawn a ball 1 time (1 s apart); each ball (100x100x140, 20 damage) flies out (func_door) and is closed back at +12 s.",
+      "spawn": {
+        "origin": [
+          0,
+          -2096,
+          8102
+        ],
+        "yaw": 90
+      },
+      "start": [
+        {
+          "target": "[PR#]radiation_attackrelay1",
+          "input": "Disable"
+        },
+        {
+          "target": "[PR#]radiation_ball_relay_1",
+          "input": "Trigger",
+          "delay": 0.1
+        }
+      ],
+      "winAfter": 10,
+      "setup": [
+        {
+          "target": "[PR#]des2",
+          "input": "ClearParent"
+        },
+        {
+          "target": "[PR#]des2",
+          "input": "KeyValue",
+          "param": "origin 0 -960 9962"
+        }
+      ]
+    },
+    {
+      "id": "core_ball2",
+      "group": "Core",
+      "parent": "core",
+      "name": "Core: balls (2 waves)",
+      "description": "All 16 radiation_ball_maker spawn a ball 2 times (1 s apart); each ball (100x100x140, 20 damage) flies out (func_door) and is closed back at +12 s.",
+      "spawn": {
+        "origin": [
+          0,
+          -2096,
+          8102
+        ],
+        "yaw": 90
+      },
+      "start": [
+        {
+          "target": "[PR#]radiation_attackrelay1",
+          "input": "Disable"
+        },
+        {
+          "target": "[PR#]radiation_ball_relay_2",
+          "input": "Trigger",
+          "delay": 0.1
+        }
+      ],
+      "winAfter": 9,
+      "setup": [
+        {
+          "target": "[PR#]des2",
+          "input": "ClearParent"
+        },
+        {
+          "target": "[PR#]des2",
+          "input": "KeyValue",
+          "param": "origin 0 -960 9962"
+        }
+      ]
+    },
+    {
+      "id": "core_ball3",
+      "group": "Core",
+      "parent": "core",
+      "name": "Core: balls (3 waves)",
+      "description": "All 16 radiation_ball_maker spawn a ball 3 times (1 s apart); each ball (100x100x140, 20 damage) flies out (func_door) and is closed back at +12 s.",
+      "spawn": {
+        "origin": [
+          0,
+          -2096,
+          8102
+        ],
+        "yaw": 90
+      },
+      "start": [
+        {
+          "target": "[PR#]radiation_attackrelay1",
+          "input": "Disable"
+        },
+        {
+          "target": "[PR#]radiation_ball_relay_3",
+          "input": "Trigger",
+          "delay": 0.1
+        }
+      ],
+      "winAfter": 8,
+      "setup": [
+        {
+          "target": "[PR#]des2",
+          "input": "ClearParent"
+        },
+        {
+          "target": "[PR#]des2",
+          "input": "KeyValue",
+          "param": "origin 0 -960 9962"
+        }
+      ]
+    },
+    {
+      "id": "core_ball4",
+      "group": "Core",
+      "parent": "core",
+      "name": "Core: balls (5 waves)",
+      "description": "All 16 radiation_ball_maker spawn a ball 5 times (1 s apart); each ball (100x100x140, 20 damage) flies out (func_door) and is closed back at +12 s.",
+      "spawn": {
+        "origin": [
+          0,
+          -2096,
+          8102
+        ],
+        "yaw": 90
+      },
+      "start": [
+        {
+          "target": "[PR#]radiation_attackrelay1",
+          "input": "Disable"
+        },
+        {
+          "target": "[PR#]radiation_ball_relay_4",
+          "input": "Trigger",
+          "delay": 0.1
+        }
+      ],
+      "winAfter": 8,
+      "setup": [
+        {
+          "target": "[PR#]des2",
+          "input": "ClearParent"
+        },
+        {
+          "target": "[PR#]des2",
+          "input": "KeyValue",
+          "param": "origin 0 -960 9962"
+        }
+      ]
+    },
+    {
+      "id": "core_meteor1",
+      "group": "Core",
+      "parent": "core",
+      "name": "Core: meteors on you (every 3.5 s)",
+      "description": "radiation_meteor_timer (3.5 s) pulses radiation_meteor_detecttrigger, which drops a meteor at each human (ForceSpawnAtEntityOrigin !activator): 3.8 s warning, then a 220x220x180 hurt for 0.1 s (100 damage, 50 per touch). Keep moving.",
+      "spawn": {
+        "origin": [
+          0,
+          -2096,
+          8102
+        ],
+        "yaw": 90
+      },
+      "start": [
+        {
+          "target": "[PR#]radiation_attackrelay1",
+          "input": "Disable"
+        },
+        {
+          "target": "[PR#]radiation_meteor_relay1",
+          "input": "Trigger",
+          "delay": 0.1
+        }
+      ],
+      "winAfter": 7.9,
+      "setup": [
+        {
+          "target": "[PR#]des2",
+          "input": "ClearParent"
+        },
+        {
+          "target": "[PR#]des2",
+          "input": "KeyValue",
+          "param": "origin 0 -960 9962"
+        }
+      ]
+    },
+    {
+      "id": "core_meteor2",
+      "group": "Core",
+      "parent": "core",
+      "name": "Core: meteors on you (every 3 s)",
+      "description": "radiation_meteor_timer (3 s) pulses radiation_meteor_detecttrigger, which drops a meteor at each human (ForceSpawnAtEntityOrigin !activator): 3.8 s warning, then a 220x220x180 hurt for 0.1 s (100 damage, 50 per touch). Keep moving.",
+      "spawn": {
+        "origin": [
+          0,
+          -2096,
+          8102
+        ],
+        "yaw": 90
+      },
+      "start": [
+        {
+          "target": "[PR#]radiation_attackrelay1",
+          "input": "Disable"
+        },
+        {
+          "target": "[PR#]radiation_meteor_relay2",
+          "input": "Trigger",
+          "delay": 0.1
+        }
+      ],
+      "winAfter": 7.9,
+      "setup": [
+        {
+          "target": "[PR#]des2",
+          "input": "ClearParent"
+        },
+        {
+          "target": "[PR#]des2",
+          "input": "KeyValue",
+          "param": "origin 0 -960 9962"
+        }
+      ]
+    },
+    {
+      "id": "core_meteor3",
+      "group": "Core",
+      "parent": "core",
+      "name": "Core: meteors on you (every 2.5 s)",
+      "description": "radiation_meteor_timer (2.5 s) pulses radiation_meteor_detecttrigger, which drops a meteor at each human (ForceSpawnAtEntityOrigin !activator): 3.8 s warning, then a 220x220x180 hurt for 0.1 s (100 damage, 50 per touch). Keep moving.",
+      "spawn": {
+        "origin": [
+          0,
+          -2096,
+          8102
+        ],
+        "yaw": 90
+      },
+      "start": [
+        {
+          "target": "[PR#]radiation_attackrelay1",
+          "input": "Disable"
+        },
+        {
+          "target": "[PR#]radiation_meteor_relay3",
+          "input": "Trigger",
+          "delay": 0.1
+        }
+      ],
+      "winAfter": 7.9,
+      "setup": [
+        {
+          "target": "[PR#]des2",
+          "input": "ClearParent"
+        },
+        {
+          "target": "[PR#]des2",
+          "input": "KeyValue",
+          "param": "origin 0 -960 9962"
+        }
+      ]
+    },
+    {
+      "id": "core_meteor4",
+      "group": "Core",
+      "parent": "core",
+      "name": "Core: meteors on you (every 2 s)",
+      "description": "radiation_meteor_timer (2 s) pulses radiation_meteor_detecttrigger, which drops a meteor at each human (ForceSpawnAtEntityOrigin !activator): 3.8 s warning, then a 220x220x180 hurt for 0.1 s (100 damage, 50 per touch). Keep moving.",
+      "spawn": {
+        "origin": [
+          0,
+          -2096,
+          8102
+        ],
+        "yaw": 90
+      },
+      "start": [
+        {
+          "target": "[PR#]radiation_attackrelay1",
+          "input": "Disable"
+        },
+        {
+          "target": "[PR#]radiation_meteor_relay4",
+          "input": "Trigger",
+          "delay": 0.1
+        }
+      ],
+      "winAfter": 7,
+      "setup": [
+        {
+          "target": "[PR#]des2",
+          "input": "ClearParent"
+        },
+        {
+          "target": "[PR#]des2",
+          "input": "KeyValue",
+          "param": "origin 0 -960 9962"
+        }
+      ]
+    },
+    {
+      "id": "core_guard",
+      "group": "Core",
+      "parent": "core",
+      "name": "Core: guard cubes",
+      "description": "radiation_guard_case1 picks red/green/blue: 3 s later all 8 radiation_enemyN_maker spawn that cube type on the 8 platforms (enemy1 chasers 1500 HP / enemy2 crosses 2400 HP / enemy3 slow fields 2000 HP). The next attack breaks them.",
+      "spawn": {
+        "origin": [
+          0,
+          -2096,
+          8102
+        ],
+        "yaw": 90
+      },
+      "start": [
+        {
+          "target": "[PR#]radiation_attackrelay1",
+          "input": "Disable"
+        },
+        {
+          "target": "[PR#]radiation_guard_relay1",
+          "input": "Trigger",
+          "delay": 0.1
+        }
+      ],
+      "winAfter": 10,
+      "setup": [
+        {
+          "target": "[PR#]des2",
+          "input": "ClearParent"
+        },
+        {
+          "target": "[PR#]des2",
+          "input": "KeyValue",
+          "param": "origin 0 -960 9962"
+        }
+      ]
+    },
+    {
+      "id": "core_hugemeteor",
+      "group": "Core",
+      "parent": "core",
+      "name": "Core: huge meteor (Insane)",
+      "description": "radiation_hugemeteor_case1 picks 2 of the 8 platforms: the meteor drops on each and radiation_hugemeteor_hurt_platformN (1200x1200, 66 damage) is live from +8 to +9 s. Get off the marked platforms.",
+      "spawn": {
+        "origin": [
+          0,
+          -2096,
+          8102
+        ],
+        "yaw": 90
+      },
+      "start": [
+        {
+          "target": "[PR#]radiation_attackrelay1",
+          "input": "Disable"
+        },
+        {
+          "target": "[PR#]radiation_hugemeteor_relay1",
+          "input": "Enable"
+        },
+        {
+          "target": "[PR#]radiation_hugemeteor_relay1",
+          "input": "Trigger",
+          "delay": 0.1
+        }
+      ],
+      "winAfter": 10,
+      "setup": [
+        {
+          "target": "[PR#]des2",
+          "input": "ClearParent"
+        },
+        {
+          "target": "[PR#]des2",
+          "input": "KeyValue",
+          "param": "origin 0 -960 9962"
+        }
+      ]
+    },
+    {
+      "id": "escape",
+      "group": "Core",
+      "full": true,
+      "name": "Final escape (normal)",
+      "description": "escape_common_relay: at +17 s escape_humantele puts you at (-5 -192 198). Beams (escape_beam_timer1, 7.5 s, 300 damage) from +44 s, platforms from +45 s, jump/duck lasers (escape_laser_timer1, 3.5 s, 300) from +52 s, the press at +92 s, final lasers (999999) at +108-110.6 s. d_win_detecttrigger opens at +120 s; d_nuke at +123 s.",
+      "spawn": {
+        "origin": [
+          -5,
+          -192,
+          157
+        ],
+        "yaw": 90
+      },
+      "start": [
+        {
+          "target": "[PR#]escape_common_relay",
+          "input": "Trigger"
+        }
+      ],
+      "fastForward": 17.5,
+      "win": {
+        "target": "[PR#]d_win_detecttrigger",
+        "input": "FireUser1"
+      }
+    },
+    {
+      "id": "escape_insane",
+      "group": "Core",
+      "name": "Final escape (Insane D)",
+      "description": "escape_relay_ex: lasers every 2.5 s, escape_ex_meteor_detecttrigger meteors from +21 s, escape_ex_press_relay at +92 s. d_nuke at +123 s.",
+      "spawn": {
+        "origin": [
+          -5,
+          -192,
+          157
+        ],
+        "yaw": 90
+      },
+      "start": [
+        {
+          "target": "[PR#]escape_relay_ex",
+          "input": "FireUser1"
+        },
+        {
+          "target": "[PR#]escape_common_relay",
+          "input": "Trigger",
+          "delay": 0.1
+        }
+      ],
+      "fastForward": 17.5,
+      "winAfter": 122
+    },
+    {
+      "id": "enemy1",
+      "group": "Mini bosses",
+      "name": "Enemy1: chaser cube",
+      "description": "Stage A spot 1. A 1000-u radar beam (enemy1_filtertrigger1, 400 deg/s) tags a human (context target, 5 s) and wakes it; enemy1_triggerl/r/u/d (wait 0.3) fire the matching phys_thruster (1000, mass-independent) for 1 s toward tagged humans. Touching it: 50-damage hurt (25 per touch) plus four 300 u/s pushes up-and-out. Core 1500 HP, shootable once awake.",
+      "spawn": {
+        "origin": [
+          7079,
+          -5473,
+          -203
+        ],
+        "yaw": 0
+      },
+      "start": [
+        {
+          "target": "[PR#]enemy1_maker",
+          "input": "KeyValue",
+          "param": "origin 7479 -5473 -143"
+        },
+        {
+          "target": "[PR#]enemy1_maker",
+          "input": "ForceSpawn",
+          "delay": 0.1
+        }
+      ],
+      "bosses": [
+        {
+          "target": "[PR#]enemy1_core1*",
+          "name": "Enemy1"
+        }
+      ],
+      "win": {
+        "target": "[PR#]enemy1_ents1*",
+        "input": "FireUser2"
+      },
+      "shooters": 2,
+      "setup": [
+        {
+          "target": "[PR#]des2",
+          "input": "ClearParent"
+        },
+        {
+          "target": "[PR#]des2",
+          "input": "KeyValue",
+          "param": "origin -605 -5997 106"
+        }
+      ]
+    },
+    {
+      "id": "enemy2",
+      "group": "Mini bosses",
+      "name": "Enemy2: cross laser cube",
+      "description": "Stage C spot 1. Wakes when a human enters its 1300x1300 box (enemy2_trigger1); 2.2 s later a 1300-long laser cross (2 x enemy2_hurt1, 40 damage, 20 per touch) spins at 50 deg/s around the core, 59 u above the floor: crouch under it. Core 2400 HP (6500 in Insane D).",
+      "spawn": {
+        "origin": [
+          10763,
+          181,
+          -3162
+        ],
+        "yaw": 90
+      },
+      "start": [
+        {
+          "target": "[PR#]enemy2_maker",
+          "input": "KeyValue",
+          "param": "origin 10763 581 -3103"
+        },
+        {
+          "target": "[PR#]enemy2_maker",
+          "input": "ForceSpawn",
+          "delay": 0.1
+        }
+      ],
+      "bosses": [
+        {
+          "target": "[PR#]enemy2_core1*",
+          "name": "Enemy2"
+        }
+      ],
+      "win": {
+        "target": "[PR#]enemy2_ents1*",
+        "input": "FireUser2"
+      },
+      "shooters": 2,
+      "setup": [
+        {
+          "target": "[PR#]des2",
+          "input": "ClearParent"
+        },
+        {
+          "target": "[PR#]des2",
+          "input": "KeyValue",
+          "param": "origin 10761 -4741 -2131"
+        }
+      ]
+    },
+    {
+      "id": "enemy2_insane",
+      "group": "Mini bosses",
+      "name": "Enemy2 (Insane D): 6500 HP",
+      "description": "As enemy2 with d_ex_enemy_relay's SetHealth(6500).",
+      "spawn": {
+        "origin": [
+          10763,
+          181,
+          -3162
+        ],
+        "yaw": 90
+      },
+      "start": [
+        {
+          "target": "[PR#]enemy2_maker",
+          "input": "KeyValue",
+          "param": "origin 10763 581 -3103"
+        },
+        {
+          "target": "[PR#]enemy2_maker",
+          "input": "ForceSpawn",
+          "delay": 0.1
+        },
+        {
+          "target": "[PR#]enemy2_core1*",
+          "input": "SetHealth",
+          "param": "6500",
+          "delay": 1
+        }
+      ],
+      "bosses": [
+        {
+          "target": "[PR#]enemy2_core1*",
+          "name": "Enemy2 (Insane D)"
+        }
+      ],
+      "win": {
+        "target": "[PR#]enemy2_ents1*",
+        "input": "FireUser2"
+      },
+      "shooters": 2,
+      "setup": [
+        {
+          "target": "[PR#]des2",
+          "input": "ClearParent"
+        },
+        {
+          "target": "[PR#]des2",
+          "input": "KeyValue",
+          "param": "origin 10761 -4741 -2131"
+        }
+      ]
+    },
+    {
+      "id": "enemy3",
+      "group": "Mini bosses",
+      "name": "Enemy3: slow field cube",
+      "description": "Stage B spot 1. Wakes on its 1200x1200 box (enemy3_trigger1); from +2 s enemy3_timer1 pulses enemy3_slow1 (1200x1200x112) every 0.2 s: each touch sets speed 0.1, back to 1 over 2.6 s, so inside the field you crawl. Core 2000 HP.",
+      "spawn": {
+        "origin": [
+          7480,
+          -10120,
+          -287
+        ],
+        "yaw": 0
+      },
+      "start": [
+        {
+          "target": "[PR#]enemy3_maker",
+          "input": "KeyValue",
+          "param": "origin 7880 -10120 -229"
+        },
+        {
+          "target": "[PR#]enemy3_maker",
+          "input": "ForceSpawn",
+          "delay": 0.1
+        }
+      ],
+      "bosses": [
+        {
+          "target": "[PR#]enemy3_core1*",
+          "name": "Enemy3"
+        }
+      ],
+      "win": {
+        "target": "[PR#]enemy3_ents1*",
+        "input": "FireUser2"
+      },
+      "shooters": 2,
+      "setup": [
+        {
+          "target": "[PR#]des2",
+          "input": "ClearParent"
+        },
+        {
+          "target": "[PR#]des2",
+          "input": "KeyValue",
+          "param": "origin 11247 -9519 -172"
+        }
+      ]
+    },
+    {
+      "id": "enemy4",
+      "group": "Mini bosses",
+      "name": "Enemy4: attack cube (Stage B boss)",
+      "description": "One enemy4 at enemy4_maker1. Shootable at once (1500 HP). Radar tags humans; four thrusters (1100) chase. Every 7 s (enemy4_attack_timer1) it stops (DisableMotion) and one of 3 floor patterns (650x650) telegraphs for 2 s, then hurts for 4 s (40 damage, 20 per touch).",
+      "spawn": {
+        "origin": [
+          -9707,
+          -372,
+          1218
+        ],
+        "yaw": 90
+      },
+      "start": [
+        {
+          "target": "[PR#]enemy4_maker1",
+          "input": "ForceSpawn"
+        }
+      ],
+      "bosses": [
+        {
+          "target": "[PR#]enemy4_core1*",
+          "name": "Enemy4"
+        }
+      ],
+      "win": {
+        "target": "[PR#]b_boss_breakrelay1",
+        "input": "Trigger"
+      },
+      "setup": [
+        {
+          "target": "[PR#]des2",
+          "input": "ClearParent"
+        },
+        {
+          "target": "[PR#]des2",
+          "input": "KeyValue",
+          "param": "origin -7393 -1270 3661"
+        }
+      ]
+    }
+  ],
+  "workshop": "3351649726"
+}

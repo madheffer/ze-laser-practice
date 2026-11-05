@@ -22,6 +22,18 @@ export function getRecord(map, stage, mode) {
   return recordIn(load(), id(map, stage, mode));
 }
 
+// How many stages of a map have a record (normal clears, endless runs), for the map picker.
+export function mapRecordCounts(map) {
+  const out = { cleared: 0, endless: 0 };
+  const prefix = `${map}/`;
+  for (const k of Object.keys(load())) {
+    if (!k.startsWith(prefix)) continue;
+    if (k.endsWith('/normal')) out.cleared++;
+    else if (k.endsWith('/endless')) out.endless++;
+  }
+  return out;
+}
+
 // Returns { record, improved: { time?, hits? } }.
 export function submitRun(map, stage, mode, { time, hits, humans, bossHp }) {
   const all = load();

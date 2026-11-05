@@ -8,7 +8,8 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { mapName, safeRelPath, assetKey, versioned } from '../lib/paths.js';
 import { fetchJson, fetchBuffer, FRESH } from '../lib/fetch.js';
-import { emptyBounds, growBounds } from '../lib/math.js';
+import { normaliseHulls } from './hulls.js';
+import { mapItems } from './items.js';
 
 // VRF exports glTF in metres, Y up: gltf = (src.y, src.z, src.x) * 0.0254. This puts it back in Source units.
 export const GLTF_TO_SOURCE = new THREE.Matrix4().set(
@@ -50,37 +51,18 @@ export async function loadMap(name, onProgress = () => {}) {
   const url = (rel) => versioned(base + rel, version);
   const loader = glbLoader(version);
   onProgress('entities');
-  const [entities, hullsRaw, colBuf, particles] = await Promise.all([
+  const [entities, hullsRaw, colBuf, particles, entwatch, overview] = await Promise.all([
     fetchJson(url('entities.json')),
     fetchJson(url(manifestPath(manifest.hulls, 'hulls.json'))).catch(() => ({})),
     fetchBuffer(url(manifestPath(manifest.collision?.file, 'collision.bin'))),
     fetchJson(url('particles.json')).catch(() => ({})),
+    // optional: GFL's EntWatch items (tools/entwatch.mjs) and the map's CS2 radar (lasers-bake --overview)
+    fetchJson(url('entwatch.json')).catch(() => null),
+    fetchJson(url('overview/overview.json')).catch(() => null),
   ]);
   const collision = new Float32Array(colBuf);
 
-  // Normalise hulls: keys lower-case with forward slashes; mesh-only shapes become their bounding box so
-  // triggers built from them still work.
-  const hulls = Object.create(null);
-  const bounds = Object.create(null);
-  for (const [model, list] of Object.entries(hullsRaw || {})) {
-    if (!Array.isArray(list)) continue;
-    const key = assetKey(model);
-    const out = [];
-    const all = emptyBounds();
-    for (const h of list) {
-      if (!h || typeof h !== 'object') continue;
-      const v = h.verts || h.tris || [];
-      const { min, max } = emptyBounds();
-      for (let i = 0; i < v.length; i += 3) for (let a = 0; a < 3; a++) {
-        min[a] = Math.min(min[a], v[i + a]); max[a] = Math.max(max[a], v[i + a]);
-      }
-      growBounds(all.min, all.max, min, max);
-      const b = { min, max };
-      if (h.planes) out.push({ verts: h.verts, planes: h.planes, solid: h.solid !== false });
-      else if (v.length) out.push(boxHull(b.min, b.max, h.solid !== false));
-    }
-    if (out.length) { hulls[key] = out; bounds[key] = all; }
-  }
+  const { hulls, bounds } = normaliseHulls(hullsRaw);
 
   onProgress('world');
   const world = await loadGlb(loader, base + manifestPath(manifest.world, null), (p) => onProgress(`world ${Math.round(p * 100)}%`));
@@ -100,14 +82,9 @@ export async function loadMap(name, onProgress = () => {}) {
 
   const fx = Object.create(null);
   for (const [k, v] of Object.entries(particles || {})) fx[assetKey(k)] = v;
-  return { name, version, manifest, entities, collision, hulls, bounds, world, getModel, particles: fx };
-}
-
-function boxHull(min, max, solid) {
-  const verts = [];
-  for (let i = 0; i < 8; i++) verts.push(i & 1 ? max[0] : min[0], i & 2 ? max[1] : min[1], i & 4 ? max[2] : min[2]);
-  const planes = [1, 0, 0, max[0], -1, 0, 0, -min[0], 0, 1, 0, max[1], 0, -1, 0, -min[1], 0, 0, 1, max[2], 0, 0, -1, -min[2]];
-  return { verts, planes, solid };
+  const items = mapItems(entities, entwatch); // world/items.js: the map's EntWatch items, heals marked
+  const radar = radarInfo(overview, (rel) => url(rel));
+  return { name, version, manifest, entities, collision, hulls, bounds, world, getModel, particles: fx, items, radar };
 }
 
 // (the loader adds ?v=)
@@ -115,4 +92,21 @@ function loadGlb(loader, url, onProgress) {
   return new Promise((resolve, reject) => {
     loader.load(url, (g) => resolve(g.scene), (e) => e.total && onProgress?.(e.loaded / e.total), reject);
   });
+}
+
+// overview.json -> { posX, posY, scale, sections: [{ min, max, src }] } (null without one). Numbers checked, image
+// names only from the fixed radar[_<suffix>].png set the bake writes.
+function radarInfo(o, url) {
+  if (!o || typeof o !== 'object' || !Number.isFinite(o.pos_x) || !Number.isFinite(o.pos_y) || !(o.scale > 0)) return null;
+  const images = o.images && typeof o.images === 'object' ? o.images : {};
+  const src = (suffix) => {
+    const name = images[suffix];
+    return typeof name === 'string' && /^radar(_[a-z0-9]{1,16})?\.png$/.test(name) ? url('overview/' + name) : null;
+  };
+  const sections = (Array.isArray(o.sections) ? o.sections : [])
+    .map((s) => ({ min: Number(s?.min), max: Number(s?.max), src: src(String(s?.name ?? '').toLowerCase()) }))
+    .filter((s) => Number.isFinite(s.min) && Number.isFinite(s.max) && s.src);
+  const base = src('') || sections[0]?.src || null;
+  if (!base) return null;
+  return { posX: o.pos_x, posY: o.pos_y, scale: o.scale, base, sections };
 }

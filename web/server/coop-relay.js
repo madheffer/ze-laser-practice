@@ -3,6 +3,9 @@
 // the stage and kick, and the server checks every one of those; a round (coop-round.js) is run by the server,
 // not by a player. Public rooms show up in a list anyone can browse; private ones only by code / invite link.
 //
+// Rounds are checked: the server runs its own copy of each player's run (coop-check.js), so HP, deaths, shots and
+// movement are the server's call, not the client's.
+//
 // Players only ever talk to the server, never to each other, so no one sees another player's address, and the
 // server never sends or logs one. Everything a client sends is untrusted: frames are size- and rate-limited,
 // names and settings are cleaned (lib/room-rules.js), and connections per address are capped.
@@ -13,9 +16,12 @@ import { cleanName, cleanSettings, cheatsOn, ROOM_MAX } from '../src/lib/room-ru
 import { isMapName } from '../src/lib/paths.js';
 import { Round } from './coop-round.js';
 import { scenarioStore } from './scenarios.js';
+import { mapStore } from './map-store.js';
+import { activityFeed } from './activity.js';
 
 export const PATH = '/coop';
 const MAX_ROOMS = 300;
+const MAX_ROUNDS = 24; // rounds running at once: each player in one costs the server a copy of the map's logic
 const MAX_FRAME = 8 * 1024; // bytes
 const RATE = 80; // messages per second per connection (20 Hz state + events)
 const PER_ADDRESS = 6; // open sockets per remote address
@@ -48,15 +54,28 @@ function uniqueName(room, name, self) {
   return name;
 }
 
-export function attachCoopRelay(httpServer, { log = () => {}, scenariosDir = path.resolve(HERE, '../public/scenarios') } = {}) {
+export function attachCoopRelay(httpServer, { log = () => {}, scenariosDir = path.resolve(HERE, '../public/scenarios'), mapsDir = path.resolve(HERE, '../public/maps') } = {}) {
   const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_FRAME, perMessageDeflate: false });
   const rooms = new Map(); // code -> room
   const perAddress = new Map();
   const findStage = scenarioStore(scenariosDir);
+  const loadMap = mapStore(mapsDir);
   let nextId = 1;
 
   const send = (c, msg) => { if (c.ws.readyState === 1) c.ws.send(JSON.stringify(msg)); };
-  const io = { send };
+  const io = { send, log };
+  // the home page's live feed (activity.js): finished rounds and solo runs, and how busy the server is
+  const feed = activityFeed({
+    send, findStage,
+    stats: () => {
+      const live = [...rooms.values()].filter((r) => r.round && !r.round.ended);
+      return {
+        online: wss.clients.size,
+        rooms: [...rooms.values()].filter((r) => r.settings.public && r.members.length < r.settings.max).length,
+        rounds: live.length, playing: live.reduce((n, r) => n + r.round.players.size, 0),
+      };
+    },
+  });
 
   const roomView = (room) => ({
     code: room.code, owner: room.owner, settings: room.settings, map: room.map,
@@ -95,7 +114,12 @@ export function attachCoopRelay(httpServer, { log = () => {}, scenariosDir = pat
     if (c.room !== room) return; // left while the file was read
     if (!stage) return send(c, { t: 'error', msg: 'That stage is not on this server' });
     const mode = m.mode === 'endless' && stage.endless ? 'endless' : 'normal';
-    room.round = new Round(room, { map: m.map, stage, mode, kind: room.settings.kind, rules: room.settings.rules }, io);
+    const live = [...rooms.values()].filter((r) => r !== room && r.round && !r.round.ended).length;
+    if (live >= MAX_ROUNDS) return send(c, { t: 'error', msg: 'The server is busy, try again in a minute' });
+    let assets;
+    try { assets = await loadMap(m.map); } catch { return send(c, { t: 'error', msg: 'That map is not on this server' }); }
+    if (c.room !== room || room.owner !== c.id) return;
+    room.round = new Round(room, { map: m.map, stage, mode, kind: room.settings.kind, rules: room.settings.rules, assets }, io);
     room.map = m.map;
     room.round.broadcast(room.round.startMessage());
     announce(room);
@@ -164,8 +188,12 @@ export function attachCoopRelay(httpServer, { log = () => {}, scenariosDir = pat
       // a round's traffic, for the round the client is in
       case 's': if (round && m.r === round.r) round.onState(c, m); break;
       case 'dead': if (round && m.r === round.r) round.onDead(c, m); break;
-      case 'outcome': if (round && m.r === round.r) round.onOutcome(c, m); break;
       case 'hit': if (round && m.r === round.r) round.onHit(c, m); break;
+      // the home page's live feed: watch it, or report your own solo run to it
+      case 'feed': feed.watch(c, m.on !== false); break;
+      case 'solo': feed.solo(c, m).catch(() => {}); break;
+      case 'reload': if (round && m.r === round.r) round.onReload(c); break;
+      case 'use': if (round && m.r === round.r) round.onUse(c, m); break;
     }
   }
 
@@ -178,6 +206,7 @@ export function attachCoopRelay(httpServer, { log = () => {}, scenariosDir = pat
     ws.on('message', (raw) => onMessage(c, raw));
     const gone = () => {
       leave(c);
+      feed.unwatch(c);
       const n = (perAddress.get(addr) || 1) - 1;
       if (n > 0) perAddress.set(addr, n); else perAddress.delete(addr);
     };
@@ -187,7 +216,11 @@ export function attachCoopRelay(httpServer, { log = () => {}, scenariosDir = pat
   // rounds: boss damage, clock, vote timeouts; and dead sockets
   const tick = setInterval(() => {
     const now = Date.now();
-    for (const r of rooms.values()) r.round?.tick(now);
+    for (const r of rooms.values()) {
+      r.round?.tick(now);
+      if (r.round?.ended && !r.round.fed) { r.round.fed = true; feed.round(r, r.round); }
+    }
+    feed.tick(now);
   }, 100);
   const ping = setInterval(() => {
     for (const ws of wss.clients) {

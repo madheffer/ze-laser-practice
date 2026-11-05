@@ -49,8 +49,9 @@ body.touch #menu .kb { display: none; }
 .tabs [role=tab]:hover { color: var(--text); }
 .tabs [role=tab][aria-selected=true] { background: #1d2733; color: #fff; box-shadow: inset 0 -2px 0 var(--accent); }
 
-.map-pick { grid-area: map; display: flex; align-items: center; gap: 8px; min-width: 0; justify-self: end; font-size: 12px; color: var(--dim); }
-.map-pick select { min-height: var(--tap); min-width: 0; max-width: 320px; width: 100%; }
+.map-pick { grid-area: map; display: flex; align-items: center; gap: 10px; min-width: 0; justify-self: end; font-size: 12px; color: var(--dim); }
+.map-pick .back::before { content: ''; width: 7px; height: 7px; border: solid currentColor; border-width: 0 0 2px 2px; transform: rotate(45deg); margin-right: 2px; }
+.map-name { font: 600 12px ui-monospace, Consolas, monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 #menu select, #menu input[type=number] {
   background: #0b0f14; border: 1px solid var(--line); border-radius: 7px; padding: 6px 8px; font-size: 14px;
 }
@@ -59,9 +60,63 @@ body.touch #menu .kb { display: none; }
 .tab-panels { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; padding: 16px; scrollbar-color: #2a3646 transparent; }
 .tab-panels [role=tabpanel][hidden] { display: none; }
 
+/* ---- map picker (ui/maps.js): a card per map, its colour from its name (--hue) */
+.map-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); gap: 14px; }
+.maps-empty { color: var(--dim); font-size: 14px; }
+.map-card {
+  --tint: hsl(var(--hue) 55% 42%);
+  position: relative; display: flex; flex-direction: column; text-align: left; padding: 0; min-width: 0; overflow: hidden;
+  background: #121922; border: 1px solid var(--line); border-radius: 12px; transition: border-color 0.12s, transform 0.12s;
+}
+.map-card:hover:not(:disabled), .map-card:focus-visible { border-color: var(--tint); transform: translateY(-2px); }
+.map-card:disabled { cursor: progress; opacity: 0.6; }
+.map-card.loading { opacity: 1; border-color: var(--tint); }
+.map-art {
+  position: relative; display: flex; align-items: flex-end; min-height: 112px; padding: 14px 16px;
+  background:
+    repeating-linear-gradient(115deg, transparent 0 22px, hsl(var(--hue) 70% 60% / 0.07) 22px 24px),
+    radial-gradient(ellipse at 85% 0%, hsl(var(--hue) 80% 55% / 0.55), transparent 60%),
+    linear-gradient(160deg, hsl(var(--hue) 45% 18%), #0c1117 85%);
+  border-bottom: 1px solid var(--line);
+}
+.map-big { font: 700 26px/1.05 'Stratum2', 'Segoe UI', sans-serif; letter-spacing: 0.03em; text-transform: uppercase; color: #fff; text-shadow: 0 2px 12px rgba(0, 0, 0, 0.6); overflow-wrap: anywhere; }
+.map-badge { position: absolute; top: 10px; right: 12px; font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--good); border: 1px solid currentColor; border-radius: 3px; padding: 1px 6px; }
+.map-body { display: flex; flex-direction: column; gap: 8px; padding: 12px 16px 14px; flex: 1; }
+.map-id { font: 600 11px ui-monospace, Consolas, monospace; color: var(--dim); }
+.map-desc { font-size: 13px; line-height: 1.4; color: var(--text); opacity: 0.85; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; }
+.map-parts { display: flex; flex-wrap: wrap; gap: 6px; }
+.map-parts .part { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; padding: 3px 8px; border-radius: 999px; background: #0b1016; border: 1px solid var(--line); }
+.map-parts .part b { font-weight: 600; }
+.map-parts .part i { font-style: normal; color: var(--dim); font-variant-numeric: tabular-nums; }
+.map-parts .part.has-boss { border-color: #5a4320; }
+.map-parts .part.has-boss b { color: var(--gold); }
+.map-parts .part.free { color: var(--dim); border-style: dashed; }
+.map-foot { display: flex; flex-wrap: wrap; gap: 4px 12px; justify-content: space-between; margin-top: auto; font-size: 12px; color: var(--dim); }
+.map-pb { color: var(--gold); }
+.map-progress { display: none; }
+.map-card.loading .map-progress {
+  display: block; padding: 8px 16px; font: 600 12px ui-monospace, Consolas, monospace; color: #fff; border-top: 1px solid var(--line);
+  background: linear-gradient(90deg, hsl(var(--hue) 60% 30% / 0.7), transparent); animation: map-load 1.2s ease-in-out infinite alternate;
+}
+@keyframes map-load { from { background-position: -200px 0; } to { background-position: 200px 0; } }
+.map-card.bare .map-art { filter: saturate(0.35); }
+
+/* ---- the picked map: header (title, what it is, a jump bar of its parts), then a section per part */
+.map-head { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+.map-title { margin: 0; font: 700 24px/1.1 'Stratum2', 'Segoe UI', sans-serif; letter-spacing: 0.04em; text-transform: uppercase; }
+.map-sub { margin: 0; font-size: 13px; color: var(--dim); max-width: 90ch; }
+.part-nav { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.part-jump { min-height: calc(var(--tap) - 6px); padding: 0 12px; border-radius: 999px; border: 1px solid var(--line); background: #0b1016; font-size: 12.5px; font-weight: 600; }
+.part-jump:hover { border-color: #3b4c60; color: #fff; }
+.part-sec { scroll-margin-top: 4px; }
+.part-sec + .part-sec { margin-top: 18px; }
+.part-h { display: flex; align-items: baseline; gap: 8px; margin: 0 0 8px; font: 600 11px 'Segoe UI', sans-serif; letter-spacing: 0.14em; text-transform: uppercase; color: var(--dim); }
+.part-h small { font-size: 11px; letter-spacing: 0; opacity: 0.7; font-variant-numeric: tabular-nums; }
+.part-h::after { content: ''; flex: 1; height: 1px; background: var(--line); align-self: center; }
+
 /* ---- stage picker */
 /* One stage per row (a mixed-width grid left holes beside full-width cards); a boss's attacks get a grid inside */
-#scenarios { display: flex; flex-direction: column; gap: 10px; }
+#scenarios, .part-grid { display: flex; flex-direction: column; gap: 10px; }
 
 .stage { position: relative; display: flex; min-width: 0; background: #121922; border: 1px solid var(--line); border-radius: 10px; transition: border-color 0.12s, transform 0.12s; }
 .stage:hover, .stage:focus-within { border-color: #3b4c60; }
@@ -186,8 +241,7 @@ body.touch .keys-card { display: none; }
   .brand h1 { font-size: 16px; }
   .tabs { width: 100%; }
   .tabs [role=tab] { flex: 1; }
-  .map-pick { justify-self: stretch; }
-  .map-pick select { max-width: none; }
+  .map-pick { justify-self: stretch; justify-content: space-between; }
   .tab-panels { padding: 12px max(12px, var(--safe-r)) 12px max(12px, var(--safe-l)); }
   .menu-foot { padding-bottom: max(6px, var(--safe-b)); }
   .stage.featured .stage-main b { font-size: 19px; }
@@ -200,10 +254,22 @@ body.touch .keys-card { display: none; }
   .brand .tag, .brand h1 { display: none; }
   .brand::before { content: 'ZE LASERS'; font: 700 14px 'Stratum2', 'Segoe UI', sans-serif; letter-spacing: 0.08em; white-space: nowrap; }
   .tabs [role=tab] { min-width: 76px; }
-  .map-pick > span { display: none; }
+  .map-name { display: none; }
   .tab-panels { padding: 10px max(12px, var(--safe-r)) 10px max(12px, var(--safe-l)); }
   .menu-foot { display: none; }
   .stage.featured .stage-main { padding: 12px 16px; min-height: 0; }
   .stage.featured .stage-main b { font-size: 18px; }
 }
-@media (prefers-reduced-motion: reduce) { .stage, .attacks summary::before, .card .chk input, .card .chk input::after { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .map-card, .map-card.loading .map-progress, .stage, .attacks summary::before, .card .chk input, .card .chk input::after { transition: none; } }
+
+/* the map's heal option (ui/menu.js healToggle): a switch in the stage list header, only on maps with a heal item */
+.heal-toggle { display: flex; align-items: center; gap: 10px; margin-top: 6px; padding: 8px 12px; border: 1px solid #3a2f4a; border-radius: 8px; background: #17131d; font-size: 13px; cursor: pointer; max-width: 640px; }
+.heal-toggle small { display: block; color: var(--dim); font-size: 11.5px; margin-top: 2px; }
+.heal-toggle b { color: #ff9ad5; }
+.heal-toggle input {
+  appearance: none; -webkit-appearance: none; flex: none; position: relative; width: 38px; height: 22px; margin: 0;
+  border-radius: 11px; background: #26303c; border: 1px solid #34414f; cursor: pointer;
+}
+.heal-toggle input::after { content: ''; position: absolute; left: 2px; top: 2px; width: 16px; height: 16px; border-radius: 50%; background: #a8b4c0; transition: transform 0.15s; }
+.heal-toggle input:checked { background: #6a2a55; border-color: #ff9ad5; }
+.heal-toggle input:checked::after { transform: translateX(16px); background: #fff; }

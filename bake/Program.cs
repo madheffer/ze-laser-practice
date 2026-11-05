@@ -48,6 +48,21 @@ public static class Program
             PanoramaBake.Run(pCs2, Path.GetFullPath(args[1]));
             return 0;
         }
+        if (args.Length >= 3 && args[0] == "--shots")
+        {
+            // lasers-bake --shots <workshop.vpk> <web/public/maps/<name>>: only the map's screenshots (ShotsBake.cs)
+            return ShotsBake.Run(Path.GetFullPath(args[1]), Path.GetFullPath(args[2]));
+        }
+        if (args.Length >= 3 && args[0] == "--scan")
+        {
+            // lasers-bake --scan <workshop/content/730> <out.json>: rank a local library for laser maps (LibraryScan.cs)
+            return LibraryScan.Run(Path.GetFullPath(args[1]), Path.GetFullPath(args[2]));
+        }
+        if (args.Length >= 3 && args[0] == "--overview")
+        {
+            // lasers-bake --overview <workshop.vpk> <web/public/maps/<name>>: only the map's radar (OverviewBake.cs)
+            return OverviewBake.Run(Path.GetFullPath(args[1]), Path.GetFullPath(args[2]));
+        }
         if (args.Length >= 2 && args[0] == "--player")
         {
             // lasers-bake --player <web/public/player> [--cs2 <game/csgo>]: your own third-person body (CT agent + knife).
@@ -257,6 +272,12 @@ sealed class Baker(string input, string outRoot, string? cs2, bool textures)
         // 5. sounds: soundevents.json (every event the map's .vsndevts_c files define) + the sounds they play.
         var soundEvents = SoundBake.Map(loader, [map, outer], outDir);
 
+        // 6. shots/: the map's loading-screen screenshots, for the home page (ShotsBake.cs)
+        ShotsBake.Write(outer, outDir, Log);
+
+        // 7. overview/: the map's CS2 radar for the minimap (OverviewBake.cs)
+        OverviewBake.Write([map, outer], mapName, outDir, Log);
+
         var manifest = new JsonObject
         {
             ["map"] = mapName,
@@ -420,6 +441,10 @@ sealed class Baker(string input, string outRoot, string? cs2, bool textures)
     // StringifyValue writes KV3 text: a string comes back quoted with \\ and \" escapes.
     static string Unquote(string s)
     {
+        // resource-typed keys (a brush entity's model in newer maps) stringify as resource_name:"<path>": write
+        // the plain path, as older maps and lasers.cybo.dev's format have it
+        const string Res = "resource_name:";
+        if (s.StartsWith(Res, StringComparison.Ordinal)) s = s[Res.Length..];
         if (s.Length >= 2 && s[0] == '"' && s[^1] == '"')
         {
             try { return JsonSerializer.Deserialize<string>(s) ?? ""; }

@@ -208,8 +208,9 @@ export function clipHull(hull, h, s, e, tr, ref) {
 // ---------------------------------------------------------------- world
 
 export class CollisionWorld {
+  // tris: collision.bin's floats, or an already built TriangleBVH (the co-op server shares one per map)
   constructor(tris) {
-    this.bvh = new TriangleBVH(tris);
+    this.bvh = tris instanceof TriangleBVH ? tris : new TriangleBVH(tris);
     this.dynamic = []; // [{ hulls: [{planes,min,max}], min, max, ref }] refreshed by the entity system each tick
     this._lo = [0, 0, 0];
     this._hi = [0, 0, 0];

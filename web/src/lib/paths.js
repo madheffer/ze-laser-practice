@@ -39,4 +39,5 @@ export function versioned(url, version) {
 }
 
 // The key a model / effect path is stored and looked up under: forward slashes, lower case.
-export const assetKey = (p) => String(p ?? '').replace(/\\+/g, '/').toLowerCase();
+// Maps baked before the bake unwrapped resource-typed keys have model values like resource_name:"maps/x.vmdl".
+export const assetKey = (p) => String(p ?? '').replace(/^resource_name:"(.*)"$/s, '$1').replace(/\\+/g, '/').toLowerCase();

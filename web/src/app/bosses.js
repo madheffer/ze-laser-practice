@@ -8,6 +8,7 @@ import { rayHullEntry } from '../world/collision.js';
 import { angleForward } from '../world/entities/index.js';
 import { stripPrefix } from '../lib/names.js';
 import { clamp } from '../lib/math.js';
+import { bossHittable, replayBossFire } from '../world/run-engine.js';
 
 // The other humans, as a squad. Each carries a rifle (AK-47: 10 rounds/s, 36 dmg), an SMG (P90: 14.3/s,
 // 26 dmg) or just a knife (no boss damage), lands about half its rounds, and is only firing part of the time:
@@ -53,9 +54,6 @@ function bossVisible(e) {
   return S.world.traceRay(eye, c, undefined, true).fraction >= 0.999;
 }
 
-// a physbox boss under 1% (strictly, as the map's compare is) is between segments: the map is about to top it
-// back up
-export const bossHittable = (e) => e.alive && (e.cls === 'func_breakable' || e.state.health >= e.state.max * 0.01);
 
 // how: 'me' (your shot), 'team' (the simulated team), 'replay' (a fast-forward, the same on every client)
 function hitBoss(e, damage, how = 'me') {
@@ -74,6 +72,8 @@ export function applyBossDamage(e, damage) {
 // silent: during a fast-forward replay (shoots the scenario's fastForwardBosses, no line of sight needed)
 export function bossFire(dt, silent = false) {
   const { run, scenario } = S;
+  // a fast-forward replay: the same on every client and on the server (world/run-engine.js)
+  if (silent) { replayBossFire(run, scenario, dt, rule('humans'), rule('bossHp')); return; }
   if (!silent && (!rule('autoFire') || run.endless && scenario.endless?.noBossDamage)) return;
   // in a round the simulated team fires from one client, the round's leader (a replay runs everywhere)
   if (!silent && S.mp && !S.mp.isLeader) return;
@@ -81,7 +81,9 @@ export function bossFire(dt, silent = false) {
   const targets = silent ? bossTargets(scenario.fastForwardBosses) : bossTargets().filter(({ e }) => bossVisible(e));
   if (!targets.length) return;
   // you are one of the humans: the team is the other (humans - 1); your own shots come from your gun
-  const team = silent ? rule('humans') : Math.max(0, rule('humans') - 1);
+  // scenario.shooters: only that many of them are on it (a mini boss a few humans meet, not the whole server)
+  const all = silent ? rule('humans') : Math.max(0, rule('humans') - 1);
+  const team = Number.isFinite(scenario?.shooters) ? Math.min(all, Math.max(0, scenario.shooters)) : all;
   const scale = 100 / Math.max(1, rule('bossHp'));
   let guard = 0;
   if (silent || rule('perfectTeam')) {

@@ -6,6 +6,7 @@
 import { S, G } from './state.js';
 import { settings, setToggle, M_YAW } from './settings.js';
 import { clamp } from '../lib/math.js';
+import { useItems } from './items.js';
 import { TouchControls, touchQuery } from '../ui/touch.js';
 
 const keys = new Set();
@@ -181,6 +182,7 @@ export function installInput(canvas, actions) {
       case 'KeyQ': actions.lastWeapon(); break;
       case 'KeyR': actions.reload(); break;
       case 'KeyF': G.vm.inspect(); break;
+      case 'KeyE': useItems(); break; // CS2 +use: the held map item's button (app/items.js)
       case 'Backspace': actions.restart(); break;
       // a co-op / versus round plays by the room's rules (app/rules.js): these are solo-only
       case 'KeyH': if (!S.mp) { setToggle('hitboxes', '#hitboxes', !settings.hitboxes); actions.applySettings(); } break;

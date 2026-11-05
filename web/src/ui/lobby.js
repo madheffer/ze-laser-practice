@@ -127,7 +127,7 @@ export class Lobby {
     const room = this.net.room;
     if (!room || !this.net.isHost) return;
     this.formBox.replaceChildren(roomForm(room.settings, {
-      mode: 'edit', ownerName: this.net.member(room.owner)?.name, members: room.members.length,
+      mode: 'edit', ownerName: this.net.member(room.owner)?.name, members: room.members.length, players: room.members,
       onSubmit: (s) => { this.lastSettings = s; saveJson(KEY, { name: this.name, room: s }); this.net.setSettings(s); this.go('room'); },
       onCancel: () => this.go('room'),
     }));
@@ -189,6 +189,7 @@ export class Lobby {
     const chips = [
       [`${r.humans} humans`], [`Boss HP ${r.bossHp}%`], [r.autoFire ? (r.perfectTeam ? 'Perfect team' : 'Team fires') : 'No team fire'],
       [r.fallDamage ? 'Fall damage' : 'No fall damage'],
+      ...(r.heal === 'all' ? [['Heal: everyone']] : typeof r.heal === 'number' ? [[`Heal: ${net.member(r.heal)?.name || 'nobody (left)'}`]] : []),
       ...cheatsOn(r).map((k) => [CHEAT_LABELS[k], 'cheat']),
     ];
     if (!cheatsOn(r).length) chips.push(['No cheats', 'clean']);

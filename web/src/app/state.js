@@ -7,6 +7,7 @@ export const S = {
   world: null, // CollisionWorld
   player: null, // Player (movement.js)
   engine: null, // EntityEngine, null until a stage is picked
+  mapIndex: [], // maps/index.json's maps (validated names), for the map picker
   scenarios: [],
   scenario: null,
   scenarioIndex: -2, // -2 nothing picked, -1 free roam

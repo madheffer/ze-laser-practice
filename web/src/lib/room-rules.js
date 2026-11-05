@@ -14,6 +14,9 @@ export const CHEATS = ['god', 'hitboxes', 'autoBhop'];
 export const RULE_DEFAULTS = Object.freeze({
   humans: 20, bossHp: 100, autoFire: true, perfectTeam: false, fallDamage: false,
   god: false, hitboxes: false, autoBhop: false,
+  // who carries the map's heal item (world/items.js heals): 'none', 'all', or one player's id (co-op only; versus is
+  // all or none, so nobody starts with an edge)
+  heal: 'none',
 });
 const RANGES = { humans: [1, 64], bossHp: [1, 100] };
 
@@ -33,6 +36,7 @@ export function cleanRules(r) {
     if (!Object.hasOwn(r, k)) continue;
     const d = RULE_DEFAULTS[k], v = r[k];
     if (typeof d === 'boolean' && typeof v === 'boolean') out[k] = v;
+    else if (k === 'heal') out.heal = v === 'all' || v === 'none' ? v : Number.isInteger(v) && v > 0 ? v : 'none';
     else if (typeof d === 'number' && typeof v === 'number' && Number.isFinite(v)) {
       const [lo, hi] = RANGES[k];
       out[k] = Math.round(Math.min(hi, Math.max(lo, v)));
@@ -45,13 +49,22 @@ export function cleanRules(r) {
 export function cleanSettings(s, members = 1) {
   const o = s && typeof s === 'object' ? s : {};
   const max = Number.isInteger(o.max) ? o.max : SETTINGS_DEFAULTS.max;
+  const kind = ROOM_KINDS.includes(o.kind) ? o.kind : SETTINGS_DEFAULTS.kind;
+  const rules = cleanRules(o.rules);
+  if (kind === 'versus' && typeof rules.heal === 'number') rules.heal = 'all';
   return {
     name: cleanText(o.name, 32),
     public: o.public === true,
-    kind: ROOM_KINDS.includes(o.kind) ? o.kind : SETTINGS_DEFAULTS.kind,
+    kind,
     max: Math.min(ROOM_MAX, Math.max(2, members, max)),
-    rules: cleanRules(o.rules),
+    rules,
   };
+}
+
+// the round's item holders: the room's heal setting against who is in the round
+export function healHolders(heal, ids) {
+  if (heal === 'all') return [...ids];
+  return typeof heal === 'number' && ids.includes(heal) ? [heal] : [];
 }
 
 export const cheatsOn = (rules) => CHEATS.filter((k) => rules?.[k] === true);
