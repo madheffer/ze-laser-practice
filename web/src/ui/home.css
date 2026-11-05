@@ -258,8 +258,8 @@
   font: inherit; font-size: 13px; font-weight: 600; padding: 8px 4px 10px; margin-right: 14px; transition: color 0.15s;
 }
 .hf-tab:hover { color: var(--text); }
-.hf-tab[aria-selected="true"] { color: var(--text); }
-.hf-tab[aria-selected="true"]::after { content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; border-radius: 2px; background: var(--accent); }
+.hf-tab[aria-selected="true"] { color: #fff; }
+.hf-tab[aria-selected="true"]::after { content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; border-radius: 2px; background: var(--text); }
 .hf-tab:focus-visible { outline: 2px solid var(--focus, #6cb6ff); outline-offset: 2px; border-radius: 4px; }
 
 /* rows: icon | what | time + when | play */

@@ -292,8 +292,8 @@ G.loadStage = loadStage;
 
 async function init() {
   bindSettings(applySettings);
-  // graphics presets (ui/graphics-ui.js): above the map list and in Video; Auto follows this device
-  installGraphics({ gl: G.renderer.renderer.getContext(), apply: applySettings, mapLoaded: () => !!S.map?.loaded });
+  // graphics presets (ui/graphics-ui.js): above the map list and in Video; Medium (Low on a phone) until one is picked
+  installGraphics({ apply: applySettings, mapLoaded: () => !!S.map?.loaded });
   applySettings();
   G.vm.load().catch((e) => log(`viewmodel: ${e.message || e}`));
   const idx = await loadMapIndex().catch(() => ({ maps: [] }));

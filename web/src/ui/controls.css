@@ -60,8 +60,9 @@
   padding: 10px 4px 12px; margin-right: 18px; min-height: var(--tap);
 }
 :is(#menu, .sheet) .sp-tab:hover { color: var(--text); }
-:is(#menu, .sheet) .sp-tab[aria-selected="true"] { color: var(--text); }
-:is(#menu, .sheet) .sp-tab[aria-selected="true"]::after { content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; border-radius: 2px; background: var(--accent); }
+:is(#menu, .sheet) .sp-tab[aria-selected="true"] { color: #fff; }
+/* the picked tab's underline: light, like every selected control (style.css --sel-*), never the accent */
+:is(#menu, .sheet) .sp-tab[aria-selected="true"]::after { content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; border-radius: 2px; background: var(--text); }
 .sp-pane[hidden] { display: none; }
 .sp-note { margin: 0 0 10px; font-size: 13px; color: var(--dim); }
 .sp-room .room-form .rf-buttons { position: sticky; bottom: 0; padding: 10px 0 2px; background: linear-gradient(transparent, var(--panel) 30%); }

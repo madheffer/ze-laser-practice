@@ -13,7 +13,7 @@
   color: var(--dim); font: 600 12.5px 'Segoe UI', sans-serif; cursor: pointer; transition: color 0.12s, border-color 0.12s, background 0.12s;
 }
 .sl-chip:hover { color: var(--text); border-color: #3b4c60; }
-.sl-chip[aria-pressed=true] { color: #fff; background: #1d2733; border-color: #3b4c60; box-shadow: inset 0 -2px 0 var(--accent); }
+.sl-chip[aria-pressed=true] { color: #fff; background: var(--sel-bg); border-color: var(--sel-border); box-shadow: var(--sel-shadow); }
 .sl-chip:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 
 /* ---- a part: its heading, its grid, its bosses' single attacks */

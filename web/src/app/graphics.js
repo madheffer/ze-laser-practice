@@ -1,13 +1,13 @@
-// Graphics presets: one choice (Low / Medium / High, or Auto) that sets every performance knob at once.
+// Graphics presets: one choice (Low / Medium / High) that sets every performance knob at once.
 // The knobs themselves stay in Settings > Video; changing one by hand makes the preset 'custom'.
 //
-//   graphics: 'auto' | 'low' | 'medium' | 'high' | 'custom'   (settings.graphics; 'auto' = recommended())
+//   graphics: 'low' | 'medium' | 'high' | 'custom'   (settings.graphics)
 //   applyPreset(name)   writes the preset's knobs into settings, saves, and returns what needs a map reload
-//   recommended()       the preset for this device: phones / tablets and GPUs without BC7 get Low, the rest High
+//   defaultPreset()     what a player starts on until they pick: Medium (a quick load), Low on a phone or tablet
 //
-// What each knob costs, biggest first: render resolution (pixels drawn, x the screen's pixel ratio), MSAA (4 samples
-// a pixel into a half-float target), the texture / lightmap tier (download + GPU memory), particle lights (a loop per
-// pixel over up to 16 lights), reflections (cubemaps), fog, how much of the world streams in.
+// What each knob costs, biggest first: render resolution (pixels drawn, x the screen's pixel ratio), the texture /
+// lightmap tier (download, decode, GPU memory), MSAA (4 samples a pixel into a half-float target), particle lights
+// (a loop per pixel over up to 16 lights), reflections (the cubemaps in view), fog, how much of the world streams in.
 // Low is the fast build for phones and old PCs: about a sixth of High's pixels on a phone, nothing optional per pixel.
 import { settings, saveSettings } from './settings.js';
 
@@ -39,24 +39,13 @@ export function isMobile() {
   return coarse || (globalThis.screen ? Math.min(screen.width, screen.height) < 600 : false);
 }
 
-// gl: the renderer's WebGL context. Desktop GPUs take BC6H / BC7 (EXT_texture_compression_bptc); most phones don't.
-export function recommended(gl) {
-  if (isMobile()) return 'low';
-  if (gl && !gl.getExtension('EXT_texture_compression_bptc')) return 'medium';
-  return 'high';
-}
-
-// the preset in effect: 'auto' resolves to the device's recommendation
-export function effectivePreset(gl) {
-  const g = settings.graphics;
-  return g === 'auto' ? recommended(gl) : g;
-}
+// what a player starts on until they pick one
+export const defaultPreset = () => (isMobile() ? 'low' : 'medium');
 
 // Write a preset's knobs into settings. Returns the knobs that changed and only apply on the next map load.
-// chosen: the player picked it (false: 'auto' keeping the knobs in step with the device at start)
-export function applyPreset(name, gl, { chosen = true } = {}) {
-  const resolved = name === 'auto' ? recommended(gl) : name;
-  const p = PRESETS[resolved];
+// chosen: the player picked it (false: the default, set at start until they do)
+export function applyPreset(name, { chosen = true } = {}) {
+  const p = PRESETS[name];
   if (!p) return [];
   const later = [];
   for (const [k, v] of Object.entries(p)) {
@@ -69,16 +58,9 @@ export function applyPreset(name, gl, { chosen = true } = {}) {
   return later;
 }
 
-// why recommended() picked what it did, for the picker
-export function recommendedReason(gl) {
-  if (isMobile()) return 'phone or tablet';
-  if (gl && !gl.getExtension('EXT_texture_compression_bptc')) return 'no desktop texture compression';
-  return 'desktop GPU';
-}
-
-// A knob changed by hand: the preset no longer describes the settings
-export function markCustom(gl) {
-  const p = PRESETS[effectivePreset(gl)];
+// A knob changed by hand: the preset no longer describes the settings (unless it lands back on it exactly)
+export function markCustom() {
+  const p = PRESETS[settings.graphics];
   if (p && PRESET_KEYS.every((k) => settings[k] === p[k])) return;
   settings.graphics = 'custom';
   saveSettings();

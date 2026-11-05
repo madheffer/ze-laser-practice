@@ -48,8 +48,10 @@ body.touch :is(#menu, .sheet) .kb { display: none; }
   min-height: calc(var(--tap) - 6px); min-width: 92px; padding: 0 16px; border: 0; border-radius: 7px; background: transparent;
   color: var(--dim); font-weight: 600; font-size: 14px; letter-spacing: 0.04em;
 }
-.tabs [role=tab]:hover { color: var(--text); }
-.tabs [role=tab][aria-selected=true] { background: #1d2733; color: #fff; box-shadow: inset 0 -2px 0 var(--accent); }
+.tabs [role=tab] { transition: background-color 0.15s, color 0.15s; }
+.tabs [role=tab]:hover { color: var(--text); background: var(--hover-bg); }
+.tabs [role=tab][aria-selected=true] { background: var(--sel-bg); color: #fff; box-shadow: var(--sel-shadow); }
+.tabs [role=tab]:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 
 .map-pick { grid-area: map; display: flex; align-items: center; gap: 10px; min-width: 0; justify-self: end; font-size: 12px; color: var(--dim); }
 .map-pick .back::before { content: ''; width: 7px; height: 7px; border: solid currentColor; border-width: 0 0 2px 2px; transform: rotate(45deg); margin-right: 2px; }

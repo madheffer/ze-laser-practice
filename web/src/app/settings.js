@@ -28,10 +28,10 @@ export const DEFAULTS = {
   // performance (Video): render resolution (x the screen's pixel ratio, capped at 2), MSAA, and the CS2 lighting
   // pieces. Fog / reflections switch instantly; baked lighting + quality apply when a map loads (quality 0 = auto)
   renderScale: 1, msaa: true, fog: true, reflections: true, bakedLighting: true, quality: 0,
-  // graphics: the preset those knobs come from (app/graphics.js): 'auto' follows the device, 'custom' after a hand
-  // change. pixelCap: the screen pixel ratio render resolution multiplies (phones are 3x). particleLights: effects
+  // graphics: the preset those knobs come from (app/graphics.js): Medium (Low on a phone) until one is picked,
+  // 'custom' after a hand change. pixelCap: the screen pixel ratio render resolution multiplies (phones are 3x). particleLights: effects
   // lighting the world. graphicsChosen: the player picked a preset (the map list stops asking)
-  graphics: 'auto', pixelCap: 2, particleLights: true, graphicsChosen: false,
+  graphics: 'medium', pixelCap: 2, particleLights: true, graphicsChosen: false,
   streamDistance: 1, // a streamed world (world/stream.js): 1 auto (area, then what can be seen), 2 area only, 0 the whole map
   touchSens: 1, touchCrouch: false, // phone / tablet: look speed multiplier, crouch as a toggle instead of hold
 };
@@ -43,7 +43,7 @@ const RANGES = {
 };
 const DROPPED = new Set(['myaw', 'fov', 'stamina', 'volume']);
 // string settings: one of these values
-const CHOICES = { graphics: ['auto', 'low', 'medium', 'high', 'custom'] };
+const CHOICES = { graphics: ['low', 'medium', 'high', 'custom'] };
 const FORBIDDEN = new Set(['__proto__', 'constructor', 'prototype']);
 
 const KEY = 'lasers.settings';
