@@ -40,8 +40,9 @@ static class LightingBake
         _ => null,
     };
 
-    // skyOnly: just the skies + reflection cubemaps (SkyBake.cs), merged into an existing lighting.json
-    public static int Run(string vpk, string mapDir, bool skyOnly = false)
+    // skyOnly: just the skies + reflection cubemaps (SkyBake.cs), merged into an existing lighting.json; postOnly: just
+    // the post-processing volumes (WritePost), the same way
+    public static int Run(string vpk, string mapDir, bool skyOnly = false, bool postOnly = false)
     {
         if (!File.Exists(Path.Combine(mapDir, "manifest.json"))) { Console.Error.WriteLine($"not a baked map folder: {mapDir}"); return 1; }
         var outer = new Package();
@@ -58,11 +59,18 @@ static class LightingBake
             }
         var mapName = Path.GetFileName(mapDir.TrimEnd('/', '\\'));
         if (!SafePath.IsMapName(mapName)) { Console.Error.WriteLine($"bad map folder name: {mapName}"); return 1; }
-        if (skyOnly)
+        if (skyOnly || postOnly)
         {
             var outDir = Path.Combine(mapDir, "lighting");
             var path = Path.Combine(outDir, "lighting.json");
             if (JsonNode.Parse(File.Exists(path) ? File.ReadAllText(path) : "null") is not JsonObject json) { Console.Error.WriteLine("run --lighting first"); return 1; }
+            if (postOnly)
+            {
+                json["post"] = WritePost(paks, outDir, Console.WriteLine);
+                json["version"] = DateTime.UtcNow.ToString("yyyyMMddHHmmss");
+                File.WriteAllText(SafePath.OutFile(outDir, "lighting.json"), json.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
+                return 0;
+            }
             var sky = SkyBake.Write(p => Load(paks, p), mapName, mapDir, outDir, Console.WriteLine);
             json.Remove("cubemaps");
             if (sky["cubemaps"] is { } cubes) json["cubemaps"] = cubes.DeepClone();
@@ -172,8 +180,7 @@ static class LightingBake
                             tm[k] = t.GetFloatProperty(k);
                         o["tonemap"] = tm;
                     }
-                    if (d.GetBooleanProperty("m_bHasBloomParams") && d.GetSubCollection("m_bloomParams") is { } b)
-                        o["bloom"] = new JsonObject { ["strength"] = b.GetFloatProperty("m_flBloomStrength"), ["threshold"] = b.GetFloatProperty("m_flBloomThreshold"), ["thresholdWidth"] = b.GetFloatProperty("m_flBloomThresholdWidth") };
+                    if (d.GetBooleanProperty("m_bHasBloomParams") && d.GetSubCollection("m_bloomParams") is { } b) o["bloom"] = BloomJson(b);
                     var dim = d.ContainsKey("m_nColorCorrectionVolumeDim") ? d.GetInt32Property("m_nColorCorrectionVolumeDim") : 0;
                     byte[]? lut = null;
                     foreach (var (k, v) in d.Children) if (k == "m_colorCorrectionVolumeData" && v.ValueType == KVValueType.BinaryBlob) lut = v.AsBlob().ToArray();
@@ -192,6 +199,25 @@ static class LightingBake
             }
         }
         return index;
+    }
+
+    // m_bloomParams (world/bloom.js reads every field): blend mode, the three strengths, threshold, start value, the
+    // per-level blur weights and tints (5 levels in every vpost seen)
+    static JsonObject BloomJson(KVObject b)
+    {
+        var o = new JsonObject
+        {
+            ["blendMode"] = b.ContainsKey("m_blendMode") ? b.GetStringProperty("m_blendMode") : "BLOOM_BLEND_ADD",
+            ["strength"] = b.GetFloatProperty("m_flBloomStrength"), ["screenStrength"] = b.GetFloatProperty("m_flScreenBloomStrength"),
+            ["blurStrength"] = b.GetFloatProperty("m_flBlurBloomStrength"), ["threshold"] = b.GetFloatProperty("m_flBloomThreshold"),
+            ["thresholdWidth"] = b.GetFloatProperty("m_flBloomThresholdWidth"), ["skyboxStrength"] = b.GetFloatProperty("m_flSkyboxBloomStrength"),
+            ["startValue"] = b.GetFloatProperty("m_flBloomStartValue"),
+        };
+        var weights = b.GetArray<double>("m_flBlurWeight");
+        if (weights != null) o["weights"] = new JsonArray(weights.Take(8).Select(v => (JsonNode)JsonValue.Create(v)!).ToArray());
+        var tints = b.GetArray("m_vBlurTint");
+        if (tints != null) o["tints"] = new JsonArray(tints.Take(8).Select(t => (JsonNode)new JsonArray(t.ToVector3() is var v ? new JsonNode[] { v.X, v.Y, v.Z } : [])).ToArray());
+        return o;
     }
 
     static string Fnv(string s)

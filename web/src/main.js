@@ -132,7 +132,7 @@ function applySettings() {
   if (S.engine) S.engine.humans = rule('humans');
   G.audio.setVolumes({ sfx: settings.sfx, music: settings.music });
   applyGamma(settings.gamma); // r_fullscreen_gamma (ui/gamma.js)
-  G.renderer.setQuality({ renderScale: settings.renderScale, msaa: settings.msaa, pixelCap: settings.pixelCap });
+  G.renderer.setQuality({ renderScale: settings.renderScale, msaa: settings.msaa, pixelCap: settings.pixelCap, bloom: settings.bloom });
   G.renderer.lighting.setOptions({ fog: settings.fog, reflections: settings.reflections, particleLights: settings.particleLights });
   G.stream?.setMode(streamMode());
 }

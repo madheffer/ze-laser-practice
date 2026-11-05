@@ -13,7 +13,8 @@
 // Without an engine (no run yet) the map-wide pick stands: the enabled master, else the first enabled volume.
 // A volume whose .vpost the bake did not export (a stock CS2 one) is skipped: the map-wide pick shows instead.
 // Not yet: auto exposure (CS2 meters the frame and clamps to the volume's min / max exposure; here the exposure is 1
-// clamped into that range, which is what every baked map so far asks for at rest), bloom, vignette.
+// clamped into that range, which is what every baked map so far asks for at rest), vignette. Bloom: the volume's
+// m_bloomParams ride along here (cleanBloom, blended in a fade) and world/bloom.js draws them.
 // UNSETTLED: CS2's client blend between two volumes (parameter lerp vs a blend of the two results) is not
 // decompiled; the lerp here matches both at the ends of a fade.
 import * as THREE from 'three';
@@ -53,6 +54,25 @@ const cleanParams = (p) => {
   for (const k of Object.keys(DEFAULTS)) q[k] = finite(p?.[k], DEFAULTS[k]);
   if (q.m_flToeDenom === 0) q.m_flToeDenom = DEFAULTS.m_flToeDenom;
   return q;
+};
+// a .vpost's bloom block (lasers-bake --post): null without one
+const cleanBloom = (b) => (b && typeof b === 'object' ? {
+  strength: finite(b.strength, 0), screenStrength: finite(b.screenStrength, 0), blurStrength: finite(b.blurStrength, 0),
+  threshold: finite(b.threshold, 0), thresholdWidth: finite(b.thresholdWidth, 0),
+  weights: Array.from({ length: 5 }, (_, k) => finite(b.weights?.[k], 0.2)),
+  tints: Array.from({ length: 5 }, (_, k) => [0, 1, 2].map((q) => finite(b.tints?.[k]?.[q], 1))),
+} : null);
+const NO_BLOOM = cleanBloom({});
+const lerp = (a, b, w) => a + (b - a) * w;
+// a fade between two volumes blends the bloom numbers like the rest (no bloom = zero strengths)
+const mixBloom = (a, b, w) => {
+  if (!a && !b) return null;
+  const x = a || NO_BLOOM, y = b || NO_BLOOM;
+  const o = {};
+  for (const k of ['strength', 'screenStrength', 'blurStrength', 'threshold', 'thresholdWidth']) o[k] = lerp(x[k], y[k], w);
+  o.weights = x.weights.map((v, k) => lerp(v, y.weights[k], w));
+  o.tints = x.tints.map((t, k) => t.map((v, q) => lerp(v, y.tints[k][q], w)));
+  return o;
 };
 const vpostKey = (vol) => assetKey(vol?.postprocessing).replace(/_c$/, '');
 
@@ -125,7 +145,7 @@ export class PostProcess {
       if (!hash) return;
       try {
         const post = await fetchJson(versioned(`${base}lighting/post/${hash}.json`, lightmaps.version));
-        const prof = { params: cleanParams(post?.tonemap), lut: null, dim: 0 };
+        const prof = { params: cleanParams(post?.tonemap), bloom: cleanBloom(post?.bloom), lut: null, dim: 0 };
         const dim = post?.lutDim;
         if (Number.isInteger(dim) && dim >= 2 && dim <= MAX_LUT) {
           const buf = await fetchBuffer(versioned(`${base}lighting/post/${hash}.lut`, lightmaps.version));
@@ -158,7 +178,7 @@ export class PostProcess {
     const prof = vol ? this.profiles.get(vpostKey(vol)) : null;
     const params = prof?.params || cleanParams(DEFAULTS);
     const lut = this.dim && prof?.lut ? (prof.dim === this.dim ? Float32Array.from(prof.lut) : lutAt(prof.lut, prof.dim, this.dim)) : null;
-    return { params, exposure: volumeExposure(vol) * 2 ** params.m_flExposureBias, lut };
+    return { params, exposure: volumeExposure(vol) * 2 ** params.m_flExposureBias, lut, bloom: prof?.bloom || null };
   }
 
   target(e) {
@@ -177,6 +197,7 @@ export class PostProcess {
     if (!s) return;
     this.setParams(s.params);
     this.uniforms.cs2Exposure.value = s.exposure;
+    this.bloom = s.bloom || null; // world/bloom.js reads it each frame
     this.shown = s;
     if (!this.lutTex) { this.uniforms.cs2LutWeight.value = 0; return; }
     if (!s.lut) { this.uniforms.cs2LutWeight.value = 0; return; }
@@ -213,6 +234,6 @@ export class PostProcess {
       lut = new Float32Array(la.length); // its own array: the next fade may start from this
       for (let i = 0; i < la.length; i++) lut[i] = la[i] + (lb[i] - la[i]) * w;
     }
-    return { params, exposure: a.exposure + (b.exposure - a.exposure) * w, lut };
+    return { params, exposure: a.exposure + (b.exposure - a.exposure) * w, lut, bloom: mixBloom(a.bloom, b.bloom, w) };
   }
 }

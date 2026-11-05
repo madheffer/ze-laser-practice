@@ -100,6 +100,11 @@ public static class Program
             // lasers-bake --sky <workshop.vpk> <web/public/maps/<name>>: only the skies + reflection cubemaps (SkyBake.cs)
             return LightingBake.Run(Path.GetFullPath(args[1]), Path.GetFullPath(args[2]), skyOnly: true);
         }
+        if (args.Length >= 3 && args[0] == "--post")
+        {
+            // lasers-bake --post <workshop.vpk> <web/public/maps/<name>>: only the post-processing volumes (LightingBake.cs)
+            return LightingBake.Run(Path.GetFullPath(args[1]), Path.GetFullPath(args[2]), postOnly: true);
+        }
         if (args.Length >= 3 && args[0] == "--lighting")
         {
             // lasers-bake --lighting <workshop.vpk> <web/public/maps/<name>>: the map's baked CS2 lighting (LightingBake.cs)

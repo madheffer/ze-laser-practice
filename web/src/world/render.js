@@ -9,6 +9,7 @@ import { assetKey } from '../lib/paths.js';
 import { setFxCamera, fxShared } from '../fx/effects.js';
 import { sceneCopyWanted } from '../fx/particles/render/spritecard.js';
 import { SceneCopy } from './scenecopy.js';
+import { Bloom, BLOOM_POST_GLSL } from './bloom.js';
 import { PropAnimator, cloneModel } from './anim.js';
 
 // an entity's world transform as a particle control point: position and its forward / left / up axes
@@ -66,7 +67,9 @@ export class Renderer {
 
   // performance settings: render resolution (x the screen's pixel ratio) and MSAA on the HDR target
   // pixelCap: the most of the screen's pixel ratio to draw at (phones are 3x; app/graphics.js Low draws at 1x)
-  setQuality({ renderScale = 1, msaa = true, pixelCap = 2 } = {}) {
+  // bloom: CS2's bloom pass (bloom.js; off on Low)
+  setQuality({ renderScale = 1, msaa = true, pixelCap = 2, bloom = true } = {}) {
+    this.bloomOn = bloom !== false;
     const ratio = Math.min(window.devicePixelRatio, Math.max(0.5, pixelCap)) * Math.min(1, Math.max(0.25, renderScale));
     if (Math.abs(this.renderer.getPixelRatio() - ratio) > 1e-3) { this.renderer.setPixelRatio(ratio); this.resize(); }
     if (this.msaa !== msaa) { this.msaa = msaa; if (this.hdr) { this.hdr.dispose(); this.hdr = null; this.blitScene = null; } }
@@ -486,14 +489,19 @@ export class Renderer {
     const size = r.getDrawingBufferSize(this._size || (this._size = new THREE.Vector2()));
     if (!this.hdr) {
       this.hdr = new THREE.WebGLRenderTarget(size.x, size.y, { type: THREE.HalfFloatType, samples: this.msaa ? 4 : 0 });
+      this.bloom ||= new Bloom();
       const mat = new THREE.ShaderMaterial({
-        uniforms: { tHdr: { value: this.hdr.texture }, ...this.post.uniforms },
+        uniforms: { tHdr: { value: this.hdr.texture }, ...this.post.uniforms, ...this.bloom.uniforms },
         vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
         fragmentShader: `// three prepends its tone-mapping functions (toneMapped material, drawn to the screen)
 // CS2's curve, then sRGB, then the map's colour lookup on the sRGB values (world/tonemap.js)
 uniform sampler2D tHdr; varying vec2 vUv;
 ${CS2_POST_GLSL}
-void main() { vec3 c = cs2Tonemap(texture2D(tHdr, vUv).rgb); vec4 s = sRGBTransferOETF(vec4(clamp(c, 0.0, 1.0), 1.0)); s.rgb = cs2ColorCorrect(s.rgb); gl_FragColor = s; }`,
+${BLOOM_POST_GLSL}
+void main() {
+  vec3 c = cs2Tonemap(cs2BloomPre(texture2D(tHdr, vUv).rgb, vUv, cs2Exposure)); vec4 s = sRGBTransferOETF(vec4(clamp(c, 0.0, 1.0), 1.0));
+  s.rgb = cs2ColorCorrect(cs2BloomScreen(s.rgb, vUv, cs2Exposure)); gl_FragColor = s;
+}`,
         depthTest: false, depthWrite: false, // (toneMapped stays true: three then feeds toneMappingExposure)
       });
       this.blitScene = new THREE.Scene();
@@ -505,6 +513,10 @@ void main() { vec3 c = cs2Tonemap(texture2D(tHdr, vUv).rgb); vec4 s = sRGBTransf
     (this.sceneCopy ||= new SceneCopy(this.scene, sceneCopyWanted)).frame(r, this.hdr, this.camera);
     r.setRenderTarget(this.hdr);
     r.render(this.scene, this.camera);
+    // CS2's bloom from the post volume on screen (bloom.js; this.bloomOn: the graphics setting)
+    this.bloom.enabled = this.bloomOn !== false;
+    this.bloom.params = this.post.bloom;
+    this.bloom.render(r, this.hdr);
     r.setRenderTarget(null);
     r.render(this.blitScene, this.blitCam);
   }

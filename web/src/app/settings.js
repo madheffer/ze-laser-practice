@@ -31,7 +31,7 @@ export const DEFAULTS = {
   // graphics: the preset those knobs come from (app/graphics.js): Medium (Low on a phone) until one is picked,
   // 'custom' after a hand change. pixelCap: the screen pixel ratio render resolution multiplies (phones are 3x). particleLights: effects
   // lighting the world. graphicsChosen: the player picked a preset (the map list stops asking)
-  graphics: 'medium', pixelCap: 2, particleLights: true, graphicsChosen: false,
+  graphics: 'medium', pixelCap: 2, particleLights: true, bloom: true, graphicsChosen: false,
   streamDistance: 1, // a streamed world (world/stream.js): 1 auto (area, then what can be seen), 2 area only, 0 the whole map
   touchSens: 1, touchCrouch: false, // phone / tablet: look speed multiplier, crouch as a toggle instead of hold
 };

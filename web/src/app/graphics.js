@@ -16,15 +16,15 @@ export const PRESET_NAMES = ['low', 'medium', 'high'];
 export const PRESETS = {
   high: {
     quality: 3, renderScale: 1, pixelCap: 2, msaa: true, fog: true, reflections: true, bakedLighting: true,
-    particleLights: true, streamDistance: 1,
+    particleLights: true, streamDistance: 1, bloom: true,
   },
   medium: {
     quality: 2, renderScale: 0.85, pixelCap: 1.5, msaa: false, fog: true, reflections: true, bakedLighting: true,
-    particleLights: true, streamDistance: 1,
+    particleLights: true, streamDistance: 1, bloom: true,
   },
   low: {
     quality: 1, renderScale: 0.75, pixelCap: 1, msaa: false, fog: false, reflections: false, bakedLighting: true,
-    particleLights: false, streamDistance: 2,
+    particleLights: false, streamDistance: 2, bloom: false,
   },
 };
 
