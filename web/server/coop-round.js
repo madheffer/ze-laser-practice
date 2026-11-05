@@ -10,7 +10,7 @@
 // Players only ever talk to the server, so nobody learns anyone else's address.
 import { cleanText, healHolders } from '../src/lib/room-rules.js';
 import { TICK, COUNTDOWN } from '../src/world/run-engine.js'; // COUNTDOWN: s a round's run waits before the stage starts
-import { PlayerCheck } from './coop-check.js';
+import { PlayerCheck, MAX_PING } from './coop-check.js';
 
 // The round's clock starts only when every player has loaded the stage and drawn it (their 'ready'), so a slow
 // device (a phone streaming the world) never meets the lasers on a black screen. Who holds the rest up for too long
@@ -47,7 +47,7 @@ export class Round {
     this.clockAt = 0; this.bossAt = 0;
     this.ended = false;
     this.players = new Map(room.members.map((c) => [c.id, { id: c.id, name: c.name, steamId: c.user?.steamId || null, alive: true, deadAt: null, cheat: '', budget: { at: 0, n: 0 },
-      load: 0, loadAt: Date.now(), readyMs: null, left: false }])); // left: gone or never loaded (out, not beaten)
+      load: 0, loadAt: Date.now(), readyMs: null, left: false, ping: 0 }])); // left: gone or never loaded (out, not beaten)
     // who starts holding the map's heal: the room's choice against who is in this round
     this.holders = assets.heals.length ? healHolders(rules.heal, [...this.players.keys()], this.seed) : [];
     for (const p of this.players.values()) {
@@ -88,9 +88,10 @@ export class Round {
   }
 
   // ---- loading: every player says when its stage is loaded and drawn; the clock starts when all have
-  onReady(c) {
+  onReady(c, m = {}) {
     const p = this.players.get(c.id);
     if (this.started || this.ended || !p?.alive || this.ready.has(c.id)) return;
+    this.setPing(p, m.ping);
     this.ready.add(c.id);
     p.load = 1; p.readyMs = Date.now() - this.loadT0;
     this.sendWait();
@@ -101,10 +102,22 @@ export class Round {
   onLoad(c, m) {
     const p = this.players.get(c.id);
     if (this.started || this.ended || !p?.alive || this.ready.has(c.id)) return;
-    const v = Math.min(0.99, Math.max(0, Number(m.p)));
-    if (!Number.isFinite(v) || v <= p.load + 0.005) return;
+    this.setPing(p, m.ping);
+    const n = Number(m.p);
+    if (typeof m.p !== 'number' || !Number.isFinite(n)) return;
+    const v = Math.min(0.99, Math.max(0, n));
+    if (v <= p.load + 0.005) return;
     p.load = v; p.loadAt = Date.now();
     this.waitDirty = true;
+  }
+
+  // the player's simulated ping (ms, their own setting): untrusted, so an integer clamped to 0..MAX_PING, and only
+  // taken while the round loads, so nobody changes it mid-round. It widens that player's own checks only
+  // (coop-check.js MAX_PING): the round clock, the boss damage schedule and the other players' copies never see it.
+  setPing(p, ms) {
+    if (typeof ms !== 'number' || !Number.isFinite(ms)) return;
+    p.ping = Math.max(0, Math.min(MAX_PING, Math.round(ms)));
+    p.check.setPing(p.ping);
   }
 
   // who is ready and everyone's progress (percent): the loading screens' roster

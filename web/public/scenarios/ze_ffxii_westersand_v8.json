@@ -5,9 +5,10 @@
   "scenarios": [
     {
       "id": "chaos",
-      "group": "Most played",
+      "group": "Airship (ending)",
       "featured": true,
       "name": "Chaos – laser boss",
+      "summary": "Jump or crouch Chaos's deck lasers",
       "description": "The airship finale's Chaos fight. A random laser (low, mid or high) fires down the deck every 1.2 s until Chaos dies: jump the low and mid ones, crouch the high one. 380 hits per segment at 20 humans (50 + 16.5 per human, from the map's HP trigger), 6 segments; the 25 s Holy hit takes off 9 × 125.",
       "spawn": {
         "origin": [
@@ -128,6 +129,7 @@
       "id": "chaos_lasers",
       "parent": "chaos",
       "name": "Laser stream only",
+      "summary": "Just the lasers: jump low, crouch high",
       "description": "Chaos's laser timer with no HP to shoot: a random low / mid / high laser every 1.2 s for 40 s.",
       "spawn": {
         "origin": [
@@ -215,8 +217,9 @@
     },
     {
       "id": "desert_dragon",
-      "group": "Act 1 – Desert",
+      "group": "Main stages",
       "name": "Dragon – desert hall",
+      "summary": "Dragon fight in the volcano hall",
       "description": "The stage-1 dragon in the volcano hall. An attack every 7 s (fire on the left or right half, electro floor, lure, wind, heal, water) and a fire nova or meteor after every 4th. 50 + 43 HP per human per segment, 6 segments; 80 s after it lands Holy goes off, and 20 s later the hall is nuked if it still lives. You start in the hall door (its HP trigger) 4 s before it closes; anyone still in the corridor at 54 s is sent to the zombie cage.",
       "spawn": {
         "origin": [
@@ -322,6 +325,7 @@
     {
       "id": "dragon_fire",
       "name": "Fire – one half",
+      "summary": "Fire on one half: switch sides",
       "description": "Fire on the right half of the hall (0.2–5 s, 30/s): get to the other side.",
       "parent": "desert_dragon",
       "spawn": {
@@ -410,6 +414,7 @@
     {
       "id": "dragon_electro",
       "name": "Electro floor",
+      "summary": "Crouch under the electro field",
       "description": "The electro floor (0.2–5 s, 25/s) starts 59 u above the floor: crouch.",
       "parent": "desert_dragon",
       "spawn": {
@@ -497,8 +502,9 @@
     },
     {
       "id": "desert_ending",
-      "group": "Act 1 – Desert",
+      "group": "Main stages",
       "name": "Desert ending – dragon and guard lasers",
+      "summary": "Kill the crawling dragon, then guard lasers",
       "description": "The 80 s hold at the end of the stage-1 road. A dragon wakes at 12 s and crawls down the road (touching it kills): kill it within 20 s (50 + 15 HP per human, 6 segments) or Holy nukes everyone. Fireballs roll down the road. At 74–76 s the guard fires 3 random lasers across the end platform (low: jump, high: crouch); the end trigger opens at 80 s.",
       "spawn": {
         "origin": [
@@ -603,6 +609,7 @@
       "id": "desert_guard_lasers",
       "parent": "desert_ending",
       "name": "Guard lasers",
+      "summary": "Three random guard lasers: jump or crouch",
       "description": "The guard's 3 random lasers at 3, 4 and 5 s, sweeping the end platform at 1300 u/s. Low ones (39–47 u up): jump. High ones (59–99 u): crouch.",
       "spawn": {
         "origin": [
@@ -692,6 +699,7 @@
       "id": "desert_guard_lasers_insane",
       "parent": "desert_ending",
       "name": "Guard lasers (insane)",
+      "summary": "Faster guard lasers, tighter timing",
       "description": "The insane version: lasers at 3, 3.85 and 4.7 s, sped up to 1400 u/s.",
       "spawn": {
         "origin": [
@@ -779,8 +787,9 @@
     },
     {
       "id": "belias",
-      "group": "Act 2 – Tomb",
+      "group": "Main stages",
       "name": "Belias",
+      "summary": "Fire esper: firewaves, lures, falling tiles",
       "description": "The tomb's fire esper. The fight starts 10 s after the first human enters. Every 5 s a random attack (firewave sweep either way, a lure into an explosion, falling tiles), and a random firewave every 2 s between. At 1 segment left he goes critical for 20 s (immune) and the attacks speed up. 50 + 43 HP per human per segment, 6 segments.",
       "spawn": {
         "origin": [
@@ -878,6 +887,7 @@
     {
       "id": "belias_sweep",
       "name": "Firewave sweep",
+      "summary": "Jump eight sweeping firewaves",
       "description": "Eight firewaves, one every 0.15 s, sweeping across the arena.",
       "parent": "belias",
       "spawn": {
@@ -978,6 +988,7 @@
     {
       "id": "belias_sweep_back",
       "name": "Firewave sweep (other way)",
+      "summary": "Firewaves sweeping from the far side",
       "description": "The same sweep from the far side.",
       "parent": "belias",
       "spawn": {
@@ -1120,6 +1131,7 @@
     {
       "id": "belias_lure",
       "name": "Lure + explosion",
+      "summary": "Resist the pull, escape the explosions",
       "description": "A 3.5 s pull toward Belias, then three explosions in front of him at 4.25 s.",
       "parent": "belias",
       "spawn": {
@@ -1220,6 +1232,7 @@
     {
       "id": "belias_tiles",
       "name": "Falling tiles",
+      "summary": "Dodge tiles falling from the ceiling",
       "description": "Eight random tiles of the 12 drop from the ceiling over 1 s.",
       "parent": "belias",
       "spawn": {
@@ -1354,6 +1367,7 @@
     {
       "id": "belias_xzone",
       "name": "Critical: the X-zone",
+      "summary": "Survive the X-zone's rolling fire",
       "description": "Belias at his last segment: 3 s in, everyone in the arena is teleported to the X-zone, where Belias's fire (600 damage on touch) rolls through and explosions go off for 17 s, then you are sent back to the arena.",
       "parent": "belias",
       "spawn": {
@@ -1457,8 +1471,9 @@
     },
     {
       "id": "gabranth_tomb",
-      "group": "Act 2 – Tomb",
+      "group": "Main stages",
       "name": "Gabranth – tomb chase",
+      "summary": "Stop Gabranth's charge down the corridor",
       "description": "99 s after Belias falls, Gabranth charges down the tomb corridor (350 u/s, touching him kills). Kill him before he reaches the end, about 10 s, or the tomb is nuked. 5 + 6 HP per human per segment (125 at 20 humans), 6 segments. On death he fires one last laser down the corridor.",
       "spawn": {
         "origin": [
@@ -1574,6 +1589,7 @@
       "id": "gabranth_last_laser",
       "parent": "gabranth_tomb",
       "name": "Last laser",
+      "summary": "His parting laser: jump or crouch",
       "description": "Gabranth's parting shot: one random laser (low: jump, high: crouch) down the corridor at 2000 u/s.",
       "spawn": {
         "origin": [
@@ -1666,8 +1682,9 @@
     },
     {
       "id": "guard_gabranth",
-      "group": "Act 3 – Airship",
+      "group": "Airship (ending)",
       "name": "Gabranth – airship boss",
+      "summary": "Kite Gabranth around the airship ring",
       "description": "The airship's Gabranth (Epic, normal difficulty): he chases the team round the ring (120-damage touch) while a random summon attack lands every 10.5 s. 50 + 30 HP per human per segment, 6 segments.",
       "spawn": {
         "origin": [
@@ -1786,9 +1803,10 @@
     },
     {
       "id": "airship_ending",
-      "group": "Act 3 – Airship",
+      "group": "Airship (ending)",
       "full": true,
       "name": "Chaos → plate escape (Epic ending)",
+      "summary": "Chaos fight, then jump to the plate",
       "description": "Chaos fight, then the run to the plate under it (Chaos_End_Epic): the plate rises 5 s after the first human reaches it and the airship is nuked 3.5 s later. The plate is across the void from the deck: jump the stepping stones. Win on the plate.",
       "spawn": {
         "origin": [

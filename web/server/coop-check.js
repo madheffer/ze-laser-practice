@@ -29,6 +29,15 @@ const TELEPORT_SLACK = 96; // units: the tick after a map teleport, this close t
 const KNIFE_REACH = 32; // units added to a knife's range (hull / latency)
 const BURST = 6; // AK rounds that may arrive at once (network jitter bunches a few 100 ms batches)
 const RELOAD_SLACK = 0.3; // s off a reported reload (the report travels; the last rounds' hits may trail it)
+// A player's simulated ping (their own setting, 0-500 ms, sent with 'load' / 'ready': server/coop-round.js) is theirs
+// alone: it never touches the round clock, the boss damage schedule (coop-round.js BD_DELAY_TICKS: the same tick on
+// every copy, so the boss has one HP for everyone) or another player's copy. It widens two of this player's checks:
+//   - behind(): the run may trail the round clock by its ping too, on top of BEHIND_LIMIT's 3 s of real jitter;
+//   - shots: their client draws the map's entities ping late (render.js delay) and aims at that, so a hit is also
+//     checked against where the boss was then (lag compensation, as CS2's, at most MAX_PING back).
+// AHEAD_LIMIT doesn't change (a ping only ever makes a client later), nor do the fire-rate / reload checks (they
+// count shots over wall time, which a constant delay doesn't change).
+export const MAX_PING = 500;
 
 const len3 = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 
@@ -53,6 +62,7 @@ export class PlayerCheck {
     this.vz = 0; this.air = []; this.wasAir = false;
     this.uses = []; // ticks after which the player pressed their map item (E)
     this.bd = []; // [{ tick, hits }] boss damage to apply when this run reaches that tick
+    this.ping = 0; this.lagTicks = 0; this.past = []; // past: [{ tick, hulls: Map boss id -> hulls }], lagTicks + 1 long
     this.shots = { tokens: BURST, rounds: WEAPONS.gun.clip, reloadUntil: 0, knife: 2, at: Date.now() };
     const me = this;
     this.stub = { centre: () => [me.pos[0], me.pos[1], me.pos[2] + me.height / 2], half: () => [CS.halfWidth, CS.halfWidth, me.height / 2] };
@@ -125,7 +135,26 @@ export class PlayerCheck {
   // boss damage the round applied at round tick `tick` (every client applies it as it arrives)
   queueBossDamage(tick, hits) { this.bd.push({ tick, hits }); }
 
-  behind(roundTick) { return this.alive && this.ticks < roundTick - BEHIND_LIMIT; }
+  behind(roundTick) { return this.alive && this.ticks < roundTick - BEHIND_LIMIT - this.lagTicks; }
+
+  // ms, already checked by the round (an integer in 0..MAX_PING)
+  setPing(ms) { this.ping = ms; this.lagTicks = Math.ceil(ms / 1000 / TICK); if (!ms) this.past = []; }
+
+  // the bosses that can be shot now: the stage's boss targets, alive with health
+  bosses() {
+    const out = [];
+    for (const b of this.scenario?.bosses || []) for (const e of this.engine.find(b.target)) if (e.alive && e.state.health != null) out.push(e);
+    return out;
+  }
+
+  // with a ping: where each boss is this tick, for the shots that arrive lagTicks later
+  recordPast() {
+    if (!this.lagTicks || !this.scenario?.bosses?.length) return;
+    const hulls = new Map();
+    for (const e of this.bosses()) hulls.set(e.id, e.hulls()); // a new array whenever it moves: no copy needed
+    this.past.push({ tick: this.ticks, hulls });
+    while (this.past.length > this.lagTicks + 1) this.past.shift();
+  }
 
   step(pos, ducked) {
     const { engine, run } = this;
@@ -157,6 +186,7 @@ export class PlayerCheck {
         this.skipMove = true; this.expectAt = [...ev.origin];
       } else if (ev.type === 'push') this.boostFor(ev.speed);
     }
+    this.recordPast();
     if (run.started && run.endlessTick) run.endlessTick(TICK);
     if (run.started && !run.endless && this.scenario?.winAfter && engine.time - run.startTime >= this.scenario.winAfter) this.onOutcome('win');
   }
@@ -256,15 +286,17 @@ export class PlayerCheck {
     s.at = now;
     s.tokens = Math.min(BURST, s.tokens + dt / WEAPONS.gun.cycle);
     s.knife = Math.min(BURST / 2, s.knife + dt / WEAPONS.knife.slash.cycle);
-    const bosses = new Set();
-    for (const b of this.scenario?.bosses || []) for (const e of this.engine.find(b.target)) if (e.alive && e.state.health != null) bosses.add(e);
+    const bosses = this.bosses();
+    const then = this.lagTicks ? this.past[0] : null; // the oldest kept: what a client lagTicks behind saw
     const out = [];
     for (const [id, dmg, n] of hits) {
-      const e = [...bosses].find((x) => x.id === id);
+      const e = bosses.find((x) => x.id === id);
       const kind = dmg === WEAPONS.gun.damage ? 'gun' : [WEAPONS.knife.slash.first, WEAPONS.knife.slash.follow, WEAPONS.knife.stab.damage].includes(dmg) ? 'knife' : null;
       if (!e || !kind) { this.strike('shot', `damage ${dmg} on ${id}`); continue; }
       const range = kind === 'gun' ? WEAPONS.gun.range : (dmg === WEAPONS.knife.stab.damage ? WEAPONS.knife.stab.range : WEAPONS.knife.slash.range) + KNIFE_REACH;
-      if (!this.canHit(e, range)) continue; // out of sight / reach: dropped (lag can do this honestly)
+      // out of sight / reach, now and where the player's ping showed it: dropped (real lag can do this honestly)
+      const past = then?.hulls.get(e.id);
+      if (!this.canHit(e.hulls(), range) && !(past && this.canHit(past, range))) continue;
       let shotsWanted = Math.ceil(n / mult), ok = 0;
       while (shotsWanted-- > 0) {
         if (kind === 'gun') {
@@ -293,10 +325,10 @@ export class PlayerCheck {
   }
 
   // a clear line from the eye to the boss hull (its centre or a corner), within range
-  canHit(e, range) {
+  canHit(hulls, range) {
     const eye = this.eye();
     const tr = makeTrace();
-    for (const h of e.hulls() || []) {
+    for (const h of hulls || []) {
       const pts = [[(h.min[0] + h.max[0]) / 2, (h.min[1] + h.max[1]) / 2, (h.min[2] + h.max[2]) / 2]];
       for (let i = 0; i < 8; i++) pts.push([i & 1 ? h.max[0] : h.min[0], i & 2 ? h.max[1] : h.min[1], i & 4 ? h.max[2] : h.min[2]]);
       // the nearest point of the box, for reach

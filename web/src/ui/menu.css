@@ -103,83 +103,7 @@ body.touch :is(#menu, .sheet) .kb { display: none; }
 @keyframes map-load { from { background-position: -200px 0; } to { background-position: 200px 0; } }
 .map-card.bare .map-art { filter: saturate(0.35); }
 
-/* ---- the picked map: header (title, what it is, a jump bar of its parts), then a section per part */
-.map-head { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
-.map-title { margin: 0; font: 700 24px/1.1 'Stratum2', 'Segoe UI', sans-serif; letter-spacing: 0.04em; text-transform: uppercase; }
-.map-sub { margin: 0; font-size: 13px; color: var(--dim); max-width: 90ch; }
-.part-nav { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
-.part-jump { min-height: calc(var(--tap) - 6px); padding: 0 12px; border-radius: 999px; border: 1px solid var(--line); background: #0b1016; font-size: 12.5px; font-weight: 600; }
-.part-jump:hover { border-color: #3b4c60; color: #fff; }
-.part-sec { scroll-margin-top: 4px; }
-.part-sec + .part-sec { margin-top: 18px; }
-.part-h { display: flex; align-items: baseline; gap: 8px; margin: 0 0 8px; font: 600 11px 'Segoe UI', sans-serif; letter-spacing: 0.14em; text-transform: uppercase; color: var(--dim); }
-.part-h small { font-size: 11px; letter-spacing: 0; opacity: 0.7; font-variant-numeric: tabular-nums; }
-.part-h::after { content: ''; flex: 1; height: 1px; background: var(--line); align-self: center; }
-
-/* ---- stage picker */
-/* One stage per row (a mixed-width grid left holes beside full-width cards); a boss's attacks get a grid inside */
-#scenarios, .part-grid { display: flex; flex-direction: column; gap: 10px; }
-
-.stage { position: relative; display: flex; min-width: 0; background: #121922; border: 1px solid var(--line); border-radius: 10px; transition: border-color 0.12s, transform 0.12s; }
-.stage:hover, .stage:focus-within { border-color: #3b4c60; }
-.stage-main {
-  flex: 1; min-width: 0; text-align: left; background: none; border: 0; border-radius: 10px 0 0 10px; padding: 12px 14px;
-  display: flex; flex-direction: column; gap: 4px; min-height: 64px;
-}
-.stage:hover .stage-main b { color: #fff; }
-.stage-kicker { font-size: 10.5px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--dim); opacity: 0.85; }
-.stage-main b { font-size: 15px; font-weight: 700; display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
-.stage-main .tags i {
-  font-style: normal; font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--gold);
-  border: 1px solid #5a4320; border-radius: 3px; padding: 0 5px;
-}
-.stage-desc {
-  font-size: 12.5px; line-height: 1.4; color: var(--dim);
-  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden;
-}
-.stage.open .stage-desc { -webkit-line-clamp: unset; line-clamp: none; }
-.stage-pb { font-size: 12px; color: var(--gold); font-variant-numeric: tabular-nums; }
-
-/* the right rail: endless (infinity) and "more" */
-.stage-rail { display: flex; flex-direction: column; border-left: 1px solid var(--line); }
-.stage-rail button {
-  flex: 1; width: max(44px, var(--tap)); min-height: var(--tap); border: 0; background: none; color: var(--dim); font-size: 13px;
-}
-.stage-rail button + button { border-top: 1px solid var(--line); }
-.stage-rail button:last-child { border-radius: 0 10px 10px 0; }
-.stage-rail button:first-child:not(:last-child) { border-radius: 0 10px 0 0; }
-.stage-rail button:hover { background: rgba(255, 255, 255, 0.05); color: var(--text); }
-.stage-rail .endless { color: #4cff9a; font-size: 22px; line-height: 1; background: rgba(17, 34, 26, 0.6); }
-.stage-rail .endless:hover { background: #11221a; color: #8affbe; }
-.stage-rail .more[aria-expanded=true] { color: var(--text); }
-
-.stage.featured { grid-column: 1 / -1; border-color: #7a2d2d; background: linear-gradient(100deg, #2e1515 0%, #1a1418 45%, #121922 100%); }
-.stage.featured .stage-main { padding: 18px 20px; min-height: 96px; }
-.stage.featured .stage-main b { font: 700 22px/1.1 'Stratum2', 'Segoe UI', sans-serif; letter-spacing: 0.02em; }
-.stage.featured .stage-desc { font-size: 13.5px; -webkit-line-clamp: 2; max-width: 80ch; }
-.stage.featured:hover { border-color: var(--accent); }
-.stage.full { border-color: #4a3a1a; background: #19150f; }
-.stage.full:hover { border-color: var(--gold); }
-
-/* a boss: its card, then its single attacks folded under it */
-.family { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
-.family:has(.attacks[open]) { grid-column: 1 / -1; }
-.attacks { border: 1px dashed var(--line); border-radius: 10px; }
-.attacks summary {
-  min-height: var(--tap); display: flex; align-items: center; gap: 8px; padding: 0 14px; cursor: pointer; list-style: none;
-  font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--dim); border-radius: 10px;
-}
-.attacks summary::-webkit-details-marker { display: none; }
-.attacks summary::before { content: ''; width: 7px; height: 7px; border: solid currentColor; border-width: 0 2px 2px 0; transform: rotate(-45deg); transition: transform 0.15s; }
-.attacks[open] summary::before { transform: rotate(45deg); }
-.attacks summary:hover { color: var(--text); }
-.attacks summary .count { margin-left: auto; font-variant-numeric: tabular-nums; opacity: 0.7; }
-.attack-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr)); gap: 8px; padding: 0 10px 10px; }
-.stage.child .stage-main { padding: 9px 12px; min-height: 52px; }
-.stage.child .stage-main b { font-size: 14px; }
-.stage.child .stage-desc { -webkit-line-clamp: 1; line-clamp: 1; }
-
-.stage.free { border-style: dashed; background: transparent; }
+/* ---- the picked map's stages: ui/stage-list.css */
 
 /* ---- settings */
 .settings-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); gap: 12px; align-items: start; }
@@ -246,7 +170,6 @@ body.touch .keys-card { display: none; }
   .map-pick { justify-self: stretch; justify-content: space-between; }
   .tab-panels { padding: 12px max(12px, var(--safe-r)) 12px max(12px, var(--safe-l)); }
   .menu-foot { padding-bottom: max(6px, var(--safe-b)); }
-  .stage.featured .stage-main b { font-size: 19px; }
 }
 /* phone landscape (short): one compact bar, full-bleed panel */
 @media (max-height: 520px) and (orientation: landscape) {
@@ -259,19 +182,5 @@ body.touch .keys-card { display: none; }
   .map-name { display: none; }
   .tab-panels { padding: 10px max(12px, var(--safe-r)) 10px max(12px, var(--safe-l)); }
   .menu-foot { display: none; }
-  .stage.featured .stage-main { padding: 12px 16px; min-height: 0; }
-  .stage.featured .stage-main b { font-size: 18px; }
 }
-@media (prefers-reduced-motion: reduce) { .map-card, .map-card.loading .map-progress, .stage, .attacks summary::before, .card .chk input, .card .chk input::after { transition: none; } }
-
-/* the map's heal option (ui/menu.js healToggle): a switch in the stage list header, only on maps with a heal item */
-.heal-toggle { display: flex; align-items: center; gap: 10px; margin-top: 6px; padding: 8px 12px; border: 1px solid #3a2f4a; border-radius: 8px; background: #17131d; font-size: 13px; cursor: pointer; max-width: 640px; }
-.heal-toggle small { display: block; color: var(--dim); font-size: 11.5px; margin-top: 2px; }
-.heal-toggle b { color: #ff9ad5; }
-.heal-toggle input {
-  appearance: none; -webkit-appearance: none; flex: none; position: relative; width: 38px; height: 22px; margin: 0;
-  border-radius: 11px; background: #26303c; border: 1px solid #34414f; cursor: pointer;
-}
-.heal-toggle input::after { content: ''; position: absolute; left: 2px; top: 2px; width: 16px; height: 16px; border-radius: 50%; background: #a8b4c0; transition: transform 0.15s; }
-.heal-toggle input:checked { background: #6a2a55; border-color: #ff9ad5; }
-.heal-toggle input:checked::after { transform: translateX(16px); background: #fff; }
+@media (prefers-reduced-motion: reduce) { .map-card, .map-card.loading .map-progress, .card .chk input, .card .chk input::after { transition: none; } }

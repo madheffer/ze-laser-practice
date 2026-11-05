@@ -108,6 +108,24 @@ Cache: files are fetched with the manifest's / `lighting.json`'s `version` (a ba
 re-bake reaches browsers. Re-running `--tiers` alone keeps the old manifest version for the tier textures: hard
 reload, or run the `map` step too.
 
+## Stage thumbnails
+
+The stage list shows a small picture per stage: `maps/<map>/stages/<id>.webp` (320x180, webp quality 0.6, a few
+KB), the stage's own spawn view captured in the game. Generated, gitignored like the rest of `maps/`. To make them,
+open the map on a dev server (`npm --prefix web run dev:stable`, no hot reload) and in the page's console:
+
+```js
+const cap = await import('/src/dev/capture-stage-shots.js');
+await cap.captureStages();        // every top-level stage of the open map; or cap.captureStage(i) for one
+```
+
+Each stage is started, waited on until ready (`run.ready`), drawn once without the HUD or viewmodel, pitch levelled
+to ±12° (a spawn looking at the sky still shows the place), and POSTed to the dev server's `/__dev/stage-shot`
+(`web/server/stage-shots-dev.js`: `vite` serve only, localhost only, a known map and stage id, a real webp under
+64 KB, written only to that file). A black frame is reported and not saved. Audio stays silent and no setting is
+saved. Then `node tools/index-maps.mjs`: it lists the thumbnails per map (`stageShots`, plus `stageShotsVersion` on
+their URLs), so the menu only asks for files that exist.
+
 ## Rules the bake keeps
 
 - It never writes outside its output folder: every path built from a VPK goes through `SafePath.cs`.

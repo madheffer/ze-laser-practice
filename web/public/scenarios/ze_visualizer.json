@@ -9,6 +9,7 @@
       "group": "Level 5 – ending",
       "featured": true,
       "name": "Level 5 ending: falling balls",
+      "summary": "Ride the platform, dodge falling balls",
       "description": "Ride the ending platform (le5_movelinear_end, 7.5 s). On arrival l5_ending_relay drops two then four lines of balls from above every 0.15 s (12–20 s, l5_ball_end_hurt: instant kill) while the cube dodge sweeps the platform (stage5ending_hurt: 800). Win when s5_once_win turns on at +22 s.",
       "spawn": {
         "at": "[PR#]S5FIXERS",
@@ -112,6 +113,7 @@
       "full": true,
       "featured": true,
       "name": "Blue Particle (boss)",
+      "summary": "Blue Particle boss: 22 random attacks",
       "childrenTitle": "Single attacks",
       "description": "main_boss_start_relay: the boss spawns over the room, boss_add_hp gives each human 90 hits per segment (16 segments, boss_healthcount), and 123_boss_case_attack_main picks one of 22 attacks after each one ends. stage6_playerboss_hp sets 160 HP. Win when boss_death_relay fires (its 16th segment).",
       "spawn": {
@@ -182,6 +184,7 @@
       "group": "Level 6 – Blue Particle",
       "featured": true,
       "name": "Final dodge (after the boss)",
+      "summary": "The floor breaks: dodge shots from below",
       "description": "From the boss's death: the floor breaks under you at +61 s and final_dodge_relay fires 43 s of shots rising from ~3000 u below (look down): l6 balls (instant kill), l7 balls (180), l8 beams (120), the l9 beam spray (instant kill) and l10 rings every 2–4 s (instant kill). Then the floor breaks again; win on the humans-win trigger the fall reaches.",
       "spawn": {
         "origin": [
@@ -229,6 +232,7 @@
       "id": "l6_a01",
       "parent": "l6_boss",
       "name": "Attack 1: track lasers",
+      "summary": "Track lasers and spheres cross the room",
       "description": "first_attack_maker pairs send track lasers (1_hurt: 20) and spheres (newsphere_hurt: 20) across the room at 0, 2, 4 and 6 s (makers 1+3, 7+8, 4+5, 8+7).",
       "spawn": {
         "origin": [
@@ -304,6 +308,7 @@
       "id": "l6_a01b",
       "parent": "l6_boss",
       "name": "Attack 1b: track lasers",
+      "summary": "Track lasers, the other order",
       "description": "The other order of attack 1: makers 4+5, 6+9, 3+1, 4+5 at 0, 2, 4 and 6 s.",
       "spawn": {
         "origin": [
@@ -379,6 +384,7 @@
       "id": "l6_a02",
       "parent": "l6_boss",
       "name": "Attack 2: floor spheres",
+      "summary": "Spheres rolling along the floor",
       "description": "Six second_makers drop spheres along the floor (2_hurt: 40), then track lasers at 12.5 s.",
       "spawn": {
         "origin": [
@@ -454,6 +460,7 @@
       "id": "l6_a03",
       "parent": "l6_boss",
       "name": "Attack 3: side spheres",
+      "summary": "Side lasers from racing spheres",
       "description": "Two mini spheres run the sides on tracktrains (600 u/s) and fire side lasers (3_1_hurt: 40, 3_2_hurt: 30) every 1.3–2.6 s for 8.5 s; track lasers at 13.5 and 15.5 s.",
       "spawn": {
         "origin": [
@@ -529,6 +536,7 @@
       "id": "l6_a04",
       "parent": "l6_boss",
       "name": "Attack 4: sweeping lasers",
+      "summary": "A wall of sweeping lasers",
       "description": "fourth_attack_template: a door (512 u at 400 u/s) carries 10 makers of sweeping lasers (4_1_hurt: 30).",
       "spawn": {
         "origin": [
@@ -604,6 +612,7 @@
       "id": "l6_a05",
       "parent": "l6_boss",
       "name": "Attack 5: twin sphere rings",
+      "summary": "Rings of spheres from two orbiters",
       "description": "Two spheres circle on tracktrains and spit rings of spheres (newsphere_hurt: 20) every 0.13 s (4.7–10 s, then 15–19.5 s); track lasers at 23 s. The longest attack.",
       "spawn": {
         "origin": [
@@ -679,6 +688,7 @@
       "id": "l6_a06",
       "parent": "l6_boss",
       "name": "Attack 6: push or gravity",
+      "summary": "A push or a pull, then lasers",
       "description": "boss_six_random_case: a push or a gravity pull, then track lasers at 4.15 s.",
       "spawn": {
         "origin": [
@@ -754,6 +764,7 @@
       "id": "l6_a07",
       "parent": "l6_boss",
       "name": "Attack 7: NPC drops",
+      "summary": "Dodge NPCs dropping into the room",
       "description": "boss_seven_timer drops NPCs (npc_hurt: 40) at one of six spawnpoints every 1.5–3.3 s for 10 s.",
       "spawn": {
         "origin": [
@@ -829,6 +840,7 @@
       "id": "l6_a08",
       "parent": "l6_boss",
       "name": "Attack 8: laser wall",
+      "summary": "Jump the descending laser wall",
       "description": "height_attack_template: a door (328 u down at 600 u/s) with 19 makers of wall lasers (8_laserhurt1: 20); track lasers at 14 and 15 s.",
       "spawn": {
         "origin": [
@@ -904,6 +916,7 @@
       "id": "l6_a09",
       "parent": "l6_boss",
       "name": "Attack 9: track pairs",
+      "summary": "Two of four tracks fire at once",
       "description": "nine_track_case fires two of four tracks every 2 s from 2 to 12 s (9_hurt: 30).",
       "spawn": {
         "origin": [
@@ -979,6 +992,7 @@
       "id": "l6_a10",
       "parent": "l6_boss",
       "name": "Attack 10: laser fan",
+      "summary": "A fan of eight lasers sweeps across",
       "description": "ten_attack_maker sweeps a fan of 8 lasers 25° apart, one every 0.5 s, left or right (10_hurt: 60).",
       "spawn": {
         "origin": [
@@ -1054,6 +1068,7 @@
       "id": "l6_a11",
       "parent": "l6_boss",
       "name": "Attack 11: rotating beam",
+      "summary": "One beam rotating around the room",
       "description": "One beam turns around the room (11_rotating, 13°/s, 11_hurt: 60); track lasers at 20 s.",
       "spawn": {
         "origin": [
@@ -1129,6 +1144,7 @@
       "id": "l6_a12",
       "parent": "l6_boss",
       "name": "Attack 12: yellow spheres",
+      "summary": "Dodge the yellow sphere barrage",
       "description": "Two spheres ride tracktrains out (600 u/s) and fire yellow spheres (12_hurt: 40) every 0.1–0.4 s from 3 to 9 s.",
       "spawn": {
         "origin": [
@@ -1204,6 +1220,7 @@
       "id": "l6_a13",
       "parent": "l6_boss",
       "name": "Attack 13: twin rotating beams",
+      "summary": "Two beams turning at different speeds",
       "description": "Two beams turn at different speeds (15 and 35°/s, 13_hurt: 30 each).",
       "spawn": {
         "origin": [
@@ -1279,6 +1296,7 @@
       "id": "l6_a14",
       "parent": "l6_boss",
       "name": "Attack 14: triple beam",
+      "summary": "Three hard-hitting beams on one rotator",
       "description": "Three beams on one rotator (14°/s), 100 damage each.",
       "spawn": {
         "origin": [
@@ -1354,6 +1372,7 @@
       "id": "l6_a15",
       "parent": "l6_boss",
       "name": "Attack 15: rotating NPCs",
+      "summary": "Rotating NPCs at two spawnpoints",
       "description": "boss_fiveteen_random_case spawns rotating NPCs (rotating_npc_hurt: 30) at two of four spawnpoints.",
       "spawn": {
         "origin": [
@@ -1429,6 +1448,7 @@
       "id": "l6_a16",
       "parent": "l6_boss",
       "name": "Attack 16: sphere train",
+      "summary": "A train throwing spheres",
       "description": "sixteen_tracktrain carries a maker that throws spheres (16_hurt: 20) while a door moves 1000 u.",
       "spawn": {
         "origin": [
@@ -1504,6 +1524,7 @@
       "id": "l6_a17",
       "parent": "l6_boss",
       "name": "Attack 17: falling lasers",
+      "summary": "Falling lasers on a rotator",
       "description": "seventeen_rotating (45°/s) carries four makers of falling lasers (17_hurt1: 80).",
       "spawn": {
         "origin": [
@@ -1579,6 +1600,7 @@
       "id": "l6_a18",
       "parent": "l6_boss",
       "name": "Attack 18: laser wall 2",
+      "summary": "Another descending laser wall",
       "description": "heighteen_attack_template: a door (512 u at 400 u/s) with 19 makers of wall lasers (18_laserhurt1: 30).",
       "spawn": {
         "origin": [
@@ -1654,6 +1676,7 @@
       "id": "l6_a19",
       "parent": "l6_boss",
       "name": "Attack 19: four beams",
+      "summary": "Four rotating beams",
       "description": "19_template: four rotating beams (14°/s, 19_beam_hurt: 60); track lasers at 22 s.",
       "spawn": {
         "origin": [
@@ -1729,6 +1752,7 @@
       "id": "l6_a20",
       "parent": "l6_boss",
       "name": "Attack 20: sphere fan",
+      "summary": "A fan of spheres flung out",
       "description": "twenty_case throws up to 16 spheres from twenty_maker, fanned 10–30° apart (12_hurt: 40); track lasers at 8 s.",
       "spawn": {
         "origin": [

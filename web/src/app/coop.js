@@ -18,7 +18,7 @@ import { showRoundEnd } from './coop-end.js';
 import { isMapName } from '../lib/paths.js';
 import { lastFrameAt } from './loop.js';
 import { itemState, spendUse, usableHeals } from '../world/items.js';
-import { beginRoster, applyWait, markOut, rosterGo, clearRoster, waitLine, startReports } from './coop-load.js';
+import { beginRoster, applyWait, markOut, rosterGo, clearRoster, waitLine, startReports, simulatedPing } from './coop-load.js';
 
 export const net = new CoopClient();
 export const lobby = { busy: false }; // busy = a round is on that you're not in (you'll be in the next one)
@@ -134,7 +134,7 @@ class Round {
   spectateLabel() { const v = this.spectateView(); return v ? `Spectating ${this.name(v.id)}` : 'You died'; }
 
   // ---- loading: the stage is loaded and drawn here (app/readiness.js); the server starts the clock when all are
-  sendReady() { if (!this.ended) { this.readyIds.add(this.me); net.game({ t: 'ready', r: this.r }); } }
+  sendReady() { if (!this.ended) { this.readyIds.add(this.me); net.game({ t: 'ready', r: this.r, ping: simulatedPing() }); } }
   waitLine() { return waitLine(); } // app/coop-load.js: the ready ones among those still in
 
   hudLine() {

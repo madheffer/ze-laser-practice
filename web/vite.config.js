@@ -1,6 +1,7 @@
 import { defineConfig, loadEnv } from 'vite';
 import { fileURLToPath } from 'node:url';
 import { coopRelayPlugin } from './server/coop-relay.js';
+import { stageShotsDevPlugin } from './server/stage-shots-dev.js';
 import { CSP, CSP_HEADER, IMMUTABLE_CACHE, isImmutable } from './server/http-policy.js';
 
 // The run store's database (server/db/store.js): DATABASE_URL from the environment, else from web/.env
@@ -42,8 +43,18 @@ function cspHeaderInPreview() {
 }
 
 export default defineConfig({
-  plugins: [longCacheForAssets(), cspInBuild(), cspHeaderInPreview(), coopRelayPlugin()],
-  server: { port: 5804, strictPort: true },
+  plugins: [longCacheForAssets(), cspInBuild(), cspHeaderInPreview(), coopRelayPlugin(), stageShotsDevPlugin()],
+  server: {
+    port: 5804, strictPort: true,
+    // Generated content (bakes write thousands of files) never reloads a page or restarts anything.
+    watch: { ignored: ['**/public/maps/**', '**/public/sounds/**', '**/public/panorama/**', '**/public/weapons/**', '**/public/player/**', '**/dist/**'] },
+  },
+  // Every package the game imports, bundled up front: Vite never discovers a new one mid-session, which re-optimizes,
+  // full-reloads every open page and can leave the server answering "504 Outdated Request" until it restarts.
+  optimizeDeps: {
+    include: ['three', 'three/addons/loaders/GLTFLoader.js', 'three/addons/libs/meshopt_decoder.module.js',
+      'three/addons/environments/RoomEnvironment.js', 'three/addons/utils/SkeletonUtils.js', 'three/addons/geometries/ConvexGeometry.js'],
+  },
   // a stable copy for playing while code is being edited: `npm run play` (build + preview, no hot reload)
   // `npm run host` = the same on every network interface, so a friend on your LAN can join a co-op room
   preview: { port: 5805, strictPort: true },

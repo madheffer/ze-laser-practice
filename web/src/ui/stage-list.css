@@ -1,0 +1,147 @@
+/* The stage list (ui/stage-list.js) and its cards (ui/stage-card.js). Class-scoped (.sl-*, no #menu-only
+   selectors), so the cards look the same inside #menu and a .sheet (the room screen). About five cards a row on a
+   desktop, two on a phone; a thumbnail box is a fixed 16:9 with a neutral colour, so nothing moves while it loads. */
+
+/* ---- the picked map's header: title, what it is, the part chips, the heal option */
+.map-head { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+.map-title { margin: 0; font: 700 24px/1.1 'Stratum2', 'Segoe UI', sans-serif; letter-spacing: 0.04em; text-transform: uppercase; }
+.map-sub { margin: 0; font-size: 13px; color: var(--dim); max-width: 90ch; }
+
+.sl-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; font: 600 12.5px 'Segoe UI', sans-serif; } /* buttons inherit it (a screen may set button { font: inherit }) */
+.sl-chip {
+  min-height: calc(var(--tap) - 4px); padding: 0 14px; border-radius: 999px; border: 1px solid var(--line); background: #0b1016;
+  color: var(--dim); font: 600 12.5px 'Segoe UI', sans-serif; cursor: pointer; transition: color 0.12s, border-color 0.12s, background 0.12s;
+}
+.sl-chip:hover { color: var(--text); border-color: #3b4c60; }
+.sl-chip[aria-pressed=true] { color: #fff; background: #1d2733; border-color: #3b4c60; box-shadow: inset 0 -2px 0 var(--accent); }
+.sl-chip:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+/* ---- a part: its heading, its grid, its bosses' single attacks */
+.sl-sec { scroll-margin-top: 4px; }
+.sl-sec + .sl-sec { margin-top: 22px; }
+.sl-h { display: flex; align-items: baseline; gap: 8px; margin: 0 0 10px; font: 600 11px 'Segoe UI', sans-serif; letter-spacing: 0.14em; text-transform: uppercase; color: var(--dim); }
+.sl-h small { font-size: 11px; letter-spacing: 0; opacity: 0.7; font-variant-numeric: tabular-nums; }
+.sl-h::after { content: ''; flex: 1; height: 1px; background: var(--line); align-self: center; }
+
+.sl-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 184px), 1fr)); gap: 12px; }
+.sl-grid.mini { grid-template-columns: repeat(auto-fill, minmax(min(100%, 176px), 1fr)); gap: 8px; }
+
+/* ---- a card */
+.sl-card {
+  position: relative; display: flex; flex-direction: column; min-width: 0; overflow: hidden;
+  background: #121922; border: 1px solid var(--line); border-radius: 10px; color: var(--text);
+  transition: border-color 0.12s, transform 0.12s, box-shadow 0.12s;
+}
+.sl-card:hover { border-color: #3b4c60; transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35); }
+.sl-card:has(.sl-main:focus-visible) { border-color: var(--focus); outline: 2px solid var(--focus); outline-offset: 1px; }
+.sl-card.featured { border-color: #6a2b2b; }
+.sl-card.featured:hover { border-color: var(--accent); }
+.sl-card.free { border-style: dashed; background: transparent; }
+
+.sl-main {
+  flex: 1; display: flex; flex-direction: column; min-width: 0; padding: 0; margin: 0; border: 0; background: none;
+  color: inherit; font: inherit; text-align: left; cursor: pointer;
+}
+.sl-main:focus-visible { outline: none; } /* the card draws the ring (above) */
+
+.sl-thumb {
+  position: relative; display: block; aspect-ratio: 16 / 9; overflow: hidden; border-bottom: 1px solid var(--line);
+  background: linear-gradient(160deg, #18212c, #0c1117);
+}
+.sl-thumb img { display: block; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity 0.25s, transform 0.3s; }
+.sl-thumb.loaded img { opacity: 1; }
+.sl-card:hover .sl-thumb img { transform: scale(1.04); }
+.sl-thumb.empty { background: repeating-linear-gradient(135deg, transparent 0 14px, rgba(255, 255, 255, 0.025) 14px 16px), linear-gradient(160deg, #18212c, #0c1117); }
+.sl-thumb-label { position: absolute; inset: 0; display: grid; place-items: center; font: 700 13px 'Stratum2', 'Segoe UI', sans-serif; letter-spacing: 0.16em; text-transform: uppercase; color: var(--dim); }
+
+.sl-body { display: flex; flex-direction: column; gap: 3px; padding: 9px 11px 2px; min-width: 0; }
+.sl-name {
+  font-size: 14px; font-weight: 700; line-height: 1.25; color: #e9eef3;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden;
+}
+.sl-card:hover .sl-name { color: #fff; }
+.sl-sum {
+  font-size: 12.5px; line-height: 1.35; color: var(--dim);
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden;
+}
+
+.sl-foot { display: flex; align-items: center; gap: 6px; min-width: 0; min-height: 32px; padding: 4px 8px 8px 11px; cursor: pointer; font: 600 12px 'Segoe UI', sans-serif; }
+.sl-gap { flex: 1; }
+.sl-badge {
+  flex: none; font: 700 10px 'Segoe UI', sans-serif; letter-spacing: 0.06em; text-transform: uppercase;
+  border: 1px solid currentColor; border-radius: 3px; padding: 1px 5px;
+}
+.sl-badge.full { color: var(--gold); }
+.sl-badge.boss { color: #ff7a7a; }
+.sl-badge.endless { color: #4cff9a; }
+.sl-pb { min-width: 0; font-size: 11.5px; color: var(--gold); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.sl-tool {
+  flex: none; min-width: max(28px, calc(var(--tap) - 8px)); height: max(28px, calc(var(--tap) - 8px)); padding: 0 7px; margin: 0;
+  border: 1px solid var(--line); border-radius: 7px; background: rgba(255, 255, 255, 0.03);
+  color: var(--dim); font: 600 12px 'Segoe UI', sans-serif; cursor: pointer; transition: color 0.12s, border-color 0.12s, background 0.12s;
+}
+.sl-tool:hover { color: var(--text); border-color: #3b4c60; background: rgba(255, 255, 255, 0.07); }
+.sl-tool:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+.sl-tool.info { border-radius: 50%; padding: 0; font: italic 700 13px Georgia, 'Times New Roman', serif; }
+.sl-tool.endless { color: #4cff9a; font-size: 17px; line-height: 1; padding: 0 6px; }
+.sl-tool.endless:hover { background: #11221a; color: #8affbe; }
+
+/* a boss's single attacks: compact cards, no thumbnail */
+.sl-card.mini .sl-body { padding: 8px 10px 0; }
+.sl-card.mini .sl-name { font-size: 13px; }
+.sl-card.mini .sl-sum { -webkit-line-clamp: 1; line-clamp: 1; }
+.sl-drills { margin-top: 10px; border: 1px dashed var(--line); border-radius: 10px; }
+.sl-drills summary {
+  min-height: var(--tap); display: flex; align-items: center; gap: 8px; padding: 0 14px; cursor: pointer; list-style: none;
+  font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--dim); border-radius: 10px;
+}
+.sl-drills summary::-webkit-details-marker { display: none; }
+.sl-drills summary::before { content: ''; width: 7px; height: 7px; border: solid currentColor; border-width: 0 2px 2px 0; transform: rotate(-45deg); transition: transform 0.15s; }
+.sl-drills[open] summary::before { transform: rotate(45deg); }
+.sl-drills summary:hover { color: var(--text); }
+.sl-drills summary:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.sl-drills summary .count { margin-left: auto; font-variant-numeric: tabular-nums; opacity: 0.7; }
+.sl-drills .sl-grid { padding: 0 10px 10px; }
+
+/* ---- the details panel (a popover: light dismiss, Esc) */
+.sl-details {
+  width: min(520px, calc(100vw - 32px)); max-height: min(75vh, 600px); overflow: auto; padding: 16px 18px; margin: auto;
+  background: #121922; color: var(--text); border: 1px solid #3b4c60; border-radius: 12px; box-shadow: 0 24px 80px rgba(0, 0, 0, 0.6);
+}
+.sl-details::backdrop { background: rgba(3, 5, 8, 0.5); }
+.sl-details-head { display: flex; align-items: center; gap: 10px; }
+.sl-details-head h3 { margin: 0; font: 700 18px/1.2 'Stratum2', 'Segoe UI', sans-serif; letter-spacing: 0.02em; flex: 0 1 auto; }
+.sl-details-x { margin-left: auto; flex: none; width: var(--tap); height: var(--tap); border: 0; border-radius: 8px; background: none; color: var(--dim); font-size: 22px; cursor: pointer; }
+.sl-details-x:hover { color: var(--text); background: rgba(255, 255, 255, 0.06); }
+.sl-details-sum { margin: 8px 0 0; font-size: 14px; color: var(--text); }
+.sl-details-desc { margin: 10px 0 0; font-size: 13px; line-height: 1.5; color: var(--dim); }
+.sl-details .sl-pb { margin: 10px 0 0; }
+.sl-details-act { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+
+/* ---- the heal option: a switch in the header, only on maps with a heal item */
+.heal-toggle { display: flex; align-items: center; gap: 10px; margin-top: 6px; padding: 8px 12px; border: 1px solid #3a2f4a; border-radius: 8px; background: #17131d; font-size: 13px; cursor: pointer; max-width: 640px; }
+.heal-toggle small { display: block; color: var(--dim); font-size: 11.5px; margin-top: 2px; }
+.heal-toggle b { color: #ff9ad5; }
+.heal-toggle input {
+  appearance: none; -webkit-appearance: none; flex: none; position: relative; width: 38px; height: 22px; margin: 0;
+  border-radius: 11px; background: #26303c; border: 1px solid #34414f; cursor: pointer;
+}
+.heal-toggle input::after { content: ''; position: absolute; left: 2px; top: 2px; width: 16px; height: 16px; border-radius: 50%; background: #a8b4c0; transition: transform 0.15s; }
+.heal-toggle input:checked { background: #6a2a55; border-color: #ff9ad5; }
+.heal-toggle input:checked::after { transform: translateX(16px); background: #fff; }
+
+/* ---- phones: two a row, a little tighter */
+@media (max-width: 600px) {
+  .map-title { font-size: 20px; }
+  .sl-grid, .sl-grid.mini { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .sl-body { padding: 7px 9px 2px; }
+  .sl-name { font-size: 13px; }
+  .sl-sum { font-size: 12px; }
+  .sl-foot { padding: 4px 6px 6px 9px; gap: 4px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sl-card, .sl-thumb img, .sl-chip, .sl-tool, .sl-drills summary::before, .heal-toggle input::after { transition: none; }
+  .sl-card:hover { transform: none; }
+  .sl-card:hover .sl-thumb img { transform: none; }
+}

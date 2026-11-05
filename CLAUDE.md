@@ -52,7 +52,10 @@ dotnet build bake -c Release        # then see README "Run it locally" for the b
   attacker-controlled: sanitise every path built from them). Keep the CSP in `web/index.html` tight.
 - **Never write into the CS2 install.** The old VRF CLI ignores `-o` for `.uifont` and once wrote into
   `game/csgo/panorama/fonts`; use lasers-bake (VRF 20.1) for anything Valve-side.
-- **Browser checks: Chrome MCP** (`mcp__claude-in-chrome__*`) against `http://localhost:5804`.
+- **Browser checks: Chrome MCP** (`mcp__claude-in-chrome__*`) against the shared test server `http://localhost:5807`
+  (`npm run dev:stable --prefix web`, .claude/launch.json "web-stable"): nothing on it reloads by itself, so other
+  sessions' edits never cut a test short; reload the page to pick up edits. Don't test on :5804 (the hot-reloading dev
+  server), don't start copies on other ports and don't stop servers other sessions started. If :5807 is down, start it.
   `window.__lasers` is the debug handle: `startScenario(i, mode)`, `advance(seconds)` (synchronous sim; a hidden
   tab gets no animation frames), `scenarios()`, `engine`, `player`, `run`, `settings`, `audio`, `vm`;
   `window.__lasersInput = (t) => ({forward, side, jump, duck, walk})` drives the player. Tests in the user's Chrome

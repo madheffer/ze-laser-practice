@@ -7,6 +7,9 @@
 export const MAP_NAME = /^[a-z0-9_][a-z0-9_-]{0,63}$/i;
 export const isMapName = (n) => typeof n === 'string' && MAP_NAME.test(n);
 
+// A stage (scenario) id where it names a file (maps/<map>/stages/<id>.webp): the same rule as a map name.
+export const isStageId = (id) => typeof id === 'string' && MAP_NAME.test(id);
+
 export function mapName(n) {
   if (!isMapName(n)) throw new Error(`bad map name: ${JSON.stringify(String(n).slice(0, 80))}`);
   return n;

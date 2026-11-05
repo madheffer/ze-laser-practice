@@ -76,7 +76,8 @@ export function enterGame(canvas) {
   if (touchMode) {
     goFullscreen().then((fs) => { if (fs) screen.orientation?.lock?.('landscape')?.catch?.(() => {}); });
     queueMicrotask(() => {
-      if (!S.run || S.run.done || G.overlay?.open) return;
+      // a picked stage still loading (ui/loading.js) counts: its screen shows, not the menu
+      if (((!S.run || S.run.done) && !G.loading?.isOpen) || G.overlay?.open) return;
       S.locked = true;
       act.unpause();
     });

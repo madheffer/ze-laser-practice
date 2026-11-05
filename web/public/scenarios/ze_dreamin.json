@@ -6,9 +6,10 @@
   "scenarios": [
     {
       "id": "l1_full",
-      "group": "Level 1 – Fade",
+      "group": "Main stages",
       "full": true,
       "name": "Level 1 ending (full): Crystal → blade room → elevator",
+      "summary": "Crystal boss, blade room, then the elevator",
       "description": "From the Crystal's teleport (boss_teleport, +50 hits per human) through its 8 segments, back to the teleport place, the blade room (Final Crystal, +70 hits per human) and the rising floor out. Win when a human reaches clear_trigger (score).",
       "spawn": {
         "origin": [
@@ -65,8 +66,9 @@
     },
     {
       "id": "l1_crystal",
-      "group": "Level 1 – Fade",
+      "group": "Main stages",
       "name": "Crystal (boss)",
+      "summary": "A chasing crystal casting gravity, wind, ice",
       "childrenTitle": "Single casts",
       "description": "boss_teleport adds 50 hits per human to HPCounter2; boss_relay starts the fight 7 s later. The crystal chases the nearest human on thrusters (80 damage on touch) and every 10–15 s casts Gravity, Thruster, Wind or Ice. 8 segments; at +140 s st1_fail breaks the floor.",
       "spawn": {
@@ -120,6 +122,7 @@
       "id": "l1_cast_gravity",
       "parent": "l1_crystal",
       "name": "Gravity",
+      "summary": "Resist the pull toward the crystal",
       "description": "boss_g: four 200 u/s pushes on the crystal's corners pull you in toward it for 2.5 s (boss_hurt: 80 on touch).",
       "spawn": {
         "at": "[PR#]boss_des",
@@ -178,6 +181,7 @@
       "id": "l1_cast_thruster",
       "parent": "l1_crystal",
       "name": "Thruster",
+      "summary": "Stay off it: it launches you up",
       "description": "boss_up: for 1 s, touching it throws you up at 700 u/s.",
       "spawn": {
         "at": "[PR#]boss_des",
@@ -236,6 +240,7 @@
       "id": "l1_cast_wind",
       "parent": "l1_crystal",
       "name": "Wind",
+      "summary": "Wind pushes you toward the edge",
       "description": "wind_random: one of two 350 u/s pushes (east or west) across the arena for 2.5 s; the floor edge is the drop.",
       "spawn": {
         "at": "[PR#]boss_des",
@@ -289,6 +294,7 @@
       "id": "l1_cast_ice",
       "parent": "l1_crystal",
       "name": "Ice",
+      "summary": "An ice blast that slows and hurts",
       "description": "boss_ice: a 2112 x 2112 field for 1 s: 15 damage and speed 0.1 for 4 s.",
       "spawn": {
         "at": "[PR#]boss_des",
@@ -345,9 +351,10 @@
     },
     {
       "id": "l1_blades",
-      "group": "Level 1 – Fade",
+      "group": "Main stages",
       "featured": true,
       "name": "Blade room (Final Crystal)",
+      "summary": "Jump or crouch the flying blades",
       "description": "boss_to_blade2 adds 70 hits per human to blade_hp (start 50) and teleports you in. Once the first human crosses the room (the trigger 1100 u in) a blade flies out of the crystal every 2 s at 1700 u/s: low (jump), mid (jump) or high (crouch), 999999 damage. Each human a blade kills takes 60 off the crystal. Win when it breaks.",
       "spawn": {
         "origin": [
@@ -394,8 +401,9 @@
     },
     {
       "id": "l1_elevator",
-      "group": "Level 1 – Fade",
+      "group": "Main stages",
       "name": "Rising floor escape",
+      "summary": "Ride the rising floor past spinning blades",
       "description": "After the Final Crystal: final_floor rises 3200 u (500 u/s) 9 s after a human steps on it; at the top blades spin up out of blade_rotate for 8.5 s (999999), clear_trigger opens at +9.5 s, NUKE at +12 s.",
       "spawn": {
         "origin": [
@@ -434,9 +442,10 @@
     },
     {
       "id": "l2_full",
-      "group": "Level 2 – Dream",
+      "group": "Main stages",
       "full": true,
       "name": "Level 2 ending (full): Puny Light → final climb",
+      "summary": "Puny Light boss, then the final climb",
       "description": "From the snow elevator's teleport into the arena (+5000 HP per human on st2_hitbox, 1500 base) through the 118 s fight, then st2_final_relay's 128 s climb: stone walk at +90 s, the final lasers at +108 s, the teleport up at +120 s. Win at score_trigger.",
       "spawn": {
         "origin": [
@@ -505,8 +514,9 @@
     },
     {
       "id": "l2_boss",
-      "group": "Level 2 – Dream",
+      "group": "Main stages",
       "name": "Puny Light (boss)",
+      "summary": "Break the Light through six shuffled attacks",
       "childrenTitle": "Single phases",
       "description": "st2_start: a phase every 14 s (shuffled: Spread out, Zombie way, Danger Field, For Upper, Laser, Spikes) and 118 s to break st2_hitbox (1500 + 5000 per human; grenades 100 each), else fail_nuke. 200 damage touching it.",
       "spawn": {
@@ -572,6 +582,7 @@
       "id": "l2_spread",
       "parent": "l2_boss",
       "name": "Spread out",
+      "summary": "Weave through spinning bullet trains",
       "description": "b_timer: every 0.08 s for 12 s b_maker (on the spinning b_rotate) sends out two bullet trains (65 damage); at +7.5 s it switches to the second pattern.",
       "spawn": {
         "at": "[PR#]st2_boss_des",
@@ -632,6 +643,7 @@
       "id": "l2_field",
       "parent": "l2_boss",
       "name": "Danger Field",
+      "summary": "Leave the quarter that lights up",
       "description": "random_hurt_timer: every 4 s for 12 s one arena quarter lights up, then burns (50) 1–3 s later.",
       "spawn": {
         "at": "[PR#]st2_boss_des",
@@ -680,6 +692,7 @@
       "id": "l2_upper",
       "parent": "l2_boss",
       "name": "For Upper",
+      "summary": "Lifted up, then dodge sweeping lasers",
       "description": "s2_upper lifts everyone to the upper platform (boss_upper) for 2 s; at +3 s the platform breaks and six 150-damage lasers (laserhurt) sweep the levels until +9 s.",
       "spawn": {
         "at": "[PR#]st2_boss_des",
@@ -768,6 +781,7 @@
       "id": "l2_laser",
       "parent": "l2_boss",
       "name": "Laser",
+      "summary": "Jump wide lasers sweeping from the sides",
       "description": "bladerandom_timer: every 3.5 s for 12 s a 2176-wide laser (200 damage, 2000 u/s) sweeps in from one of the four sides.",
       "spawn": {
         "at": "[PR#]st2_boss_des",
@@ -816,6 +830,7 @@
       "id": "l2_spikes",
       "parent": "l2_boss",
       "name": "Spikes",
+      "summary": "Dodge spikes raining from above",
       "description": "spike_timer: every 0.12 s for 12 s three spikes (100 damage) drop from the makers riding the SETH_Ramdon3 track.",
       "spawn": {
         "at": "[PR#]st2_boss_des",
@@ -862,8 +877,9 @@
     },
     {
       "id": "l2_final_lasers",
-      "group": "Level 2 – Dream",
+      "group": "Main stages",
       "name": "Final lasers (climb top)",
+      "summary": "Pick a side, cross the final lasers",
       "description": "st2_final_relay +106 s, on test_laser: the first human there picks a side (finalaser_random), the other stone walk drops, and for 9 s vertical and sweeping lasers (999999) cross the top. st2_upper teleports humans to the end at +120 s; score_trigger opens at +128 s.",
       "spawn": {
         "origin": [
@@ -916,9 +932,10 @@
     },
     {
       "id": "l3_full",
-      "group": "Level 3",
+      "group": "Main stages",
       "full": true,
       "name": "Level 3 ending (full): Giant Light → Final Light",
+      "summary": "Giant Light, then the Final Light run",
       "description": "From st3_goto (+600 hits per human on st3_hp) through the Giant Light's 250 s (phases, totems, the defense hold at +115 s, phase 2 at +180 s), the floor out, the final run (final_relay) and the Final Light at +110 s. Win at st3_clear (+143 s).",
       "spawn": {
         "origin": [
@@ -986,8 +1003,9 @@
     },
     {
       "id": "l3_giant",
-      "group": "Level 3",
+      "group": "Main stages",
       "name": "Giant Light (boss)",
+      "summary": "A long boss fight with shuffled phases",
       "childrenTitle": "Single phases",
       "description": "st3_goto drops each human into a corner of the arena and adds 600 hits per human; st3_boss_start (+5 s). A phase every 13 s (shuffled: two Ice, Crouch, Wind, Upline, Explosions, Line lasers), a Reflection one time in eight every 15 s (shooting it then costs you 10 per hit), totems every 10–14 s. 250 s, else st3_fail.",
       "spawn": {
@@ -1046,6 +1064,7 @@
       "id": "l3_ice",
       "parent": "l3_giant",
       "name": "Ice",
+      "summary": "Jump the spinning ice bar",
       "description": "st3_ice: the spinning ice bar (5 damage, speed 0.1 for 3 s) from +0.5 s to +8 s.",
       "spawn": {
         "origin": [
@@ -1100,6 +1119,7 @@
       "id": "l3_crouch",
       "parent": "l3_giant",
       "name": "Crouch field",
+      "summary": "Crouch under the damage plane",
       "description": "st3_crouch: a 2560 x 2560 plane of 40 damage across the arena for 8 s.",
       "spawn": {
         "origin": [
@@ -1154,6 +1174,7 @@
       "id": "l3_wind",
       "parent": "l3_giant",
       "name": "Wind",
+      "summary": "Hold your ground against diagonal wind",
       "description": "st3_wind_random: one of four 320 u/s diagonal pushes for 9 s.",
       "spawn": {
         "origin": [
@@ -1203,6 +1224,7 @@
       "id": "l3_upline",
       "parent": "l3_giant",
       "name": "Upline",
+      "summary": "Dodge lines rising from the floor",
       "description": "upline_timer: every 0.4 s for 10 s a line (60 damage) rises 2000 u from a point riding the SETH_Ramdon2 track; upline_hurt slows you to 0.8 for 2 s.",
       "spawn": {
         "origin": [
@@ -1257,6 +1279,7 @@
       "id": "l3_explo",
       "parent": "l3_giant",
       "name": "Explosions",
+      "summary": "Shoot or dodge the dropped bombs",
       "description": "explo_timer: every 0.2–0.3 s for 10 s explo_maker on the spinning explo_maker_rot drops a bomb (160) that blows when shot or touched.",
       "spawn": {
         "origin": [
@@ -1301,6 +1324,7 @@
       "id": "l3_linelaser",
       "parent": "l3_giant",
       "name": "Line lasers",
+      "summary": "Jump line lasers from every direction",
       "description": "linelaser_timer: every 1 s for 10 s one of 25 grid makers sends a 2944-wide line laser (80) in one of four directions.",
       "spawn": {
         "origin": [
@@ -1343,8 +1367,9 @@
     },
     {
       "id": "l3_final",
-      "group": "Level 3",
+      "group": "Main stages",
       "name": "Final Light (boss) + corridor",
+      "summary": "Kill the Final Light, run the corridor",
       "description": "final_relay +109 s: the push (110–114 s) throws you into the room and adds 50 hits per human; the light takes bullets from +114 s and its lasers (3 heights, every 1–1.2 s) and pillars come at you. Dead by +128 s or final_fail_1. Then the corridor lasers (+130.5–141 s) and st3_clear at +143 s.",
       "spawn": {
         "origin": [
@@ -1401,9 +1426,10 @@
     },
     {
       "id": "l4_full",
-      "group": "Level 4",
+      "group": "Level 4 (ending)",
       "full": true,
       "name": "Level 4 (full): arena → Light → surf",
+      "summary": "Arena attacks, the Light, then the surf",
       "description": "rtv_relay from the arena (+50 s, 222 HP from rtv_enter_1): random attacks every 14 s until +133 s, the Light at +160 s (+100 hits per human, 24 s), then the surf with lasers to rtv_last. Win when rtv_endnuke comes on.",
       "spawn": {
         "at": "[PR#]rtv_des_1",
@@ -1465,8 +1491,9 @@
     },
     {
       "id": "l4_arena",
-      "group": "Level 4",
+      "group": "Level 4 (ending)",
       "name": "Arena attacks",
+      "summary": "Survive five shuffled arena attacks",
       "childrenTitle": "Single attacks",
       "description": "rtv_first_timer: every 14 s from +50 to +133 s one of five (shuffled): Lasers, Thrusters, Ice, Danger Fields, Bombs. Falling off is 200 and rtv_teleport_case puts you back in a corner.",
       "spawn": {
@@ -1519,6 +1546,7 @@
       "id": "l4_lasers",
       "parent": "l4_arena",
       "name": "Lasers",
+      "summary": "Dodge laser pillars running across",
       "description": "rtv_laser_timer: every 0.1 s for 13 s a laser pillar (50, slows zombies) spawns where SETH_Ramdon_Maker is on its back-and-forth tracks and runs across.",
       "spawn": {
         "at": "[PR#]rtv_des_1",
@@ -1568,6 +1596,7 @@
       "id": "l4_thrusters",
       "parent": "l4_arena",
       "name": "Thrusters",
+      "summary": "Avoid the pads that fling you out",
       "description": "rtv_th_timer: every 0.08 s for 13 s a pad (rtv_th) that throws you 400 u/s out and up.",
       "spawn": {
         "at": "[PR#]rtv_des_1",
@@ -1617,6 +1646,7 @@
       "id": "l4_ice",
       "parent": "l4_arena",
       "name": "Ice",
+      "summary": "Jump the sweeping ice bar",
       "description": "rtv_ice_relay: the ice bar (50, speed 0.5) sweeps for 13 s, stopping at +7 s and reversing at +9 s.",
       "spawn": {
         "at": "[PR#]rtv_des_1",
@@ -1661,6 +1691,7 @@
       "id": "l4_fields",
       "parent": "l4_arena",
       "name": "Danger fields",
+      "summary": "Leave the quarter before it burns",
       "description": "rtv_field_case at 0/3/6/9 s: one quarter (1024 x 1024) burns 70 for 3 s after a 1 s warning.",
       "spawn": {
         "at": "[PR#]rtv_des_1",
@@ -1720,6 +1751,7 @@
       "id": "l4_bombs",
       "parent": "l4_arena",
       "name": "Bombs",
+      "summary": "Stay clear of the walking bombs",
       "description": "SETH_BOMB_MAKER x3: walking bombs (180) that pick a direction, walk and explode; their makers are removed at +13 s.",
       "spawn": {
         "at": "[PR#]rtv_des_1",
@@ -1777,8 +1809,9 @@
     },
     {
       "id": "l4_light",
-      "group": "Level 4",
+      "group": "Level 4 (ending)",
       "name": "Light (boss)",
+      "summary": "Dodge the Light's lasers and pillars",
       "description": "rtv_relay +160 s: rtv_teleport_2 lands you on the heal pad at rtv_des_3 (+300 HP, +100 hits per human on rtv_linelaser_count, start 10). For 24 s the wall-wide light fires line lasers (175) and pillars (200, half speed) every 1–1.5 s; each human they touch takes 70 off it. Dead at +185 s or rtv_nuke_1.",
       "spawn": {
         "at": "[PR#]rtv_des_3",
@@ -1840,8 +1873,9 @@
     },
     {
       "id": "l4_surf",
-      "group": "Level 4",
+      "group": "Level 4 (ending)",
       "name": "Surf lasers",
+      "summary": "Surf to the end past the lasers",
       "description": "After the Light: rtv_compare_1 sends humans to rtv_des_4 and starts rtv_surflaser_timer (every 0.8–1 s one of five heights, 999999). Ride the trigger_push (sv_airaccelerate 1000) to rtv_last; rtv_endnuke 25 s after the push.",
       "spawn": {
         "at": "[PR#]rtv_des_4",

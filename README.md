@@ -208,7 +208,8 @@ is received. Fields we added (cybo's site ignores them):
 
 | Field | What |
 |---|---|
-| `group`, `full` | groups the menu (the stage picker); `full` marks the whole-sequence run |
+| `summary` | one short line for the stage card (4-9 words, no entity names); `description` is the full technical text, shown only behind the card's details (i) |
+| `group`, `full` | groups the menu (the stage picker): `Main stages`, the ending (a group whose name has "ending"), special modes (`Redcore`), `Mini bosses`, in that order whatever the file order (`web/src/lib/stage-groups.js`); `full` marks the whole-sequence run (listed first in its group) |
 | `lose` | `{target, input}` (or a list) that fails the stage, e.g. `relay_fail.Trigger`. A disabled relay doesn't count |
 | `fastForward` | seconds of the map's own sequence to replay silently before placing you. This is how later stages start mid-ending |
 | `fastForwardBosses` | `[{target, after}]` bosses the simulated team shoots down during that replay (from `after` s in) |
@@ -271,7 +272,7 @@ A drop is simulated tick by tick with the engine running, so it also catches a h
 zombie-cage teleport 64 u below).
 After editing a scenario file, `node tools/index-maps.mjs` refreshes the map picker's index (title, description
 and parts come from the scenario file's top-level `title`, `description`, `workshop` and its groups; `shots` lists the
-map's screenshots for the home page). The bake writes those screenshots (`maps/<name>/shots/N.jpg`, the map's own
+map's screenshots for the home page; `stageShots` the stage thumbnails, BAKING.md "Stage thumbnails"). The bake writes those screenshots (`maps/<name>/shots/N.jpg`, the map's own
 `panorama/images/map_icons/screenshots/1080p/*`); for an already-baked map, write only them with
 `lasers-bake --shots <workshop.vpk> web/public/maps/<name>`.
 

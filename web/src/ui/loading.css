@@ -6,6 +6,7 @@
   background: var(--bg); color: var(--text); opacity: 1; transition: opacity 0.35s ease; user-select: none;
 }
 #loading[hidden] { display: none; }
+#loading.round { z-index: 35; } /* a round: over the menu (30) and the pause card (31), under the home page (40) */
 #loading.out { opacity: 0; pointer-events: none; }
 
 .ld-bg {

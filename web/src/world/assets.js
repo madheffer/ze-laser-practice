@@ -30,7 +30,32 @@ function glbLoader(version, mapBase = '', texBase = '') {
     if (texBase) { const i = url.indexOf(mapBase); if (i >= 0 && /\.png$/i.test(url)) url = texBase + url.slice(i + mapBase.length); }
     return versioned(url, version);
   });
-  return new GLTFLoader(manager).setMeshoptDecoder(MeshoptDecoder);
+  const textures = new Map(); // one map's loads share it: see SharedTextures
+  return new GLTFLoader(manager).setMeshoptDecoder(MeshoptDecoder).register((parser) => new SharedTextures(parser, textures));
+}
+
+// A GLTFLoader plugin: a texture file is fetched and decoded once for every glb of the map. The world's chunks
+// (world/stream.js) each name the same PNGs (mist: 338 texture loads for 38 files, ~350 MB of PNG decoded for
+// 36 MB), and GLTFLoader's own cache is per glb. Keyed by the resolved file and its sampler; textures with an
+// extension (basisu, webp, ...) go the usual way. A glb that clones a texture (texCoord, transform) still shares
+// its image (THREE.Source), so render.js sharedMaterial's one upload per texture holds.
+class SharedTextures {
+  constructor(parser, cache) { this.parser = parser; this.cache = cache; this.name = 'lasers_shared_textures'; }
+
+  loadTexture(index) {
+    const p = this.parser, json = p.json;
+    const def = json.textures?.[index], src = json.images?.[def?.source];
+    if (!def || typeof src?.uri !== 'string' || /^(data|blob):/.test(src.uri) || (def.extensions && Object.keys(def.extensions).length)) return null;
+    const key = `${THREE.LoaderUtils.resolveURL(src.uri, p.options.path)}|${JSON.stringify(json.samplers?.[def.sampler] ?? null)}`;
+    let t = this.cache.get(key);
+    if (!t) {
+      const loader = p.options.manager.getHandler(src.uri) || p.textureLoader;
+      t = p.loadTextureImage(index, def.source, loader);
+      this.cache.set(key, t);
+      t.then((tex) => { if (!tex) this.cache.delete(key); }, () => this.cache.delete(key)); // a failed load may be retried
+    }
+    return t;
+  }
 }
 
 export async function loadMapIndex(base = 'maps/') {

@@ -93,12 +93,16 @@ export class LoadingScreen {
     this.root.hidden = false;
     clearInterval(this.rosterTimer);
     this.rosterTimer = setInterval(() => this.roster(), ROSTER_MS);
+    this.rosterKey = null; // drawn afresh: a solo stage after a round has none
     this.roster();
   }
 
   // a round's players: name, their bar and percent, a tick when ready, "out" when left behind or gone
   roster() {
     const list = loadRoster();
+    // a round loads over the menu and the pause card too: a guest who hasn't clicked in still sees who everyone is
+    // waiting for, and one the round started without still sees their own load finish (the roster is gone by then)
+    this.root.classList.toggle('round', !!list || !!S.mp);
     const key = list ? list.map((p) => `${p.id}:${p.pct}:${p.ready}:${p.out}`).join('|') : '';
     if (key === this.rosterKey) return;
     this.rosterKey = key;

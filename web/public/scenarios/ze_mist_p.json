@@ -6,8 +6,9 @@
   "scenarios": [
     {
       "id": "throne",
-      "group": "Most played",
+      "group": "Ending",
       "name": "Throne finale – falling balls",
+      "summary": "Dodge the falling balls on the throne",
       "description": "Starts on the throne at the bottom of its descent, 5 s before the balls. Normal gravity: the escape's 0.1 ends at the trigger every human crosses into the throne room (KeyValue gravity 1). 300-damage balls rain from the spinning makers above for 23 s (150 per half-second touch on 180 HP: one graze survives, two kill). Survive until the nuke.",
       "spawn": {
         "on": "[PR#]ml_throne",
@@ -101,9 +102,10 @@
     },
     {
       "id": "full",
-      "group": "Full sequence",
+      "group": "Ending",
       "full": true,
       "name": "Dragon → escape → throne (full run)",
+      "summary": "The whole ending: dragon, chase, throne",
       "description": "The whole ending as it plays on a server: the bone dragon fight with every attack, its death, the escape-dragon chase and the falling-ball finale in the throne room.",
       "spawn": {
         "origin": [
@@ -183,8 +185,9 @@
     },
     {
       "id": "dragon",
-      "group": "Bosses",
+      "group": "Ending",
       "name": "Dragon – full fight",
+      "summary": "The bone dragon fight, every attack",
       "description": "The fight from the moment the dragon lands: a random attack every 30 s until its 16 health segments (900 HP per human each, as the map adds it) are gone. Ends when it dies.",
       "spawn": {
         "origin": [
@@ -259,6 +262,7 @@
     {
       "id": "dragon_lasers",
       "name": "Laser waves",
+      "summary": "Laser waves: jump low, crouch high",
       "description": "7 random waves fan out from the centre over ~21 s. Low ones to jump, high ones to crouch.",
       "spawn": {
         "origin": [
@@ -325,6 +329,7 @@
     {
       "id": "dragon_triangle",
       "name": "Triangle",
+      "summary": "Triangle lasers from a turning ring",
       "description": "Triangle-shaped lasers from the ring of makers while the whole ring turns, reversing direction as it goes.",
       "spawn": {
         "origin": [
@@ -391,6 +396,7 @@
     {
       "id": "dragon_curveball",
       "name": "Curveball",
+      "summary": "Curving lasers from a turning ring",
       "description": "Curving lasers out of a turning ring.",
       "spawn": {
         "origin": [
@@ -457,6 +463,7 @@
     {
       "id": "dragon_firestorm",
       "name": "Firestorm",
+      "summary": "Fire lasers from every side",
       "description": "Fire lasers from all sides while the ring spins backwards.",
       "spawn": {
         "origin": [
@@ -523,6 +530,7 @@
     {
       "id": "dragon_spin",
       "name": "Spin",
+      "summary": "The dragon's spin attack",
       "description": "The dragon's spin attack.",
       "spawn": {
         "origin": [
@@ -594,6 +602,7 @@
     {
       "id": "dragon_beam",
       "name": "Beam",
+      "summary": "Dodge the sweeping beams",
       "description": "Sweeping beams.",
       "spawn": {
         "origin": [
@@ -664,8 +673,9 @@
     },
     {
       "id": "escape",
-      "group": "Bosses",
+      "group": "Ending",
       "name": "Escape-dragon chase",
+      "summary": "Low-gravity chase: float over the lasers",
       "description": "After the dragon dies: landing at the escape start (tr_addeschp) sets your gravity to 0.1 and adds the boss HP per human; it lasts until the gravity-1 trigger at the throne-room entrance. Float-jump the escape dragon's lasers (300), bullets (30) and fireballs (60) with the firewall behind you, and kill it before it reaches the end.",
       "spawn": {
         "at": "[PR#]td_throneroom",

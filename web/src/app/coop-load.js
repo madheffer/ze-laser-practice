@@ -3,6 +3,7 @@
 // round's 'start' (app/coop.js onStart), before this client has even loaded the map, and our own progress goes to
 // the server every REPORT_MS while we load (its straggler rule reads it). Everything from the server is checked.
 import { G, S } from './state.js';
+import { settings } from './settings.js';
 
 const REPORT_MS = 500;
 const REPORT_LIMIT_MS = 180_000;
@@ -66,6 +67,10 @@ export function startReports(r, send) {
     const done = roster?.r !== r || (S.mp?.r === r && (S.run?.ready || S.run?.go || S.mp.ended)) || Date.now() > until;
     if (done) { clearInterval(reportTimer); reportTimer = null; return; }
     const p = Math.round((G.loading?.frac || 0) * 100) / 100;
-    if (p > last) { last = p; send({ t: 'load', r, p }); }
+    if (p > last) { last = p; send({ t: 'load', r, p, ping: simulatedPing() }); }
   }, REPORT_MS);
 }
+
+// this player's simulated ping (settings, ms): with 'load' and 'ready', so the server's checks of our run allow for
+// it (server/coop-check.js MAX_PING); it is ours alone and changes nobody else's round
+export function simulatedPing() { return Math.max(0, Math.min(500, Math.round(Number(settings.ping) || 0))); }
