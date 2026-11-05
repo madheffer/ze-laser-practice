@@ -301,5 +301,7 @@
 .hh-dot { display: grid; place-items: center; }
 .hh .hf-empty .steam-btn { margin-top: 4px; }
 .hf.mine .hf-foot { display: none; }
+/* the wrapper passes the panel's height down, so its list scrolls inside the panel like the live one */
+.hh { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 .hh[hidden] { display: none; }
 @media (prefers-reduced-motion: reduce) { .rbtn, .hf-row.has-replay:hover .rbtn-play { transition: none; transform: none; } }
