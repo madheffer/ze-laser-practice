@@ -88,8 +88,31 @@ const camPos = [0, 0, 0];
 const PAUSED_FRAME_MS = 100;
 let lastPausedDraw = -Infinity;
 export let lastFrameAt = 0; // app/coop.js keeps a round going when frames stop (hidden or throttled tab)
+
+// Settings › Display "Uncapped FPS" (settings.fpsUncapped): while playing, the next frame starts as soon as this one is
+// drawn (a MessageChannel task, which requestAnimationFrame's hold to the monitor's refresh doesn't apply to), as CS2's
+// fps_max 0. The screen still shows one frame per refresh, the newest, so it cuts input lag (app/input.js reads the
+// mouse unaligned then) rather than adding frames you can see. Paused, hidden, no run: the refresh-rate loop again.
+// At most MAX_FPS (the viewmodel's update takes 1 ms steps at the least: G.vm.update below).
+const MAX_FPS = 1000;
+const nextFrame = new MessageChannel();
+nextFrame.port1.onmessage = () => {
+  const now = performance.now();
+  if (now - lastFrameAt < 1000 / MAX_FPS) { nextFrame.port2.postMessage(0); return; }
+  frame(now);
+};
+const uncapped = () => settings.fpsUncapped && !!S.run && !S.paused && !document.hidden;
+function scheduleFrame() {
+  if (uncapped()) nextFrame.port2.postMessage(0);
+  else requestAnimationFrame(frame);
+}
+// the listener (and every 3D voice's gain / pan with it) moves at most this often: an uncapped loop would otherwise
+// queue thousands of audio automation events a second per voice (audio.js _update), which crackles
+const LISTENER_MS = 1000 / 120;
+let listenerAt = -Infinity;
+
 export function frame(now) {
-  requestAnimationFrame(frame);
+  scheduleFrame();
   lastFrameAt = now;
   syncLeaveGuard(); // the tab-close prompt only while a run is live (app/input.js)
   const { player, engine } = S;
@@ -147,8 +170,11 @@ export function frame(now) {
     G.vm.setParticleLights(G.renderer.lighting?.barnUniforms, G.renderer.camera, (G.renderer.post?.uniforms?.cs2Exposure?.value ?? 1) * 2.8);
     G.vm.render(G.renderer.camera.aspect);
   }
-  if (rv) G.audio.setListener(rv.pos, rv.yaw, rv.pitch);
-  else G.audio.setListener(eye, player.yaw, player.pitch);
+  if (now - listenerAt >= LISTENER_MS) {
+    listenerAt = now;
+    if (rv) G.audio.setListener(rv.pos, rv.yaw, rv.pitch);
+    else G.audio.setListener(eye, player.yaw, player.pitch);
+  }
   // the frame rate (the meter) and the slow-PC check: only frames of a run being played count (app/perf.js)
   const throttled = S.paused && !S.mp && !S.replay; // the paused redraws above: not the game's pace
   perfFrame(now, { throttled, live: !!S.run && S.run.ready && S.run.go && !S.run.done && !S.run.spectating && !throttled && !S.replay });

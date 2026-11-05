@@ -205,11 +205,17 @@ export function installInput(canvas, actions) {
     if (ev.button === 2) G.vm.trigger2(false);
   });
   document.addEventListener('contextmenu', (ev) => { if (S.locked) ev.preventDefault(); });
-  document.addEventListener('mousemove', (ev) => {
+  // Uncapped FPS (app/loop.js): pointerrawupdate, which the browser sends as the mouse reports instead of once per screen
+  // refresh as it does mousemove, so frames drawn between refreshes see the newest aim. One of the two counts, never both.
+  const raw = 'onpointerrawupdate' in window;
+  const mouseLook = (ev, isRaw) => {
     if (!document.pointerLockElement || chatOpen()) return; // typing in the chat: no mouse look
+    if ((raw && settings.fpsUncapped) !== isRaw) return;
     const k = settings.sens * M_YAW; // CS2: degrees per count = sensitivity * m_yaw (m_pitch = m_yaw)
     look(ev.movementX * k, ev.movementY * k);
-  });
+  };
+  document.addEventListener('mousemove', (ev) => mouseLook(ev, false));
+  if (raw) document.addEventListener('pointerrawupdate', (ev) => { if (ev.pointerType === 'mouse') mouseLook(ev, true); });
   // Wheel down jumps. Not passive, so it can cancel the browser's default: Ctrl + wheel (crouch + jump spam, and a
   // trackpad pinch) would zoom the page, anywhere on it, menus included; in a run the wheel never scrolls either.
   // Keyboard zoom (Ctrl +/-) is left alone for anyone who needs it.
