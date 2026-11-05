@@ -12,14 +12,15 @@
 // (render.js feeds them every frame): beams between two points, ropes and the like come from these.
 import * as THREE from 'three';
 import { ParticleSystem, expandDefaults } from './particles/system.js';
-import defaults from './particles/defaults.js';
 import { SpriteRenderer } from './particles/render/sprites.js';
 import { RopeRenderer } from './particles/render/ropes.js';
 import { LightRenderer } from './particles/render/lights.js';
 import { createBarnUniforms } from './particles/render/spritecard.js';
 import { safeRelPath } from '../lib/paths.js';
 
-const expanded = expandDefaults(defaults);
+// particles.dll's class defaults (2.3 MB generated): loaded with the first map that has effects, not at page start
+let expanded = null;
+const loadDefaults = () => (expanded ? Promise.resolve() : import('./particles/defaults.js').then((m) => { expanded ||= expandDefaults(m.default); }));
 const MAX_SYSTEMS_PER_EFFECT = 64;
 
 // one set of view uniforms for every effect's materials: render.js sets the camera each frame
@@ -42,6 +43,7 @@ export class MapEffects {
   static async load(urlOf, fetchJson) {
     const index = await fetchJson(urlOf('fx/index.json')).catch(() => null);
     if (!index || typeof index !== 'object' || typeof index.systems !== 'object') return null;
+    await loadDefaults();
     return new MapEffects(index, urlOf, fetchJson);
   }
 

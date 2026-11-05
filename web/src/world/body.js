@@ -45,8 +45,10 @@ function swingTwist(q, axis, out) {
 
 export class PlayerBody {
   // onModel(root): once loaded (main.js: the particle lights, world/lighting.js patchDynamic)
-  constructor(scene, { log = () => {}, onModel = null } = {}) {
+  // lazy: load on the first update that shows it (main.js: your own body), instead of a load() call
+  constructor(scene, { log = () => {}, onModel = null, lazy = false } = {}) {
     this.log = log;
+    this.lazy = lazy;
     this.onModel = onModel;
     this.place = new THREE.Group(); // feet at the origin, turned by yaw (Source units, Z up)
     this.place.visible = false;
@@ -61,7 +63,10 @@ export class PlayerBody {
     this._twist = new THREE.Quaternion(); this._dq = new THREE.Quaternion();
   }
 
-  async load() {
+  // once (a failed load is not retried every frame)
+  load() { return (this.loading ||= this._load()); }
+
+  async _load() {
     const [gltf, stand] = await Promise.all([loadGltf(BASE + FILES.body), fetchJson(BASE + FILES.stand)]);
     const crouch = await fetchJson(BASE + FILES.crouch).catch((e) => { this.log(`body: no crouch stance (${e.message}), standing only`); return null; });
     this.stand = stand.clips[0];
@@ -102,7 +107,9 @@ export class PlayerBody {
 
   // state: { visible, origin (feet, Source units), yaw (deg), ducked, duckAmount (0..1), onGround }
   update(state) {
-    if (!this.ready) return;
+    // your own body loads the first time it is shown (third person, a replay's camera): ~15 MB of model and
+    // textures nobody in first person needs at page start
+    if (!this.ready) { if (state.visible && this.lazy) this.load().catch((e) => this.log(`body: ${e.message || e} (third person shows no body)`)); return; }
     this.place.visible = !!state.visible;
     if (!state.visible) return;
     const o = state.origin;

@@ -120,6 +120,21 @@ function touchButton(name, down) {
   }
 }
 
+// Ctrl+W outside fullscreen can't be blocked; at least ask before the tab goes. The listener is there only while a run
+// is live (the frame loop calls this): with a beforeunload listener Chrome can't close the tab at once, it waits for this
+// page's main thread to run it, and that is a long wait behind a map load on a slow PC or a phone.
+let leaveGuarded = false;
+const runLive = () => !!(S.run && !S.run.done && !S.replay);
+// checked again here: a hidden tab gets no frames, so the run may have ended since the last sync
+const askBeforeLeaving = (ev) => { if (runLive()) { ev.preventDefault(); ev.returnValue = ''; } };
+export function syncLeaveGuard() {
+  const want = runLive();
+  if (want === leaveGuarded) return;
+  leaveGuarded = want;
+  if (want) window.addEventListener('beforeunload', askBeforeLeaving);
+  else window.removeEventListener('beforeunload', askBeforeLeaving);
+}
+
 export function installInput(canvas, actions) {
   act = actions;
   const force = new URLSearchParams(location.search).get('touch');
@@ -143,8 +158,6 @@ export function installInput(canvas, actions) {
     if (S.replay) { if (S.replay.cam === 'free' && !S.locked) lockPointer(canvas); return; } // mouse look for the free camera
     if (!S.locked && S.run && !S.run.done && !G.overlay.open) actions.resume();
   });
-  // Ctrl+W outside fullscreen can't be blocked; at least ask before the tab goes.
-  window.addEventListener('beforeunload', (ev) => { if (S.run && !S.run.done && !S.replay) { ev.preventDefault(); ev.returnValue = ''; } });
 
   document.addEventListener('mousedown', (ev) => {
     if (!S.locked || S.replay || ev.sourceCapabilities?.firesTouchEvents) return; // a tap's emulated mouse is not Mouse 1

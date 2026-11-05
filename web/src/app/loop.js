@@ -4,7 +4,7 @@ import { S, G } from './state.js';
 import { settings } from './settings.js';
 import { rule, timescale, godMode, moveSettings } from './rules.js';
 import { clamp } from '../lib/math.js';
-import { readInput, takeLookDelta } from './input.js';
+import { readInput, takeLookDelta, syncLeaveGuard } from './input.js';
 import { bossFire, bossStatus, trackSegments, shootAs } from './bosses.js';
 import { applyPose, eventsAfter, eventsDuring } from './replay-play.js';
 import { replayView } from './replay-view.js';
@@ -60,6 +60,7 @@ export let lastFrameAt = 0; // app/coop.js keeps a round going when frames stop 
 export function frame(now) {
   requestAnimationFrame(frame);
   lastFrameAt = now;
+  syncLeaveGuard(); // the tab-close prompt only while a run is live (app/input.js)
   const { player, engine } = S;
   if (!player) return;
   const realDt = Math.min(0.1, (now - last) / 1000);

@@ -18,10 +18,16 @@ export function makeTrace() {
 // ---------------------------------------------------------------- BVH over triangles
 
 export class TriangleBVH {
-  constructor(tris) {
+  // parts: { idx, nodeB, nodeI } of a tree already built over these tris (world/bvh-build.js builds it in a worker)
+  constructor(tris, parts = null) {
     this.tris = tris; // Float32Array, 9 floats per triangle
     const n = tris.length / 9;
     this.count = n;
+    if (parts) {
+      this.idx = parts.idx; this.nodeB = parts.nodeB; this.nodeI = parts.nodeI;
+      this.stack = new Uint32Array(128);
+      return;
+    }
     const idx = new Uint32Array(n);
     const cen = new Float32Array(n * 3);
     const bmin = new Float32Array(n * 3);
@@ -35,32 +41,37 @@ export class TriangleBVH {
       }
     }
     this.idx = idx;
-    // nodes: [minx,miny,minz,maxx,maxy,maxz] + (left/right or start/count)
-    const nodesB = [];
-    const nodesI = [];
+    // nodes: [minx,miny,minz,maxx,maxy,maxz] + (left/right or start/count). Every split leaves both sides non-empty,
+    // so a tree over n triangles has at most 2n - 1 nodes: preallocated typed arrays, scalar bounds (a big map's
+    // build was ~0.3 s of frozen page on a desktop with growing JS arrays, several times that on a phone)
+    const cap = Math.max(1, 2 * n - 1);
+    const nodesB = new Float32Array(cap * 6);
+    const nodesI = new Uint32Array(cap * 3);
+    let nodes = 0;
     const build = (start, end) => {
-      const ni = nodesI.length / 3;
-      nodesI.push(0, 0, 0);
-      let lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
-      let clo = [Infinity, Infinity, Infinity], chi = [-Infinity, -Infinity, -Infinity];
+      const ni = nodes++;
+      let lx = Infinity, ly = Infinity, lz = Infinity, hx = -Infinity, hy = -Infinity, hz = -Infinity;
+      let clx = Infinity, cly = Infinity, clz = Infinity, chx = -Infinity, chy = -Infinity, chz = -Infinity;
       for (let k = start; k < end; k++) {
-        const t = idx[k];
-        for (let a = 0; a < 3; a++) {
-          lo[a] = Math.min(lo[a], bmin[t * 3 + a]); hi[a] = Math.max(hi[a], bmax[t * 3 + a]);
-          clo[a] = Math.min(clo[a], cen[t * 3 + a]); chi[a] = Math.max(chi[a], cen[t * 3 + a]);
-        }
+        const t3 = idx[k] * 3;
+        let v = bmin[t3]; if (v < lx) lx = v; v = bmin[t3 + 1]; if (v < ly) ly = v; v = bmin[t3 + 2]; if (v < lz) lz = v;
+        v = bmax[t3]; if (v > hx) hx = v; v = bmax[t3 + 1]; if (v > hy) hy = v; v = bmax[t3 + 2]; if (v > hz) hz = v;
+        v = cen[t3]; if (v < clx) clx = v; if (v > chx) chx = v;
+        v = cen[t3 + 1]; if (v < cly) cly = v; if (v > chy) chy = v;
+        v = cen[t3 + 2]; if (v < clz) clz = v; if (v > chz) chz = v;
       }
-      nodesB.push(lo[0], lo[1], lo[2], hi[0], hi[1], hi[2]);
+      const o = ni * 6;
+      nodesB[o] = lx; nodesB[o + 1] = ly; nodesB[o + 2] = lz; nodesB[o + 3] = hx; nodesB[o + 4] = hy; nodesB[o + 5] = hz;
       const count = end - start;
       if (count <= 6) {
         nodesI[ni * 3] = 1; nodesI[ni * 3 + 1] = start; nodesI[ni * 3 + 2] = count;
         return ni;
       }
       let axis = 0;
-      const ext = [chi[0] - clo[0], chi[1] - clo[1], chi[2] - clo[2]];
+      const ext = [chx - clx, chy - cly, chz - clz];
       if (ext[1] > ext[axis]) axis = 1;
       if (ext[2] > ext[axis]) axis = 2;
-      const mid = (clo[axis] + chi[axis]) * 0.5;
+      const mid = axis === 0 ? (clx + chx) * 0.5 : axis === 1 ? (cly + chy) * 0.5 : (clz + chz) * 0.5;
       let i = start, j = end - 1;
       while (i <= j) {
         if (cen[idx[i] * 3 + axis] < mid) i++;
@@ -74,8 +85,8 @@ export class TriangleBVH {
       return ni;
     };
     if (n > 0) build(0, n);
-    this.nodeB = new Float32Array(nodesB);
-    this.nodeI = new Uint32Array(nodesI);
+    this.nodeB = nodesB.slice(0, nodes * 6);
+    this.nodeI = nodesI.slice(0, nodes * 3);
     this.stack = new Uint32Array(128);
   }
 

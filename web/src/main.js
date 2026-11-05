@@ -48,7 +48,7 @@ G.renderer = new Renderer(canvas);
 G.audio = new GameAudio();
 G.vm = new Viewmodel(G.renderer.renderer);
 const litByParticles = (root) => G.renderer.lighting.patchDynamic(root); // the particle lights (world/lighting.js)
-G.body = new PlayerBody(G.renderer.scene, { log, onModel: litByParticles }); // third person (!tp): your own CT
+G.body = new PlayerBody(G.renderer.scene, { log, onModel: litByParticles, lazy: true }); // third person (!tp): your own CT
 G.hud = new Hud($('#hud'));
 G.radar = new Radar($('#hud')); // the minimap (CS2's own radar) and the EntWatch-style item list under it
 G.itemHud = new ItemHud($('#hud'));
@@ -212,7 +212,6 @@ async function init() {
   bindSettings(applySettings);
   applySettings();
   G.vm.load().catch((e) => log(`viewmodel: ${e.message || e}`));
-  G.body.load().catch((e) => log(`body: ${e.message || e} (third person shows no body)`));
   const idx = await loadMapIndex().catch(() => ({ maps: [] }));
   // map names become fetch paths (maps/<name>/...): only well-formed ones, from the index or ?map=
   S.mapIndex = (Array.isArray(idx?.maps) ? idx.maps : []).filter((m) => isMapName(m?.name));
