@@ -48,9 +48,12 @@ exact map-folder format so he can lift our maps straight into his site. See [REA
     - [ ] Level 5 White Particle (s5_sphere_boss_counter) and the 4 Pink Particles (niveau5_track_counter, s5_4boss_relay)
     - [ ] Level 2 Orange Particle (stage2_track_counter)
     - [ ] the levels' own laser runs (8_laserrelay1, 18_laserrelay1, l8/l9 beams, the 1–6 stage escapes)
-    - [ ] Level 5 ending dodge (l5_ending_relay: balls fall from above, then s5_once_win at +22 s) and the Level 6
-      final dodge after the boss (final_dodge_relay: 43 s of l6/l7 balls, l8/l9 beams and l10 rings rising from
-      below, then p2_s6_ending_breakable_humanswin). Unblocked by the func_door lip fix below
+    - [x] Level 6 final dodge (`l6_final_dodge`): from boss_death_relay, both floors break, 43 s of l6/l7 balls,
+      l8/l9 beams and l10 rings rising from below, the fall reaches p2_s6_once_humans_win (checked to the win)
+    - [x] Level 5 ending (`l5_ending`): level5_relay + s5_once07's +90 s outputs, ride le5_movelinear_end from
+      S5FIXERS, balls fall from above, win at s5_once_win (+22 s). `s5_slow_nuke` (humans, enabled at +90 s over the
+      whole end area) is the too-slow-team nuke: `s5_once_end01` on the start ledge kills it when the first human
+      arrives, so the scenario replays that touch's output before +90 s (all 1:1, nothing left out)
     - [x] engine: func_door travel is `|movedir . size| - lip`, signed and unclamped (CS2 CBaseDoor::Spawn,
       cs2_server FUN_180d53f10): a lip bigger than the brush moves the door backwards. The old `Math.max(0, ...)`
       froze 42 of visualizer's doors (dodge balls/beams, boss attacks 2/4/9/15/16/18, item balls) and gris's

@@ -11,17 +11,18 @@
       "name": "Level 5 ending: falling balls",
       "description": "Ride the ending platform (le5_movelinear_end, 7.5 s). On arrival l5_ending_relay drops two then four lines of balls from above every 0.15 s (12–20 s, l5_ball_end_hurt: instant kill) while the cube dodge sweeps the platform (stage5ending_hurt: 800). Win when s5_once_win turns on at +22 s.",
       "spawn": {
-        "origin": [
-          -3072,
-          -3072,
-          -4410
-        ],
+        "at": "[PR#]S5FIXERS",
         "yaw": 90
       },
       "start": [
         {
           "target": "[PR#]level5_relay",
           "input": "Trigger"
+        },
+        {
+          "target": "[PR#]s5_slow_nuke",
+          "input": "Kill",
+          "delay": 8
         },
         {
           "target": "[PR#]s5_beam*",
