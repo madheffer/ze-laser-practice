@@ -20,6 +20,7 @@
 import * as THREE from 'three';
 import { fetchJson, fetchBuffer } from '../lib/fetch.js';
 import { versioned, assetKey } from '../lib/paths.js';
+import { COMPUTE_DEFAULTS } from './bloom.js';
 
 const DEFAULTS = { m_flExposureBias: 0, m_flShoulderStrength: 0.15, m_flLinearStrength: 0.5, m_flLinearAngle: 0.1, m_flToeStrength: 0.2, m_flToeNum: 0.02, m_flToeDenom: 0.3, m_flWhitePoint: 4 };
 const MAX_LUT = 64;
@@ -56,7 +57,10 @@ const cleanParams = (p) => {
   return q;
 };
 // a .vpost's bloom block (lasers-bake --post): null without one
+const COMPUTE_KEYS = ['computeStrength', 'computeThreshold', 'computeRadius', 'computeEffectsScale']; // world/bloom.js defaults
 const cleanBloom = (b) => (b && typeof b === 'object' ? {
+  blendMode: typeof b.blendMode === 'string' ? b.blendMode : 'BLOOM_BLEND_ADD',
+  ...Object.fromEntries(COMPUTE_KEYS.filter((k) => Number.isFinite(b[k])).map((k) => [k, b[k]])),
   strength: finite(b.strength, 0), screenStrength: finite(b.screenStrength, 0), blurStrength: finite(b.blurStrength, 0),
   threshold: finite(b.threshold, 0), thresholdWidth: finite(b.thresholdWidth, 0),
   weights: Array.from({ length: 5 }, (_, k) => finite(b.weights?.[k], 0.2)),
@@ -70,6 +74,8 @@ const mixBloom = (a, b, w) => {
   const x = a || NO_BLOOM, y = b || NO_BLOOM;
   const o = {};
   for (const k of ['strength', 'screenStrength', 'blurStrength', 'threshold', 'thresholdWidth']) o[k] = lerp(x[k], y[k], w);
+  o.blendMode = w < 0.5 ? x.blendMode : y.blendMode;
+  for (const k of COMPUTE_KEYS) if (Number.isFinite(x[k]) || Number.isFinite(y[k])) o[k] = lerp(x[k] ?? COMPUTE_DEFAULTS[k], y[k] ?? COMPUTE_DEFAULTS[k], w);
   o.weights = x.weights.map((v, k) => lerp(v, y.weights[k], w));
   o.tints = x.tints.map((t, k) => t.map((v, q) => lerp(v, y.tints[k][q], w)));
   return o;

@@ -213,6 +213,10 @@ static class LightingBake
             ["thresholdWidth"] = b.GetFloatProperty("m_flBloomThresholdWidth"), ["skyboxStrength"] = b.GetFloatProperty("m_flSkyboxBloomStrength"),
             ["startValue"] = b.GetFloatProperty("m_flBloomStartValue"),
         };
+        // the compute bloom fields (client.dll FUN_1811e88a0 reads these for r_csgo_use_compute_bloom), only when present
+        foreach (var (k, name) in new[] { ("computeStrength", "m_flComputeBloomStrength"), ("computeThreshold", "m_flComputeBloomThreshold"),
+            ("computeRadius", "m_flComputeBloomRadius"), ("computeEffectsScale", "m_flComputeBloomEffectsScale") })
+            if (b.ContainsKey(name)) o[k] = b.GetFloatProperty(name);
         var weights = b.GetArray<double>("m_flBlurWeight");
         if (weights != null) o["weights"] = new JsonArray(weights.Take(8).Select(v => (JsonNode)JsonValue.Create(v)!).ToArray());
         var tints = b.GetArray("m_vBlurTint");
