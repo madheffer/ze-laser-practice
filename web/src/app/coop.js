@@ -325,6 +325,8 @@ function onRoom(room) {
 function onLeft(why) {
   const run = S.run;
   S.mp = null;
+  // a round still loading here is dropped: onStart stops once its load is in (starting !== its pend)
+  if (starting) { starting = null; G.loading.close(false); }
   clearRoster();
   unlockPing();
   lobby.busy = false;

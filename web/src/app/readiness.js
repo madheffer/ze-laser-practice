@@ -84,6 +84,9 @@ export function stepProgress(step, part = null) {
 // the server's go), else the step and the bar
 export function stageStatus(run) {
   if (!run || S.run !== run) return null;
+  // the run is over before its clock started (a round that ended while we loaded: everyone left out, the owner gave
+  // up): its end card shows, not a loading screen that never finishes
+  if (run.done) return { done: true };
   // a round: the go and our own stage drawn (a player the round started without finishes loading, then watches)
   if (run.ready && (!S.mp || run.go)) return { done: true };
   if (run.ready) {

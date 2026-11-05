@@ -68,7 +68,20 @@ G.hud = new Hud($('#hud'));
 G.radar = new Radar($('#hud')); // the minimap (CS2's own radar) and the EntWatch-style item list under it
 G.itemHud = new ItemHud($('#hud'));
 G.overlay = new Overlay($('#overlay'));
-G.loading = new LoadingScreen($('#loading')); // a picked stage, until its clock starts
+// a picked stage, until its clock starts. Leave room / Back drops the load: out of the room in a round (the others
+// play on), the stage dropped, the stage list
+G.loading = new LoadingScreen($('#loading'), { onLeave: leaveLoading });
+let playToken = 0; // a stage being loaded (G.play): a newer pick or leaveLoading drops it
+function leaveLoading() {
+  playToken++;
+  if (net.inRoom) net.leave(); // app/coop.js onLeft: the round being loaded is dropped too
+  G.loading.close(false);
+  if (S.run) endRun();
+  if (document.pointerLockElement) document.exitPointerLock?.();
+  G.pause();
+  G.menu.show(S.map ? 'stages' : 'maps');
+  G.menu.update();
+}
 G.killfeed = new Killfeed($('#killfeed'));
 installChat($('#chat'), { net }); // Y / U to talk (app/chat.js)
 G.peers = new Peers(G.renderer.scene, { log, onModel: litByParticles }); // the other players in a co-op / versus round
@@ -105,9 +118,11 @@ G.play = (i, mode = 'normal') => {
     return;
   }
   S.mp = null;
+  const token = ++playToken;
   beginStageLoading(i);
   enterGame(canvas);
   loadStage().then(() => {
+    if (token !== playToken) return; // left (Back) or picked again meanwhile
     if (!S.map?.loaded) { G.loading.close(false); return; } // another map was picked meanwhile
     startScenario(i, mode);
     // the lock landed while the map loaded: play on; on touch, enterGame again (it unpauses once a run exists)

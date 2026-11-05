@@ -78,9 +78,13 @@ export function staticFiles(roots) {
       if (enc) { delete headers['content-length']; headers['content-encoding'] = enc.name; }
       res.writeHead(200, headers);
       if (req.method === 'HEAD') { enc?.stream.destroy(); return res.end(); }
-      // pipeline tears every stage down when the player closes the tab mid-download
-      const stages = enc ? [createReadStream(file), enc.stream, res] : [createReadStream(file), res];
-      pipeline(...stages, () => {});
+      // pipeline tears every stage down when the player closes the tab mid-download. A file replaced or cut short
+      // while it is read (a map re-uploaded during a load) must not end the response short of its content-length:
+      // the browser would wait for the rest for ever. The response is dropped instead, so the game's load retries.
+      const read = createReadStream(file, { end: Math.max(0, st.size - 1) });
+      read.on('end', () => { if (read.bytesRead !== st.size) res.destroy(); });
+      const stages = enc ? [read, enc.stream, res] : [read, res];
+      pipeline(...stages, (e) => { if (e) res.destroy(); });
       return;
     }
     next();

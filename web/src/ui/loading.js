@@ -3,7 +3,8 @@
 // stage, the map's own screenshot behind (ui/home-hero.js shotsOf), a bar and the current step: main.js loadStage
 // (the map's files) feeds step(), then follow() polls the run (app/readiness.js stageStatus). Map text goes in
 // through textContent only. In a co-op / versus round it also lists every player's progress and who is ready
-// (app/coop-load.js loadRoster).
+// (app/coop-load.js loadRoster). Leave (a round: leaves the room) / Back (solo) drops the load and goes to the menu,
+// so a load that never finishes never needs a page reload.
 import './loading.css';
 import { S } from '../app/state.js';
 import { stageStatus } from '../app/readiness.js';
@@ -16,7 +17,8 @@ const FADE_MS = 350;
 const ROSTER_MS = 250;
 
 export class LoadingScreen {
-  constructor(root) {
+  // onLeave(): the Leave / Back button
+  constructor(root, { onLeave = () => {} } = {}) {
     this.root = root;
     root.hidden = true;
     root.setAttribute('aria-busy', 'true');
@@ -28,12 +30,14 @@ export class LoadingScreen {
         <div class="ld-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100"><i></i></div>
         <div class="ld-step" role="status" aria-live="polite"></div>
         <ul class="ld-players" aria-label="Players" hidden></ul>
+        <button type="button" class="ghost ld-leave"></button>
       </div>`;
     this.el = {
       bg: root.querySelector('.ld-bg'), map: root.querySelector('.ld-map'), stage: root.querySelector('.ld-stage'),
       bar: root.querySelector('.ld-bar'), fill: root.querySelector('.ld-bar i'), step: root.querySelector('.ld-step'),
-      players: root.querySelector('.ld-players'),
+      players: root.querySelector('.ld-players'), leave: root.querySelector('.ld-leave'),
     };
+    this.el.leave.addEventListener('click', () => onLeave());
     this.rosterTimer = null; this.rosterKey = '';
     this.open = false;
     this.frac = 0;
@@ -102,7 +106,10 @@ export class LoadingScreen {
     const list = loadRoster();
     // a round loads over the menu and the pause card too: a guest who hasn't clicked in still sees who everyone is
     // waiting for, and one the round started without still sees their own load finish (the roster is gone by then)
-    this.root.classList.toggle('round', !!list || !!S.mp);
+    const round = !!list || !!S.mp;
+    this.root.classList.toggle('round', round);
+    const leave = round ? 'Leave room' : 'Back';
+    if (this.el.leave.textContent !== leave) this.el.leave.textContent = leave;
     const key = list ? list.map((p) => `${p.id}:${p.pct}:${p.ready}:${p.out}`).join('|') : '';
     if (key === this.rosterKey) return;
     this.rosterKey = key;

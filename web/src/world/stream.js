@@ -20,7 +20,7 @@ const GATE_RADIUS = 6000;
 const CONCURRENT = 6; // a browser's HTTP/1.1 connections per host (HTTP/2 multiplexes more; 6 keeps a frame's decode short)
 
 export class WorldStream {
-  // list: chunks.json entries { file, min, max, always }; load(file) -> Promise<THREE.Object3D>; add(scene)
+  // list: chunks.json entries { file, min, max, always }; load(file, attempt) -> Promise<THREE.Object3D>; add(scene)
   constructor(list, { load, add, radius = 12000, mode = 'auto', log = () => {} }) {
     this.chunks = list.map((c) => ({ ...c, state: 'idle' })); // idle | loading | done | failed
     this.load = load;
@@ -80,13 +80,15 @@ export class WorldStream {
   fetch(c) {
     c.state = 'loading';
     this.active++;
-    this.load(c.file).then((scene) => {
+    this.load(c.file, c.retried ? 1 : 0).then((scene) => {
       if (this.disposed) return;
       c.state = 'done';
       this.add(scene, c);
     }, (e) => {
-      c.state = 'failed'; // a missing chunk is a hole in the scenery, not the end of the map
-      this.log(`world ${c.file}: ${e?.message || e}`);
+      // tried once more (a download cut short), then a hole in the scenery, not the end of the map
+      c.state = c.retried ? 'failed' : 'idle';
+      c.retried = true;
+      this.log(`world ${c.file}: ${e?.message || e}${c.state === 'idle' ? ' (retrying)' : ''}`);
     }).finally(() => {
       this.active--;
       this.dirty = true;

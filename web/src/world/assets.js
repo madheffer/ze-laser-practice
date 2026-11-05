@@ -143,7 +143,8 @@ export async function loadMap(name, onProgress = () => {}, opts = {}) {
     onProgress('world');
     world = await loadGlb(loader, base + manifestPath(manifest.world, null), (p) => onProgress(`world ${Math.round(p * 100)}%`));
   }
-  const loadChunk = (file) => loadGlb(loader, base + file);
+  // attempt > 0 (world/stream.js retrying): a URL of its own, or three's loader would join the request that hung
+  const loadChunk = (file, attempt = 0) => loadGlb(loader, base + file + (attempt > 0 ? `?retry=${attempt}` : ''));
 
   const renderModels = new Set((Array.isArray(manifest.renderModels) ? manifest.renderModels : []).map(assetKey));
   const modelBase = base + manifestPath(manifest.models, 'models/');
@@ -185,10 +186,18 @@ function waterTextures(j, url) {
 }
 
 // (the loader adds ?v=)
+// a glb (and its textures) that shows no progress for GLB_IDLE_MS fails instead of holding a stage's load for ever
+// (a file replaced on the host mid-download); world/stream.js tries a chunk once more. Two tries fit well inside
+// the co-op server's wait for a round's players (server/coop-round.js LOAD_CAP_MS)
+const GLB_IDLE_MS = 20_000;
 function loadGlb(loader, url, onProgress) {
   return new Promise((resolve, reject) => {
+    let timer = null;
+    const poke = () => { clearTimeout(timer); timer = setTimeout(() => reject(new Error(`${url}: no data for ${GLB_IDLE_MS / 1000} s`)), GLB_IDLE_MS); };
+    poke();
     // the clips ride on the scene (Object3D.animations survives clone()): world/anim.js plays them
-    loader.load(url, (g) => { g.scene.animations = g.animations || []; resolve(g.scene); }, (e) => e.total && onProgress?.(e.loaded / e.total), reject);
+    loader.load(url, (g) => { clearTimeout(timer); g.scene.animations = g.animations || []; resolve(g.scene); },
+      (e) => { poke(); if (e.total) onProgress?.(e.loaded / e.total); }, (e) => { clearTimeout(timer); reject(e); });
   });
 }
 
