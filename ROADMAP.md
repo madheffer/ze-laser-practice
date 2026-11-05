@@ -135,8 +135,11 @@ exact map-folder format so he can lift our maps straight into his site. See [REA
     - [x] engine: a mesh-only collision shape on a solid entity collides as its triangles (`world/hulls.js` meshSlabs,
       `entity.solidHulls()`), not its bounding box: each room here is one mesh, so it was a block you couldn't stand in
     - [ ] the boss face's `SetRenderAttribute bossX/bossY` flicker (a shader sprite-sheet offset) isn't drawn
-    - [ ] the spike's Rod.crystal is its door's moving sound, stopped on arrival 0.05 s later as Source's DoorHitTop
-      does (`entities/sound.js`); not confirmed against CS2's server.dll (its keyvalue names are hashed)
+    - [x] the spikes' sound (2026-11-06): Rod.crystal is each spike door's moving sound (noise1), and CS2 stops it on
+      arrival 0.05 s later (server.dll CBaseDoor::DoorHitTop -> vtable +0x888 StopMovingSound, which stops the handle
+      PlayMovingSound kept): 1:1 already. The static was 8-12 copies starting on one tick summed to 5.3x full scale
+      (+14 dB, clipped); CS2 runs every sound through its final-mix compressor (`__main__.vmix` FinalMixGlue: -6 dB,
+      40:1, 4 / 458 ms, peak mode), now `audio/mixglue.js`: the same strike peaks at 0.75, quiet sounds untouched
     - [ ] the rest of the map (15 random rooms, the puro chase in room 4) has no stages yet
   - [ ] **ze_ffvii_mako_reactor_v5_p** (3513334092) — 85, 5 laser templates; Heal Materia + 7 materia
   - [ ] **ze_ffvii_mako_reactor_v6_p** (3378273414) — 80, 12 laser templates; Heal Materia + 11 materia (Mimic, Barrier, Ultima ...)

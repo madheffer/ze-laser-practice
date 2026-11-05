@@ -351,7 +351,7 @@ world triangle from `--collision`;
 `lasers-bake --stock-sounds web/public/sounds` writes the stock knife / buyable guns / player set (gitignored);
 the entity engine only emits sound requests (`world/entities/sound.js`: breakable break / hit by material, env_explosion,
 train move / ping / start / stop, door and movelinear sounds, from server.dll / Source) and
-`audio/audio.js` plays them (CS2 distance curves, csgo_mega voice limits in `audio/limits.js`, music through the music volume). Test pages:
+`audio/audio.js` plays them (CS2 distance curves, csgo_mega voice limits in `audio/limits.js`, music through the music volume, then CS2's final-mix compressor `FinalMixGlue` from `sounds/graphs/__main__.vmix`: `audio/mixglue.js`). Test pages:
 `audio-test.html`, `vm-test.html`.
 
 Third person (CS2Fixes `!tp`, menu "Video & camera"): `world/body.js` draws your CT, the stock

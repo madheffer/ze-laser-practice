@@ -30,6 +30,7 @@ import { clamp01 } from '../lib/math.js';
 import { mapName } from '../lib/paths.js';
 import { spatialMix } from './spatial.js';
 import { VoiceLimits } from './limits.js';
+import { createMixGlue } from './mixglue.js';
 import { SurfaceSounds } from './surfaces.js';
 import { ALIASES, readTable, fileUrl } from './tables.js';
 import { DEFAULT_GUN, gunSounds } from '../lib/weapons.js';
@@ -64,8 +65,11 @@ export class GameAudio {
     this.sfx = this.ctx.createGain();
     this.music = this.ctx.createGain();
     this.master.gain.value = 0; // paused at boot: silent until a stage is entered (resume fades in)
-    this.sfx.connect(this.master);
-    this.music.connect(this.master);
+    // everything goes through CS2's final-mix compressor (mixglue.js), then the pause fade
+    this.glue = createMixGlue(this.ctx);
+    this.sfx.connect(this.glue.input);
+    this.music.connect(this.glue.input);
+    this.glue.output.connect(this.master);
     this.master.connect(this.ctx.destination);
     this.stockReady = this._loadTable('stock', 'sounds/soundevents.json').then(() => this._preloadStock());
     this.setVolumes(this.volumes);
