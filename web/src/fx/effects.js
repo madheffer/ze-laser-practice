@@ -231,6 +231,30 @@ export class MapEffects {
   }
 }
 
+// Whether a collection's particles can reach the view: the box around their positions (field 0), grown by four times
+// the largest radius (field 3) and a margin, for the sprite's own size, its stretch and the roll of its quad.
+// No frustum: always.
+const CULL_MARGIN = 128;
+const _box = new THREE.Box3();
+function collectionInView(col, frustum) {
+  if (!frustum) return true;
+  const P = col.attr?.[0], R = col.attr?.[3], n = col.count || 0;
+  if (!P) return true;
+  let x0 = Infinity, y0 = Infinity, z0 = Infinity, x1 = -Infinity, y1 = -Infinity, z1 = -Infinity, r = 0;
+  for (let i = 0; i < n; i++) {
+    const x = P[3 * i], y = P[3 * i + 1], z = P[3 * i + 2];
+    if (x < x0) x0 = x; if (x > x1) x1 = x;
+    if (y < y0) y0 = y; if (y > y1) y1 = y;
+    if (z < z0) z0 = z; if (z > z1) z1 = z;
+    if (R && R[i] > r) r = R[i];
+  }
+  if (!Number.isFinite(x0 + x1 + y0 + y1 + z0 + z1)) return true; // a NaN position: drawn as before
+  const pad = 4 * (Number.isFinite(r) ? r : 0) + CULL_MARGIN;
+  _box.min.set(x0 - pad, y0 - pad, z0 - pad);
+  _box.max.set(x1 + pad, y1 + pad, z1 + pad);
+  return frustum.intersectsBox(_box);
+}
+
 export class EffectInstance {
   constructor(effects, doc, { seed = 1, camera = null } = {}) {
     this.effects = effects;
@@ -249,7 +273,10 @@ export class EffectInstance {
   }
 
   // cps: [{ position, forward, left, up }] by control point index (any may be missing)
-  update(dt, { cps = [], active = true, camPos = [0, 0, 0] } = {}) {
+  // frustum: the camera's (THREE.Frustum); sprites and ropes wholly outside it skip building their buffers and are not
+  // drawn (they still simulate, so what they do is unchanged). prepare: build every renderer and its material whatever
+  // is live or seen (render.js compiles the effect's shaders from that before it is shown)
+  update(dt, { cps = [], active = true, camPos = [0, 0, 0], frustum = null, prepare = false } = {}) {
     // A start plays from this frame on; a stop came at the end of the time this frame covers, so that time still runs
     // with emission on (a fresh instance that was never on stops before its first step). Westersand's Chaos_Tesla gets
     // Stop 0.5 s after Start, the frame its beams restart (tesla_beam_mainc C_OP_RestartAfterDuration 0.5) and fire
@@ -296,6 +323,12 @@ export class EffectInstance {
           return;
         }
         if (!rend.mesh) return;
+        // nothing of it can be on screen: its buffers wait for the frame it can (trails and models are left alone: a
+        // streak reaches back along the velocity, a model has its own size)
+        if (!prepare && (rend instanceof SpriteRenderer || rend instanceof RopeRenderer) && !(col.count > 0 && collectionInView(col, frustum))) {
+          rend.mesh.visible = false;
+          return;
+        }
         // CS2's GameOverlay layer (m_bOnlyRenderInEffecsGameOverlay; client.dll builds a "GameOverlay Particles" layer):
         // drawn after the scene, over it. Westersand's Chaos_Tesla lightning (tesla_beam_p1c) is one: in game its bolts
         // show across Chaos's body although they start inside it. UNSETTLED: the layer's own pass is not traced; no depth

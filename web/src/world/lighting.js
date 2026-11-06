@@ -152,10 +152,13 @@ export class MapLighting {
     if (this.defaultFar == null) this.defaultFar = camera.far;
     this.cullCubes(camera);
     this.mapLights.update(camera, engine); // with the live directlight 2 omnis (maplights.js)
-    const fog = this.options.fog && engine?.fogState ? engine.fogState() : { controller: null, gradient: null };
+    const state = engine?.fogState ? engine.fogState() : { controller: null, gradient: null };
+    const fog = this.options.fog ? state : { controller: null, gradient: null };
     const u = this.fogUniforms;
     const g = fog.gradient, c = fog.controller?.on ? fog.controller : null;
-    let farz = -1;
+    // the map's far Z holds with the Fog setting off too: that setting drops the fog's shading, not where the map ends
+    // its world (westersand's controllers clip at 6000; without it Low drew the whole desert out to 60000)
+    const farz = state.gradient ? state.gradient.farz : state.controller?.on ? state.controller.farz : -1;
     if (g) {
       // env_gradient_fog (VRF SceneGradientFog): colour x strength (as stored, /255: no sRGB decode), distance and
       // height terms each biased, scaled and raised to their exponent, times the max opacity
@@ -167,14 +170,12 @@ export class MapLighting {
       u.cs2FogDist.value.set(dScale, -g.start * dScale, Math.min(1, Math.max(0, g.opacity * g.weight)), g.exponent);
       u.cs2FogHeight.value.set(hScale, hBias, g.vexponent, g.endHeight);
       u.cs2FogStartSq.value = g.start * g.start;
-      farz = g.farz;
     } else if (c) {
       // env_fog_controller: colour (sRGB -> linear) x hdrcolorscale, blended toward the secondary colour by the view
       // direction when fogblend is on; amount = min(maxdensity, ((d - start) / (end - start)) ^ exponent)
       u.cs2FogType.value = 1;
       controllerColor(c, camera, u.cs2FogColor.value, this._fwd, this._dir);
       u.cs2FogDist.value.set(c.start, c.end, Math.min(1, Math.max(0, c.density)), c.exponent);
-      farz = c.farz;
     } else u.cs2FogType.value = 0;
     // farz: how far the world draws (the sky stays)
     const far = farz > 0 ? Math.max(256, Math.min(farz, this.defaultFar)) : this.defaultFar;

@@ -19,6 +19,8 @@ import { Moondome } from './moondome.js';
 import { Effects } from './effects.js';
 import { spawnsHidden } from './entities/render-mode.js';
 import { applySelfIllum, tintSelfIllum } from './selfillum.js';
+import { uploadNow, uploadSpread, FRAME_BUDGET_MS } from './gpu-upload.js';
+import { ChunkOcclusion } from './occlusion.js';
 
 // an entity's world transform as a particle control point: position and its forward / left / up axes
 function cpFrom(ent) {
@@ -53,6 +55,10 @@ export class Renderer {
     this.moondome = new Moondome(this.lighting); // csgo_moondome: fake-skybox surfaces that show a sky cube (world/moondome.js)
     this.effects = new Effects(); // csgo_effects: unlit see-through / additive surfaces with fresnel and distance fade (world/effects.js)
 
+    // world chunks hidden behind walls are not drawn (world/occlusion.js); ?noocclusion draws them all (comparisons)
+    this.occlusion = new URLSearchParams(location.search).has('noocclusion') ? null : new ChunkOcclusion(this.renderer.getContext());
+    if (this.occlusion && !this.occlusion.ok) this.occlusion = null;
+    this.chunks = []; // the world's chunks ready to draw: { object, box } (warmChunk)
     this.worldRoot = new THREE.Group();
     this.worldRoot.matrixAutoUpdate = false;
     this.worldRoot.matrix.copy(GLTF_TO_SOURCE);
@@ -62,6 +68,7 @@ export class Renderer {
     this.visuals = new Map(); // entity -> Object3D
     this.anims = new PropAnimator(); // prop_dynamic sequences (world/anim.js)
     this.loading = new Set(); // entity models / effects still loading (app/readiness.js waits for them)
+    this.loadingStage = false; // behind the loading screen (app/readiness.js): streamed chunks upload at full speed
     // real particle effects (fx/effects.js) draw in world space
     this.fxRoot = new THREE.Group();
     this.scene.add(this.fxRoot);
@@ -107,6 +114,8 @@ export class Renderer {
   // the whole world glb, or null for a streamed map (its chunks come through addWorldChunk)
   // water: the map's baked water textures (loadMap's map.water; null for an older bake)
   setWorld(scene, water = null) {
+    for (const c of this.chunks) this.occlusion?.forget(c.object);
+    this.chunks = [];
     this.worldRoot.clear();
     this.viewBox = null; // a stage sets its own (setViewBox)
     this.water.setMap(water);
@@ -149,7 +158,29 @@ export class Renderer {
     this.worldRoot.add(scene);
     this.lighting.applyToWorld(scene); // the map's CS2 lightmap shading (world/lighting.js; nothing without a bake)
     if (this.viewBox) { this.worldRoot.updateMatrixWorld(true); scene.traverse((o) => this.fitView(o)); }
+    this.track(this.warmChunk(scene));
   }
+
+  // A chunk is shown once its shaders are compiled and its textures are on the GPU, a few per frame: drawn at once, its
+  // first frame did all of that (a chunk streaming in while you play, or one turned to). app/readiness.js waits for
+  // the chunks a stage starts with (render.loading).
+  async warmChunk(scene) {
+    const attached = () => scene.parent === this.worldRoot;
+    // compile() reads what is visible when it is called; the chunk is hidden while the programs link
+    const programs = this.compileAsync(scene);
+    scene.visible = false;
+    await programs;
+    await uploadSpread(this.renderer, scene, attached, () => (this.loadingStage ? 50 : FRAME_BUDGET_MS));
+    if (!attached()) return;
+    scene.visible = true;
+    const box = new THREE.Box3();
+    scene.updateMatrixWorld(true);
+    scene.traverse((o) => { if (o.isMesh) box.union(new THREE.Box3().setFromObject(o, false)); });
+    if (!box.isEmpty()) this.chunks.push({ object: scene, box: [box.min.toArray(), box.max.toArray()] });
+  }
+
+  // every texture of what is in the scene now, on the GPU (behind the loading screen: app/readiness.js)
+  uploadTextures() { uploadNow(this.renderer, this.scene); }
 
   // The stage's view box (world/view-box.js, null for the whole map): world meshes and entity models outside it are
   // not drawn. World meshes are placed once, so they are sorted here; entities move, so updateEntities checks them.
@@ -172,6 +203,11 @@ export class Renderer {
   // model arrives (they load after the entity spawns), placed where the entity is now
   entityInView(g) {
     if (!this.viewBox) return true;
+    return boxInView(this.viewBox, this.entityLocalBox(g), g.matrix);
+  }
+
+  // an entity visual's bounds in its own space, measured again whenever a model arrives
+  entityLocalBox(g) {
     const u = g.userData;
     let n = 0;
     g.traverse((o) => { if (o.isMesh || o.isLine) n++; });
@@ -180,7 +216,16 @@ export class Renderer {
       u.viewLocal = new THREE.Box3().setFromObject(g, true).applyMatrix4(g.matrixWorld.clone().invert());
       u.viewMeshes = n;
     }
-    return boxInView(this.viewBox, u.viewLocal, g.matrix);
+    return u.viewLocal;
+  }
+
+  // an entity visual wholly inside a world chunk hidden behind walls (world/occlusion.js hides): not drawn either
+  entityOccluded(g) {
+    if (!this.occlusion || this.chunks.length < 2) return false;
+    const local = this.entityLocalBox(g);
+    if (local.isEmpty()) return false;
+    const box = (this._entBox ||= new THREE.Box3()).copy(local).applyMatrix4(g.matrix);
+    return this.occlusion.hides(box, this.chunks, this.camera);
   }
 
   clearEntities() {
@@ -212,11 +257,21 @@ export class Renderer {
     if (isParticleSystem(e.cls) && map.effects?.has(kv.effect_name)) {
       // the real effect (fx/particles): it lives in world space, under fxRoot, fed from this entity every frame
       any = true;
-      this.track(map.effects.spawn(kv.effect_name, { seed: e.id })).then((inst) => {
+      // its shaders are compiled before it is shown (off the main thread where the browser can): a first draw that
+      // compiled them held the frame (deadcore: 138 ms when a stage's first effect started mid-stage)
+      this.track(map.effects.spawn(kv.effect_name, { seed: e.id }).then(async (inst) => {
         if (!inst || !e.alive || this.visuals.get(e) !== group) return inst?.dispose();
+        // a zero-length step with the state its first frame will have: its renderers and their materials exist
+        inst.update(0, { cps: this.controlPoints(e, group), active: !!e.state.active, prepare: true });
+        // three compiles only what is visible, and a renderer with no particles yet hides its mesh
+        const hidden = [];
+        inst.group.traverse((o) => { if (!o.visible) { hidden.push(o); o.visible = true; } });
+        await this.compileAsync(inst.group);
+        for (const o of hidden) o.visible = false;
+        if (!e.alive || this.visuals.get(e) !== group) return inst.dispose();
         group.userData.fx = inst;
         this.fxRoot.add(inst.group);
-      });
+      }));
     } else if (isParticleSystem(e.cls)) {
       // an older bake without fx/: the summary sprites
       const fx = map.particles?.[assetKey(kv.effect_name || '')];
@@ -458,22 +513,36 @@ export class Renderer {
     const amb = this.lighting?.ambient;
     if (amb) fxShared.uAmbient.value.set(amb.r, amb.g, amb.b); else fxShared.uAmbient.value.set(1, 1, 1);
     const camPos = [this.camera.position.x, this.camera.position.y, this.camera.position.z];
+    const frustum = this.viewFrustum();
     for (const [e, g] of this.visuals) {
       const inst = g.userData.fx;
       if (!inst) continue;
-      // control point n: the entity its cpoint<n> names (cpoint0 too: ze_dreamin's beams set it), CP 0 defaults to itself
-      const cps = [cpFrom(e)];
-      for (let i = 0; i <= 63; i++) {
-        const name = e.kv[`cpoint${i}`];
-        if (!name) continue;
-        const t = e.engine.findOne(name);
-        if (t) cps[i] = cpFrom(t);
-      }
-      const glow = glowControlPoints(e); // env_particle_glow: its tint and scales as CP 16 / 17
-      if (glow) { cps[16] = glow[16]; cps[17] = glow[17]; }
-      inst.update(dt, { cps, active: !!(e.alive && e.state.active), camPos });
+      inst.update(dt, { cps: this.controlPoints(e, g), active: !!(e.alive && e.state.active), camPos, frustum });
       inst.group.visible = e.visible !== false;
     }
+  }
+
+  // the camera's frustum this frame (particles skip what it can't see: fx/effects.js)
+  viewFrustum() {
+    const cam = this.camera;
+    cam.updateMatrixWorld();
+    this._pv ||= new THREE.Matrix4();
+    this._frustum ||= new THREE.Frustum();
+    return this._frustum.setFromProjectionMatrix(this._pv.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse));
+  }
+
+  // an effect's control points: n = the entity its cpoint<n> names (cpoint0 too: ze_dreamin's beams set it), CP 0
+  // defaults to itself. Which cpoints the entity names is read once (its keyvalues don't change; the targets move).
+  controlPoints(e, g) {
+    const names = g.userData.cpNames ||= Array.from({ length: 64 }, (_, i) => e.kv[`cpoint${i}`]).map((n, i) => (n ? [i, n] : null)).filter(Boolean);
+    const cps = [cpFrom(e)];
+    for (const [i, name] of names) {
+      const t = e.engine.findOne(name);
+      if (t) cps[i] = cpFrom(t);
+    }
+    const glow = glowControlPoints(e); // env_particle_glow: its tint and scales as CP 16 / 17
+    if (glow) { cps[16] = glow[16]; cps[17] = glow[17]; }
+    return cps;
   }
 
   updateEntities(time = 0) {
@@ -502,7 +571,7 @@ export class Renderer {
         g.visible = !!s && s.vis;
         if (!s) continue;
         g.matrix.copy(s.m);
-        if (g.visible) g.visible = !this.fadedOut(g) && this.entityInView(g);
+        if (g.visible) g.visible = !this.fadedOut(g) && this.entityInView(g) && !this.entityOccluded(g);
         g.matrixWorldNeedsUpdate = true;
         for (const c of g.children) {
           const k = c.userData.kind;
@@ -515,7 +584,7 @@ export class Renderer {
       g.matrix.copy(e.getWorld());
       g.matrixWorldNeedsUpdate = true;
       const on = e.alive && e.visible;
-      g.visible = on && !this.fadedOut(g) && this.entityInView(g);
+      g.visible = on && !this.fadedOut(g) && this.entityInView(g) && !this.entityOccluded(g);
       for (const c of g.children) {
         const k = c.userData.kind;
         if (k === 'fx') c.visible = !!e.state.active;
@@ -576,6 +645,47 @@ export class Renderer {
   // world materials already used per material, so the world looks as before.
   render() {
     const r = this.renderer;
+    this.ensureTarget();
+    // depth feathering / refraction read the frame after the opaques (scenecopy.js)
+    this.water.frame(this.camera, performance.now() / 1000);
+    this.effects.frame(performance.now() / 1000);
+    (this.sceneCopy ||= new SceneCopy(this.scene, () => this.water.wantsCopy || sceneCopyWanted())).frame(r, this.hdr, this.camera);
+    // the chunks the last frames' queries found hidden stay out of this one; a world in one piece has nothing to cull
+    const occlude = this.occlusion && this.chunks.length > 1;
+    if (occlude) this.occlusion.apply(this.chunks, this.camera);
+    r.setRenderTarget(this.hdr);
+    r.render(this.scene, this.camera);
+    if (occlude) {
+      // against this frame's depth (MSAA's resolved into the target's own framebuffer): three's state is restored after
+      const fbo = r.properties.get(this.hdr).__webglFramebuffer;
+      this.occlusion.query(this.chunks, this.camera, this.viewFrustum(), this._occBox ||= new THREE.Box3(), fbo, this.hdr.width, this.hdr.height);
+      r.resetState();
+    }
+    // CS2's bloom from the post volume on screen (bloom.js; this.bloomOn: the graphics setting)
+    this.bloom.enabled = this.bloomOn !== false;
+    this.bloom.params = this.post.bloom;
+    this.bloom.render(r, this.hdr);
+    r.setRenderTarget(null);
+    r.render(this.blitScene, this.blitCam);
+  }
+
+  // Build the shaders object (and what is under it) is drawn with, as the world pass draws it: into the HDR target.
+  // three picks a program variant by the target bound (the screen gets sRGB output and tone mapping, a render target
+  // linear and none), so compiling with the screen bound built variants the frame never uses and the real ones were
+  // still compiled on their first draw. Off the main thread where the browser can (KHR_parallel_shader_compile).
+  compileAsync(object) {
+    const r = this.renderer;
+    this.ensureTarget();
+    const prev = r.getRenderTarget();
+    r.setRenderTarget(this.hdr);
+    const done = r.compileAsync(object, this.camera, this.scene); // compiles now; resolves once the programs link
+    r.setRenderTarget(prev);
+    return done.catch(() => {});
+  }
+
+  // the HDR target the world is drawn into, and the blit that tone-maps it onto the screen, at the canvas's size
+  ensureTarget() {
+    const r = this.renderer;
     const size = r.getDrawingBufferSize(this._size || (this._size = new THREE.Vector2()));
     if (!this.hdr) {
       this.hdr = new THREE.WebGLRenderTarget(size.x, size.y, { type: THREE.HalfFloatType, samples: this.msaa ? 4 : 0 });
@@ -599,17 +709,5 @@ void main() {
       this.blitCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
     }
     if (this.hdr.width !== size.x || this.hdr.height !== size.y) this.hdr.setSize(size.x, size.y);
-    // depth feathering / refraction read the frame after the opaques (scenecopy.js)
-    this.water.frame(this.camera, performance.now() / 1000);
-    this.effects.frame(performance.now() / 1000);
-    (this.sceneCopy ||= new SceneCopy(this.scene, () => this.water.wantsCopy || sceneCopyWanted())).frame(r, this.hdr, this.camera);
-    r.setRenderTarget(this.hdr);
-    r.render(this.scene, this.camera);
-    // CS2's bloom from the post volume on screen (bloom.js; this.bloomOn: the graphics setting)
-    this.bloom.enabled = this.bloomOn !== false;
-    this.bloom.params = this.post.bloom;
-    this.bloom.render(r, this.hdr);
-    r.setRenderTarget(null);
-    r.render(this.blitScene, this.blitCam);
   }
 }

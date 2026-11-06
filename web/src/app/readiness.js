@@ -30,8 +30,9 @@ const within = (p, until) => new Promise((resolve) => {
 export async function prepareStage(run, onStep = () => {}) {
   const until = Date.now() + LIMIT_MS;
   const stillRun = () => S.run === run && Date.now() < until;
+  const r = G.renderer;
+  r.loadingStage = true;
   try {
-    const r = G.renderer;
     // one frame at the spawn first: the camera, the fog and so the view distance the stream gates on are the stage's
     await nextFrame();
     if (G.stream && stillRun()) {
@@ -45,11 +46,15 @@ export async function prepareStage(run, onStep = () => {}) {
     // the map's sound table (audio.js): no sound of the stage is asked for before it is in
     if (stillRun() && G.audio?.ready) { onStep('loading sounds'); await within(G.audio.ready(), until); }
     // build every shader the scene needs now, not on the first frame that meets a laser
-    if (stillRun() && r.renderer.compileAsync) { onStep('preparing shaders'); await within(r.renderer.compileAsync(r.scene, r.camera), until); }
+    if (stillRun()) { onStep('preparing shaders'); await within(r.compileAsync(r.scene), until); }
+    // and every texture on the GPU: three uploads one the first time it is drawn, a hitch the first time you turn to it
+    if (stillRun()) r.uploadTextures();
     await nextFrame();
     await nextFrame();
   } catch (e) {
     console.warn('stage preparation:', e);
+  } finally {
+    r.loadingStage = false;
   }
 }
 

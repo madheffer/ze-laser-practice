@@ -18,6 +18,7 @@ import { cloneModel } from './anim.js';
 import { applySelfIllum } from './selfillum.js';
 import { parseVec, isParticleSystem } from './entities/index.js';
 import { spawnsHidden } from './entities/render-mode.js';
+import { texturesOf } from './gpu-upload.js';
 
 const MAX_MODELS = 80;
 const IDLE_TIMEOUT_MS = 250;
@@ -59,16 +60,9 @@ export function templateAssets(engine) {
   return out;
 }
 
-// every texture a material samples
-function texturesOf(material, out) {
-  for (const m of Array.isArray(material) ? material : [material]) {
-    if (m) for (const v of Object.values(m)) if (v?.isTexture) out.add(v);
-  }
-}
-
 // Warm `run`'s map in the background. renderer: world/render.js; isCurrent() false once the run is over.
 export async function warmTemplates({ renderer, map, engine, origin, isCurrent }) {
-  const gl = renderer.renderer, scene = renderer.scene, camera = renderer.camera;
+  const gl = renderer.renderer;
   const d2 = (o) => (o[0] - origin[0]) ** 2 + (o[1] - origin[1]) ** 2 + (o[2] - origin[2]) ** 2;
   const items = templateAssets(engine).sort((a, b) => d2(a.origin) - d2(b.origin));
   // what this map has warmed: each stage warms its own nearest, skipping what an earlier stage did
@@ -98,7 +92,7 @@ export async function warmTemplates({ renderer, map, engine, origin, isCurrent }
       group.updateMatrixWorld(true);
       group.traverse((o) => { if (o.isMesh) { applySelfIllum(o, renderer.selfIllum); renderer.lighting?.applyProbes(o); } });
       // shaders off the main thread where the browser can (KHR_parallel_shader_compile), then textures one per idle
-      await gl.compileAsync(group, camera, scene).catch(() => {});
+      await renderer.compileAsync(group); // into the HDR target, as it is drawn (render.js compileAsync)
       const tex = new Set();
       group.traverse((o) => { if (o.material) texturesOf(o.material, tex); });
       for (const t of tex) {
