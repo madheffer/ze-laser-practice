@@ -76,10 +76,11 @@ export class VoicePlayback {
     sp.next += buf.duration;
   }
 
-  // is their audio playing now (the popup follows what you hear, not when the packet came)
+  // is their audio playing now (the popup follows what you hear, not when the packet came). A context the browser
+  // still holds suspended (no click or key on the page yet) plays nothing and its clock stands still: not speaking.
   speaking(id) {
     const sp = this.speakers.get(id);
-    return !!sp && !!this.ctx && sp.next > 0 && this.ctx.currentTime < sp.next + HOLD;
+    return !!sp && this.ctx?.state === 'running' && sp.next > 0 && this.ctx.currentTime < sp.next + HOLD;
   }
 
   // the loudness of what is playing now, 0..1

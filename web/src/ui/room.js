@@ -17,6 +17,7 @@ import { fillSlider } from './controls.js';
 import { RoomPicker } from './room-picker.js';
 import { displayName } from './maps.js';
 import { RoomChat } from './room-chat.js';
+import { voiceBadge } from './voice-hud.js';
 
 function el(tag, cls, t) { const e = document.createElement(tag); if (cls) e.className = cls; if (t != null) e.textContent = t; return e; }
 function btn(label, cls, onClick, title) {
@@ -89,7 +90,11 @@ export class RoomScreen {
     const players = el('section', 'rm-players');
     this.countEl = el('span', 'rm-count');
     const ph = el('h2', null, 'Players ');
-    ph.append(this.countEl);
+    // voice chat works here too (app/voice.js), so everyone can talk while the host picks
+    const voiceHint = el('span', 'rm-voice-hint', ' Hold to talk');
+    voiceHint.prepend(el('kbd', null, 'V'));
+    voiceHint.title = 'Voice chat: hold V anywhere in the room, here or in a round';
+    ph.append(this.countEl, voiceHint);
     this.slots = el('ol', 'rm-slots');
     const you = el('label', 'rm-you');
     you.append(el('span', null, 'Your name'));
@@ -205,7 +210,10 @@ export class RoomScreen {
       this.slotKey = key;
       const rows = room.members.map((m) => {
         const li = el('li', `rm-slot${m.id === room.owner ? ' owner' : ''}${m.id === net.you ? ' you' : ''}`);
-        li.append(el('span', 'rm-avatar', (m.name || '?').slice(0, 1).toUpperCase()), el('span', 'rm-pname', m.name));
+        const sq = el('span', 'rm-avatar', (m.name || '?').slice(0, 1).toUpperCase());
+        sq.dataset.voiceId = String(m.id); // lit while they talk (app/voice.js)
+        sq.append(voiceBadge());
+        li.append(sq, el('span', 'rm-pname', m.name));
         li.append(el('span', `rm-ms${m.ping ? '' : ' zero'}`, `${m.ping || 0} ms`));
         if (m.id === room.owner) li.append(el('span', 'rm-tag owner', 'Host'));
         if (m.id === net.you) li.append(el('span', 'rm-tag', 'You'));
@@ -218,6 +226,9 @@ export class RoomScreen {
         li.append(el('span', 'rm-avatar'), el('span', 'rm-pname', 'Waiting for a player…'));
         rows.push(li);
       }
+      // who is talking stays lit through the rebuild (app/voice.js marks the squares every 50 ms)
+      const talking = new Set([...this.slots.querySelectorAll('.talking')].map((e) => e.dataset.voiceId));
+      for (const sq of rows.map((li) => li.querySelector('[data-voice-id]'))) if (sq && talking.has(sq.dataset.voiceId)) sq.classList.add('talking');
       this.slots.replaceChildren(...rows);
     }
 

@@ -11,6 +11,7 @@ import { stageStatus } from '../app/readiness.js';
 import { loadRoster } from '../app/coop-load.js';
 import { shotsOf } from './home-hero.js';
 import { displayName } from './maps.js';
+import { voiceBadge } from './voice-hud.js';
 
 const POLL_MS = 100;
 const FADE_MS = 350;
@@ -38,7 +39,7 @@ export class LoadingScreen {
       players: root.querySelector('.ld-players'), leave: root.querySelector('.ld-leave'),
     };
     this.el.leave.addEventListener('click', () => onLeave());
-    this.rosterTimer = null; this.rosterKey = '';
+    this.rosterTimer = null; this.rosterKey = ''; this.rows = [];
     this.open = false;
     this.frac = 0;
     this.openTimer = null; this.pollTimer = null; this.fadeTimer = null;
@@ -110,30 +111,48 @@ export class LoadingScreen {
     this.root.classList.toggle('round', round);
     const leave = round ? 'Leave room' : 'Back';
     if (this.el.leave.textContent !== leave) this.el.leave.textContent = leave;
-    const key = list ? list.map((p) => `${p.id}:${p.pct}:${p.ready}:${p.out}`).join('|') : '';
-    if (key === this.rosterKey) return;
-    this.rosterKey = key;
     const ul = this.el.players;
-    ul.hidden = !list || list.length < 2;
-    if (ul.hidden) { ul.replaceChildren(); return; }
-    ul.replaceChildren(...list.map((p) => {
-      const li = document.createElement('li');
-      li.className = p.out ? 'out' : p.ready ? 'ready' : '';
-      if (p.you) li.classList.add('you');
-      const name = document.createElement('span');
-      name.className = 'ld-pname';
-      name.textContent = p.you ? `${p.name} (you)` : p.name;
-      const bar = document.createElement('span');
-      bar.className = 'ld-pbar';
-      const fill = document.createElement('i');
-      fill.style.transform = `scaleX(${p.out ? 0 : p.pct / 100})`;
-      bar.append(fill);
-      const state = document.createElement('span');
-      state.className = 'ld-pstate';
-      state.textContent = p.out ? 'out' : p.ready ? '\u2713' : `${p.pct}%`;
-      li.append(name, bar, state);
-      return li;
-    }));
+    const show = !!list && list.length >= 2;
+    ul.hidden = !show;
+    // the rows are made once per roster and only updated after, so a talking square (app/voice.js) stays lit
+    const key = show ? list.map((p) => `${p.id}:${p.name}:${p.you}`).join('|') : '';
+    if (key !== this.rosterKey) {
+      this.rosterKey = key;
+      this.rows = show ? list.map((p) => this.playerRow(p)) : [];
+      ul.replaceChildren(...this.rows.map((r) => r.li));
+    }
+    if (!show) return;
+    list.forEach((p, i) => {
+      const r = this.rows[i];
+      const cls = `${p.out ? 'out' : p.ready ? 'ready' : ''}${p.you ? ' you' : ''}`.trim();
+      if (r.li.className !== cls) r.li.className = cls;
+      const scale = `scaleX(${p.out ? 0 : p.pct / 100})`;
+      if (r.fill.style.transform !== scale) r.fill.style.transform = scale;
+      const state = p.out ? 'out' : p.ready ? '\u2713' : `${p.pct}%`;
+      if (r.state.textContent !== state) r.state.textContent = state;
+    });
+  }
+
+  // a roster row: their square (lit while they talk), name, bar, percent / tick / out
+  playerRow(p) {
+    const li = document.createElement('li');
+    const sq = document.createElement('span');
+    sq.className = 'ld-avatar';
+    sq.textContent = (p.name || '?').slice(0, 1).toUpperCase();
+    sq.dataset.voiceId = String(p.id);
+    sq.append(voiceBadge());
+    const name = document.createElement('span');
+    name.className = 'ld-pname';
+    name.textContent = p.you ? `${p.name} (you)` : p.name;
+    const bar = document.createElement('span');
+    bar.className = 'ld-pbar';
+    const fill = document.createElement('i');
+    fill.style.transform = 'scaleX(0)';
+    bar.append(fill);
+    const state = document.createElement('span');
+    state.className = 'ld-pstate';
+    li.append(sq, name, bar, state);
+    return { li, fill, state };
   }
 
   label(mapName, stageId) {

@@ -1,4 +1,4 @@
-// The room screen's map + stage picker (ui/room.js): the maps as a strip of screenshot cards, then the picked map's
+// The room screen's map + stage picker (ui/room.js): the maps as a compact grid of screenshot cards, then the picked map's
 // stages as the stage list's own cards (ui/stage-list.js: thumbnail, one-line summary, badge, ∞ for endless), grouped
 // the same way (lib/stage-groups.js; a boss's single attacks in a drawer under it), free roam last. The room owner
 // picks; everyone else sees the same cards read-only with the owner's pick marked.
@@ -59,7 +59,7 @@ export class RoomPicker {
       const url = shots.get(m.name);
       if (url) b.style.backgroundImage = `url("${url}")`;
       const cap = el('span', 'rp-map-cap');
-      cap.append(el('b', null, displayName(m.title || m.name)), el('small', null, `${m.scenarios || 0} stages`));
+      cap.append(el('b', null, displayName(m.title || m.name)), el('small', null, `${m.scenarios || 0} stage${m.scenarios === 1 ? '' : 's'}`));
       b.append(cap);
       b.addEventListener('click', () => { this.map = m.name; this.render(); });
       return b;
