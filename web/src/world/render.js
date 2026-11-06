@@ -18,6 +18,8 @@ import { applyUnlit } from './unlit.js';
 import { applySource1, lightModel } from './source1-light.js';
 import { TempEffects } from './temp-effects.js';
 import { Moondome } from './moondome.js';
+import { skyMatrix } from './skybox.js';
+import { Skins } from './skins.js';
 import { Effects } from './effects.js';
 import { spawnsHidden } from './entities/render-mode.js';
 import { applySelfIllum, tintSelfIllum } from './selfillum.js';
@@ -25,6 +27,42 @@ import { uploadNow, uploadSpread, FRAME_BUDGET_MS } from './gpu-upload.js';
 import { ChunkOcclusion } from './occlusion.js';
 
 const _estP = new THREE.Vector3(), _estS = new THREE.Vector3(); // modelEstimate scratch
+const _skyM = new THREE.Matrix4();
+
+// where an entity is drawn: its world transform, or for a 3D skybox entity (world/skybox.js) that seen through the
+// sky camera. Shared scratch for a sky entity: copy or clone it before the next call
+const drawMatrix = (e) => (e.sky ? _skyM.multiplyMatrices(skyMatrix(e.sky), e.getWorld()) : e.getWorld());
+// A 3D skybox model's meshes: behind the world, in front of the 2D sky, as CS2 draws them (sky, skybox, world). Drawn
+// first, at a depth just short of the far plane: the world draws over it wherever the world is, and the 2D sky
+// (lighting.js: on the far plane, last, only where nothing was drawn) doesn't. Its vertices are seen at the sky
+// camera's distance: the view-space position / scale (same direction, so the same pixel), which keeps a skybox scaled
+// out to tens of thousands of units inside the far plane and fogged as near as the sky camera sees it. Run last, after anything that replaces the materials (tint, skins): one sky copy per material,
+// keeping the source's own shader patch (a clone drops onBeforeCompile)
+const skyCopies = new WeakMap(); // material -> its sky copy
+const skyOwn = new WeakSet(); // the sky copies themselves
+function skyMeshes(inst, scale) {
+  inst.traverse((o) => {
+    if (!o.isMesh || Array.isArray(o.material)) return;
+    o.renderOrder = -1000;
+    o.frustumCulled = false; // its bounds are the scaled ones, mostly past the far plane
+    const src = o.material;
+    if (skyOwn.has(src)) return;
+    let m = skyCopies.get(src);
+    if (!m) {
+      m = src.clone();
+      const prev = src.onBeforeCompile, prevKey = src.customProgramCacheKey;
+      m.onBeforeCompile = (sh, r) => {
+        prev?.call(src, sh, r);
+        sh.vertexShader = sh.vertexShader.replace('#include <project_vertex>',
+          `#include <project_vertex>\n  mvPosition.xyz *= ${(1 / scale).toFixed(8)};\n  gl_Position = projectionMatrix * mvPosition;\n  gl_Position.z = gl_Position.w * 0.99999;`);
+      };
+      m.customProgramCacheKey = () => `${prevKey ? prevKey.call(src) : ''}|sky${scale}`;
+      skyCopies.set(src, m);
+      skyOwn.add(m);
+    }
+    o.material = m;
+  });
+}
 
 // an entity's world transform as a particle control point: position and its forward / left / up axes
 function cpFrom(ent) {
@@ -239,7 +277,7 @@ export class Renderer {
   // an entity's visual reaches into the view box: its meshes' bounds in its own space, measured again whenever a
   // model arrives (they load after the entity spawns), placed where the entity is now
   entityInView(g) {
-    if (!this.viewBox) return true;
+    if (!this.viewBox || g.userData.sky) return true; // the 3D skybox is seen from everywhere
     return boxInView(this.viewBox, this.entityLocalBox(g), g.matrix);
   }
 
@@ -258,11 +296,20 @@ export class Renderer {
 
   // an entity visual wholly inside a world chunk hidden behind walls (world/occlusion.js hides): not drawn either
   entityOccluded(g) {
-    if (!this.occlusion || this.chunks.length < 2) return false;
+    if (!this.occlusion || this.chunks.length < 2 || g.userData.sky) return false;
     const local = this.entityLocalBox(g);
     if (local.isEmpty()) return false;
     const box = (this._entBox ||= new THREE.Box3()).copy(local).applyMatrix4(g.matrix);
     return this.occlusion.hides(box, this.chunks, this.camera);
+  }
+
+  // the open map's skins (world/skins.js), with this renderer's material passes for a swapped material
+  skinsFor(map) {
+    if (this.skins?.map !== map) {
+      this.skins = new Skins(map.skins, map.url, (o) => { applySource1(o); applyUnlit(o, this.unlitEntity); applySelfIllum(o, this.selfIllum); this.moondome.apply(o); this.effects.apply(o); });
+      this.skins.map = map;
+    }
+    return this.skins;
   }
 
   clearEntities() {
@@ -287,6 +334,8 @@ export class Renderer {
 
   async addEntity(e, map) {
     if (this.hidden?.length && e.name && this.hidden.some((n) => nameMatches(n, e.name))) return;
+    // a 3D skybox entity: its model only (its glows / particles would need the sky camera too)
+    if (e.sky && (!e.model || e.cls.startsWith('trigger_'))) return;
     const kv = e.kv;
     const group = new THREE.Group();
     group.matrixAutoUpdate = false;
@@ -370,7 +419,7 @@ export class Renderer {
         // outside the stage's view box (world/view-box.js) the model isn't fetched until the entity moves into it
         // (updateEntities): ze_the_shifting_pool's tube never downloads the platform stage's 250 grid pieces
         group.userData.estBox = this.modelEstimate(e.model, map);
-        const pending = !boxInView(this.viewBox, group.userData.estBox, e.getWorld());
+        const pending = !e.sky && !boxInView(this.viewBox, group.userData.estBox, e.getWorld());
         const p = pending ? null : map.getModel(e.model);
         if (p || pending) {
           any = true;
@@ -378,18 +427,22 @@ export class Renderer {
             if (!scene || !e.alive) return;
             const inst = cloneModel(scene);
             this.anims.attach(e, inst);
+            const skins = this.skinsFor(map);
+            skins.prepare(e.model, inst); // before the passes: a skin swap starts from the exported materials (world/skins.js)
             const holder = new THREE.Group();
             holder.matrixAutoUpdate = false;
             holder.matrix.copy(GLTF_TO_SOURCE);
             holder.add(inst);
             inst.traverse((o) => { if (o.isMesh) { applySource1(o); applyUnlit(o, this.unlitEntity); applySelfIllum(o, this.selfIllum); this.moondome.apply(o); this.effects.apply(o); } }); // before the tint: it clones
+            if (e.sky) group.userData.sky = true;
             group.userData.model = inst;
+            group.userData.skins = skins.has(e.model) ? skins : null;
             applyTint(e, inst); // rendercolor / renderamt, and again whenever a Color / Alpha input changes them
             lightModel(inst, kv); // a Source 1 model: the ambient cube where it spawned (no-op otherwise)
             group.add(holder);
             // probe-lit like the props (world/lighting.js): placed first, so the probe volume is picked where the
             // entity is; a mover picks again as it goes (updateEntities -> lighting.refreshProbes)
-            group.matrix.copy(e.getWorld());
+            group.matrix.copy(drawMatrix(e));
             group.updateMatrixWorld(true);
             const meshes = group.userData.probeMeshes = [];
             inst.traverse((o) => {
@@ -397,8 +450,9 @@ export class Renderer {
               // CS2 water on an entity's model (a moving water brush): no lightmap UVs, so the sky ambient lights it
               const w = !Array.isArray(o.material) && this.water.material(o.material, { lit: false });
               if (w) { o.material = w; this.water.track(o); return; }
-              this.lighting?.applyProbes(o); meshes.push(o);
+              if (!e.sky) { this.lighting?.applyProbes(o); meshes.push(o); } // the skybox isn't lit by the main world's probes
             });
+            if (e.sky) skyMeshes(inst, e.sky.scale);
           });
           if (p) build(p);
           else group.userData.pendingLoad = () => { const q = map.getModel(e.model); if (q) build(q); };
@@ -522,7 +576,7 @@ export class Renderer {
     const keep = time - this.delay - 0.25;
     for (const [e, g] of this.visuals) {
       const h = g.userData.hist || (g.userData.hist = []);
-      h.push({ t: time, m: e.getWorld().clone(), vis: e.alive && e.visible, en: e.enabled, fx: !!e.state.active });
+      h.push({ t: time, m: drawMatrix(e).clone(), vis: e.alive && e.visible, en: e.enabled, fx: !!e.state.active });
       while (h.length > 2 && h[1].t < keep) h.shift();
     }
   }
@@ -630,9 +684,14 @@ export class Renderer {
         }
         continue;
       }
-      g.matrix.copy(e.getWorld());
+      g.matrix.copy(drawMatrix(e));
       g.matrixWorldNeedsUpdate = true;
+      // the skin (Skin input): swapped materials get the probes again, then the tint below
+      if (g.userData.skins && g.userData.skins.apply(e, e.model, g.userData.model)) {
+        for (const o of g.userData.probeMeshes || []) { o.userData.cs2Base = undefined; this.lighting?.applyProbes(o); } // re-patched from the skin
+      }
       if (g.userData.model && g.userData.model.userData.tintKey !== tintKey(e.kv)) applyTint(e, g.userData.model);
+      if (g.userData.sky && g.userData.model) skyMeshes(g.userData.model, e.sky.scale);
       this.loadPending(g);
       const on = e.alive && e.visible;
       g.visible = on && !this.fadedOut(g) && this.entityInView(g) && !this.entityOccluded(g);

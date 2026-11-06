@@ -4,6 +4,7 @@
 // manifest names go through lib/paths.js before they reach a URL, and the lookup tables built here have no
 // prototype, so a model or effect called "constructor" or "__proto__" is just a missing key.
 import { source1Sky } from './source1-light.js';
+import { mergeSkybox } from './skybox.js';
 import { Source1Sprites } from './sprites-source1.js';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
@@ -119,7 +120,7 @@ export async function loadMap(name, onProgress = () => {}, opts = {}) {
     fetchBuffer(url('physics.bin')).catch(() => null),
     loadPhysics(new URL(`${import.meta.env?.BASE_URL || '/'}rubikon/_framework/dotnet.js`, location.href).href),
   ]).then(([bin, ok]) => (ok && isPhysicsBin(bin) ? bin : null));
-  const [entities, hullsRaw, colBuf, particles, entwatch, overview, animations, stripper] = await Promise.all([
+  const [entities, hullsRaw, colBuf, particles, entwatch, overview, animations, stripper, skybox, skins] = await Promise.all([
     fetchJson(url('entities.json')),
     fetchJson(url(manifestPath(manifest.hulls, 'hulls.json'))).catch(() => ({})),
     fetchBufferProgress(url(manifestPath(manifest.collision?.file, 'collision.bin')), bytes),
@@ -131,6 +132,9 @@ export async function loadMap(name, onProgress = () => {}, opts = {}) {
     manifest.animations ? fetchJson(url(manifestPath(manifest.animations, null))).catch(() => null) : null,
     // optional: GFL's StripperCS2 edits to this map (tools/stripper.mjs), applied below as GFL's servers do
     fetchJson(url('stripper.json')).catch(() => null),
+    // optional: the 3D skybox worlds (lasers-bake: skybox.json, world/skybox.js) and model skins (skins.json, world/skins.js)
+    fetchJson(url('skybox.json')).catch(() => null),
+    fetchJson(url('skins.json')).catch(() => null),
   ]);
   // the map's sound events' lengths, for point_soundevent's OnSoundFinished (entities/classes/soundents.js)
   const sounds = soundDurations(await fetchJson(url('soundevents.json')).catch(() => null));
@@ -138,6 +142,9 @@ export async function loadMap(name, onProgress = () => {}, opts = {}) {
   const water = waterTextures(await fetchJson(url('water/water.json')).catch(() => null), url);
   // the same edits the co-op server applies to its copy (server/map-store.js): both must hold the same entities
   applyStripper(entities, stripper, name);
+  // the 3D skybox's entities, after the stripper (GFL's configs for a skybox world are skipped: BAKING.md) and after
+  // the main lumps, so the main world spawns as the co-op server's copy does (it has no skybox: visual only)
+  mergeSkybox(entities, skybox);
   const [fxBuf, fxLayerBuf] = await fxFiles;
   const physics = await physicsFile;
   const collisionFx = fxBuf && fxLayerBuf && fxBuf.byteLength === fxLayerBuf.byteLength * 9 ? { tris: new Float32Array(fxBuf), layers: new Uint32Array(fxLayerBuf) } : null;
@@ -181,7 +188,7 @@ export async function loadMap(name, onProgress = () => {}, opts = {}) {
   const sky2d = source1Sky(manifest.sky2d, url, manifest.engine);
   // and its env_sprite glows (lasers-bake source1: manifest sprites), null for a map without them
   const sprites = await Source1Sprites.load(manifest, url, fetchJson);
-  return { name, version, manifest, entities, collision, collisionFx, physics, hulls, bounds, animations, soundDurations: sounds, world, chunks, loadChunk, getModel, particles: fx, items, radar, effects, water, sky2d, sprites };
+  return { name, version, url, skins, manifest, entities, collision, collisionFx, physics, hulls, bounds, animations, soundDurations: sounds, world, chunks, loadChunk, getModel, particles: fx, items, radar, effects, water, sky2d, sprites };
 }
 
 // water.json -> { textures: { <vtex path>: url }, frames: { <vtex path>: slices }, cubes } (null without one). File names only

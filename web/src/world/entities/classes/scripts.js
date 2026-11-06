@@ -64,7 +64,43 @@ const bosshud = {
     return true;
   },
 };
-const PORTS = { bosshud };
+// ---- minigames (ze_rush_b's scripts/rushb.vjs: StartMiniGame1-3 + MiniGameCheckPlayers). A start input picks its
+// minigame (cfg.minigames[input]: humans_pos `pos`, checkRadius `radius`, minigameTime `time`, minigame_f `fail`,
+// minigame_s `success`) and runs the check loop: re-fired every 0.01 s through the I/O queue, it counts down by the
+// game time passed; no live human (team 3) within the radius fires `fail` and ends the loop (the script returns
+// without re-firing), the clock reaching 0 fires `success` and stops. The script's zombie side
+// (zombies_pos, minigame_zm_*) needs zombies, which a trainer has none of; its hudhint countdown is HUD text only.
+const minigames = {
+  reset(s) { Object.assign(s, { game: null, left: 0, ticking: false, last: null }); },
+  run(e, cfg, name, act) {
+    const s = e.state;
+    const g = own(cfg.minigames, name);
+    if (g) {
+      s.game = g; s.left = num(g.time); s.ticking = true;
+      e.engine.fire(e.name, 'RunScriptInput', 'MiniGameCheckPlayers', 0, act, e);
+      return true;
+    }
+    if (name !== 'MiniGameCheckPlayers') return false;
+    if (!s.ticking || !s.game) return true;
+    const now = e.engine.time;
+    if (s.last === null) s.last = now;
+    s.left -= now - s.last;
+    s.last = now;
+    const g2 = s.game, c = Array.isArray(g2.pos) ? g2.pos.map((v) => num(v)) : [0, 0, 0], r = num(g2.radius);
+    const p = e.engine.playerEnt;
+    const o = p.worldOrigin();
+    const inside = p.alive !== false && p.team === 3 && (o[0] - c[0]) ** 2 + (o[1] - c[1]) ** 2 + (o[2] - c[2]) ** 2 <= r * r;
+    if (!inside) { if (g2.fail) e.engine.fire(String(g2.fail), 'Trigger', '', 0, act, e); return true; }
+    if (s.left <= 0) {
+      e.engine.fire(String(g2.success), 'Trigger', '', 0, act, e);
+      s.last = null; s.ticking = false;
+      return true;
+    }
+    e.engine.fire(e.name, 'RunScriptInput', 'MiniGameCheckPlayers', 0.01, act, e);
+    return true;
+  },
+};
+const PORTS = { bosshud, minigames };
 
 // the stage's `scripts` (keyed by the point_script's targetname) onto the engine, before the world spawns. The adds
 // are what fireOutput repeats once per simulated human, like an AddHealth (engine.js)

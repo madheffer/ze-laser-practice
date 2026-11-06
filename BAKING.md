@@ -27,6 +27,7 @@ make that from your own CS2 install. You need:
 | ze_alien_shooter | [3425735986](https://steamcommunity.com/sharedfiles/filedetails/?id=3425735986) |
 | ze_minecraft_sakura | [3195096311](https://steamcommunity.com/sharedfiles/filedetails/?id=3195096311) |
 | ze_the_shifting_pool | [3554883009](https://steamcommunity.com/sharedfiles/filedetails/?id=3554883009) |
+| ze_rush_b | [3588414134](https://steamcommunity.com/sharedfiles/filedetails/?id=3588414134) |
 
 (Each `web/public/scenarios/<map>.json` names its workshop id; that list is where `--scenarios` reads them.)
 
@@ -66,7 +67,7 @@ It builds `bake/` (Release), then runs, per map:
 
 | Step | lasers-bake | Writes (`web/public/maps/<map>/`) |
 |---|---|---|
-| `map` | `<vpk> web/public/maps` | manifest, entities, collision (+ `collision_fx*.bin`, what particle traces hit), hulls, glbs + textures (cut-out alpha put back; animated props with their sequences + `animations.json`), particles + `fx/`, sounds (the stock events the map's entities name), `shots/`, `overview/`, `water/` (the water shaders' textures, only for a map with CS2 water) |
+| `map` | `<vpk> web/public/maps` | manifest, entities, collision (+ `collision_fx*.bin`, what particle traces hit), hulls, glbs + textures (cut-out alpha put back; animated props with their sequences + `animations.json`), particles + `fx/`, sounds (the stock events the map's entities name), `skybox.json` (the 3D skybox world's entities; its models with the rest), `skins.json` + `models/skins/` (model skins the glbs don't carry), `shots/`, `overview/`, `water/` (the water shaders' textures, only for a map with CS2 water) |
 | `entwatch` | `node tools/entwatch.mjs <map>` | `entwatch.json`: GFL's EntWatch config (the map's items: the heal option, the item HUD); none if GFL has no config for the map |
 | `stripper` | `node tools/stripper.mjs <map>` | `stripper.json`: GFL's StripperCS2 edits to the map's entities (below); none if GFL doesn't strip the map |
 | `lighting` | `--lighting <vpk> <map dir>` | `lighting/`: lightmaps (raw BC6H/BC7/DXT1/BC4 blocks), probes, tonemap + LUT (`post/`), skies, reflection cubemaps. The **high** tier |

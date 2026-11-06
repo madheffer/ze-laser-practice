@@ -243,7 +243,7 @@ export function updateTriggers(engine, player) {
         if (e.state.thinkAt != null && engine.time + EPS >= e.state.thinkAt) { e.state.thinkAt = null; e.state.hurtThisCycle = false; }
         continue;
       }
-      if (!touchesPlayers(e.kv)) continue; // "Clients" or "Everything" (math.js)
+      if (e.sky || !touchesPlayers(e.kv)) continue; // "Clients" or "Everything" (math.js); a 3D skybox's triggers touch nobody here
       const hulls = e.hulls();
       if (!hulls) continue;
       let inside = false;

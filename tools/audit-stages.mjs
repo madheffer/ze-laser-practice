@@ -19,7 +19,7 @@ import { readMapEntities } from './map-entities.mjs';
 import { normaliseHulls } from '../web/src/world/hulls.js';
 import { CollisionWorld } from '../web/src/world/collision.js';
 import { spawnsHidden } from '../web/src/world/entities/render-mode.js';
-import { createRunEngine, startIfDue, mapRuns, winDue, TICK } from '../web/src/world/run-engine.js';
+import { createRunEngine, startIfDue, mapRuns, winDue, sentOut, TICK } from '../web/src/world/run-engine.js';
 import { isParticleSystem } from '../web/src/world/entities/index.js';
 import { nameKey } from '../web/src/lib/names.js';
 import { assetKey } from '../web/src/lib/paths.js';
@@ -158,6 +158,8 @@ for (const sc of stages) {
         firstHurt ??= { t: engine.time - run.startTime, by: ev.ent?.name || ev.ent?.cls };
         if (damage >= 100 && !dead) dead = { t: engine.time - run.startTime, by: ev.ent?.name || ev.ent?.cls };
       }
+      // a teleport into the stage's `loseTo` (a holding pen) ends the run as a death does (world/run-engine.js sentOut)
+      if (ev.type === 'teleport' && run.started && !dead && sentOut(sc, ev.dest)) dead = { t: engine.time - run.startTime, by: `${ev.trigger?.name || 'teleport'} -> ${ev.dest.name}` };
     }
     if (winDue(run, sc.winAfter)) winNow();
   }

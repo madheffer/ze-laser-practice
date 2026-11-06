@@ -155,6 +155,9 @@ export class MapLighting {
     if (this.defaultFar == null) this.defaultFar = camera.far;
     this.cullCubes(camera);
     this.mapLights.update(camera, engine); // with the live directlight 2 omnis (maplights.js)
+    // the sky the map's I/O has switched to (env_sky Enable / Disable: entities/classes/sky.js)
+    const skyEnt = engine?.skyState ? engine.skyState() : undefined;
+    if (skyEnt !== undefined && skyEnt !== this.skyEnt) { this.skyEnt = skyEnt; if (skyEnt) this.showSky(skyEnt.kv); }
     const state = engine?.fogState ? engine.fogState() : { controller: null, gradient: null };
     const fog = this.options.fog ? state : { controller: null, gradient: null };
     const u = this.fogUniforms;
@@ -235,6 +238,8 @@ export class MapLighting {
     irr.updateMatrix();
     this.volumes = probeVolumes(ents, lightmaps.probes);
     this.probePatched.clear();
+    this.skies = lightmaps.skies;
+    this.skyEnt = undefined;
     this.setSky(ents, lightmaps.skies);
     this.setCubemaps(ents, lightmaps.cubemaps);
   }
@@ -323,9 +328,16 @@ export class MapLighting {
   // env_sky: the first enabled one's sky material, as a cube drawn behind everything (sky.vfx: the texture x
   // 2^(brightness exposure bias + render-only bias) x the entity's tint (sRGB -> linear) x brightnessscale)
   setSky(ents, skies) {
-    if (this.sky) { this.scene.remove(this.sky); this.sky.geometry.dispose(); this.sky.material.dispose(); this.skyUniforms.cs2SkyTexture.value?.dispose(); this.sky = null; }
     const kv = ents.find((e) => e?.kv?.classname === 'env_sky' && !['true', '1'].includes(String(e.kv.startdisabled)) && String(e.kv.enabled ?? '1') !== '0')?.kv;
+    this.showSky(kv, skies);
+  }
+
+  // one env_sky's sky (its keyvalues), replacing the one drawn; none drawn if the bake has no such sky
+  showSky(kv, skies = this.skies) {
     const key = kv && String(kv.skyname || kv.skybox_material_day || '').replace(/\\/g, '/').toLowerCase().replace(/_c$/, '');
+    if (this.sky && key && key === this.skyKey) return;
+    if (this.sky) { this.scene.remove(this.sky); this.sky.geometry.dispose(); this.sky.material.dispose(); this.skyUniforms.cs2SkyTexture.value?.dispose(); this.sky = null; }
+    this.skyKey = key;
     const sky = key && skies?.[key];
     if (!sky) return;
     const { tex, rgbm, decodeSrgb } = skyCubeTexture(sky); // world/sky-cube.js

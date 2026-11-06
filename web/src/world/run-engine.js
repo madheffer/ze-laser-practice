@@ -201,7 +201,7 @@ export function freeSpawn(origin, fits) {
 }
 
 // a scenario `arrive` entry's triggers: by name, or { hammerid } (the map's hammeruniqueid keyvalue)
-function arriveTriggers(engine, a) {
+export function arriveTriggers(engine, a) {
   if (typeof a === 'string') return engine.find(a);
   const id = a && typeof a === 'object' ? String(a.hammerid ?? '') : '';
   return id ? engine.ents.filter((e) => e.alive && String(e.kv?.hammeruniqueid ?? '') === id) : [];

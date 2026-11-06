@@ -29,6 +29,7 @@ import './classes/sparks.js';
 import './classes/scripts.js';
 import { runScriptCode } from './classes/vscripts.js';
 import { fogState } from './classes/fog.js';
+import { skyState } from './classes/sky.js';
 import { postState } from './classes/post.js';
 import { breakSound, hitSound } from './sound.js';
 
@@ -46,6 +47,18 @@ function validLumps(lumps) {
   return out;
 }
 
+// entities.json's skybox lumps (world/skybox.js): { lump: { origin: [x, y, z], scale } }, only for lumps that exist
+function skyLumpsOf(sky, lumps) {
+  const out = new Map();
+  if (!sky || typeof sky !== 'object') return out;
+  for (const [k, v] of Object.entries(sky)) {
+    const o = Array.isArray(v?.origin) ? v.origin.map(Number) : null;
+    const scale = Number(v?.scale);
+    if (lumps[k] && o?.length === 3 && o.every(Number.isFinite) && Number.isFinite(scale) && scale > 0 && scale <= 1024) out.set(k, { origin: o, scale });
+  }
+  return out;
+}
+
 function addTo(index, key, e) {
   let set = index.get(key);
   if (!set) index.set(key, (set = new Set()));
@@ -56,6 +69,9 @@ export class EntityEngine {
   constructor(entitiesJson, assets, { seed = 1 } = {}) {
     this.assets = assets; // { hulls: {model: [...]}, bounds: {model:{min,max}}, animations?: animations.json (classes/props.js) }
     this.lumps = validLumps(entitiesJson?.lumps);
+    // the 3D skybox worlds' lumps (world/skybox.js mergeSkybox): lump -> { origin, scale } of its sky_camera. Their
+    // entities (e.sky) take I/O like any other but are drawn through the sky camera and never collide or touch
+    this.skyLumps = skyLumpsOf(entitiesJson?.skybox, this.lumps);
     // a CS:GO / CS:S map (lasers-bake source1): Source 1's rules where CS2's differ (AddOutput as KeyValue)
     this.source1 = entitiesJson?.engine === 'source1';
     this.live = 0; // entities alive (bounded by MAX_ENTITIES)
@@ -69,6 +85,7 @@ export class EntityEngine {
     this.nextId = 1;
     this.fixup = 0;
     this.rng = mulberry32(seed);
+    this.skySerial = 0; // env_sky Enable order (classes/sky.js)
     this.warned = new Set();
     this.moveStamps = new WeakMap();
     this.touching = new Set();
@@ -118,6 +135,7 @@ export class EntityEngine {
       if (this.templateLumps.has(lump)) continue;
       for (const d of ents) {
         const e = this.create(d);
+        if (this.skyLumps.has(lump)) e.sky = this.skyLumps.get(lump);
         e.pos.set(...parseVec(d.kv.origin));
         angleQuat(parseVec(d.kv.angles), e.quat);
         created.push(e);
@@ -384,7 +402,10 @@ export class EntityEngine {
       // the model when they change (render.js applyTint). ze_ffvii_malgo_reactor's rainbow lasers cycle Color every 0.1 s
       case 'color': e.kv.rendercolor = String(param ?? '255 255 255'); return;
       case 'alpha': e.kv.renderamt = String(param ?? '255'); return;
-      case 'skin': case 'setglowenabled': case 'setglowdisabled':
+      // the model's skin (material group): the renderer swaps its materials when it changes (render.js, world/skins.js).
+      // ze_rush_b's tube steps through 27 of them every 0.04 s (matrix_end_skin)
+      case 'skin': e.kv.skin = String(param ?? '0'); return;
+      case 'setglowenabled': case 'setglowdisabled':
       case 'setanimation': case 'setanimationnotlooping': case 'setanimationlooping': case 'setdefaultanimation':
       case 'setplaybackrate': case 'playsound': case 'stopsound': case 'startsound': case 'volume': case 'turnon': case 'turnoff':
       case 'setscale': case 'setbodygroup': case 'disablecollision': case 'enablecollision': case 'start': case 'stop':
@@ -407,6 +428,7 @@ export class EntityEngine {
 
   // the fog the player sees now (classes/fog.js): read by the renderer each frame
   fogState() { return fogState(this); }
+  skyState() { return skyState(this); } // the env_sky drawn now (classes/sky.js)
   // the post_processing_volume the player sees now and its fade (classes/post.js): read by world/tonemap.js
   postState() { return postState(this); }
 
@@ -429,7 +451,7 @@ export class EntityEngine {
   solids({ physics = false } = {}) {
     const out = [];
     for (const e of this.ents) {
-      if (!e.alive) continue;
+      if (!e.alive || e.sky) continue;
       const h = C[e.cls];
       if (!(h?.solid && h.solid(e)) && !(physics && h?.physSolid && h.physSolid(e))) continue;
       const hulls = e.solidHulls(); // mesh shapes as their triangles (entity.js)

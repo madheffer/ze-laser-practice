@@ -319,6 +319,8 @@ sealed class Baker(string input, string outRoot, string? cs2, bool textures)
         }
         File.WriteAllText(Path.Combine(outDir, "entities.json"), new JsonObject { ["lumps"] = lumps }.ToJsonString(Json));
         Log($"entities: {lumps.Count} lumps, {models.Count} entity models");
+        // 1b. skybox.json: the 3D skybox worlds (skybox_reference) and their entities; their models join the export
+        SkyboxBake.Write(outer, loader, lumps, models, outDir, WalkLump, Log);
 
         // 2. collision.bin: the static world's player-solid triangles, 9 floats each.
         var tris = new List<float>();
@@ -399,6 +401,7 @@ sealed class Baker(string input, string outRoot, string? cs2, bool textures)
             break; // CS2 maps compile to a single node
         }
         var renderModels = new JsonArray();
+        var skinModels = new List<(string, Model)>(); // for skins.json (SkinBake.cs)
         // models with real sequences get their skeleton + animations, and a line in animations.json (ModelBake.cs)
         var animExporter = ModelBake.Exporter(loader, textures);
         var animations = new JsonObject();
@@ -414,6 +417,7 @@ sealed class Baker(string input, string outRoot, string? cs2, bool textures)
                 if (animated) ModelBake.Export(animExporter, res, target, seqs!); else exporter.Export(res, target);
                 if (seqs != null) animations[m] = seqs;
                 renderModels.Add(m);
+                skinModels.Add((m, model));
             }
             catch (Exception e)
             {
@@ -421,6 +425,7 @@ sealed class Baker(string input, string outRoot, string? cs2, bool textures)
             }
         }
         Log($"models: {renderModels.Count} exported");
+        SkinBake.Write(loader, skinModels, outDir, Log);
         GlbImages.FillMissing(outDir, Log); // a texture shared by two exports lands beside one glb only (GlbImages.cs)
 
         // Textures come out as full-size PNGs beside each glb. Cap them so a map loads in a browser:

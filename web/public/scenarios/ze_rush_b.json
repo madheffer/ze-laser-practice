@@ -1,0 +1,62 @@
+{
+  "map": "ze_rush_b",
+  "title": "ze_rush_b",
+  "workshop": "3588414134",
+  "workshopUpdated": "2025-12-02",
+  "description": "The Matrix code tube near the ending: look up and dodge the falling code for 62 seconds.",
+  "scenarios": [
+    {
+      "id": "matrix_code",
+      "group": "Ending",
+      "name": "Dodge the Matrix code",
+      "summary": "Look up, dodge the falling code for 62 s",
+      "description": "Where tele_matrix_whiteroom puts the humans (td_matrix_boss), 46 s after the dial-up phone (trigger_dialup, replayed silently up to its layer swap: loc_matrix_boss_layer shown, the doors hidden). At +47 s rushb_script's StartMiniGame3 (scripts/rushb.vjs, ported) counts 62 s down and checks every 0.01 s that a human is within 300 u of the floor's centre. From +52.2 s timer_matrixboss picks, every 0.6-1 s (0.4-0.8 at +56, 0.3-0.7 at +71, 0.2-0.6 at +96, off at +106), a random piece from each of the six case_matrixboss_* rings: a code*_maker spawns a digit (func_movelinear, 1500 u down at 400 u/s) carrying tele_code*, which sends you to td_matrixboss_jail. Out of the radius the script fires minigame3_failed; at 0 it fires minigame3_success: the win. The last hold after it is not part of this stage.",
+      "spawn": {
+        "at": "[PR#]td_matrix_boss",
+        "yaw": 90
+      },
+      "arrive": [
+        "[PR#]trigger_dialup"
+      ],
+      "fastForward": 46.1,
+      "player": {
+        "health": 100
+      },
+      "scripts": {
+        "[PR#]rushb_script": {
+          "port": "minigames",
+          "minigames": {
+            "StartMiniGame3": {
+              "pos": [3584, -4744, -3069],
+              "radius": 300,
+              "time": 62,
+              "fail": "minigame3_failed",
+              "success": "minigame3_success"
+            }
+          }
+        }
+      },
+      "win": {
+        "target": "[PR#]minigame3_success",
+        "input": "Trigger"
+      },
+      "lose": {
+        "target": "[PR#]minigame3_failed",
+        "input": "Trigger"
+      },
+      "loseTo": [
+        "[PR#]td_matrixboss_jail"
+      ],
+      "view": {
+        "min": [3200, -5130, -3200],
+        "max": [3968, -4360, -1900]
+      },
+      "hide": [
+        "[PR#]prop_skybox_*",
+        "[PR#]water_skybox",
+        "[PR#]skybox_matrix_model",
+        "[PR#]brush_skybox_*"
+      ]
+    }
+  ]
+}

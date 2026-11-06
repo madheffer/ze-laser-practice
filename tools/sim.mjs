@@ -5,7 +5,7 @@
 //   node tools/sim.mjs web/public/maps/ze_deadcore --scenario a_boss --for 60 --watch "boss|hurt"
 //   node tools/sim.mjs web/public/maps/ze_deadcore --fire "stage_a_relay.Trigger" --fire "a_temp.ForceSpawn@0.5" --for 30
 //
-//   --scenario <id>   fire that scenario's `start` (web/public/scenarios/<map>.json)
+//   --scenario <id>   fire that scenario's `arrive` and `start` (web/public/scenarios/<map>.json)
 //   --fire t.Input[(param)][@delay]   fire an input (repeatable)
 //   --for <s>         seconds to run (default 30)
 //   --watch <regex>   print spawns, kills and inputs of entities whose name or class matches
@@ -19,6 +19,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { EntityEngine } from '../web/src/world/entities/index.js';
 import { configureScripts } from '../web/src/world/entities/classes/scripts.js';
+import { arriveTriggers } from '../web/src/world/run-engine.js';
 import { readMapEntities } from './map-entities.mjs';
 import { normaliseHulls } from '../web/src/world/hulls.js';
 import { CollisionWorld } from '../web/src/world/collision.js';
@@ -76,6 +77,8 @@ for (const f of fires) {
   if (!m) { console.error(`bad --fire ${f}`); process.exit(2); }
   start.push({ target: m[1], input: m[2], param: m[3] || '', delay: Number(m[4] || 0) });
 }
+// `arrive`: the triggers whose touch put you there fire OnStartTouch with you as the toucher, as run-engine.js does
+for (const a of sc?.arrive || []) for (const e of arriveTriggers(engine, a)) engine.fireOutput(e, 'OnStartTouch', engine.playerEnt);
 for (const s of start) engine.fire(s.target, s.input, s.param || '', s.delay || 0, engine.playerEnt, null);
 
 const TICK = 1 / 64;
