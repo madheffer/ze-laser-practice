@@ -72,10 +72,18 @@ sealed class Materials(GameFiles files, Action<string> log)
         if (img == null) { log($"  texture {key}: unsupported VTF"); return null; }
         w = img.Width; h = img.Height;
         if (png.TryGetValue(key, out var done)) return done;
+        var bytes = EncodePng(img, Baker.MaxTexture);
+        png[key] = bytes;
+        fileToTex[FileName(tex)] = key;
+        return bytes;
+    }
+
+    /// A decoded VTF as PNG bytes, its longest side scaled down to max (Mitchell) when larger
+    public static byte[] EncodePng(Vtf.Image img, int max)
+    {
         var info = new SKImageInfo(img.Width, img.Height, SKColorType.Rgba8888, SKAlphaType.Unpremul);
         using var bmp = new SKBitmap(info);
         System.Runtime.InteropServices.Marshal.Copy(img.Rgba, 0, bmp.GetPixels(), img.Rgba.Length);
-        var max = Baker.MaxTexture;
         SKBitmap outBmp = bmp;
         if (img.Width > max || img.Height > max)
         {
@@ -87,8 +95,6 @@ sealed class Materials(GameFiles files, Action<string> log)
         using var data = image.Encode(SKEncodedImageFormat.Png, 100);
         var bytes = data.ToArray();
         if (outBmp != bmp) outBmp.Dispose();
-        png[key] = bytes;
-        fileToTex[FileName(tex)] = key;
         return bytes;
     }
 

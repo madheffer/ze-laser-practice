@@ -135,6 +135,8 @@ export function frame(now) {
   const a = live ? acc / CS.tick : 1;
   const o = prevOrigin ? prevOrigin.map((v, i) => v + (player.origin[i] - v) * a) : player.origin;
   let eye = [o[0], o[1], o[2] + player.eyeHeight()];
+  // a map's screen shake (env_shake, app/view-shake.js) moves the view origin, on the game clock
+  if (engine && G.shake) { const sh = G.shake.frame(engine.time + (live ? acc : 0), live ? realDt : 0); eye = [eye[0] + sh[0], eye[1] + sh[1], eye[2] + sh[2]]; }
   // CS2's CalcView: your eyes + 45% of the aim punch + the view punch (lib/recoil.js, the viewmodel's shots)
   const punch = G.vm?.recoil ? G.vm.recoil.cameraOffset() : [0, 0];
   let view = { yaw: player.yaw + punch[1], pitch: player.pitch + punch[0] };

@@ -12,6 +12,7 @@ import { particleTrace } from './fx/trace.js';
 import { CS } from './world/movement.js';
 import { playerFor } from './world/movement-csgo.js';
 import { Renderer } from './world/render.js';
+import { ViewShake } from './app/view-shake.js';
 import { parseVec } from './world/entities/index.js';
 import { GameAudio } from './audio/audio.js';
 import { Viewmodel } from './weapons/viewmodel.js';
@@ -63,6 +64,7 @@ import { simulatedPing } from './app/coop-load.js';
 
 const canvas = $('#view');
 G.renderer = new Renderer(canvas);
+G.shake = new ViewShake(); // env_shake (app/view-shake.js)
 G.audio = new GameAudio();
 G.vm = new Viewmodel(G.renderer.renderer);
 const litByParticles = (root) => G.renderer.lighting.patchDynamic(root); // the particle lights (world/lighting.js)
@@ -318,7 +320,9 @@ async function loadStage() {
     }
     G.radar.setMap(data.radar);
     S.world = new CollisionWorld(bvh);
-    if (data.effects) data.effects.trace = particleTrace(S.world, data.collisionFx);
+    const fxTrace = particleTrace(S.world, data.collisionFx);
+    if (data.effects) data.effects.trace = fxTrace;
+    G.renderer.tempFx.trace = fxTrace; // point_tesla's beams find the walls they strike (world/temp-effects.js)
     // particle sounds (C_OP_RenderSound, fx/particles/render/sound.js) play through the game audio
     if (data.effects) data.effects.onSound = (req) => G.audio.onSound(req);
     // where your bullets hit the world and on what surface (world/impacts.js): its bullet impact sound

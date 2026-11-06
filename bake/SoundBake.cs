@@ -334,7 +334,7 @@ static class SoundBake
     }
 
     // A RIFF wave in MS-ADPCM (format 2) -> PCM16; anything else is returned as it is.
-    static byte[] WavToPcm16(byte[] wav)
+    internal static byte[] WavToPcm16(byte[] wav)
     {
         if (wav.Length < 12 || BitConverter.ToUInt32(wav, 0) != 0x46464952) return wav; // "RIFF"
         int pos = 12, fmtAt = -1, fmtLen = 0, dataAt = -1, dataLen = 0;

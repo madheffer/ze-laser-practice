@@ -180,9 +180,23 @@ world glb (light baked per vertex), entity models are `models/<path>.glb` (the r
 `_s1light`). Both take Source's model lighting: the leaf ambient cube with the visible world lights folded in
 (bake/Source1/AmbientLight.cs). Solid static props (solid 6: their .phy; 2: their box) are in `collision.bin`, entity
 models' .phy pieces in `hulls.json`. A model with a multi-frame sequence is exported skinned with a glTF animation per
-sequence, and `animations.json` lists every model's sequences (what prop_dynamic's SetAnimation times by). Not baked
-yet: sounds, particles (.pcf), lighting/, tiers,
-chunks (the whole world glb loads: 27 MB for ze_ffvii_malgo_reactor, static props not instanced).
+sequence, and `animations.json` lists every model's sequences (what prop_dynamic's SetAnimation times by).
+
+Sounds, effects and sprites (bake/Source1/Source1Sounds.cs, Source1Particles.cs + PcfOps.cs, SpriteBake.cs):
+- `soundevents.json` + `sounds/`: every name the entities play (ambient_generic files, door / mover / tesla keys,
+  `Buttons.sndN`, `DoSpark`, breakable and explosion soundscripts), from the map's pakfile, then CS:GO's pak01; a
+  soundscript entry from `maps/<map>_level_sounds.txt` or CS:GO's `scripts/game_sounds_manifest.txt`. Each event carries
+  its `soundlevel`: the player turns it into Source's falloff (web/src/audio/source1-falloff.js). A wave's cue point is
+  its loop; ADPCM waves are decoded; files under a `music/` folder are typed `source1_music` (the music slider).
+- `fx/`: the `.pcf` systems the map's particle manifest lists (`maps/<map>_particles.txt`), read as binary DMX
+  (Source1/Dmx.cs), each function converted to the CS2 class the particle runtime runs (PcfOps.cs: Source 1's
+  defaults written out, its old operator names renamed as Source does), keyed by system name. A material or texture
+  CS:GO doesn't have draws the error checker, as Source draws its error material.
+- `sprites/`: env_sprite / env_glow textures (`sprites.json`, manifest `sprites`), drawn facing the view.
+
+For a map already baked, redo only those: `lasers-bake <map.bsp> web/public/maps --only sounds,fx,sprites` (bumps the
+manifest version, keeps everything else). Not baked yet: lighting/, tiers, chunks (the whole world glb loads: 27 MB
+for ze_ffvii_malgo_reactor, static props not instanced).
 
 ## Single steps
 

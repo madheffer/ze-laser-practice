@@ -177,10 +177,14 @@ export function doorArriveSound(e, open) {
 // (buttons.cpp): a press plays use_sound, locked or not, then the lock sound for its state (PlayLockSounds: at most
 // one per BUTTON_SOUNDWAIT 0.5 s). Source-era values a port left (locked_sound "11", a sound table index) name no
 // sound event and stay silent, as in CS2. UNSETTLED: CS2's ButtonActivate itself is not decompiled.
+// A Source 1 map's button names its sounds by index (CBaseButton::Spawn: m_sNoise = MakeButtonSound(sounds), the
+// lock sounds the same): N > 0 is the soundscript "Buttons.sndN", 0 none.
 const BUTTON_SOUNDWAIT = 0.5;
+const buttonIndexSound = (v) => { const n = num(v) | 0; return n > 0 ? `Buttons.snd${n}` : ''; };
 export function buttonSound(e, locked) {
-  startSound(e, e.kv.use_sound, { center: true, slot: 'use' });
-  const lock = locked ? e.kv.locked_sound : e.kv.unlocked_sound;
+  const s1 = !!e.engine.source1;
+  startSound(e, s1 ? buttonIndexSound(e.kv.sounds) : e.kv.use_sound, { center: true, slot: 'use' });
+  const lock = s1 ? buttonIndexSound(locked ? e.kv.locked_sound : e.kv.unlocked_sound) : locked ? e.kv.locked_sound : e.kv.unlocked_sound;
   const now = e.engine.time;
   if (!lock || now <= (e.state.lockSoundWait ?? -Infinity)) return;
   e.state.lockSoundWait = now + BUTTON_SOUNDWAIT;

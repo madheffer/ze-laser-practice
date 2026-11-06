@@ -9,7 +9,8 @@
 //    has OnSoundFinished connections, with a warning: "playing sound event '%s' with no duration!")
 //  - SoundEventGuid's value is how snd_event_param (CSoundEventParameter) finds the sound: SetSoundEventGUID keeps
 //    it, SetFloatValue sets the parameter (parametername, "volume" on ze_gris_p's music faders) on that sound
-// ambient_generic is played through the same requests (Source's spawnflags: 1 everywhere, 16 start silent).
+// ambient_generic is played through the same requests (Source's spawnflags: 1 everywhere, 16 start silent); on a Source 1
+// map it runs CS:GO's CAmbientGeneric instead (ambient-source1.js).
 // The handle is a counter on the engine, the same on every client and on the server.
 //
 // Soundscapes (env_soundscape, env_soundscape_triggerable, env_soundscape_proxy, trigger_soundscape) as Source runs
@@ -18,6 +19,7 @@
 // enablesoundevent) to the player and stops the one before. It stays until another takes over.
 import { register } from '../registry.js';
 import { num, bool } from '../math.js';
+import { ambientSource1 } from './ambient-source1.js';
 
 function soundName(e) {
   return e.kv.soundname || e.kv.message || e.kv.soundeventname || e.kv.sound || '';
@@ -52,13 +54,16 @@ function startSound(e, act) {
   }
 }
 
+const source1 = (e) => e.cls === 'ambient_generic' && e.engine.source1;
 const soundEntity = {
   spawn(e) {
+    if (source1(e)) { ambientSource1.spawn(e); return; }
     if (e.cls === 'ambient_generic') {
       if (!(num(e.kv.spawnflags) & 16)) e.engine.fire(e, 'StartSound', '', 0, null, e);
     } else if (bool(e.kv.startonspawn)) e.engine.fire(e, 'StartSound', '', 1, null, e);
   },
   input(e, inp, p, act) {
+    if (source1(e)) return ambientSource1.input(e, inp, p, act);
     switch (inp) {
       case 'startsound': case 'playsound': case 'start': startSound(e, act); return true;
       case 'stopsound': case 'stop': emit(e, 'stop'); e.state.guid = 0; return true;

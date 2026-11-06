@@ -16,6 +16,7 @@ import { PropAnimator, cloneModel } from './anim.js';
 import { Water } from './water.js';
 import { applyUnlit } from './unlit.js';
 import { applySource1, lightModel } from './source1-light.js';
+import { TempEffects } from './temp-effects.js';
 import { Moondome } from './moondome.js';
 import { Effects } from './effects.js';
 import { spawnsHidden } from './entities/render-mode.js';
@@ -75,6 +76,8 @@ export class Renderer {
     // real particle effects (fx/effects.js) draw in world space
     this.fxRoot = new THREE.Group();
     this.scene.add(this.fxRoot);
+    // a Source 1 map's sparks and tesla beams (world/temp-effects.js), in world space too
+    this.tempFx = new TempEffects(this.fxRoot);
     this.fxClock = null;
     this.hullGeo = new Map(); // model -> [BufferGeometry]
     this.fxGeo = new Map(); // effect summary -> BufferGeometry
@@ -265,6 +268,7 @@ export class Renderer {
   clearEntities() {
     for (const v of this.visuals.values()) { this.entRoot.remove(v); v.userData.fx?.dispose(); }
     this.visuals.clear();
+    this.tempFx.clear();
     this.fxClock = null;
   }
 
@@ -318,6 +322,11 @@ export class Renderer {
         this.addParticle(group, fx, map, 0, { left: MAX_FX_PER_ENTITY });
         any = true;
       }
+    } else if (map.sprites?.has(e)) {
+      // a Source 1 map's env_sprite (world/sprites-source1.js), placed facing the view every frame
+      this.sprites = map.sprites;
+      group.add(map.sprites.create(e));
+      any = true;
     } else if (e.cls === 'env_laser' && /\.spr$/i.test(String(kv.texture || ''))) {
       // a CS:GO sprite (.spr): Source 2 has no sprite resources, so CS2 draws no beam for it (its damage stays,
       // beams.js); maps that wanted it seen add a particle beam between the same points (ze_dreamin's laser_*_fix)
@@ -592,6 +601,7 @@ export class Renderer {
       }
     }
     this.updateEffects(time - (this.delay || 0));
+    this.tempFx.update(time - (this.delay || 0));
     this.anims.update(time - (this.delay || 0));
     if (this._sprite) {
       this._sprite.uniforms.uTime.value = performance.now() / 1000;
@@ -614,6 +624,7 @@ export class Renderer {
         for (const c of g.children) {
           const k = c.userData.kind;
           if (k === 'fx' || k === 'beam') c.visible = s.fx;
+          else if (k === 'sprite') this.sprites?.update(c, e, this.camera, target);
           else if (k === 'heal') c.visible = s.en;
           else if (k === 'hurt' || k === 'hitbox') c.visible = s.en && this.showHitboxes;
         }
@@ -629,6 +640,7 @@ export class Renderer {
         const k = c.userData.kind;
         if (k === 'fx') c.visible = !!e.state.active;
         else if (k === 'beam') this.placeBeam(c, e);
+        else if (k === 'sprite') this.sprites?.update(c, e, this.camera, e.engine.time);
         else if (k === 'heal') c.visible = e.enabled;
         else if (k === 'hurt') c.visible = e.enabled && this.showHitboxes;
         else if (k === 'hitbox') c.visible = e.enabled && this.showHitboxes;

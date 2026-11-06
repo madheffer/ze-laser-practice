@@ -38,6 +38,8 @@ const { hulls, bounds } = normaliseHulls(fs.existsSync(path.join(dir, 'hulls.jso
 const manifest = read('manifest.json');
 const baked = new Set((manifest.renderModels || []).map(assetKey)); // ze__hell_p's model keys use backslashes
 const fxIndex = fs.existsSync(path.join(dir, 'fx/index.json')) ? read('fx/index.json').systems || {} : {};
+// a Source 1 map's env_sprite textures (lasers-bake source1: manifest sprites, world/sprites-source1.js)
+const sprites = manifest.sprites && fs.existsSync(path.join(dir, manifest.sprites)) ? read(manifest.sprites) : {};
 const colFile = path.join(dir, 'collision.bin');
 let world = null;
 if (fs.existsSync(colFile)) {
@@ -95,6 +97,8 @@ function drawProblems(e) {
   if (!kv.model || e.cls.startsWith('trigger_') || spawnsHidden(kv, e.engine?.renderMigrated)) return [];
   const m = assetKey(kv.model);
   if (baked.has(m)) return [];
+  if (Object.hasOwn(sprites, String(kv.model).replace(/\\/g, '/').toLowerCase())) return [];
+  if (/^env_(sprite|glow)/.test(e.cls)) return [`sprite not baked: ${kv.model} (${e.cls})`];
   // a prop always has a mesh; a brush entity without one is invisible in CS2 too (the bake leaves it out)
   if (e.cls.startsWith('prop_')) return [`model not baked: ${kv.model} (${e.cls})`];
   if (!hulls[m]) return [`model neither drawn nor solid: ${kv.model} (${e.cls})`];

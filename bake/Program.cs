@@ -165,9 +165,12 @@ public static class Program
         }
         if (args.Length >= 2 && args[0].EndsWith(".bsp", StringComparison.OrdinalIgnoreCase))
         {
-            // lasers-bake <map.bsp> <out maps dir> [--csgo <csgo dir>]: a Source 1 (CS:GO / CS:S) map (Source1/Source1Bake.cs)
+            // lasers-bake <map.bsp> <out maps dir> [--csgo <csgo dir>] [--only sounds,fx,sprites]: a Source 1 (CS:GO / CS:S) map
+            // (Source1/Source1Bake.cs); --only redoes those steps for a map already baked
             var ci = Array.IndexOf(args, "--csgo");
-            return Source1.Source1Bake.Run(Path.GetFullPath(args[0]), Path.GetFullPath(args[1]), ci > 0 && ci + 1 < args.Length ? args[ci + 1] : null);
+            var oi = Array.IndexOf(args, "--only");
+            var only = oi > 0 && oi + 1 < args.Length ? args[oi + 1].Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries) : null;
+            return Source1.Source1Bake.Run(Path.GetFullPath(args[0]), Path.GetFullPath(args[1]), ci > 0 && ci + 1 < args.Length ? args[ci + 1] : null, only);
         }
         if (args.Length < 2)
         {

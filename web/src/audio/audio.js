@@ -7,7 +7,9 @@
 //                                           //   'volume'|'pitch', ent (Entity; ent.id is stable), name (soundevent name),
 //                                           //   pos [x,y,z], local (bool: play 2D to you), slot? (one of the entity's
 //                                           //   sounds; stop / pitch / volume without one reach all of them), volume?,
-//                                           //   volumeRandom? [min, max], pitch? (x1), follow()? (where it is now), value? }
+//                                           //   volumeRandom? [min, max], pitch? (x1), follow()? (where it is now), value?,
+//                                           //   soundlevel? (a Source 1 sound's level: its falloff, audio/source1-falloff.js),
+//                                           //   absolute? (volume: value is the voice's volume 0..1, not a 0..10 factor) }
 //   audio.play(name, { pos?, volume? })     // one-shot by soundevent name (weapons: 'Weapon_Knife.Slash', ...)
 //   audio.setListener(pos, yaw, pitch)      // every frame; Source units, degrees
 //   audio.setVolumes({ sfx, music })        // 0..1 each (slider^2 gain); the master gain is only the pause fade
@@ -29,6 +31,7 @@
 import { clamp01 } from '../lib/math.js';
 import { mapName } from '../lib/paths.js';
 import { spatialMix } from './spatial.js';
+import { sourceCurve } from './source1-falloff.js';
 import { VoiceLimits } from './limits.js';
 import { createMixGlue } from './mixglue.js';
 import { groupLevels, eventGroup, eventVolume } from './mix.js';
@@ -134,6 +137,7 @@ export class GameAudio {
           pos: ev.pos, ent: ev.ent, local: !!ev.local, entId: id, offset: ev.offset || 0, slot: ev.slot ?? null,
           volume, pitch: Number.isFinite(ev.pitch) && ev.pitch > 0 ? ev.pitch : 1, follow: typeof ev.follow === 'function' ? ev.follow : null,
           repeat: !!ev.repeat, guid: Number.isFinite(ev.guid) ? ev.guid : 0,
+          soundlevel: Number.isFinite(ev.soundlevel) ? ev.soundlevel : undefined,
           // the emitter's volume, replacing the event's own (client.dll starts Player.AmbientUnderWater, volume 0 in its
           // event, with 1: app/water-sounds.js)
           paramVolume: Number.isFinite(ev.paramVolume) ? ev.paramVolume : undefined,
@@ -166,6 +170,8 @@ export class GameAudio {
       case 'volume': {
         let val = Number(ev.value);
         if (!Number.isFinite(val)) return;
+        // a Source 1 ambient_generic's new volume replaces what it started with (classes/ambient-source1.js)
+        if (ev.absolute) { for (const v of this._voicesOf(id, ev.slot)) { v.requestVolume = clamp01(val); v.userVolume = 1; this._update(v); } return; }
         if (ev.ent?.cls === 'ambient_generic' || val > 1) val /= 10; // ambient_generic's 0..10 (its "1" is 0.1)
         for (const v of this._voicesOf(id, ev.slot)) { v.userVolume = clamp01(val); this._update(v); }
         return;
@@ -392,6 +398,8 @@ export class GameAudio {
         // group's level (layers included) is applied in _update
         eventVolume: eventVolume(def), paramVolume: Number.isFinite(o.paramVolume) ? Math.abs(o.paramVolume) : null, requestVolume: hit.volume * (o.volume ?? 1), group: eventGroup(def),
         userVolume: 1, userPitch: 1, stopped: false,
+        // a Source 1 sound's falloff: the request's level (an ambient_generic's radius), else its event's
+        curve: o.soundlevel != null ? sourceCurve(o.soundlevel) : def.soundlevel != null && !def.curve ? sourceCurve(def.soundlevel) : def.curve,
       };
       this._track(v);
       this._buffer(this._fileUrl(table, file)).then((buf) => {
@@ -498,7 +506,7 @@ export class GameAudio {
     let g = (v.paramVolume ?? v.eventVolume) * v.requestVolume * lv.vol * v.userVolume, p = 0;
     if (v.spatial) {
       const pos = (!v.fixedPos && v.ent && v.ent.alive !== false && (v.follow ? safeCall(v.follow) : typeof v.ent.worldOrigin === 'function' && safeOrigin(v.ent))) || v.pos;
-      ({ gain: g, pan: p } = spatialMix(pos, this.listener, v.def.curve, g, v.def.distanceMultiplier ?? 1));
+      ({ gain: g, pan: p } = spatialMix(pos, this.listener, v.curve, g, v.def.distanceMultiplier ?? 1));
     }
     // nothing moved: no new automation event (setListener runs every frame; at uncapped frame rates a new
     // setTargetAtTime per frame per voice piles up hundreds of events a second on each param)

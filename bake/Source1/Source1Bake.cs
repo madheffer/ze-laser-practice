@@ -6,8 +6,11 @@
 //   hulls.json     one convex hull per brush of each brush entity's model (BrushGeometry.cs)
 //   world/<map>.glb, models/maps/<map>/entities/brush_<n>.glb   faces with their textures and baked light (FaceMesh.cs)
 //   static props in the world glb, entity studio models as models/<path>.glb (PropBake.cs)
+//   soundevents.json + sounds/   the sounds its entities play (Source1Sounds.cs)
+//   fx/            the particle systems its info_particle_systems name, from the .pcf files (Source1Particles.cs)
+//   sprites/       its env_sprite textures (SpriteBake.cs)
 // Content comes from the map's pakfile, then the game's VPK (CS:GO's csgo/pak01_dir.vpk: stock textures). Not yet:
-// sounds, particles (.pcf), the 3D skybox, lighting/.
+// the 3D skybox, lighting/.
 using System.Numerics;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -16,7 +19,7 @@ namespace Lasers.Bake.Source1;
 
 static class Source1Bake
 {
-    public static int Run(string bspPath, string outRoot, string? csgo)
+    public static int Run(string bspPath, string outRoot, string? csgo, string[]? only = null)
     {
         var mapName = Path.GetFileNameWithoutExtension(bspPath);
         if (!SafePath.IsMapName(mapName)) { Console.Error.WriteLine($"map name refused (letters, digits, _ and - only): {SafePath.Describe(mapName)}"); return 1; }
@@ -30,6 +33,8 @@ static class Source1Bake
         if (csgo == null) Log("WARNING: no CS:GO install found (--csgo <csgo dir>): stock textures will be missing");
         using var files = new GameFiles(bsp.Lump(Bsp.LumpPakfile).ToArray(), csgo != null ? [Path.Combine(csgo, "pak01_dir.vpk")] : []);
         foreach (var s in files.Sources) Log($"+ {s}");
+
+        if (only != null) return RunOnly(only, files, mapName, outDir);
 
         // 1. entities.json
         var ents = Entities.Parse(bsp.EntityText);
@@ -135,6 +140,11 @@ static class Source1Bake
         // 5. sky/: worldspawn's skyname, the 2D skybox's six faces (materials/skybox/<name><rt|bk|lf|ft|up|dn>)
         var sky = WriteSky(ents.FirstOrDefault(e => e.Get("classname") == "worldspawn")?.Get("skyname"), files, mats, outDir);
 
+        // 6. sounds (soundevents.json + sounds/) and particle effects (fx/: the .pcf systems as the runtime's documents)
+        Source1Sounds.Bake(lumps, files, mapName, outDir, Log);
+        Source1Particles.Bake(lumps, files, mapName, outDir, Log);
+        SpriteBake.Bake(lumps, files, outDir, Log);
+
         var manifest = new JsonObject
         {
             ["map"] = mapName,
@@ -151,8 +161,34 @@ static class Source1Bake
             ["missingMaterials"] = new JsonArray([.. mats.Missing.Select(x => (JsonNode)x!)]),
         };
         if (sky != null) manifest["sky2d"] = sky;
+        manifest["sprites"] = "sprites/sprites.json";
         manifest["animations"] = "animations.json";
         File.WriteAllText(Path.Combine(outDir, "manifest.json"), manifest.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
+        Log("done");
+        return 0;
+    }
+
+    // --only <steps>: sounds and / or fx for a map folder already baked (its entities.json, as stamped), then the
+    // manifest's version bumped so clients fetch them again (every other key kept)
+    static int RunOnly(string[] only, GameFiles files, string mapName, string outDir)
+    {
+        var entsFile = Path.Combine(outDir, "entities.json");
+        var manifestFile = Path.Combine(outDir, "manifest.json");
+        if (!File.Exists(entsFile) || !File.Exists(manifestFile)) { Console.Error.WriteLine($"not a baked map folder: {outDir}"); return 1; }
+        var lumps = JsonNode.Parse(File.ReadAllText(entsFile))?["lumps"]?.AsObject() ?? throw new InvalidDataException("entities.json has no lumps");
+        var manifest = JsonNode.Parse(File.ReadAllText(manifestFile))!.AsObject();
+        foreach (var step in only)
+        {
+            switch (step.ToLowerInvariant())
+            {
+                case "sounds": Source1Sounds.Bake(lumps, files, mapName, outDir, Log); break;
+                case "fx": Source1Particles.Bake(lumps, files, mapName, outDir, Log); break;
+                case "sprites": SpriteBake.Bake(lumps, files, outDir, Log); manifest["sprites"] = "sprites/sprites.json"; break;
+                default: Console.Error.WriteLine($"unknown step {step} (sounds, fx, sprites)"); return 2;
+            }
+        }
+        manifest["version"] = DateTime.UtcNow.ToString("yyyyMMddHHmmss");
+        File.WriteAllText(manifestFile, manifest.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
         Log("done");
         return 0;
     }

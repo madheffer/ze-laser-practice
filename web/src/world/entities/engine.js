@@ -24,6 +24,8 @@ import './classes/soundents.js';
 import './classes/physics.js';
 import './classes/server.js';
 import './classes/beams.js';
+import './classes/sprites.js';
+import './classes/sparks.js';
 import './classes/scripts.js';
 import { runScriptCode } from './classes/vscripts.js';
 import { fogState } from './classes/fog.js';
@@ -70,7 +72,7 @@ export class EntityEngine {
     this.warned = new Set();
     this.moveStamps = new WeakMap();
     this.touching = new Set();
-    this.listeners = { spawn: [], kill: [], hit: [], log: [], sound: [], cvar: [], say: [] }; // say: point_servercommand "say ..." (classes/server.js)
+    this.listeners = { spawn: [], kill: [], hit: [], log: [], sound: [], cvar: [], say: [], tempfx: [], shake: [] }; // say: point_servercommand "say ..." (classes/server.js); tempfx / shake: classes/sparks.js
     // The player as an I/O target / activator. worldOrigin() so "at the activator / at !player" spawns work, and
     // getWorld() + children so SetParent(!activator) makes an entity follow you (westersand's Xzone marker). The
     // session sets playerMatrix (a THREE.Matrix4, or anything with column-major `elements`); without one, e.g.

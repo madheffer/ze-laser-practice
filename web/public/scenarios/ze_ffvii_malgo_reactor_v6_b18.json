@@ -2,23 +2,41 @@
   "map": "ze_ffvii_malgo_reactor_v6_b18",
   "title": "ze_ffvii_malgo_reactor_v6_b18",
   "engine": "csgo",
-  "description": "A CS:GO map (Source 1, baked from its BSP): Sephiroth's final stand in the reactor's lower corridor, his laser waves, the rainbow lasers and the fight itself.",
+  "description": "A CS:GO map (Source 1, baked from its BSP): the two endings of Insane II. Hellz: Bahamut's Fulgor, then Sephiroth and his lasers in the reactor's lower corridor. Cosmo: Bahamut, then Genesis on the walkway to the airship.",
   "scenarios": [
+    {
+      "id": "hellz_full",
+      "group": "Hellz ending",
+      "full": true,
+      "name": "Hellz ending (full)",
+      "summary": "Bahamut, Sephiroth, then out through the bunker",
+      "description": "Extreme III (Hellz) from 'Hellz once 6' (its touch replayed, fastForward 44 s: the Sephiroth and Bahamut templates spawn at 35.1 s, '[dnb] - muzzy - endgameb' at 42 s). At 45 s Final_Fulgor_Relay starts Bahamut's Fulgor: Sephiroth_Final_HP_Counter adds 460 HP per human to Hellz_Final_Fulgor_Breakable (1000). Its OnBreak gives Sephiroth 250 + 101 per human and starts Rainbow_LaserTimer 3 s later. Bridge_Door_Bunker opens when Sephiroth breaks, or 67 s after the touch anyway (speed 18). LevelHellz_Trig_ct behind it enables 'Nuke win' 5.1 s later (the once's own nuke comes at 90 s): win by being alive past the door when it goes off.",
+      "spawn": { "origin": [3500, 10178, -140], "yaw": 140, "pitch": -55 },
+      "arrive": ["Hellz once 6"],
+      "fastForward": 44,
+      "setup": [{ "target": "LevelHellz_Trig_ct", "input": "Enable" }],
+      "bosses": [
+        { "target": "Hellz_Final_Fulgor_Breakable", "name": "Bahamut" },
+        { "target": "Sephiroth_Final_Breakable", "name": "Sephiroth" }
+      ],
+      "win": { "target": "nuke win", "input": "Enable", "survive": 2 }
+    },
     {
       "id": "seph_boss",
       "group": "Hellz ending",
       "name": "Sephiroth (final boss)",
       "summary": "Shoot Sephiroth through the rainbow lasers",
-      "description": "Extreme III (Hellz): Hellz_Final_Fulgor_Breakable's OnBreak sets Sephiroth_Final_Breakable to 250 HP, briefly enables Sephiroth_Final_HP_Counter (AddHealth 101 per human) and enables Rainbow_LaserTimer 3 s later (0.9-1.3 s refire: Rainbow_LaserCase picks one of the s_laser_1..4 templates). Win when his OnBreak opens Bridge_Door_Bunker.",
+      "description": "From the moment Bahamut falls: the stage breaks Hellz_Final_Fulgor_Breakable and its own OnBreak runs the fight. Sephiroth_Final_Breakable is set to 250 HP, Sephiroth_Final_HP_Counter is enabled for 0.04 s (AddHealth 101 per human touching it: the corridor is inside it), Sephiroth says 'Too late for laments' and Rainbow_LaserTimer starts 3 s later (0.9-1.3 s refire: Rainbow_LaserCase picks one of the s_laser_1..4 templates; each laser that hurts a human takes 25 HP off him). Win when his OnBreak opens Bridge_Door_Bunker.",
       "spawn": { "origin": [3600, 10178, -140], "yaw": 0 },
       "setup": [
         { "target": "Sephiroth_Final_Template", "input": "ForceSpawn" },
-        { "target": "Sephiroth_Final_Breakable", "input": "SetHealth", "param": "250" }
+        { "target": "Hellz_Bahamut_Final_Template", "input": "ForceSpawn" },
+        { "target": "Bahamut_Final_Template1", "input": "ForceSpawn" }
       ],
-      "arrive": ["Sephiroth_Final_HP_Counter"],
-      "start": [{ "target": "Rainbow_LaserTimer", "input": "Enable", "delay": 3 }],
+      "start": [{ "target": "Hellz_Final_Fulgor_Breakable", "input": "Break" }],
+      "music": [{ "target": "[dnb] - muzzy - endgameb.mp3", "input": "PlaySound" }],
       "bosses": [{ "target": "Sephiroth_Final_Breakable", "name": "Sephiroth" }],
-      "win": { "target": "Bridge_Door_Bunker", "input": "Open" }
+      "win": { "target": "Bridge_Door_Bunker", "input": "Open", "from": "Sephiroth_Final_Breakable" }
     },
     {
       "id": "rainbow_lasers",
@@ -40,6 +58,52 @@
       "spawn": { "origin": [3600, 10178, -140], "yaw": 0 },
       "setup": [{ "target": "Sephiroth_Final_Template", "input": "ForceSpawn" }],
       "start": [{ "target": "Sephiroth_Laser_Timer", "input": "Enable" }],
+      "winAfter": 45
+    },
+    {
+      "id": "cosmo_full",
+      "group": "Cosmo ending",
+      "full": true,
+      "name": "Cosmo ending (full)",
+      "summary": "Bahamut, Genesis, then catch the airship",
+      "description": "Insane II (Cosmo version) from 'Cosmo once 6' (its touch replayed, fastForward 44 s; Cosmo_template, spawned as the mode starts, holds Genesis, his wall and the airship). At 45 s Final_Fulgor_Relay starts Bahamut's Fulgor: Cosmo_Final_Fulgor_Breakable gets 450 HP per human from Sephiroth_Final_HP_Counter. Its OnBreak gives Genesis 260 HP (+120 per human), starts CosmoG_LaserTimer 3.2 s later (1.2-1.5 s: one of four Genesis_Laser templates, 2000 units north to south at 1380 u/s; each laser that hurts a human takes 40 HP off Genesis) and sends Rage_End_Airship off 23 s later whatever happens. Genesis' death kills Genesis_Wall and starts the airship 4 s later. Cosmo_win_once on the deck enables 'Nuke win' 1.1 s after you touch it (the airship's Path_8 does at 5 s): win by being on board when it goes off. Bahamut's Fulgor (Final_Fulgor_Hurt on Final_Fulgor_Door) swings down the junction's middle strip 10 s after the relay: stand clear of it or break him first.",
+      "spawn": { "origin": [3500, 10178, -140], "yaw": 132, "pitch": -60 },
+      "arrive": ["Cosmo once 6"],
+      "fastForward": 44,
+      "setup": [{ "target": "Cosmo_template", "input": "ForceSpawn" }],
+      "bosses": [
+        { "target": "Cosmo_Final_Fulgor_Breakable", "name": "Bahamut" },
+        { "target": "Genesis_Final_Breakable", "name": "Genesis" }
+      ],
+      "win": { "target": "nuke win", "input": "Enable", "survive": 2 }
+    },
+    {
+      "id": "genesis_boss",
+      "group": "Cosmo ending",
+      "name": "Genesis (final boss)",
+      "summary": "Shoot Genesis through his red lasers",
+      "description": "From the moment Bahamut falls in the Cosmo ending: the stage spawns Cosmo_template and breaks Cosmo_Final_Fulgor_Breakable, whose OnBreak sets Genesis_Final_Breakable to 260 HP and enables CosmoG_LaserTimer 3.2 s later (1.2-1.5 s refire, point_tesla sparks, blade_out). CosmoG_LaserCase picks Genesis_Laser_Temp (z -77..-57 over the walkway floor at -100: a full jump), 2Genesis / 3Genesis (low: jump) or 7Genesis (a blade spinning about the walkway on a func_rotating, 265 deg/s: duck off its centre): func_movelinear 2000 units north to south at 1380 u/s. Sephiroth_Final_HP_Counter's touch adds 120 HP per human; each laser that hurts a human takes 40 off Genesis. Win when his OnBreak disables the timer.",
+      "spawn": { "origin": [3259, 10650, -100], "yaw": 90 },
+      "setup": [
+        { "target": "Cosmo_template", "input": "ForceSpawn" },
+        { "target": "Cosmo_Bahamut_Final_Template", "input": "ForceSpawn" },
+        { "target": "Bahamut_Final_Template1", "input": "ForceSpawn" },
+        { "target": "Cosmo_Final_Fulgor_Breakable", "input": "Break", "delay": 0.05 }
+      ],
+      "arrive": ["Sephiroth_Final_HP_Counter"],
+      "music": [{ "target": "ffvii_propane_nightmares.mp3", "input": "PlaySound" }],
+      "bosses": [{ "target": "Genesis_Final_Breakable", "name": "Genesis" }],
+      "win": { "target": "CosmoG_LaserTimer", "input": "Disable", "from": "Genesis_Final_Breakable" }
+    },
+    {
+      "id": "genesis_lasers",
+      "group": "Cosmo ending",
+      "name": "Genesis' lasers (drill)",
+      "summary": "Jump the red lasers, duck the spinning blade",
+      "description": "CosmoG_LaserTimer alone (1.2-1.5 s): CosmoG_LaserCase spawns one of Genesis_Laser_Temp (z -77..-57 over the walkway floor at -100: a full jump), 2Genesis_Laser_Temp / 3Genesis_Laser_Temp (low: jump) or 7Genesis_Laser_Temp (a blade spinning about the walkway on a func_rotating, 265 deg/s: duck away from its centre), each a func_movelinear sweeping 2000 units down the walkway at 1380 u/s with its trigger_hurt (5000), killed 3.5 s after it spawns.",
+      "spawn": { "origin": [3259, 10650, -100], "yaw": 90 },
+      "setup": [{ "target": "Cosmo_template", "input": "ForceSpawn" }],
+      "start": [{ "target": "CosmoG_LaserTimer", "input": "Enable" }],
       "winAfter": 45
     }
   ]

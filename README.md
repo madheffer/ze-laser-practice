@@ -393,6 +393,11 @@ the stance files are vpkstuff's clip decode (lab `tools/previewer/extract-tp-cli
 - **Room reverb** (`audio/dsp.js`): RoomDSP is `core_null` (dry) until a sound event with `override_dsp_preset` switches
   it; presets are CS2's reverb graphs (delay / filter as stated, diffusor / boxverb approximated). None of the baked maps
   switches it, so they play dry as in CS2.
+- **Source 1 maps** (CS:GO, `engine: source1`): ambient_generic runs CS:GO's CAmbientGeneric (classes/ambient-source1.js:
+  only a looping sound starts on spawn or is "active"; PlaySound restarts a non-looping one, StopSound only stops an
+  active one, so maps stop music with Volume 0; radius -> sound level -> Source's falloff, audio/source1-falloff.js);
+  soundscripts carry their level, volume / pitch ranges; func_button's `sounds` index plays `Buttons.sndN`. env_spark,
+  point_tesla (sparks, beams: world/temp-effects.js) and env_shake (app/view-shake.js) run as Source's.
 - **Music**: csgo_music `stop_music` stops other `Music.` events; a scenario's `music` list starts the track a stage begins
   in the middle of (the map's own level template / relay inputs). `node tools/audit-sounds.mjs` lists each stage's music.
 

@@ -4,6 +4,7 @@
 // manifest names go through lib/paths.js before they reach a URL, and the lookup tables built here have no
 // prototype, so a model or effect called "constructor" or "__proto__" is just a missing key.
 import { source1Sky } from './source1-light.js';
+import { Source1Sprites } from './sprites-source1.js';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
@@ -178,7 +179,9 @@ export async function loadMap(name, onProgress = () => {}, opts = {}) {
   const radar = radarInfo(overview, (rel) => url(rel));
   // a Source 1 map's look: its 2D skybox faces (lasers-bake source1: manifest sky2d) and Source's tone mapping
   const sky2d = source1Sky(manifest.sky2d, url, manifest.engine);
-  return { name, version, manifest, entities, collision, collisionFx, physics, hulls, bounds, animations, soundDurations: sounds, world, chunks, loadChunk, getModel, particles: fx, items, radar, effects, water, sky2d };
+  // and its env_sprite glows (lasers-bake source1: manifest sprites), null for a map without them
+  const sprites = await Source1Sprites.load(manifest, url, fetchJson);
+  return { name, version, manifest, entities, collision, collisionFx, physics, hulls, bounds, animations, soundDurations: sounds, world, chunks, loadChunk, getModel, particles: fx, items, radar, effects, water, sky2d, sprites };
 }
 
 // water.json -> { textures: { <vtex path>: url }, frames: { <vtex path>: slices }, cubes } (null without one). File names only

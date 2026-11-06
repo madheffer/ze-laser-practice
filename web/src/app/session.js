@@ -118,6 +118,14 @@ export function startScenario(i, mode = 'normal') {
           if (lag > 0) setTimeout(() => { if (S.engine === engine) G.audio.onSound(ev); }, lag);
           else G.audio.onSound(ev);
         });
+        // a Source 1 map's sparks / tesla beams and screen shakes (entities/classes/sparks.js), not while replaying silently
+        G.shake.clear();
+        engine.on('tempfx', (ev) => { if (!run.silent) G.renderer.tempFx.request(ev, engine.time); });
+        engine.on('shake', (ev) => {
+          if (run.silent) return;
+          const at = [player.origin[0], player.origin[1], player.origin[2] + player.eyeHeight() / 2];
+          G.shake.request(ev, at, player.onGround, engine.time);
+        });
         engine.onTeleportPlayer = (o, yaw) => player.teleport(landing(o), yaw ?? player.yaw);
         engine.playerMatrix = () => new THREE.Matrix4().compose(
           new THREE.Vector3(...player.origin),
