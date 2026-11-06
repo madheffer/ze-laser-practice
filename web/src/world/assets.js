@@ -11,7 +11,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { mapName, safeRelPath, assetKey, versioned } from '../lib/paths.js';
 import { fetchJson, fetchBuffer, fetchBufferProgress, FRESH } from '../lib/fetch.js';
-import { applyStripper } from '../lib/stripper.js';
+import { applyStripper, stripperEdits, cleanEditsOff } from '../lib/stripper.js';
 import { normaliseHulls } from './hulls.js';
 import { mapItems } from './items.js';
 import { MapEffects } from '../fx/effects.js';
@@ -140,7 +140,9 @@ export async function loadMap(name, onProgress = () => {}, opts = {}) {
   const sounds = soundDurations(await fetchJson(url('soundevents.json')).catch(() => null));
   // optional: the water shader's textures (lasers-bake --water), only for a map with CS2 water in it
   const water = waterTextures(await fetchJson(url('water/water.json')).catch(() => null), url);
-  // the same edits the co-op server applies to its copy (server/map-store.js): both must hold the same entities
+  // the same edits the co-op server applies to its copy (server/map-store.js): both must hold the same entities.
+  // The map as it came is kept for a solo run with some of them off (mapEdits below)
+  const raw = stripper ? structuredClone(entities) : null;
   applyStripper(entities, stripper, name);
   // the 3D skybox's entities, after the stripper (GFL's configs for a skybox world are skipped: BAKING.md) and after
   // the main lumps, so the main world spawns as the co-op server's copy does (it has no skybox: visual only)
@@ -188,7 +190,30 @@ export async function loadMap(name, onProgress = () => {}, opts = {}) {
   const sky2d = source1Sky(manifest.sky2d, url, manifest.engine);
   // and its env_sprite glows (lasers-bake source1: manifest sprites), null for a map without them
   const sprites = await Source1Sprites.load(manifest, url, fetchJson);
-  return { name, version, url, skins, manifest, entities, collision, collisionFx, physics, hulls, bounds, animations, soundDurations: sounds, world, chunks, loadChunk, getModel, particles: fx, items, radar, effects, water, sky2d, sprites };
+  // GFL's edits (lib/stripper.js): what can be turned off, and the map with some off, built on demand (mapEdits)
+  const edits = { list: stripperEdits(stripper, name), off: '', variants: new Map([['', { entities, items }]]), raw, stripper, skybox, entwatch };
+  return { name, version, url, skins, manifest, entities, collision, collisionFx, physics, hulls, bounds, animations, soundDurations: sounds, world, chunks, loadChunk, getModel, particles: fx, items, radar, effects, water, sky2d, sprites, edits };
+}
+
+// Put a loaded map (S.map) on the entities a run plays with GFL's edits `off` left out (lib/stripper.js cleanEditsOff):
+// its entities and items swap to that variant, built once (the same steps as above: the edits, then the skybox) and
+// kept for the next run. Off ids the map doesn't have are dropped. -> the off list actually used (a replay records it)
+export function mapEdits(map, off) {
+  const e = map?.edits;
+  if (!e) return [];
+  const known = new Set(e.list.map((x) => x.id));
+  const list = cleanEditsOff(off).filter((id) => known.has(id));
+  const key = list.join(',');
+  if (!e.variants.has(key)) {
+    const entities = applyStripper(structuredClone(e.raw), e.stripper, map.name, list);
+    mergeSkybox(entities, e.skybox);
+    e.variants.set(key, { entities, items: mapItems(entities, e.entwatch) });
+  }
+  const v = e.variants.get(key);
+  map.entities = v.entities;
+  map.items = v.items;
+  e.off = key;
+  return list;
 }
 
 // water.json -> { textures: { <vtex path>: url }, frames: { <vtex path>: slices }, cubes } (null without one). File names only

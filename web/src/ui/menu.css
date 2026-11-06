@@ -158,6 +158,10 @@ body.touch :is(#menu, .sheet) .kb { display: none; }
 .card .chk input:checked { background: #7a2525; border-color: var(--accent); }
 .card .chk input:checked::after { transform: translateX(16px); background: #fff; }
 .card .chk kbd { margin-left: 4px; }
+/* GFL map edits (ui/stripper-settings.js): a switch with its (i) details button beside it */
+.se-note { margin: 0 0 2px; font-size: 12px; color: var(--dim); }
+.se-row { display: flex; align-items: center; gap: 8px; }
+.se-row .chk { flex: 1; min-width: 0; }
 
 /* third-person distance only while third person is on */
 .card:has(#thirdperson:not(:checked)) .tp-dist { display: none; }

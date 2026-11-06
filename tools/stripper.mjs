@@ -2,7 +2,8 @@
 // Fetch GFL's StripperCS2 configs for a map (github.com/gflze/CS2-ZE-Configs, stripper/<map>/[<world>/]<lump>.jsonc)
 // into the baked map folder as stripper.json: the entity edits GFL's servers make to that map (lib/stripper.js
 // applies them wherever the map's entities load: the client, the co-op server, the tools). A map GFL doesn't strip
-// gets no file (a stale one is removed). The configs are data: parsed as JSON(C), never run.
+// gets no file (a stale one is removed). The configs are data: parsed as JSON(C), never run. Each file is kept as its
+// named edits (GFL's comments; the ids printed here are what a scenario file's "stripper" list describes).
 //
 //   node tools/stripper.mjs ze_deadcore [ze_ffxii_westersand_v8 ...]
 import fs from 'node:fs';
@@ -44,10 +45,14 @@ for (const map of process.argv.slice(2)) {
     const res = await fetch(RAW + p.split('/').map(encodeURIComponent).join('/'), { headers: UA });
     if (!res.ok) { console.error(`${map}: ${p}: ${res.status}`); continue; }
     try {
-      const actions = parseStripperJsonc(await res.text());
-      files.push({ path: p, world, lump, actions });
-      const n = (k) => actions[k].length;
-      console.log(`${map}: ${world}/${lump}: ${n('filter')} filter, ${n('add')} add, ${n('modify')} modify${world.toLowerCase() !== map ? ' (another world: not baked, skipped when applied)' : ''}`);
+      // the file's named edits (lib/stripper.js "Named edits"): each can be turned off in the settings
+      const { edits } = parseStripperJsonc(await res.text());
+      files.push({ path: p, world, lump, edits });
+      console.log(`${map}: ${world}/${lump}${world.toLowerCase() !== map ? ' (another world: not baked, skipped when applied)' : ''}`);
+      for (const e of edits) {
+        const n = (k) => e.actions[k].length;
+        console.log(`  ${e.id}: ${n('filter')} filter, ${n('add')} add, ${n('modify')} modify  // ${e.note}`);
+      }
     } catch (e) {
       console.error(`${map}: ${p}: ${e.message}`);
     }

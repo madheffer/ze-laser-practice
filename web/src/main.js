@@ -53,6 +53,7 @@ import { installReplays, bootReplays, replayKey, hasReplayLink } from './app/rep
 import { Peers } from './world/peers.js';
 import { usableHeals, usableUltimas } from './world/items.js';
 import { applyGamma } from './ui/gamma.js';
+import { installStripperSettings } from './ui/stripper-settings.js';
 import { ScreenEffects } from './fx/screen-effects.js';
 import { loadLightmaps } from './world/lightmaps.js';
 import { Source1Look } from './world/source1-look.js';
@@ -356,6 +357,8 @@ async function init() {
   const idx = await loadMapIndex().catch(() => ({ maps: [] }));
   // map names become fetch paths (maps/<name>/...): only well-formed ones, from the index or ?map=
   S.mapIndex = (Array.isArray(idx?.maps) ? idx.maps : []).filter((m) => isMapName(m?.name));
+  // Settings: GFL's edits to the maps, on / off per map (ui/stripper-settings.js), under Gameplay / Bosses
+  installStripperSettings(document.querySelectorAll('.settings-grid .settings-col')[2], S.mapIndex);
   G.maps.build(S.mapIndex, null);
   G.menu.show('maps');
   G.menu.update();

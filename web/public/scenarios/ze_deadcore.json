@@ -2,6 +2,13 @@
   "map": "ze_deadcore",
   "title": "ze_deadcore",
   "description": "A climb through four stages (A, B, C, D / Insane D) to the radiation core: block trains, cube mini bosses, dodge corridors, rising escapes, then the core's altar lasers, presses, beams, link lasers, balls and meteors.",
+  "stripper": {
+    "fix-broken-movement-prediction": {
+      "name": "B ending speed boost",
+      "summary": "The B escape's 2x speed is CS2Fixes runspeed, not the map's laggy speed",
+      "detail": "At the B ending, b_escape_speedup1 doubles your speed for 36 s. The map does it with KeyValue speed 2 (lagged movement, which CS2 mispredicts: you stutter). GFL rewrites it to CS2Fixes' runspeed 2, a max-speed multiplier that predicts smoothly, then runspeed 1 36 s later. Off: the map's own speed 2 / speed 1."
+    }
+  },
   "scenarios": [
     {
       "id": "a_full",

@@ -3,6 +3,18 @@
   "title": "ze_minecraft_sakura",
   "workshop": "3195096311",
   "description": "The ending: L-U-C-I-D-D-R-E-A-M and its lasers down the road, then run the road through the ending lasers.",
+  "stripper": {
+    "block-off-spots-in": {
+      "name": "Pond holes blocked",
+      "summary": "Two invisible crates stop you falling out of the map in the pond",
+      "detail": "GFL adds two invisible ammo crates (prop_dynamic, solid, scale 2) at 2151 3075 332 and 2356 3556 372, over holes in the pond where you could fall out of the map. Off: the holes are open, as in the map."
+    },
+    "translate-map-to-english": {
+      "name": "English map text",
+      "summary": "The map's Chinese chat lines, translated to English",
+      "detail": "GFL replaces the map's Chinese say lines (140 of them, over four entity lumps) with English (DeepL / Google Translate). Text only: nothing about the stages changes. Off: the original Chinese."
+    }
+  },
   "scenarios": [
     {
       "id": "luciddream",

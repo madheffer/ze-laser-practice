@@ -10,6 +10,7 @@ import { isMapName, isStageId } from '../web/src/lib/paths.js';
 import { mapItems } from '../web/src/world/items.js';
 import { readMapEntities } from './map-entities.mjs';
 import { groupStages } from '../web/src/lib/stage-groups.js';
+import { stripperEdits } from '../web/src/lib/stripper.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../web/public');
 const mapsDir = path.join(root, 'maps');
@@ -55,9 +56,19 @@ for (const name of fs.readdirSync(mapsDir).sort()) {
   // loads only its stage list, the rest waits for a stage (web/src/main.js)
   const read = (f) => { const q = path.join(mapsDir, name, f); return fs.existsSync(q) ? JSON.parse(fs.readFileSync(q, 'utf8')) : null; };
   const items = mapItems(readMapEntities(path.join(mapsDir, name)), read('entwatch.json'));
+  // GFL's edits to the map (stripper.json, lib/stripper.js), for the settings' on / off list: each with the scenario
+  // file's words for it ("stripper": { <edit id>: { name, summary, detail } }), else GFL's own comment
+  const words = file.stripper && typeof file.stripper === 'object' ? file.stripper : {};
+  const edits = stripperEdits(read('stripper.json'), name).map((e) => {
+    const w = Object.hasOwn(words, e.id) && words[e.id] && typeof words[e.id] === 'object' ? words[e.id] : {};
+    const text = (v, n) => (typeof v === 'string' ? v.slice(0, n) : '');
+    return { id: e.id, name: text(w.name, 60) || e.note.slice(0, 60) || e.id, summary: text(w.summary, 120) || e.note, detail: text(w.detail, 1200), gfl: e.note };
+  });
+  for (const id of Object.keys(words)) if (!edits.some((e) => e.id === id)) console.warn(`${name}: scenario "stripper" names ${id}, not one of the map's GFL edits`);
   maps.push({
     name, title: file.title || m.title || name, description: file.description || '', workshop: file.workshop || '',
     scenarios: list.length, parts, version: m.version, shots, items, stageShots, stageShotsVersion, card,
+    ...(edits.length ? { edits } : {}),
   });
 }
 fs.writeFileSync(path.join(mapsDir, 'index.json'), JSON.stringify({ maps }, null, 1));

@@ -92,6 +92,14 @@ the client (`world/assets.js`), the co-op server (`server/map-store.js`, so the 
 the tools (`tools/map-entities.mjs`: sim, teleports, io-graph, index-maps). A config for another world (a skybox) is
 skipped: the bake has the main world only. Re-run the step to pick up GFL's changes.
 
+Each config is kept as its **named edits**: GFL comments every fix at the top level, and a comment plus the actions
+under it is one edit (id: the comment's first four words, e.g. `fix-broken-respawn-toggle`; the same id in several
+files is one edit). Players can turn each one off per map in Settings > GFL map edits (solo only; a co-op round plays
+them all, and a solo replay records which were off so the server's check loads the same map). The words shown there
+come from the scenario file: `"stripper": { "<edit id>": { "name", "summary" (one line), "detail" } }`, collected into
+`maps/index.json` by `tools/index-maps.mjs` (GFL's own comment stands in when a map has none). `tools/stripper.mjs`
+prints every edit's id.
+
 Applied today: ze_deadcore's B ending (`b_escape_speedup1`: `KeyValue runspeed 2`, then `runspeed 1` 36 s later,
 instead of the map's `speed`) and ze_ffxii_westersand_v8 (the `Staff_*_Epicker` item blockers killed 15 s in, a warmup
 fix). `runspeed` is CS2Fixes' custom keyvalue (the pawn's `m_flVelocityModifier`, a max-speed multiplier,

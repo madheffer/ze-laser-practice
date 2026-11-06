@@ -6,7 +6,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { isMapName } from '../src/lib/paths.js';
-import { applyStripper } from '../src/lib/stripper.js';
+import { applyStripper, cleanEditsOff } from '../src/lib/stripper.js';
 import { normaliseHulls } from '../src/world/hulls.js';
 import { TriangleBVH } from '../src/world/collision.js';
 import { mapItems } from '../src/world/items.js';
@@ -17,7 +17,14 @@ const KEEP = 3;
 
 export function mapStore(dir) {
   const cache = new Map(); // map -> Promise<assets>
-  return function load(map) {
+  // off: the GFL edits a solo run turned off (lib/stripper.js cleanEditsOff); none, or a map GFL doesn't strip: the map as GFL runs it
+  return function load(map, off = []) {
+    const list = cleanEditsOff(off);
+    const p = loadBase(map);
+    return list.length ? p.then((a) => (a.variant ? a.variant(list.join(','), list) : a)) : p;
+  };
+
+  function loadBase(map) {
     if (!isMapName(map)) return Promise.reject(new Error('bad map name'));
     if (cache.has(map)) {
       const p = cache.get(map);
@@ -45,7 +52,9 @@ export function mapStore(dir) {
         readFile(path.join(folder, 'physics.bin')).catch(() => null),
         loadPhysics(pathToFileURL(path.join(dir, '..', 'rubikon', '_framework', 'dotnet.js')).href),
       ]);
-      // the same edits the client applies (world/assets.js): the anti-cheat's copy of the map must be the player's
+      // the same edits the client applies (world/assets.js): the anti-cheat's copy of the map must be the player's.
+      // The map as it came is kept for a solo replay that turned some of GFL's edits off (variant below)
+      const raw = stripper ? structuredClone(entities) : null;
       applyStripper(entities, stripper, map);
       const { hulls, bounds } = normaliseHulls(hullsRaw);
       const tris = new Float32Array(col.buffer.slice(col.byteOffset, col.byteOffset + col.byteLength));
@@ -55,11 +64,22 @@ export function mapStore(dir) {
         : null;
       // the map's EntWatch items, as the browser reads them (world/items.js): a round's holders get theirs
       const physics = physicsOk && physicsBin ? physicsBin.buffer.slice(physicsBin.byteOffset, physicsBin.byteOffset + physicsBin.byteLength) : null;
-      return { map, entities, hulls, bounds, animations, soundDurations: soundDurations(soundevents), bvh: new TriangleBVH(tris), fx, physics, items: mapItems(entities, entwatch) };
+      const assets = { map, entities, hulls, bounds, animations, soundDurations: soundDurations(soundevents), bvh: new TriangleBVH(tris), fx, physics, items: mapItems(entities, entwatch) };
+      // the map with some of GFL's edits off (a solo run's rules.stripperOff): its own entities and items, the rest shared
+      const variants = new Map();
+      if (raw) assets.variant = (key, list) => {
+        if (!variants.has(key)) {
+          const ents = applyStripper(structuredClone(raw), stripper, map, list);
+          variants.set(key, { ...assets, entities: ents, items: mapItems(ents, entwatch) });
+          while (variants.size > KEEP) variants.delete(variants.keys().next().value);
+        }
+        return variants.get(key);
+      };
+      return assets;
     })();
     p.catch(() => cache.delete(map));
     cache.set(map, p);
     while (cache.size > KEEP) cache.delete(cache.keys().next().value);
     return p;
-  };
+  }
 }

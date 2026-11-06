@@ -16,6 +16,14 @@ export function rule(key) {
   return settings[key];
 }
 
+// GFL's map edits (lib/stripper.js) this run leaves out: none in a round (the server's copy plays them all, as GFL's
+// server does), a replay's own, solo your settings' for the map (settings.stripperOff)
+export function stripperOff(map) {
+  if (S.mp) return [];
+  if (S.replay) return S.replay.meta.rules.stripperOff || [];
+  return Object.hasOwn(settings.stripperOff, map) ? settings.stripperOff[map] : [];
+}
+
 // the real players in this run: a round's roster, else you
 export const players = () => (S.mp ? Math.max(1, S.mp.players?.size || 1) : 1);
 

@@ -13,6 +13,7 @@
 //   event: varint(tick delta from the last event), varint(type), then its fields (EVENT_FIELDS)
 // The bytes are gzipped on the wire and in the database (CompressionStream / zlib).
 import { GUN_IDS, LEGACY_GUN } from './weapons.js';
+import { cleanEditsOff } from './stripper.js';
 
 export const VERSION = 1;
 export const POS_SCALE = 32;
@@ -162,6 +163,8 @@ export function cleanMeta(m) {
       healItem: rules.healItem === true,
       // the map's ultima (world/items.js soloLoadout): yours ('hold'), the team's going off by itself ('auto'), or none
       ultimaItem: ['hold', 'auto'].includes(rules.ultimaItem) ? rules.ultimaItem : 'none', ultimaAt: num(rules.ultimaAt, 0, 300, 0),
+      // GFL's map edits the run turned off (lib/stripper.js): the server's check loads the map the same way
+      stripperOff: cleanEditsOff(rules.stripperOff),
     },
   };
 }

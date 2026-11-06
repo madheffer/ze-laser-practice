@@ -151,6 +151,14 @@ exact map-folder format so he can lift our maps straight into his site. See [REA
       stripper.json, applied by `lib/stripper.js` on the client, the co-op server and the tools alike. ze_deadcore's B
       ending gets runspeed 2 for 36 s (checked: 500 u/s on the lift's boost, back to 1 at +36 s), westersand's item
       blockers go at 15 s. All 25 of GFL's configs parse. `KeyValue runspeed` = CS2Fixes' m_flVelocityModifier
+    - [x] GFL edits on / off per map (2026-11-07): configs kept as named edits (GFL's comments), Settings > GFL map
+      edits lists them with a one-line summary + (i) details (scenario file `"stripper"` words, via index.json); solo
+      only, a replay records `rules.stripperOff` and the server's check loads that variant (map-store). Checked on
+      :5807: offliner's respawn fix off -> the map's `trigger`, on -> GFL's `Disable`
+    - [ ] GFL edits in rooms: a room rule for which edits play (rounds play them all now)
+    - [ ] ze_ffvii_cosmo_canyon_v5_p: GFL has no CS2 stripper for it (only CS:GO v5k_fix / v6test5). A player asked
+      for "the stripper where the boss shoots 4 lasers at the end"; the baked map already fires 4 of Bahamut's lasers
+      (seph_laser_counter max 4), so nothing was added
     - [ ] runspeed: how CS2's own movement applies m_flVelocityModifier (assumed Source's: a max-speed multiplier that
       recovers only below 1) isn't confirmed from the binary
     - [ ] boss bar over all 16 segments: GFL's bosshud gives Blue Particle `iterator: boss_healthcount` (CS2Fixes

@@ -4,6 +4,13 @@
   "workshop": "3559892707",
   "workshopUpdated": "2025-08-31",
   "description": "The ending: the Green Sphere's laser corridor, the 8 lasers after its floor breaks, and the look-up finale's falling blades and rings.",
+  "stripper": {
+    "fix-broken-respawn-toggle": {
+      "name": "Respawn turned off once",
+      "summary": "The ending turns respawn off, instead of toggling it on every touch",
+      "detail": "once_end_win (the ending's win area) sends zr_toggle_respawn Trigger, which flips zombie respawn each time it fires. GFL changes it to Disable, so respawn is off however many times it fires. Off: the map's toggle."
+    }
+  },
   "scenarios": [
     {
       "id": "ending_full",

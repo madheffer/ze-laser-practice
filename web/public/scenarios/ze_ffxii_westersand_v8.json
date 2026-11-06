@@ -2,6 +2,18 @@
   "map": "ze_ffxii_westersand_v8",
   "title": "FFXII Westersand",
   "description": "Slayerdragon & Noctali's Final Fantasy XII escape: the desert and its volcano hall dragon, the tomb with Belias and Gabranth, and the airship with Gabranth again and the Chaos laser fight. Five stages cycle (normal, tomb, epic, god, zombie mode) with an insane difficulty on top.",
+  "stripper": {
+    "kill-epick-blockers-when": {
+      "name": "Staff blockers removed",
+      "summary": "The staff pickup blockers are killed 15 s into the round",
+      "detail": "Each staff (Water, Electro, Fire, Earth, Heal, Wind) has a Staff_*_Epicker button that blocks it until its trigger is touched. GFL kills them all 15 s after the map spawns (logic_auto OnMapSpawn, once), so the staffs can always be picked up. Off: the blockers stay until the map's own Staff_*_Epicker_kill triggers."
+    },
+    "fix-warmup-never-ending": {
+      "name": "Warmup ends",
+      "summary": "Warmup ends 40 s after it starts instead of never",
+      "detail": "GFL adds an info_map_parameters and has Warmup_Relay's OnUser2 fire FireWinCondition 10 on it 40 s later, ending the warmup round. Stages here start past the warmup, so it only matters if a stage replays it. Off: the map's warmup, which never ends by itself."
+    }
+  },
   "hide": ["[PR#]Chaos_Hpbar", "[PR#]Boss_Hpbar", "[PR#]Belias_Hpbar", "[PR#]Judge_Hpbar", "[PR#]Ehe_Dragon_Hpbar", "[PR#]Guard_Boss_Hpbar", "[PR#]AreaPortal_*"],
   "scenarios": [
     {
