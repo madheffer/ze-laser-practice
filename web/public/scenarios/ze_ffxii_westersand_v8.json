@@ -2,7 +2,7 @@
   "map": "ze_ffxii_westersand_v8",
   "title": "FFXII Westersand",
   "description": "Slayerdragon & Noctali's Final Fantasy XII escape: the desert and its volcano hall dragon, the tomb with Belias and Gabranth, and the airship with Gabranth again and the Chaos laser fight. Five stages cycle (normal, tomb, epic, god, zombie mode) with an insane difficulty on top.",
-  "hide": ["[PR#]Chaos_Hpbar", "[PR#]Boss_Hpbar", "[PR#]Belias_Hpbar", "[PR#]Judge_Hpbar", "[PR#]Ehe_Dragon_Hpbar", "[PR#]Guard_Boss_Hpbar"],
+  "hide": ["[PR#]Chaos_Hpbar", "[PR#]Boss_Hpbar", "[PR#]Belias_Hpbar", "[PR#]Judge_Hpbar", "[PR#]Ehe_Dragon_Hpbar", "[PR#]Guard_Boss_Hpbar", "[PR#]AreaPortal_*"],
   "scenarios": [
     {
       "id": "chaos",
