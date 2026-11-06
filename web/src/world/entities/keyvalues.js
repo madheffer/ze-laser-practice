@@ -29,6 +29,32 @@ export function addOutput(engine, e, param) {
   e.io.push({ output, target: p[1], input: p[2], param: p[3] ?? '', delay: num(p[4]), times });
 }
 
+// Source 1 (a CS:GO / CS:S map, entities.json "engine": "source1"): CBaseEntity::InputAddOutput splits at the first
+// space, turns every ':' in the rest into ',' and hands both to KeyValue. An output name's value is then an event
+// ("target,input,param,delay,times": missing fields empty, delay 0, times -1); any other key is a keyvalue: origin /
+// angles are the local ones (CBaseEntity::KeyValue), targetname renames, health / max_health set the numbers, the
+// rest (message, renderamt, ...) is stored on the entity.
+export function addOutputSource1(engine, e, param) {
+  const s = String(param ?? '');
+  const sp = s.indexOf(' ');
+  if (sp <= 0) { engine.warnOnce(`addoutput1:${s.slice(0, 40)}`, `AddOutput "${s.slice(0, 60)}" has no value`); return; }
+  const key = s.slice(0, sp), value = s.slice(sp + 1).replace(/:/g, ',');
+  if (/^(on|out)/i.test(key)) {
+    const p = value.split(',');
+    e.io.push({ output: key, target: p[0] ?? '', input: p[1] ?? '', param: p[2] ?? '', delay: atof(p[3] ?? ''), times: p[4] != null && p[4].trim() !== '' ? atoi(p[4]) : -1 });
+    return;
+  }
+  const k = key.toLowerCase();
+  switch (k) {
+    case 'origin': e.pos.set(...parseVec(value).map((v) => clampN(v, -16384, 16384))); engine.moved(e); return;
+    case 'angles': angleQuat(parseVec(value), e.quat); engine.moved(e); return;
+    case 'targetname': e.kv.targetname = value; engine.rename(e, value); return;
+    case 'health': { const h = clampN(atoi(value), 0, INT_MAX); e.kv.health = String(h); if (e.state.health != null) e.state.health = h; return; }
+    case 'max_health': { const h = clampN(atoi(value), 0, INT_MAX); e.kv.max_health = String(h); if (e.state.max != null) e.state.max = Math.max(1, h); return; }
+    default: e.kv[k] = value;
+  }
+}
+
 // C's atoi / atof as CS2Fixes uses them (Q_atoi / Q_atof): leading number, else 0
 const atoi = (s) => { const n = parseInt(s, 10); return Number.isFinite(n) ? n : 0; };
 const atof = (s) => { const n = parseFloat(s); return Number.isFinite(n) ? n : 0; };

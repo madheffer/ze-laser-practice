@@ -192,8 +192,11 @@ register('func_rotating', {
     e.state.max = num(e.kv.maxspeed, 100);
     e.state.speed = sf & 1 ? e.state.max * e.state.dir : 0;
     e.state.target = e.state.speed;
-    // fanfriction: how fast it spins up/down (Source: % of max speed per tick at 10 Hz-ish). 0 = instant.
+    // fanfriction: how fast it spins up/down, only with spawnflag 16 (Accelerate/Decelerate): without it
+    // CFuncRotating::SetTargetSpeed sets the speed at once (Source SDK bmodels.cpp; ze_ffvii_malgo_reactor's rainbow
+    // lasers spin at their full 200 deg/s from the start)
     e.state.friction = num(e.kv.fanfriction, 20);
+    e.state.accel = (sf & 16) !== 0;
   },
   input(e, inp, p) {
     const s = e.state;
@@ -210,6 +213,7 @@ register('func_rotating', {
   },
   think(e, dt) {
     const s = e.state;
+    if (s.speed !== s.target && !s.accel) s.speed = s.target;
     if (s.speed !== s.target) {
       // spin up/down over roughly maxspeed / (fanfriction * maxspeed / 100 * 10) seconds
       const rate = Math.max(1, (s.max * Math.max(1, s.friction)) / 10);

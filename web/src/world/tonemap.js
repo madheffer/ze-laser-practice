@@ -43,7 +43,11 @@ vec3 cs2Curve(vec3 x) {
   return (x * (cs2ToneA.x * x + cs2ToneA.y * cs2ToneA.z) + cs2ToneB.x * cs2ToneA.w)
        / (x * (cs2ToneA.x * x + cs2ToneA.y) + cs2ToneB.y * cs2ToneA.w) - cs2ToneB.x / cs2ToneB.y;
 }
-vec3 cs2Tonemap(vec3 hdr) { return cs2Curve(min(max(hdr, vec3(0.0)) * cs2Exposure * 2.8, vec3(cs2ToneB.w))) * cs2ToneB.z; }
+uniform float s1Linear; // a Source 1 map: Source's HDR tonemap is the scale (in its materials, source1-light.js) then a clamp
+vec3 cs2Tonemap(vec3 hdr) {
+  if (s1Linear > 0.5) return clamp(hdr * cs2Exposure, 0.0, 1.0);
+  return cs2Curve(min(max(hdr, vec3(0.0)) * cs2Exposure * 2.8, vec3(cs2ToneB.w))) * cs2ToneB.z;
+}
 uniform float cs2VigOn;
 uniform vec4 cs2VigA; // c1 (edge scale), c2 (edge add), c4 (feather), c5 (inner)
 uniform vec4 cs2VigB; // centre xy, c6, c7
@@ -152,7 +156,7 @@ export class PostProcess {
     const empty = new THREE.Data3DTexture(new Uint8Array(4), 1, 1, 1);
     empty.needsUpdate = true;
     this.uniforms = {
-      cs2Exposure: { value: 1 }, cs2ToneA: { value: new THREE.Vector4() }, cs2ToneB: { value: new THREE.Vector4() },
+      s1Linear: { value: 0 }, cs2Exposure: { value: 1 }, cs2ToneA: { value: new THREE.Vector4() }, cs2ToneB: { value: new THREE.Vector4() },
       cs2Lut: { value: empty }, cs2LutWeight: { value: 0 }, cs2LutDim: { value: 1 },
       cs2VigOn: { value: 0 }, cs2VigA: { value: new THREE.Vector4() }, cs2VigB: { value: new THREE.Vector4() }, cs2VigTint: { value: new THREE.Vector3(1, 1, 1) },
     };
@@ -174,6 +178,9 @@ export class PostProcess {
   }
 
   // per map: entities (every post_processing_volume) + the lighting bake's post index (world/lightmaps.js)
+  // a Source 1 map (lasers-bake source1) is tone mapped as Source does it, not by CS2's curve
+  setSource1(on) { this.uniforms.s1Linear.value = on ? 1 : 0; }
+
   async setMap(base, entities, lightmaps) {
     this.profiles = new Map();
     this.targets = new WeakMap();

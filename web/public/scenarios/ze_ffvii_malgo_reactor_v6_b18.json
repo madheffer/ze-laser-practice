@@ -1,0 +1,46 @@
+{
+  "map": "ze_ffvii_malgo_reactor_v6_b18",
+  "title": "ze_ffvii_malgo_reactor_v6_b18",
+  "engine": "csgo",
+  "description": "A CS:GO map (Source 1, baked from its BSP): Sephiroth's final stand in the reactor's lower corridor, his laser waves, the rainbow lasers and the fight itself.",
+  "scenarios": [
+    {
+      "id": "seph_boss",
+      "group": "Hellz ending",
+      "name": "Sephiroth (final boss)",
+      "summary": "Shoot Sephiroth through the rainbow lasers",
+      "description": "Extreme III (Hellz): Hellz_Final_Fulgor_Breakable's OnBreak sets Sephiroth_Final_Breakable to 250 HP, briefly enables Sephiroth_Final_HP_Counter (AddHealth 101 per human) and enables Rainbow_LaserTimer 3 s later (0.9-1.3 s refire: Rainbow_LaserCase picks one of the s_laser_1..4 templates). Win when his OnBreak opens Bridge_Door_Bunker.",
+      "spawn": { "origin": [3600, 10178, -140], "yaw": 0 },
+      "setup": [
+        { "target": "Sephiroth_Final_Template", "input": "ForceSpawn" },
+        { "target": "Sephiroth_Final_Breakable", "input": "SetHealth", "param": "250" }
+      ],
+      "arrive": ["Sephiroth_Final_HP_Counter"],
+      "start": [{ "target": "Rainbow_LaserTimer", "input": "Enable", "delay": 3 }],
+      "bosses": [{ "target": "Sephiroth_Final_Breakable", "name": "Sephiroth" }],
+      "win": { "target": "Bridge_Door_Bunker", "input": "Open" }
+    },
+    {
+      "id": "rainbow_lasers",
+      "group": "Hellz ending",
+      "name": "Rainbow lasers (drill)",
+      "summary": "The colour-cycling lasers, no boss HP",
+      "description": "Rainbow_LaserTimer alone (0.9-1.3 s): each wave is an s_laser_N template, a func_movelinear sweeping 3000 units down the corridor at 1250 u/s with its trigger_hurt (5000) on a func_door that bobs it up and down.",
+      "spawn": { "origin": [3600, 10178, -140], "yaw": 0 },
+      "setup": [{ "target": "Sephiroth_Final_Template", "input": "ForceSpawn" }],
+      "start": [{ "target": "Rainbow_LaserTimer", "input": "Enable" }],
+      "winAfter": 45
+    },
+    {
+      "id": "seph_lasers",
+      "group": "Hellz ending",
+      "name": "Sephiroth's laser waves (drill)",
+      "summary": "Flat and tilted lasers: jump or duck",
+      "description": "Sephiroth_Laser_Timer (0.8-1.3 s), the normal ending's waves: Sephiroth_Final_Laser_Case moves Sephiroth_Final_Laser_Maker to a height and roll (flat at -92 / -116 / -117, tilted 9 and 22.1 degrees) with AddOutput origin / angles, then spawns Sephiroth_Final_Laser_Template there: a 4000-unit sweep at 1300 u/s.",
+      "spawn": { "origin": [3600, 10178, -140], "yaw": 0 },
+      "setup": [{ "target": "Sephiroth_Final_Template", "input": "ForceSpawn" }],
+      "start": [{ "target": "Sephiroth_Laser_Timer", "input": "Enable" }],
+      "winAfter": 45
+    }
+  ]
+}

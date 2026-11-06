@@ -167,13 +167,8 @@ export class Player {
     let wx = fx * input.forward + rx * input.side;
     let wy = fy * input.forward + ry * input.side;
     const wl = Math.hypot(wx, wy);
-    let wishSpeed = 0;
-    if (wl > 1e-6) {
-      wx /= wl; wy /= wl;
-      wishSpeed = this.maxSpeed * this.runSpeed * Math.min(1, wl);
-      if (this.ducked && this.onGround) wishSpeed *= CS.duckFactor;
-      else if (input.walk) wishSpeed *= CS.walkFactor;
-    }
+    if (wl > 1e-6) { wx /= wl; wy /= wl; }
+    const wishSpeed = this.wishSpeedFor(input, wl);
     const wish = [wx, wy, 0];
 
     // jump
@@ -229,16 +224,8 @@ export class Player {
       this.velocity[2] = 0;
       this.friction(dt);
       this.accelerate(wish, wishSpeed, (this.cvars.accelerate ?? CS.accelerate) * wade, dt);
-      const sp = Math.hypot(this.velocity[0], this.velocity[1]);
-      if (sp > this.maxSpeed * this.runSpeed && wishSpeed > 0) {
-        // Source clamps ground speed to the current max
-        const s = Math.max(wishSpeed, this.maxSpeed * this.runSpeed * (this.ducked ? CS.duckFactor : 1)) / sp;
-        if (s < 1) { this.velocity[0] *= s; this.velocity[1] *= s; }
-      }
-      if (this.stamina > 0) {
-        const ratio = Math.pow((CS.staminaMax - this.stamina) / CS.staminaMax, dt / (1 / 70));
-        this.velocity[0] *= ratio; this.velocity[1] *= ratio;
-      }
+      this.clampGroundSpeed(wishSpeed);
+      this.staminaSlow(dt);
       if (pushing) for (let i = 0; i < 3; i++) this.velocity[i] += bv[i];
       this.walkMove(dt);
       if (pushing) for (let i = 0; i < 3; i++) this.velocity[i] -= bv[i];
@@ -257,6 +244,33 @@ export class Player {
 
     if (this.water) { checkWater(this, this.viewZ()); waterLevelSounds(this, oldLevel, oldFrac); }
     this.clampVelocity();
+  }
+
+  // ---- the parts another game's movement replaces (world/movement-csgo.js overrides them; CS2's are these)
+
+  // the speed a move of input length wl (0..1) aims for
+  wishSpeedFor(input, wl) {
+    if (wl <= 1e-6) return 0;
+    let s = this.maxSpeed * this.runSpeed * Math.min(1, wl);
+    if (this.ducked && this.onGround) s *= CS.duckFactor;
+    else if (input.walk) s *= CS.walkFactor;
+    return s;
+  }
+
+  // Source clamps ground speed to the current max
+  clampGroundSpeed(wishSpeed) {
+    const sp = Math.hypot(this.velocity[0], this.velocity[1]);
+    if (sp > this.maxSpeed * this.runSpeed && wishSpeed > 0) {
+      const s = Math.max(wishSpeed, this.maxSpeed * this.runSpeed * (this.ducked ? CS.duckFactor : 1)) / sp;
+      if (s < 1) { this.velocity[0] *= s; this.velocity[1] *= s; }
+    }
+  }
+
+  // the legacy jump's stamina slow-down on the ground: ((max - stamina) / max) ^ (frametime / (1/70)) a tick
+  staminaSlow(dt) {
+    if (this.stamina <= 0) return;
+    const ratio = Math.pow((CS.staminaMax - this.stamina) / CS.staminaMax, dt / (1 / 70));
+    this.velocity[0] *= ratio; this.velocity[1] *= ratio;
   }
 
   clampVelocity() {

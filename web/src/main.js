@@ -9,7 +9,8 @@ import { loadImpacts } from './world/impacts.js';
 import { CollisionWorld } from './world/collision.js';
 import { buildBVH } from './world/bvh-build.js';
 import { particleTrace } from './fx/trace.js';
-import { Player, CS } from './world/movement.js';
+import { CS } from './world/movement.js';
+import { playerFor } from './world/movement-csgo.js';
 import { Renderer } from './world/render.js';
 import { parseVec } from './world/entities/index.js';
 import { GameAudio } from './audio/audio.js';
@@ -261,6 +262,7 @@ function unloadWorld() {
   G.stream?.dispose();
   G.stream = null;
   G.renderer.setWorld(null);
+  G.renderer.setSky(null);
 }
 
 // The rest of the picked map, once (a second stage on the same map reuses it). Resolves when it is in place;
@@ -306,6 +308,7 @@ async function loadStage() {
     G.stream?.dispose();
     G.stream = null;
     G.renderer.setWorld(data.world, data.water);
+    G.renderer.setSky(data.sky2d); // a Source 1 map's 2D skybox (null otherwise)
     // a chunked world streams in around you (world/stream.js); the loop asks for what the camera needs.
     // load goes through S.map.loadChunk at each call (tests slow it down there to stand in for a phone's network)
     if (data.chunks.length) {
@@ -321,7 +324,7 @@ async function loadStage() {
     // where your bullets hit the world and on what surface (world/impacts.js): its bullet impact sound
     G.impacts = null;
     loadImpacts(name, data.version, data.collisionFx).then((i) => { if (S.map?.name === name) G.impacts = i; }, () => {});
-    S.player = new Player(S.world);
+    S.player = new (playerFor(data.entities))(S.world); // CS:GO movement on a Source 1 map (world/movement-csgo.js), else CS2's
     G.audio.loadMap(name, data.version).catch((e) => log(`audio: ${e.message || e}`));
     S.map = { ...data, items: data.items, loaded: true };
     $('#status').textContent = `${name}: ${data.collision.length / 9} collision triangles, ${Object.keys(data.entities.lumps).length} entity lumps`;

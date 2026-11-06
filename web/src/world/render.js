@@ -15,6 +15,7 @@ import { Bloom, BLOOM_POST_GLSL } from './bloom.js';
 import { PropAnimator, cloneModel } from './anim.js';
 import { Water } from './water.js';
 import { applyUnlit } from './unlit.js';
+import { applySource1, lightModel } from './source1-light.js';
 import { Moondome } from './moondome.js';
 import { Effects } from './effects.js';
 import { spawnsHidden } from './entities/render-mode.js';
@@ -113,6 +114,13 @@ export class Renderer {
     this.camera.updateProjectionMatrix();
   }
 
+  // a Source 1 map's look (world/source1-light.js source1Sky: its 2D sky, Source's tone mapping), or null for a CS2 map
+  setSky(sky) {
+    this.post.setSource1(!!sky?.source1);
+    this.scene.background = sky?.texture || new THREE.Color(0x8fa3b8);
+    if (sky?.rotation) this.scene.backgroundRotation.copy(sky.rotation); else this.scene.backgroundRotation.set(0, 0, 0);
+  }
+
   // the whole world glb, or null for a streamed map (its chunks come through addWorldChunk)
   // water: the map's baked water textures (loadMap's map.water; null for an older bake)
   setWorld(scene, water = null) {
@@ -149,7 +157,7 @@ export class Renderer {
         // CS2 water gets its own shader in place of the flat glTF material (world/water.js)
         const w = !Array.isArray(o.material) && this.water.material(o.material, { lit: !!o.geometry?.attributes?.uv1 });
         if (w) { o.material = w; this.water.track(o); }
-        else { applyUnlit(o, this.unlitMaterials); applySelfIllum(o, this.selfIllum); this.moondome.apply(o); this.effects.apply(o); } // CS2's unlit / self-illum / moondome / effects shaders (world/unlit.js, selfillum.js, moondome.js, effects.js)
+        else { applySource1(o); applyUnlit(o, this.unlitMaterials); applySelfIllum(o, this.selfIllum); this.moondome.apply(o); this.effects.apply(o); } // CS2's unlit / self-illum / moondome / effects shaders (world/unlit.js, selfillum.js, moondome.js, effects.js)
         // VRF names tool-texture meshes after their material; hide the editor-only ones
         const mats = Array.isArray(o.material) ? o.material : [o.material];
         if (mats.some((m) => /tools?(trigger|clip|nodraw|skip|invisible|playerclip|blocklight|areaportal|sky)/i.test(m?.name || ''))) o.visible = false;
@@ -365,18 +373,10 @@ export class Renderer {
             holder.matrixAutoUpdate = false;
             holder.matrix.copy(GLTF_TO_SOURCE);
             holder.add(inst);
-            inst.traverse((o) => { if (o.isMesh) { applyUnlit(o, this.unlitEntity); applySelfIllum(o, this.selfIllum); this.moondome.apply(o); this.effects.apply(o); } }); // before the tint: it clones
-            const rc = kv.rendercolor ? parseVec(kv.rendercolor) : null;
-            if (rc && (rc[0] !== 255 || rc[1] !== 255 || rc[2] !== 255)) {
-              inst.traverse((o) => {
-                if (o.isMesh) {
-                  o.material = o.material.clone();
-                  const tint = new THREE.Color(rc[0] / 255, rc[1] / 255, rc[2] / 255);
-                  o.material.color?.multiply(tint);
-                  tintSelfIllum(o.material, tint);
-                }
-              });
-            }
+            inst.traverse((o) => { if (o.isMesh) { applySource1(o); applyUnlit(o, this.unlitEntity); applySelfIllum(o, this.selfIllum); this.moondome.apply(o); this.effects.apply(o); } }); // before the tint: it clones
+            group.userData.model = inst;
+            applyTint(e, inst); // rendercolor / renderamt, and again whenever a Color / Alpha input changes them
+            lightModel(inst, kv); // a Source 1 model: the ambient cube where it spawned (no-op otherwise)
             group.add(holder);
             // probe-lit like the props (world/lighting.js): placed first, so the probe volume is picked where the
             // entity is; a mover picks again as it goes (updateEntities -> lighting.refreshProbes)
@@ -621,6 +621,7 @@ export class Renderer {
       }
       g.matrix.copy(e.getWorld());
       g.matrixWorldNeedsUpdate = true;
+      if (g.userData.model && g.userData.model.userData.tintKey !== tintKey(e.kv)) applyTint(e, g.userData.model);
       this.loadPending(g);
       const on = e.alive && e.visible;
       g.visible = on && !this.fadedOut(g) && this.entityInView(g) && !this.entityOccluded(g);
@@ -749,4 +750,42 @@ void main() {
     }
     if (this.hdr.width !== size.x || this.hdr.height !== size.y) this.hdr.setSize(size.x, size.y);
   }
+}
+
+// ---- render colour (rendercolor / renderamt keyvalues, set live by the Color / Alpha inputs: entities/engine.js)
+const tintKey = (kv) => `${kv.rendercolor ?? ''}|${kv.renderamt ?? ''}|${kv.rendermode ?? ''}`;
+// Source 1's additive render modes (kRenderGlow 3, TransAdd 5, TransAddFrameBlend 7, TransAlphaAdd 8, WorldGlow 9): a
+// brush or model in one is drawn added onto the scene, so a laser's black falls away and its colour glows
+const ADDITIVE_MODES = new Set(['3', '5', '7', '8', '9']);
+const _tint = new THREE.Color();
+
+// tint an entity model's meshes by its render colour (x its alpha, for a model drawn translucent). Each mesh's
+// material is cloned once, the first time it is tinted, and keeps its own colour to tint from after that.
+function applyTint(e, inst) {
+  const key = tintKey(e.kv);
+  if (inst.userData.tintKey === key) return;
+  const first = inst.userData.tintKey === undefined;
+  inst.userData.tintKey = key;
+  const rc = e.kv.rendercolor ? parseVec(e.kv.rendercolor) : [255, 255, 255];
+  const plain = rc[0] === 255 && rc[1] === 255 && rc[2] === 255 && (e.kv.renderamt == null || Number(e.kv.renderamt) >= 255);
+  const additive = !!e.engine?.source1 && ADDITIVE_MODES.has(String(e.kv.rendermode ?? '').trim());
+  if (first && plain && !additive) return; // nothing to tint: keep the shared materials
+  _tint.setRGB((rc[0] ?? 255) / 255, (rc[1] ?? 255) / 255, (rc[2] ?? 255) / 255);
+  const amt = Math.min(1, Math.max(0, Number(e.kv.renderamt ?? 255) / 255));
+  inst.traverse((o) => {
+    if (!o.isMesh || Array.isArray(o.material)) return;
+    if (!o.userData.tintBase) {
+      o.material = o.material.clone();
+      o.userData.tintBase = { color: o.material.color?.clone(), emissive: o.material.emissive?.clone(), opacity: o.material.opacity };
+      applySource1(o); // a clone drops the lightmap patch (onBeforeCompile isn't copied)
+    }
+    const b = o.userData.tintBase, m = o.material;
+    if (b.color) m.color.copy(b.color).multiply(_tint);
+    if (b.emissive) { m.emissive.copy(b.emissive); tintSelfIllum(m, _tint); }
+    if (additive && m.blending !== THREE.AdditiveBlending) {
+      m.transparent = true; m.blending = THREE.AdditiveBlending; m.depthWrite = false; m.needsUpdate = true;
+    }
+    // alpha only on a model already drawn blended (additive lasers fade with it); an opaque one stays opaque
+    if (m.transparent) m.opacity = b.opacity * amt;
+  });
 }

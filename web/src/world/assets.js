@@ -3,6 +3,7 @@
 // Everything in a map folder is untrusted (a workshop map anyone can publish): the map name and every path a
 // manifest names go through lib/paths.js before they reach a URL, and the lookup tables built here have no
 // prototype, so a model or effect called "constructor" or "__proto__" is just a missing key.
+import { source1Sky } from './source1-light.js';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
@@ -14,8 +15,8 @@ import { mapItems } from './items.js';
 import { MapEffects } from '../fx/effects.js';
 import { chunkList } from './stream.js';
 import { soundDurations } from '../lib/sound-durations.js';
-
 import { loadPhysics } from './physics-world.js';
+
 // VRF exports glTF in metres, Y up: gltf = (src.y, src.z, src.x) * 0.0254. This puts it back in Source units.
 export const GLTF_TO_SOURCE = new THREE.Matrix4().set(
   0, 0, 1 / 0.0254, 0,
@@ -111,13 +112,13 @@ export async function loadMap(name, onProgress = () => {}, opts = {}) {
   // optional: the static world as particle traces see it (lasers-bake collision_fx*.bin; older bakes have none),
   // fetched alongside the rest rather than after it
   const fxFiles = Promise.all([fetchBufferProgress(url('collision_fx.bin'), bytes).catch(() => null), fetchBuffer(url('collision_fx_layers.bin')).catch(() => null)]);
-  const [entities, hullsRaw, colBuf, particles, entwatch, overview, animations, stripper] = await Promise.all([
   // optional: the map's physics for CS2's physics (lasers-bake --physics; world/physics-world.js), and its runtime
   // (rubikon/, served from /rubikon/_framework by tools/build-rubikon.mjs), once per page
   const physicsFile = Promise.all([
     fetchBuffer(url('physics.bin')).catch(() => null),
     loadPhysics(new URL(`${import.meta.env?.BASE_URL || '/'}rubikon/_framework/dotnet.js`, location.href).href),
-  ]).then(([bin, ok]) => (ok ? bin : null));
+  ]).then(([bin, ok]) => (ok && isPhysicsBin(bin) ? bin : null));
+  const [entities, hullsRaw, colBuf, particles, entwatch, overview, animations, stripper] = await Promise.all([
     fetchJson(url('entities.json')),
     fetchJson(url(manifestPath(manifest.hulls, 'hulls.json'))).catch(() => ({})),
     fetchBufferProgress(url(manifestPath(manifest.collision?.file, 'collision.bin')), bytes),
@@ -137,8 +138,8 @@ export async function loadMap(name, onProgress = () => {}, opts = {}) {
   // the same edits the co-op server applies to its copy (server/map-store.js): both must hold the same entities
   applyStripper(entities, stripper, name);
   const [fxBuf, fxLayerBuf] = await fxFiles;
-  const collisionFx = fxBuf && fxLayerBuf && fxBuf.byteLength === fxLayerBuf.byteLength * 9 ? { tris: new Float32Array(fxBuf), layers: new Uint32Array(fxLayerBuf) } : null;
   const physics = await physicsFile;
+  const collisionFx = fxBuf && fxLayerBuf && fxBuf.byteLength === fxLayerBuf.byteLength * 9 ? { tris: new Float32Array(fxBuf), layers: new Uint32Array(fxLayerBuf) } : null;
   const collision = new Float32Array(colBuf);
 
   const { hulls, bounds } = normaliseHulls(hullsRaw);
@@ -161,7 +162,7 @@ export async function loadMap(name, onProgress = () => {}, opts = {}) {
     const key = assetKey(path);
     if (!renderModels.has(key)) return null;
     if (!modelCache.has(key)) {
-      const rel = safeRelPath(key.replace(/\.vmdl$/, '.glb'));
+      const rel = safeRelPath(key.replace(/\.v?mdl$/, '.glb')); // CS2 .vmdl, Source 1 .mdl (lasers-bake source1)
       modelCache.set(key, rel == null ? Promise.resolve(null) : loadGlb(loader, modelBase + rel).catch(() => null));
     }
     return modelCache.get(key);
@@ -175,7 +176,9 @@ export async function loadMap(name, onProgress = () => {}, opts = {}) {
   // particles that draw a model (C_OP_RenderModels) take it from the map's own models
   if (effects) { effects.getModel = getModel; effects.modelToSource = GLTF_TO_SOURCE; }
   const radar = radarInfo(overview, (rel) => url(rel));
-  return { name, version, manifest, entities, collision, collisionFx, hulls, bounds, animations, soundDurations: sounds, world, chunks, loadChunk, getModel, particles: fx, items, radar, effects, water };
+  // a Source 1 map's look: its 2D skybox faces (lasers-bake source1: manifest sky2d) and Source's tone mapping
+  const sky2d = source1Sky(manifest.sky2d, url, manifest.engine);
+  return { name, version, manifest, entities, collision, collisionFx, physics, hulls, bounds, animations, soundDurations: sounds, world, chunks, loadChunk, getModel, particles: fx, items, radar, effects, water, sky2d };
 }
 
 // water.json -> { textures: { <vtex path>: url }, frames: { <vtex path>: slices }, cubes } (null without one). File names only
@@ -236,4 +239,12 @@ function radarInfo(o, url) {
   // size: the source texture's width (CS2 maps the overview over texW * scale units); older bakes: 1024
   const size = Number.isInteger(o.size) && o.size >= 16 && o.size <= 8192 ? o.size : 1024;
   return { posX: o.pos_x, posY: o.pos_y, scale: o.scale, size, base, sections };
+}
+
+// a physics.bin really is one ("RNPH", rubikon/src/Physics/PhysFile.cs): a map baked without it gets the dev server's
+// index.html for the URL, which the physics runtime would throw on and stop the stage loading
+function isPhysicsBin(buf) {
+  if (!(buf instanceof ArrayBuffer) || buf.byteLength < 4) return false;
+  const b = new Uint8Array(buf, 0, 4);
+  return b[0] === 0x52 && b[1] === 0x4e && b[2] === 0x50 && b[3] === 0x48;
 }

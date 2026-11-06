@@ -163,6 +163,12 @@ public static class Program
             if (plCs2 == null) { Console.Error.WriteLine("no CS2 install found (--cs2 <game/csgo>)"); return 1; }
             return PlayerBake.Run(plCs2, Path.GetFullPath(args[1]));
         }
+        if (args.Length >= 2 && args[0].EndsWith(".bsp", StringComparison.OrdinalIgnoreCase))
+        {
+            // lasers-bake <map.bsp> <out maps dir> [--csgo <csgo dir>]: a Source 1 (CS:GO / CS:S) map (Source1/Source1Bake.cs)
+            var ci = Array.IndexOf(args, "--csgo");
+            return Source1.Source1Bake.Run(Path.GetFullPath(args[0]), Path.GetFullPath(args[1]), ci > 0 && ci + 1 < args.Length ? args[ci + 1] : null);
+        }
         if (args.Length < 2)
         {
             Console.Error.WriteLine("usage: lasers-bake <workshop.vpk|map.vpk> <out maps dir> [--cs2 <game/csgo>] [--no-textures]");
@@ -198,7 +204,7 @@ public static class Program
         return null;
     }
 
-    static IEnumerable<string> SteamLibraries()
+    internal static IEnumerable<string> SteamLibraries()
     {
         var roots = new List<string>();
         var envSteam = Environment.GetEnvironmentVariable("STEAM_DIR");
@@ -303,17 +309,17 @@ sealed class Baker(string input, string outRoot, string? cs2, bool textures)
         {
             if (lumpName != null) WalkLump(loader, lumpName, lumps, models, visited);
         }
+        if (PhysicsOnly)
+        {
+            RubikonBake.Write(loader, mapName, models, [map, outer], cs2 != null ? Program.StockPaks(cs2) : [], outDir);
+            return;
+        }
         File.WriteAllText(Path.Combine(outDir, "entities.json"), new JsonObject { ["lumps"] = lumps }.ToJsonString(Json));
         Log($"entities: {lumps.Count} lumps, {models.Count} entity models");
 
         // 2. collision.bin: the static world's player-solid triangles, 9 floats each.
         var tris = new List<float>();
         var physRes = loader.LoadFile($"maps/{mapName}/world_physics.vmdl_c");
-        if (PhysicsOnly)
-        {
-            RubikonBake.Write(loader, mapName, models, [map, outer], cs2 != null ? Program.StockPaks(cs2) : [], outDir);
-            return;
-        }
         if (physRes?.DataBlock is Model physModel)
         {
             var phys = PhysOf(loader, physModel);
@@ -342,15 +348,15 @@ sealed class Baker(string input, string outRoot, string? cs2, bool textures)
         File.WriteAllText(Path.Combine(outDir, "hulls.json"), hulls.ToJsonString(Json));
         Log($"hulls: {hulls.Count} models");
 
+        // 3a. physics.bin: the world's and every entity model's compiled physics for Rubikon (RubikonBake.cs)
+        RubikonBake.Write(loader, mapName, models, [map, outer], cs2 != null ? Program.StockPaks(cs2) : [], outDir);
+
         // 3b. particles.json: a small summary of every effect an info_particle_system plays (and their
         //     children): colour, emit box, radius, rate. Laser visuals in ZE maps are particles, so the
         //     player draws these as glowing sprite strips until a full particle port lands.
         var particles = new JsonObject();
         var queue = new Queue<string>(effects);
         var seenFx = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        // 3a. physics.bin: the world's and every entity model's compiled physics for Rubikon (RubikonBake.cs)
-        RubikonBake.Write(loader, mapName, models, [map, outer], cs2 != null ? Program.StockPaks(cs2) : [], outDir);
-
         while (queue.Count > 0)
         {
             var fx = queue.Dequeue();
@@ -633,14 +639,14 @@ sealed class Baker(string input, string outRoot, string? cs2, bool textures)
 
     // lasers-bake --collision: only these two files (the rest of the map folder untouched)
     public bool CollisionOnly { get; init; }
+    // lasers-bake --physics: only physics.bin (the entity walk runs to find the models; nothing else is written)
+    public bool PhysicsOnly { get; init; }
 
     void WriteParticleCollision(GameFileLoader loader)
     {
         // collision_fx.bin + collision_fx_layers.bin: the static world as particle traces see it. A particle trace
         //    interacts with layers 0x1db001 at most (particles.dll 63babcbf: 0x1c3001, 0x1db001 with m_bIncludeWater),
         //    so player clips (layer 4) and sky (3) are left out; each triangle keeps its layer bits (uint32) so the
-    // lasers-bake --physics: only physics.bin (the entity walk runs to find the models; nothing else is written)
-    public bool PhysicsOnly { get; init; }
         //    runtime can apply the exact mask of each trace. Ours only: cybo's format is unchanged.
         var fxTris = new List<float>();
         var fxLayers = new List<uint>();

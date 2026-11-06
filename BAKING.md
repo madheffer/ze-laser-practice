@@ -161,6 +161,29 @@ Tiers don't change how the map plays: entities, collision and logic are the one 
 Other performance switches (Video, apply instantly): render resolution, MSAA, fog, reflections; "CS2 baked lighting"
 off skips the whole `lighting/` download for the simple lighting.
 
+## CS:GO maps (Source 1)
+
+```bash
+./bake/bin/Release/net10.0/lasers-bake.exe path/to/ze_map.bsp web/public/maps [--csgo <csgo dir>]
+node tools/index-maps.mjs
+```
+
+A `.bsp` (VBSP 19-21: CS:S, CS:GO) bakes to the same map folder (bake/Source1/). Stock textures come from CS:GO's own
+`csgo/pak01_dir.vpk`: Steam's "csgo legacy" install (or `LASERS_CSGO`); the map's pakfile comes first, as in the engine.
+What differs from a CS2 bake: `entities.json` carries `"engine": "source1"` (the EntityEngine then runs Source 1's rules
+where CS2's differ: AddOutput "key value" acts as KeyValue), a point_template's members move into a `tpl_<n>` lump
+(placed relative to the template, `&0000` name fixup unless spawnflags 2), brush models are `maps/<map>/entities/brush_<n>.vmdl`,
+the world / brush glbs carry the map's HDR lightmaps as an RGBM atlas (`lightmap.png`, TEXCOORD_1, drawn unlit:
+world/source1-light.js) and `sky/` holds the 2D skybox (manifest `sky2d`). Studio models (.mdl/.vvd/.dx90.vtx) are drawn
+in their first sequence's frame 0, skinned through their bones, as Source draws a still model: static props join the
+world glb (light baked per vertex), entity models are `models/<path>.glb` (the renderer lights each from its entity's
+`_s1light`). Both take Source's model lighting: the leaf ambient cube with the visible world lights folded in
+(bake/Source1/AmbientLight.cs). Solid static props (solid 6: their .phy; 2: their box) are in `collision.bin`, entity
+models' .phy pieces in `hulls.json`. A model with a multi-frame sequence is exported skinned with a glTF animation per
+sequence, and `animations.json` lists every model's sequences (what prop_dynamic's SetAnimation times by). Not baked
+yet: sounds, particles (.pcf), lighting/, tiers,
+chunks (the whole world glb loads: 27 MB for ze_ffvii_malgo_reactor, static props not instanced).
+
 ## Single steps
 
 For a map that's already baked, each piece can be redone on its own (`lasers-bake <mode> <workshop.vpk> <map dir>`):

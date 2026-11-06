@@ -9,7 +9,7 @@ import { C, MAX_HUMANS } from './registry.js';
 import { physicsStep } from './classes/physics-rubikon.js';
 import { Entity, stripName } from './entity.js';
 import { ONE, parseVec, angleQuat, mulberry32, poseMatrix } from './math.js';
-import { addOutput, keyValue, playerInput } from './keyvalues.js';
+import { addOutput, addOutputSource1, keyValue, playerInput } from './keyvalues.js';
 import { tickBurn } from './burn.js';
 import { emptyBounds, growBounds } from '../../lib/math.js';
 import { stripPrefix } from '../../lib/names.js';
@@ -53,6 +53,8 @@ export class EntityEngine {
   constructor(entitiesJson, assets, { seed = 1 } = {}) {
     this.assets = assets; // { hulls: {model: [...]}, bounds: {model:{min,max}}, animations?: animations.json (classes/props.js) }
     this.lumps = validLumps(entitiesJson?.lumps);
+    // a CS:GO / CS:S map (lasers-bake source1): Source 1's rules where CS2's differ (AddOutput as KeyValue)
+    this.source1 = entitiesJson?.engine === 'source1';
     this.live = 0; // entities alive (bounded by MAX_ENTITIES)
     this.time = 0;
     this.stamp = 0;
@@ -361,7 +363,7 @@ export class EntityEngine {
       case 'setparent': e.setParent(this.findOne(param, caller, activator)); return;
       case 'clearparent': e.setParent(null); return;
       case 'setparentattachment': case 'setparentattachmentmaintainoffset': return;
-      case 'addoutput': this.addOutput(e, param); return; // CS2's own: output>target>input>... only (keyvalues.js)
+      case 'addoutput': this.addOutput(e, param); return; // CS2's own: output>target>input>... only; Source 1's: key value (keyvalues.js)
       case 'keyvalue': case 'keyvalues': keyValue(this, e, param); return; // CS2Fixes' table (keyvalues.js)
       case 'setlocalorigin': e.pos.set(...parseVec(param)); this.moved(e); return;
       case 'setlocalangles': angleQuat(parseVec(param), e.quat); this.moved(e); return;
@@ -373,7 +375,11 @@ export class EntityEngine {
       case 'setabsangles': {
         e.setWorldTransform(poseMatrix(e.worldOrigin(), angleQuat(parseVec(param)))); return;
       }
-      case 'alpha': case 'color': case 'skin': case 'setglowenabled': case 'setglowdisabled':
+      // the render colour / alpha (CBaseModelEntity InputColor / InputAlpha, Source 1 and CS2 alike): the renderer re-tints
+      // the model when they change (render.js applyTint). ze_ffvii_malgo_reactor's rainbow lasers cycle Color every 0.1 s
+      case 'color': e.kv.rendercolor = String(param ?? '255 255 255'); return;
+      case 'alpha': e.kv.renderamt = String(param ?? '255'); return;
+      case 'skin': case 'setglowenabled': case 'setglowdisabled':
       case 'setanimation': case 'setanimationnotlooping': case 'setanimationlooping': case 'setdefaultanimation':
       case 'setplaybackrate': case 'playsound': case 'stopsound': case 'startsound': case 'volume': case 'turnon': case 'turnoff':
       case 'setscale': case 'setbodygroup': case 'disablecollision': case 'enablecollision': case 'start': case 'stop':
@@ -391,7 +397,7 @@ export class EntityEngine {
     this.input = (e, input, ...rest) => (fn(e, input, ...rest) ? undefined : next(e, input, ...rest));
   }
 
-  addOutput(e, param) { addOutput(this, e, param); }
+  addOutput(e, param) { if (this.source1) addOutputSource1(this, e, param); else addOutput(this, e, param); }
   playerInput(q) { playerInput(this, q); }
 
   // the fog the player sees now (classes/fog.js): read by the renderer each frame
