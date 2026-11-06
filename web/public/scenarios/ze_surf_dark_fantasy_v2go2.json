@@ -1,0 +1,21 @@
+{
+  "map": "ze_surf_dark_fantasy_v2go2",
+  "title": "ze_surf_dark_fantasy_v2go2",
+  "engine": "csgo",
+  "description": "A CS:GO map (Source 1, baked from its BSP): the Queen, the ghost of the \"Secret - Ghosts\" boss arena on the way to the true ending, dancing in the middle and throwing lasers.",
+  "scenarios": [
+    {
+      "id": "queen",
+      "group": "Secret - Ghosts",
+      "name": "The Queen (ghost)",
+      "summary": "She dances in the middle and throws lasers",
+      "description": "lvls_collector_trig_final -> init_Boss_Arena (bossarena.nut) shuffles ErrorGirl, Queen and CatGirl; the Queen's turn ForceSpawns boss_PT_queen and runs init_Boss() on boss_queen_phbox (bosshp_queen.nut, ported). HP 150 + 500 per human, 1 per bullet. Every 11-16 s Handler_Attack picks one of four: Uganda (60 sprites flung off the spinning boss_queen_rot, 0.16 s apart), Reverse Uganda, Rain from Uganda (from above), or Lasers: 20 boss_attack_PT_laser blades 0.5 s apart from boss_queen_laser_maker (spinning on boss_queen_rot, rolling on boss_queen_rot2), each a trigger_hurt of 100/s (50 a touch) on a door that flies 800 u out at 800 u/s. Touching her: boss_queen_hurt, 80/s. Humans have 100 HP here (stm_tp_human sets it every round; 300 only with the Heal item). Win when her death calls BossDead().",
+      "spawn": { "origin": [-8245, 9728, 1530], "yaw": 0 },
+      "setup": [{ "target": "boss_PT_queen", "input": "ForceSpawn" }],
+      "start": [{ "target": "boss_queen_phbox", "input": "RunScriptCode", "param": "init_Boss();" }],
+      "bosses": [{ "target": "boss_queen_phbox", "name": "Queen", "counter": "boss_queen_phbox", "counterMode": "hits" }],
+      "win": { "target": "lvls_true_bossarena_PT_init", "input": "RunScriptCode" },
+      "endless": { "noBossDamage": true }
+    }
+  ]
+}

@@ -107,7 +107,12 @@ static class Entities
         foreach (var t in ents.Where(e => e.Get("classname")?.Equals("point_template", StringComparison.OrdinalIgnoreCase) == true).ToList())
         {
             var names = Enumerable.Range(1, 16).Select(k => t.Get($"Template{k:00}")).Where(s => !string.IsNullOrEmpty(s)).Select(s => s!).ToList();
-            var members = names.SelectMany(n => byName.TryGetValue(n, out var l) ? l : []).Distinct().Where(e => e != t).ToList();
+            // CPointTemplate::StartBuildingTemplates finds each name with gEntList.FindEntityByName, whose NamesMatch takes
+            // a trailing '*' as a prefix (ze_surf_dark_fantasy's boss_PT_queen: "boss_queen_*")
+            var members = names.SelectMany(n => n.EndsWith('*')
+                    ? ents.Where(e => e.Get("targetname") is { Length: > 0 } tn && tn.StartsWith(n[..^1], StringComparison.OrdinalIgnoreCase))
+                    : byName.TryGetValue(n, out var l) ? l : [])
+                .Distinct().Where(e => e != t).ToList();
             if (members.Count == 0) continue;
             var flags = int.TryParse(t.Get("spawnflags"), out var sf) ? sf : 0;
             if ((flags & 1) == 0) foreach (var e in members) removed.Add(e);

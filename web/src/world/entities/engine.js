@@ -25,6 +25,7 @@ import './classes/physics.js';
 import './classes/server.js';
 import './classes/beams.js';
 import './classes/scripts.js';
+import { runScriptCode } from './classes/vscripts.js';
 import { fogState } from './classes/fog.js';
 import { postState } from './classes/post.js';
 import { breakSound, hitSound } from './sound.js';
@@ -348,6 +349,8 @@ export class EntityEngine {
     const inp = input.toLowerCase();
     // class first, so classes can override the generic ones (Enable on a timer, etc.)
     const h = C[e.cls];
+    // a Source 1 entity's VScript, as a hand port of its .nut (classes/vscripts.js)
+    if (inp === 'runscriptcode' && this.source1 && e.kv.vscripts && runScriptCode(this, e, param, activator)) return;
     if (h?.input && h.input(e, inp, param, activator, caller)) return;
     switch (inp) {
       case 'kill': this.kill(e); return;

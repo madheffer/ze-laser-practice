@@ -40,6 +40,7 @@ CS2 and its workshop folder are found from Steam's library list (`node tools/ste
 | ze_alien_shooter | 3425735986 (the Laser Alien) |
 | ze_minecraft_sakura | 3195096311 (L-U-C-I-D-D-R-E-A-M and the ending) |
 | ze_the_shifting_pool | 3554883009 (the ride-the-wave tunnel minigame) |
+| ze_surf_dark_fantasy_v2go2 | CS:GO map, from its .bsp (BAKING.md "CS:GO maps"): the Queen, "Secret - Ghosts" |
 
 ## Database (runs and leaderboards)
 
