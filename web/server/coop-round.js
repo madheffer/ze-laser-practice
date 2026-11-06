@@ -161,7 +161,11 @@ export class Round {
     this.t0 = Date.now();
     this.clockAt = 0;
     this.broadcast({ t: 'go', r: this.r });
+    this.ev('round.go', { loadMs: this.t0 - this.loadT0, playing: this.alive.map((p) => `#${p.id}`), out: [...this.players.values()].filter((p) => !p.alive).map((p) => `#${p.id}`) });
   }
+
+  // the event log (coop-log.js), with the room and round on every line
+  ev(event, fields) { this.io.ev?.(event, { room: this.room.code, r: this.r, ...fields }); }
 
   // ---- from players
   // { k: first tick, p: [[x, y, z, ducked], ...], yaw, pitch }: checked, then the newest relayed to the others
@@ -204,6 +208,7 @@ export class Round {
     p.check.alive = false;
     p.deadAt = Math.min(t, this.stageTime);
     this.broadcast({ t: 'dead', r: this.r, id: p.id, by, at: p.deadAt, note: note || '' });
+    this.ev('round.dead', { id: `#${p.id}`, name: p.name, by: by || undefined, note: note || undefined, at: p.deadAt, started: this.started, alive: this.alive.length });
     this.updateLeader();
     this.checkEnd();
   }
@@ -278,7 +283,8 @@ export class Round {
   //   all down         nobody did (endless: the run is over); best = whoever lasted longest (within a tick: a tie)
   //   failed ('lose')  the stage was lost with players alive; best = the survivors with the fewest hits
   // The anti-cheat's removals and players who left never count as best.
-  end(reason) {
+  // why: for the log only (the owner's End round)
+  end(reason, why) {
     if (this.ended) return;
     const all = [...this.players.values()];
     const alive = all.filter((p) => p.alive);
@@ -299,6 +305,8 @@ export class Round {
     this.result = { t: 'end', r: this.r, result, reason, at: t, winners: winners.map((p) => p.id), best: all.length > 1 ? best.map((p) => p.id) : [],
       stats: all.map((p) => ({ id: p.id, alive: p.alive, at: p.deadAt == null ? null : Math.min(p.deadAt, t), hits: hits(p), cheat: p.cheat || undefined })) };
     this.broadcast(this.result);
+    this.ev('round.end', { result, reason, why, at: t, sentTo: this.room.members.filter((c) => this.players.has(c.id)).length,
+      players: all.map((p) => `#${p.id}:${p.alive ? 'alive' : 'dead'}:${hits(p)}h${p.cheat ? `:cheat-${p.cheat}` : ''}${p.left ? ':left' : ''}`) });
     this.free();
   }
 
@@ -308,6 +316,7 @@ export class Round {
     if (this.ended) return;
     this.ended = true;
     this.fed = true; // no verdict, so nothing for the home page's feed
+    this.ev('round.replaced', { at: this.stageTime });
     this.free();
   }
 

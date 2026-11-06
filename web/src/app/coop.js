@@ -22,9 +22,11 @@ import { lastFrameAt } from './loop.js';
 import { systemLine } from './chat.js';
 import { ownerLine } from '../ui/room-chat.js';
 import { itemState, spendUse, usableHeals } from '../world/items.js';
+import { installCoopDiag } from './coop-diag.js';
 import { beginRoster, applyWait, markOut, rosterGo, clearRoster, waitLine, startReports, simulatedPing, lockPing, unlockPing } from './coop-load.js';
 
 export const net = new CoopClient();
+const diag = installCoopDiag(net); // what this client saw, for the server's log
 export const lobby = { busy: false }; // busy = a round is on that you're not in (you'll be in the next one)
 
 const STATE_MS = 33; // 30 Hz: the others draw you this much less late (world/peers.js)
@@ -143,6 +145,8 @@ class Round {
     G.audio?.deathFade?.('clear'); // spectating: CS2's death-cam mix is over (audio/layers.js)
   }
   spectateLabel() { const v = this.spectateView(); return v ? `Spectating ${this.name(v.id)}` : 'You died'; }
+  // what the camera has of a player (app/coop-diag.js): how many positions, the newest one's run time
+  peerSamples(id) { const p = G.peers.list.get(id); const q = p?.track?.samples || p?.samples || []; return { n: q.length, last: q[q.length - 1]?.t ?? 0 }; }
 
   // ---- loading: the stage is loaded and drawn here (app/readiness.js); the server starts the clock when all are
   sendReady() { if (!this.ended) { this.readyIds.add(this.me); net.game({ t: 'ready', r: this.r, ping: simulatedPing() }); } }
@@ -162,6 +166,7 @@ class Round {
     G.peers.setAlive(id, false);
     const self = id === this.me;
     if (self && S.run && !S.run.spectating) { S.run.spectating = true; S.run.deadAt = t; }
+    if (self) diag.died(this); // what the death camera has, for the server's log
     // CS2's feed names no cause: every death here is the map's (a trigger_hurt / the world: attacker -1), so it reads
     // "<name> [skull] <name>" (ui/killfeed.js). Leaving or not loading is a disconnect; the server's why goes to chat.
     if (note) systemLine([[` ${p.name} ${note}`, NOTE_COLOR]]);
@@ -345,8 +350,11 @@ function onLeft(why) {
 }
 
 // The owner walked away from a live round (changed map): the server ends it for everyone.
-export function abortRound() {
-  if (S.mp && !S.mp.ended && net.isHost) net.abort(S.mp.r);
+// report: the pause screen's End round (its state goes to the server's log, sent or not)
+export function abortRound(report = false) {
+  const send = !!S.mp && !S.mp.ended && net.isHost;
+  if (report) diag.endRound(send);
+  if (send) net.abort(S.mp.r);
 }
 
 export function installCoop() {

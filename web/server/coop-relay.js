@@ -24,6 +24,7 @@ import { sameOriginSocket, clientAddress } from './http-util.js';
 import { serverAuth } from './auth/index.js';
 import { replayVerifier } from './replay-verify.js';
 import { roomChat } from './coop-chat.js';
+import { coopLog, who } from './coop-log.js';
 
 export const PATH = '/coop';
 const MAX_ROOMS = 300;
@@ -48,6 +49,9 @@ const START_MS = 3000;
 // a socket that misses one pong is dropped: a vanished owner (a closed laptop, a lost Wi-Fi) hands the room on within
 // 10-20 s instead of holding it where nobody can start a round
 const HEARTBEAT_MS = 10_000;
+// a client's own reports for the log (app/coop-diag.js): what its End round, death camera and errors saw. At most
+// this many a minute per connection, each capped, so a client can't fill the log
+const DIAG_PER_MIN = 20, DIAG_MAX = 400;
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ'; // no I / O (they read as 1 / 0)
 const CODE = /^[A-Z]{4}$/;
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -85,8 +89,12 @@ export function attachCoopRelay(httpServer, { log = () => {}, store = openStore(
   const loadMap = mapStore(mapsDir);
   let nextId = 1;
 
-  const send = (c, msg) => { if (c.ws.readyState === 1) c.ws.send(JSON.stringify(msg)); };
-  const io = { send, log };
+  const ev = coopLog(log); // the event log (coop-log.js)
+  const send = (c, msg) => {
+    if (msg.t === 'error') ev('refused', { room: c.room?.code, ...who(c), msg: msg.msg });
+    if (c.ws.readyState === 1) c.ws.send(JSON.stringify(msg));
+  };
+  const io = { send, log, ev };
   // the home page's live feed (activity.js): finished rounds and solo runs, and how busy the server is
   // solo runs' replays, checked on the server's copy of the run (replay-verify.js)
   const verify = replayVerifier({ loadMap, findStage, store, log });
@@ -115,10 +123,13 @@ export function attachCoopRelay(httpServer, { log = () => {}, store = openStore(
     c.room = null;
     room.members = room.members.filter((m) => m !== c);
     room.round?.onLeave(c);
-    if (!room.members.length) { clearTimeout(room.pingT); rooms.delete(room.code); return; }
-    if (room.owner === c.id) {
+    const wasOwner = room.owner === c.id;
+    ev('leave', { room: room.code, ...who(c), why, inRound: room.round && !room.round.ended ? room.round.r : undefined, left: room.members.length });
+    if (!room.members.length) { clearTimeout(room.pingT); rooms.delete(room.code); ev('room.closed', { room: room.code }); return; }
+    if (wasOwner) {
       room.owner = room.members[0].id; // the next oldest runs the room
       room.startAt = 0; // a new owner can start at once (START_MS was the last owner's)
+      ev('room.owner', { room: room.code, ...who(room.members[0]) });
     }
     // the heal holder they were (rules.heal = their id) is nobody now: a random player carries it instead
     if (room.settings.rules.heal === c.id) room.settings = { ...room.settings, rules: { ...room.settings.rules, heal: 'random' } };
@@ -166,13 +177,17 @@ export function attachCoopRelay(httpServer, { log = () => {}, store = openStore(
     room.round = new Round(room, { map: m.map, stage, mode, kind: room.settings.kind, rules: room.settings.rules, assets }, io);
     room.map = m.map;
     room.round.broadcast(room.round.startMessage());
+    ev('round.start', { room: room.code, r: room.round.r, map: m.map, stage: stage.id ?? 'free', mode, by: `#${c.id}`, players: [...room.round.players.keys()].map((id) => `#${id}`) });
     announce(room);
   }
 
   function onMessage(c, raw) {
     const now = Date.now();
     if (now - c.windowAt > 1000) { c.windowAt = now; c.count = 0; }
-    if (++c.count > RATE) return; // dropped, not disconnected: a burst after a hidden tab wakes is normal
+    if (++c.count > RATE) { // dropped, not disconnected: a burst after a hidden tab wakes is normal
+      if (c.count === RATE + 1) ev('rate-limited', { room: c.room?.code, ...who(c) }); // once a second at most
+      return;
+    }
     let m;
     try { m = JSON.parse(String(raw)); } catch { return; }
     if (!m || typeof m !== 'object' || typeof m.t !== 'string') return;
@@ -201,7 +216,7 @@ export function attachCoopRelay(httpServer, { log = () => {}, store = openStore(
         rooms.set(code, r);
         c.room = r;
         announce(r);
-        log(`coop: room ${code} (${r.settings.public ? 'public' : 'private'})`);
+        ev('room.create', { room: code, ...who(c), public: r.settings.public, map: r.map || undefined, steam: !!c.user });
         break;
       }
       case 'join': {
@@ -216,6 +231,7 @@ export function attachCoopRelay(httpServer, { log = () => {}, store = openStore(
         c.name = uniqueName(r, c.name, c);
         r.members.push(c);
         c.room = r;
+        ev('room.join', { room: code, ...who(c), members: r.members.length, steam: !!c.user, midRound: r.round && !r.round.ended ? r.round.r : undefined });
         announce(r);
         break;
       }
@@ -243,6 +259,7 @@ export function attachCoopRelay(httpServer, { log = () => {}, store = openStore(
           if (target.user) room.bannedSteam.add(target.user.steamId); // their account, wherever they connect from
           // and their address for a while: a guest's only handle, and a signed-in player signing out to come back as one
           if (target.addr) room.bannedAddr.set(target.addr, now + KICK_ADDR_MS);
+          ev('kick', { room: room.code, by: `#${c.id}`, ...who(target) });
           leave(target, 'kicked');
         }
         break;
@@ -255,7 +272,19 @@ export function attachCoopRelay(httpServer, { log = () => {}, store = openStore(
         break;
       // r: the round the owner means. An abort sent for a round that has since been replaced (a new owner's start)
       // must not end the new one
-      case 'abort': if (owner && round && !round.ended && m.r === round.r) round.end('lose'); break;
+      case 'abort': {
+        const no = !room ? 'not in a room' : !owner ? 'not the owner' : !round ? 'no round' : round.ended ? 'round already over' : m.r !== round.r ? 'another round' : '';
+        ev('abort', { room: room?.code, ...who(c), r: m.r, round: round?.r, refused: no || undefined });
+        if (!no) round.end('lose', 'ended by the owner');
+        break;
+      }
+      // what the client saw (app/coop-diag.js), for the log only
+      case 'diag': {
+        if (now - (c.diagAt || 0) >= 60_000) { c.diagAt = now; c.diagN = 0; }
+        if (++c.diagN > DIAG_PER_MIN || typeof m.kind !== 'string') return;
+        ev(`client.${m.kind.replace(/[^a-z-]/g, '').slice(0, 20) || 'note'}`, { room: room?.code, ...who(c), r: Number.isInteger(m.r) ? m.r : undefined, msg: String(m.msg ?? '').slice(0, DIAG_MAX) });
+        break;
+      }
       // a round's traffic, for the round the client is in
       case 's': if (round && m.r === round.r) round.onState(c, m); break;
       case 'dead': if (round && m.r === round.r) round.onDead(c, m); break;
@@ -283,8 +312,12 @@ export function attachCoopRelay(httpServer, { log = () => {}, store = openStore(
     ws.on('pong', () => { ws.isAlive = true; });
     send(c, { t: 'welcome', you: c.id, max: ROOM_MAX });
     ws.on('message', (raw) => onMessage(c, raw));
-    const gone = () => {
-      leave(c);
+    // why a socket closed: the client's close code (1000/1001 a normal close or a closed tab, 1006 the line dropped),
+    // our heartbeat dropping it, or an error (1009: a frame over MAX_FRAME)
+    ws.on('error', (e) => { ws.dropWhy ||= e?.message || 'error'; });
+    const gone = (code, reason) => {
+      if (c.room) ev('disconnect', { room: c.room.code, ...who(c), code, why: ws.dropWhy || String(reason || '') || undefined });
+      leave(c, 'disconnected');
       feed.unwatch(c);
       const n = (perAddress.get(addr) || 1) - 1;
       if (n > 0) perAddress.set(addr, n); else perAddress.delete(addr);
@@ -305,7 +338,7 @@ export function attachCoopRelay(httpServer, { log = () => {}, store = openStore(
     const now = Date.now();
     for (const [addr, f] of joinFails) if (now - f.at >= JOIN_FAIL_MS) joinFails.delete(addr); // old failed joins
     for (const ws of wss.clients) {
-      if (ws.isAlive === false) { ws.terminate(); continue; }
+      if (ws.isAlive === false) { ws.dropWhy = `no pong in ${HEARTBEAT_MS / 1000} s`; ws.terminate(); continue; }
       ws.isAlive = false;
       ws.ping();
     }

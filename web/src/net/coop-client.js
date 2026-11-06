@@ -98,6 +98,8 @@ export class CoopClient {
     this.room = null;
     this.emit('left', 'left');
   }
+  // a note for the server's log (app/coop-diag.js; server/coop-relay.js 'diag'): kind a-z, msg plain text
+  diag(kind, msg, r) { if (this.ws?.readyState === 1) this.ws.send(JSON.stringify({ t: 'diag', kind, msg: String(msg).slice(0, 400), r })); }
   // round traffic (only while connected: nothing is queued for a round)
   game(m) { if (this.room && this.ws?.readyState === 1) this.ws.send(JSON.stringify(m)); }
 

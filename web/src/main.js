@@ -380,7 +380,7 @@ G.pauseScreen = new PauseScreen($('#pause'), {
     stages: () => { G.menu.show(S.map ? 'stages' : 'maps'); G.menu.update(); },
     settings: () => { G.menu.selectTab($('#tab-settings')); G.menu.update(); },
     home: () => goHome(),
-    endRound: () => abortRound(),
+    endRound: () => abortRound(true),
   },
 });
 installReplays(); // replays + the Steam account (app/replay-boot.js)
