@@ -157,6 +157,7 @@ export function frame(now) {
   G.stream?.update(G.renderer.camera.position.toArray(camPos), G.renderer.lighting?.viewDistance ?? Infinity); // the world's chunks around the camera (Source units)
   G.renderer.lighting?.update(engine, G.renderer.camera); // the map's fog (its own entities + I/O), far Z, the sky
   G.renderer.post?.update(engine); // the post_processing_volume the map's I/O has you in, fading (world/tonemap.js)
+  G.s1look?.update(G.renderer, engine, eye); // a Source 1 map's swapped sky and colour lookups (world/source1-look.js)
   G.renderer.updateEntities(engine ? engine.time + (live ? acc : 0) : 0);
   G.renderer.lighting?.setLights(S.map?.effects?.lights, G.renderer.camera); // particle lights, after the effects' update
   G.renderer.render();

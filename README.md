@@ -42,6 +42,7 @@ CS2 and its workshop folder are found from Steam's library list (`node tools/ste
 | ze_the_shifting_pool | 3554883009 (the ride-the-wave tunnel minigame) |
 | ze_rush_b | 3588414134 (the Matrix code tube near the ending) |
 | ze_surf_dark_fantasy_v2go2 | CS:GO map, from its .bsp (BAKING.md "CS:GO maps"): the Queen, "Secret - Ghosts" |
+| ze_xenovation_v3_5 | CS:GO map, from its .bsp, cropped to its endings (BAKING.md "Cropping"): the secret ending's look-up finale + climb, level 1's laser corridor, level 2's ending |
 
 ## Database (runs and leaderboards)
 
@@ -396,6 +397,12 @@ the stance files are vpkstuff's clip decode (lab `tools/previewer/extract-tp-cli
 - **Room reverb** (`audio/dsp.js`): RoomDSP is `core_null` (dry) until a sound event with `override_dsp_preset` switches
   it; presets are CS2's reverb graphs (delay / filter as stated, diffusor / boxverb approximated). None of the baked maps
   switches it, so they play dry as in CS2.
+- **Source 1 look** (`world/source1-look.js`, per frame): skybox_swapper's Trigger swaps the 2D sky (manifest
+  `sky2dSets`); color_correction lookups (`correction/`, classes/color-correction.js: Enable / Disable fade over
+  fadeIn / fadeOutDuration, falloff by distance) blend into the post pass's colour lookup; env_smoketrail puffs as
+  C_SmokeTrail emits them (`world/smoketrail-source1.js`); entities in the sky_camera's area (`_s1sky`) draw as the 3D
+  skybox through the same path as CS2's skybox_reference worlds. ze_xenovation's green void = its grey sky box
+  (hlmv/gray, platform VPK) through xenova_last.
 - **Source 1 maps** (CS:GO, `engine: source1`): ambient_generic runs CS:GO's CAmbientGeneric (classes/ambient-source1.js:
   only a looping sound starts on spawn or is "active"; PlaySound restarts a non-looping one, StopSound only stops an
   active one, so maps stop music with Volume 0; radius -> sound level -> Source's falloff, audio/source1-falloff.js);

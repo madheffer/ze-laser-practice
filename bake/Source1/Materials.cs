@@ -9,7 +9,7 @@ namespace Lasers.Bake.Source1;
 
 sealed class Materials(GameFiles files, Action<string> log)
 {
-    public sealed record Info(string Name, string? Texture, string AlphaMode, float Cutoff, bool DoubleSided, Vector4 Color, int Width, int Height, bool Tool, bool Additive);
+    public sealed record Info(string Name, string? Texture, string AlphaMode, float Cutoff, bool DoubleSided, Vector4 Color, int Width, int Height, bool Tool, bool Additive, bool Unlit = false);
 
     readonly Dictionary<string, Info> cache = new(StringComparer.OrdinalIgnoreCase);
     readonly Dictionary<string, byte[]?> png = new(StringComparer.OrdinalIgnoreCase);
@@ -44,7 +44,7 @@ sealed class Materials(GameFiles files, Action<string> log)
         if (file == null && shader.Contains("water")) { color = new Vector3(0.2f, 0.3f, 0.35f); alpha = 0.6f; translucent = true; }
         var info = new Info(key, file, translucent || alpha < 1 ? "BLEND" : alphaTest ? "MASK" : "OPAQUE",
             vmt?.Num("$alphatestreference", 0.5f) ?? 0.5f, vmt?.Flag("$nocull") == true || translucent,
-            new Vector4(color, alpha), w, h, key.StartsWith("tools/") && key != "tools/toolsblack", additive);
+            new Vector4(color, alpha), w, h, key.StartsWith("tools/") && key != "tools/toolsblack", additive, shader == "unlitgeneric");
         cache[key] = info;
         return info;
     }

@@ -115,7 +115,8 @@ function patch(m, range) {
 
 // the map's 2D sky (manifest sky2d: { rt, bk, lf, ft, up, dn } -> PNG URLs) as the scene background. The scene is in
 // Source space (Z up); a cube is sampled Y up, so the faces go in by Source axis and the background turns Z up to Y up.
-// Face per axis: ft +X, bk -X, lf +Y, rt -Y, up +Z, dn -Z (Source's skybox naming).
+// Face per axis: ft +X, bk -X, lf +Y, rt -Y, up +Z, dn -Z (Source's skybox naming). A skybox_swapper's sky
+// (manifest sky2dSets) has its faces under sky/<name>/.
 export function source1Sky(sky2d, url, engine) {
   if (engine !== 'source1') return null;
   if (!sky2d || typeof sky2d !== 'object') return { source1: true, texture: null, rotation: null };
@@ -123,7 +124,7 @@ export function source1Sky(sky2d, url, engine) {
   // flipEnvMap), hence each axis's opposite face in its slot. Checked in the game with a coloured test cube: looking
   // +X shows ft with up above it, lf on the left and rt on the right
   const order = ['bk', 'ft', 'dn', 'up', 'lf', 'rt'];
-  if (!order.every((f) => typeof sky2d[f] === 'string' && /^sky\/(rt|bk|lf|ft|up|dn)\.png$/.test(sky2d[f]))) return { source1: true, texture: null, rotation: null };
+  if (!order.every((f) => typeof sky2d[f] === 'string' && /^sky\/([a-z0-9_-]{1,64}\/)?(rt|bk|lf|ft|up|dn)\.png$/.test(sky2d[f]))) return { source1: true, texture: null, rotation: null };
   const tex = new THREE.CubeTextureLoader().load(order.map((f) => url(sky2d[f])));
   tex.colorSpace = THREE.SRGBColorSpace;
   return { source1: true, texture: tex, rotation: new THREE.Euler(-Math.PI / 2, 0, 0) };

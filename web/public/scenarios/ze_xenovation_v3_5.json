@@ -1,0 +1,203 @@
+{
+  "map": "ze_xenovation_v3_5",
+  "title": "ze_xenovation_v3_5",
+  "engine": "csgo",
+  "description": "A CS:GO map (Source 1, baked from its BSP), cropped to its endings: the secret ending's look-up finale (relay10) and the climb before it, level 1's laser corridor, and level 2's ending (floor lasers, pillars, spinning bars and squares).",
+  "scenarios": [
+    {
+      "id": "lookup_finale",
+      "group": "Secret ending",
+      "name": "Look-up finale",
+      "summary": "Look up: dodge falling bars and square frames",
+      "description": "From +121 s of relay10, on ele6 (the platform at the top of the shaft). At +122.5 the floors below are killed (hurt8 kills a human who falls, tri_tp11 sends zombies to the cage at tp15) and the lasers start falling down the shaft at 2000 u/s from 5500 units up: every 0.2 s laser_timer4 / 5 drop a 1808-unit bar (laser4 / laser5) through the platform centre at whatever angle the 600 deg/s laser_rota / laser_rota2 makers have reached. At +129.9 and +139.9 laser7 / laser8 come down over the whole platform: a column of nested square frames, so stand in a gap between them. From +132.7 laser_timer6 also drops 324 x 320 laser6 squares on 16 spots around the platform, but they don't hurt (laser6_hurt starts disabled and nothing enables it). Every other laser hurt is 99999. The timers stop at +142.3; win when ele6 starts lifting you out (+145). Endless: the bars never stop.",
+      "fastForward": 121,
+      "spawn": {
+        "origin": [-3968, 13900, -11580],
+        "yaw": 270
+      },
+      "view": {
+        "min": [-6000, 10600, -15400],
+        "max": [-900, 16000, -3000]
+      },
+      "setup": [
+        { "target": "skybox2", "input": "Trigger" }
+      ],
+      "start": [
+        { "target": "relay10", "input": "Trigger" }
+      ],
+      "win": { "target": "ele6", "input": "StartForward" },
+      "endless": {
+        "cancel": [
+          { "target": "laser_timer4", "input": "Disable" },
+          { "target": "laser_timer5", "input": "Disable" },
+          { "target": "laser_timer6", "input": "Disable" },
+          { "target": "ele6", "input": "StartForward" }
+        ]
+      }
+    },
+    {
+      "id": "ending_full",
+      "group": "Secret ending",
+      "full": true,
+      "name": "Ending (full)",
+      "summary": "The climb up the shaft, then the look-up finale",
+      "description": "relay10 from the start (relay9 fires it at +197 and sends everyone to tp16). +3: the elevators ele4 / ele5 rise; +25 tri_tp12 puts everyone on ele4 (tp14). The shaft's floors are spawned one above the other as you climb (break26 +10.8, break27 +20.8, break28 +30.5, break30 +41, then break31 with ele6 and its centre pillar break32 at +82.3). +122.5: everything under ele6 is killed and the look-up finale starts (falling laser4 / 5 bars every 0.2 s, laser7 / laser8 square-frame columns at +129.9 / +139.9; the laser6 squares from +132.7 don't hurt). Win when ele6 starts lifting you out (+145). Endless: the bars never stop.",
+      "spawn": {
+        "at": "tp16",
+        "yaw": 0
+      },
+      "view": {
+        "min": [-9600, 10600, -15400],
+        "max": [-900, 16000, -3000]
+      },
+      "setup": [
+        { "target": "skybox2", "input": "Trigger" }
+      ],
+      "start": [
+        { "target": "relay10", "input": "Trigger" }
+      ],
+      "win": { "target": "ele6", "input": "StartForward" },
+      "endless": {
+        "cancel": [
+          { "target": "laser_timer4", "input": "Disable" },
+          { "target": "laser_timer5", "input": "Disable" },
+          { "target": "laser_timer6", "input": "Disable" },
+          { "target": "ele6", "input": "StartForward" }
+        ]
+      }
+    },
+    {
+      "id": "corridor_lasers",
+      "group": "Level 1 ending",
+      "name": "Corridor lasers",
+      "summary": "Run the corridor: dodge pillars, jump the bar",
+      "description": "The end of level 1 (relay9 on the secret route, relay7 on the normal one: the same lasers). After the 120 s hold, break22 breaks at +130 and push3 / push4 shove everyone out of the hold room into the corridor (to +149): you start there at +131, facing back down it. From +136 laser_timer2 / laser_timer1 (2 s, 0.3 s from +156 / +157) send a 192-wide, 1608-tall laser2 / laser1 pillar up the corridor at 3000 u/s down one of 19 lanes 64 apart (laser_case1 / laser_case2); from +148 laser_timer3 (1 s) adds laser3, a low 1256-wide bar at 2000 u/s to jump. Every hurt is 99999. The timers stop at +160; win when door8 opens the corridor end (+163). Endless: the lasers never stop.",
+      "fastForward": 131,
+      "spawn": {
+        "origin": [-13700, 3000, -10719],
+        "yaw": 270
+      },
+      "view": {
+        "min": [-15200, 0, -11600],
+        "max": [-10000, 16400, -6000]
+      },
+      "setup": [
+        { "target": "skybox2", "input": "Trigger" }
+      ],
+      "start": [
+        { "target": "relay9", "input": "Trigger" }
+      ],
+      "win": { "target": "door8", "input": "Open" },
+      "endless": {
+        "cancel": [
+          { "target": "laser_timer1", "input": "Disable" },
+          { "target": "laser_timer2", "input": "Disable" },
+          { "target": "laser_timer3", "input": "Disable" },
+          { "target": "door8", "input": "Open" }
+        ]
+      }
+    },
+    {
+      "id": "l2_ending_full",
+      "group": "Level 2 ending",
+      "full": true,
+      "name": "Level 2 ending (full)",
+      "summary": "Floor lasers, pillars, then spinning bars and squares",
+      "description": "once12 triggers relay13 as you leave the last hallway. door9 opens at +20 (closes at +42.6, when tri_tp20 sends anyone still behind it to tp25, the pen nuke4 kills at +144). break41 (the bridge) breaks at +42.6: stand on break42. +44.1 to +66.1: laser_timer7 (0.9 s) fires laser_case7's floor lasers 1964-2016 high (laser9: jump; laser10 / 11 tilted), trailing env_smoketrail puffs. +68.2: the move1 slabs come down from the ceiling, +71 move_case1 drops move_m1 or move_m2 between them; break42 breaks at +77.8. +76.8 to +109: laser_timer11 sends laser13 pillars down one of 9 lanes (3 s, 0.5 s and 3000 u/s from +98); +77.8 to +95 laser_timer10 the laser12 walls. move_m1 / m2 are killed at +98: be on the far move1. +99 to +109: laser16, a 2816-unit bar spun by laser16_rotating (0.3 s, 0.2 from +104, 3000 u/s). +110 to +129: laser_timer12 / 13 (0.5 s each) throw 256-unit laser14 / 15 squares off four spinning makers at 2000 u/s. Every hurt is 99999. By now the map has swapped the sky to sky_oblako_01 and turned on color2 (xenova_last); relay13 adds color3 at +13. Win when laser_rotating_kill stops the squares (+129). Endless: none of them stop.",
+      "spawn": {
+        "at": "tp24",
+        "yaw": 270
+      },
+      "view": {
+        "min": [-1800, 2400, 900],
+        "max": [1800, 15600, 3250]
+      },
+      "setup": [
+        { "target": "skybox2", "input": "Trigger" },
+        { "target": "color1", "input": "Disable" },
+        { "target": "color2", "input": "Enable" }
+      ],
+      "start": [
+        { "target": "relay13", "input": "Trigger" }
+      ],
+      "loseTo": [
+        "tp25"
+      ],
+      "win": { "target": "laser_rotating_kill", "input": "Trigger" },
+      "endless": {
+        "cancel": [
+          { "target": "laser_rotating_kill", "input": "Trigger" },
+          { "target": "laser_rotating_kill2", "input": "Trigger" },
+          { "target": "laser_timer11", "input": "Disable" }
+        ]
+      }
+    },
+    {
+      "id": "l2_finale",
+      "group": "Level 2 ending",
+      "name": "Spinning bars and squares",
+      "summary": "Spinning bars, fast pillars, then the squares",
+      "description": "From +97 s of relay13, on the far move1 slab (the last floor once move_m1 / m2 are killed at +98): laser13 pillars every 0.5 s at 3000 u/s (+98 to +109), laser16, a 2816-unit bar spun by laser16_rotating, every 0.3 s (0.2 from +104) at 3000 u/s (+99 to +109), then laser_timer12 / 13 throw 256-unit laser14 / 15 squares off four spinning makers every 0.5 s each at 2000 u/s (+110 to +129). Win when laser_rotating_kill stops them (+129). Endless: none of them stop.",
+      "fastForward": 97,
+      "spawn": {
+        "origin": [0, 3584, 1953],
+        "yaw": 90
+      },
+      "view": {
+        "min": [-1800, 2400, 900],
+        "max": [1800, 15600, 3250]
+      },
+      "setup": [
+        { "target": "skybox2", "input": "Trigger" },
+        { "target": "color1", "input": "Disable" },
+        { "target": "color2", "input": "Enable" }
+      ],
+      "start": [
+        { "target": "relay13", "input": "Trigger" }
+      ],
+      "loseTo": [
+        "tp25"
+      ],
+      "win": { "target": "laser_rotating_kill", "input": "Trigger" },
+      "endless": {
+        "cancel": [
+          { "target": "laser_rotating_kill", "input": "Trigger" },
+          { "target": "laser_rotating_kill2", "input": "Trigger" },
+          { "target": "laser_timer11", "input": "Disable" }
+        ]
+      }
+    },
+    {
+      "id": "l2_floor_lasers",
+      "group": "Level 2 ending",
+      "name": "Floor lasers (drill)",
+      "summary": "Jump the smoking floor lasers",
+      "description": "laser_timer7 alone (0.9 s), on break42 past the bridge: laser_case7 sends one of five lasers down the room at 2000 u/s, flat at 1964, 1988 or 2016 high (laser9) or tilted (laser10 / 11 at 2004), each with env_smoketrail puffs at both ends. The timer stops 22 s in, as relay13 stops it (+44.1 to +66.1); win once its last laser has passed (25 s). Endless: it never stops.",
+      "spawn": {
+        "origin": [0, 8400, 1953],
+        "yaw": 90
+      },
+      "view": {
+        "min": [-1800, 2400, 900],
+        "max": [1800, 15600, 3250]
+      },
+      "setup": [
+        { "target": "skybox2", "input": "Trigger" },
+        { "target": "color1", "input": "Disable" },
+        { "target": "color2", "input": "Enable" },
+        { "target": "color3", "input": "Enable" },
+        { "target": "fog1", "input": "TurnOff" }
+      ],
+      "start": [
+        { "target": "laser_timer7", "input": "Enable" },
+        { "target": "laser_timer7", "input": "Disable", "delay": 22 }
+      ],
+      "winAfter": 25,
+      "endless": {
+        "cancel": [
+          { "target": "laser_timer7", "input": "Disable" }
+        ]
+      }
+    }
+  ]
+}

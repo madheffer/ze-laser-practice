@@ -54,6 +54,7 @@ import { usableHeals } from './world/items.js';
 import { applyGamma } from './ui/gamma.js';
 import { ScreenEffects } from './fx/screen-effects.js';
 import { loadLightmaps } from './world/lightmaps.js';
+import { Source1Look } from './world/source1-look.js';
 import { WorldStream } from './world/stream.js';
 
 // what of a streamed world loads (settings.streamDistance: 1 auto = your area, then what the map lets you see;
@@ -311,6 +312,9 @@ async function loadStage() {
     G.stream = null;
     G.renderer.setWorld(data.world, data.water);
     G.renderer.setSky(data.sky2d); // a Source 1 map's 2D skybox (null otherwise)
+    G.s1look?.dispose();
+    G.s1look = await Source1Look.load(data); // its swapped skies and colour lookups (world/source1-look.js; null for CS2)
+    if (!picked()) return;
     // a chunked world streams in around you (world/stream.js); the loop asks for what the camera needs.
     // load goes through S.map.loadChunk at each call (tests slow it down there to stand in for a phone's network)
     if (data.chunks.length) {

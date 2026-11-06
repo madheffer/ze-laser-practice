@@ -34,6 +34,9 @@ static class FaceMesh
                 used.Add(info);
             }
             var prim = glb.For(mi);
+            // UnlitGeneric ignores the lightmap (vrad still writes one: ze_xenovation's lights/white001_nochop lasers
+            // sit in an unlit room): its faces sample the atlas's white luxel
+            var lf = info.Unlit ? -1 : f;
             var td = ti.TexData >= 0 && ti.TexData < bsp.TexDatas.Length ? bsp.TexDatas[ti.TexData] : default;
             float tw = info.Width > 0 ? info.Width : Math.Max(1, td.Width), th = info.Height > 0 ? info.Height : Math.Max(1, td.Height);
             var plane = face.Plane < bsp.Planes.Length ? bsp.Planes[face.Plane] : default;
@@ -56,7 +59,7 @@ static class FaceMesh
 
             if (face.DispInfo >= 0 && face.DispInfo < bsp.Disps.Length)
             {
-                Displacement(bsp, f, face, verts, normal, prim, Uv, atlas, offset);
+                Displacement(bsp, lf, face, verts, normal, prim, Uv, atlas, offset);
                 continue;
             }
             // the vertex's luxel: the lightmap vectors minus the face's luxel mins (clamped: rounding can step past)
@@ -64,7 +67,7 @@ static class FaceMesh
             {
                 var s = Vector3.Dot(p, new(ti.LS.X, ti.LS.Y, ti.LS.Z)) + ti.LS.W - face.LmMinsX;
                 var t = Vector3.Dot(p, new(ti.LT.X, ti.LT.Y, ti.LT.Z)) + ti.LT.W - face.LmMinsY;
-                return atlas.Uv(f, Math.Clamp(s, 0, face.LmW), Math.Clamp(t, 0, face.LmH));
+                return atlas.Uv(lf, Math.Clamp(s, 0, face.LmW), Math.Clamp(t, 0, face.LmH));
             }
             var first = (uint)prim.Count;
             foreach (var v in verts) prim.Add(v - offset, normal, Uv(v), Lm(v));

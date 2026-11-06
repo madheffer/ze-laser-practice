@@ -8,7 +8,8 @@
 //   static props in the world glb, entity studio models as models/<path>.glb (PropBake.cs)
 //   soundevents.json + sounds/   the sounds its entities play (Source1Sounds.cs)
 //   fx/            the particle systems its info_particle_systems name, from the .pcf files (Source1Particles.cs)
-//   sprites/       its env_sprite textures (SpriteBake.cs)
+//   sprites/       its env_sprite textures and env_smoketrail puffs (SpriteBake.cs)
+//   correction/    its color_correction lookups (ColorCorrectionBake.cs)
 // Content comes from the map's pakfile, then the game's VPK (CS:GO's csgo/pak01_dir.vpk: stock textures). Not yet:
 // the 3D skybox, lighting/.
 using System.Numerics;
@@ -31,7 +32,9 @@ static class Source1Bake
         Log($"VBSP v{bsp.Version}: {bsp.Faces.Length} faces, {bsp.Brushes.Length} brushes, {bsp.Models.Length} models, {bsp.Disps.Length} displacements");
         csgo ??= FindCsgo();
         if (csgo == null) Log("WARNING: no CS:GO install found (--csgo <csgo dir>): stock textures will be missing");
-        using var files = new GameFiles(bsp.Lump(Bsp.LumpPakfile).ToArray(), csgo != null ? [Path.Combine(csgo, "pak01_dir.vpk")] : []);
+        // + the platform VPK beside the game folder, the engine's last search path (hlmv/gray: ze_xenovation's sky box)
+        var platform = csgo != null ? Path.Combine(Path.GetDirectoryName(Path.GetFullPath(csgo).TrimEnd('\\', '/')) ?? "", "platform", "platform_pak01_dir.vpk") : null;
+        using var files = new GameFiles(bsp.Lump(Bsp.LumpPakfile).ToArray(), csgo != null ? [Path.Combine(csgo, "pak01_dir.vpk"), .. File.Exists(platform) ? new[] { platform! } : []] : []);
         foreach (var s in files.Sources) Log($"+ {s}");
 
         if (only != null) return RunOnly(only, files, mapName, outDir);
@@ -127,6 +130,7 @@ static class Source1Bake
         }
         Log($"models: {renderModels.Count} brush models drawn");
         StampAmbient(lumps, ambient, brushModelPaths);
+        SkyArea.Stamp(lumps, bsp, mapName, Log); // the entities its sky_camera draws as the 3D skybox
         File.WriteAllText(Path.Combine(outDir, "entities.json"), new JsonObject { ["engine"] = "source1", ["lumps"] = lumps.DeepClone() }.ToJsonString());
         var animations = new JsonObject();
         var studio = PropBake.EntityModels(models.Where(m => !brushModelPaths.Contains(m)), outDir, files, mats, Log, animations);
@@ -139,11 +143,17 @@ static class Source1Bake
 
         // 5. sky/: worldspawn's skyname, the 2D skybox's six faces (materials/skybox/<name><rt|bk|lf|ft|up|dn>)
         var sky = WriteSky(ents.FirstOrDefault(e => e.Get("classname") == "worldspawn")?.Get("skyname"), files, mats, outDir);
+        //    + every skybox_swapper's SkyboxName (its Trigger input makes it the 2D sky): sky/<name>/
+        var skySets = new JsonObject();
+        foreach (var e in ents.Where(e => string.Equals(e.Get("classname"), "skybox_swapper", StringComparison.OrdinalIgnoreCase)))
+            if (e.Get("SkyboxName") is { Length: > 0 } sn && !skySets.ContainsKey(sn.Trim().ToLowerInvariant()) && WriteSky(sn, files, mats, outDir, true) is { } set)
+                skySets[sn.Trim().ToLowerInvariant()] = set;
 
         // 6. sounds (soundevents.json + sounds/) and particle effects (fx/: the .pcf systems as the runtime's documents)
         Source1Sounds.Bake(lumps, files, mapName, outDir, Log);
         Source1Particles.Bake(lumps, files, mapName, outDir, Log);
         SpriteBake.Bake(lumps, files, outDir, Log);
+        ColorCorrectionBake.Bake(lumps, files, outDir, Log);
 
         var manifest = new JsonObject
         {
@@ -161,7 +171,9 @@ static class Source1Bake
             ["missingMaterials"] = new JsonArray([.. mats.Missing.Select(x => (JsonNode)x!)]),
         };
         if (sky != null) manifest["sky2d"] = sky;
+        if (skySets.Count > 0) manifest["sky2dSets"] = skySets;
         manifest["sprites"] = "sprites/sprites.json";
+        manifest["correction"] = "correction/correction.json";
         manifest["animations"] = "animations.json";
         File.WriteAllText(Path.Combine(outDir, "manifest.json"), manifest.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
         Log("done");
@@ -184,7 +196,8 @@ static class Source1Bake
                 case "sounds": Source1Sounds.Bake(lumps, files, mapName, outDir, Log); break;
                 case "fx": Source1Particles.Bake(lumps, files, mapName, outDir, Log); break;
                 case "sprites": SpriteBake.Bake(lumps, files, outDir, Log); manifest["sprites"] = "sprites/sprites.json"; break;
-                default: Console.Error.WriteLine($"unknown step {step} (sounds, fx, sprites)"); return 2;
+                case "correction": ColorCorrectionBake.Bake(lumps, files, outDir, Log); manifest["correction"] = "correction/correction.json"; break;
+                default: Console.Error.WriteLine($"unknown step {step} (sounds, fx, sprites, correction)"); return 2;
             }
         }
         manifest["version"] = DateTime.UtcNow.ToString("yyyyMMddHHmmss");
@@ -195,12 +208,14 @@ static class Source1Bake
 
     // -> { "rt": "sky/rt.png", ... } for the faces found (null without a sky). The face's own material names its
     // texture ($basetexture), as Source's sky drawing loads skybox/<name><face>; the _hdr variant is not used
-    static JsonObject? WriteSky(string? name, GameFiles files, Materials mats, string outDir)
+    // own: a skybox_swapper's sky, in its own folder (sky/<name>/) beside worldspawn's
+    static JsonObject? WriteSky(string? name, GameFiles files, Materials mats, string outDir, bool own = false)
     {
         if (string.IsNullOrWhiteSpace(name)) return null;
-        var safe = new string(name.Trim().Where(c => char.IsAsciiLetterOrDigit(c) || c is '_' or '-').ToArray());
+        var safe = new string(name.Trim().Where(c => char.IsAsciiLetterOrDigit(c) || c is '_' or '-').ToArray()).ToLowerInvariant();
         if (safe.Length == 0) return null;
-        var dir = Path.Combine(outDir, "sky");
+        var sub = own ? $"sky/{safe}" : "sky";
+        var dir = Path.Combine(outDir, sub);
         var faces = new JsonObject();
         foreach (var f in new[] { "rt", "bk", "lf", "ft", "up", "dn" })
         {
@@ -210,7 +225,7 @@ static class Source1Bake
             mats.WriteImage(m, dir);
             var png = Path.Combine(dir, f + ".png");
             File.Move(Path.Combine(dir, m.Texture), png, true);
-            faces[f] = $"sky/{f}.png";
+            faces[f] = $"{sub}/{f}.png";
         }
         Log($"sky: {safe}, {faces.Count} faces");
         return faces.Count > 0 ? faces : null;

@@ -26,7 +26,7 @@ sealed class Bsp
         int LightOfs, int LmMinsX, int LmMinsY, int LmW, int LmH, byte Style0);
     public readonly record struct Model(Vector3 Mins, Vector3 Maxs, Vector3 Origin, int HeadNode, int FirstFace, int NumFaces);
     public readonly record struct Node(int Plane, int Child0, int Child1);
-    public readonly record struct Leaf(int Contents, int FirstLeafBrush, int NumLeafBrushes);
+    public readonly record struct Leaf(int Contents, int FirstLeafBrush, int NumLeafBrushes, int Area = 0);
     public readonly record struct Brush(int FirstSide, int NumSides, int Contents);
     public readonly record struct BrushSide(int Plane, int TexInfo, int DispInfo, bool Bevel);
     public readonly record struct DispInfo(Vector3 Start, int VertStart, int Power, int Contents, int MapFace, int Flags);
@@ -83,7 +83,7 @@ sealed class Bsp
         b.Models = b.Array(LumpModels, 48, (o) => new Model(V3(d, o), V3(d, o + 12), V3(d, o + 24), I(d, o + 36), I(d, o + 40), I(d, o + 44)));
         b.Nodes = b.Array(LumpNodes, 32, (o) => new Node(I(d, o), I(d, o + 4), I(d, o + 8)));
         var leafSize = b.Version >= 20 ? 32 : 56; // version 19 leaves carry ambient lighting (CompressedLightCube, 24 bytes)
-        b.Leafs = b.Array(LumpLeafs, leafSize, (o) => new Leaf(I(d, o), U16(d, o + 24), U16(d, o + 26)));
+        b.Leafs = b.Array(LumpLeafs, leafSize, (o) => new Leaf(I(d, o), U16(d, o + 24), U16(d, o + 26), U16(d, o + 6) & 0x1ff));
         b.LeafBrushes = b.Array(LumpLeafBrushes, 2, (o) => (int)U16(d, o));
         b.Brushes = b.Array(LumpBrushes, 12, (o) => new Brush(I(d, o), I(d, o + 4), I(d, o + 8)));
         b.BrushSides = b.Array(LumpBrushSides, 8, (o) => new BrushSide(U16(d, o), S16(d, o + 2), S16(d, o + 4), d[o + 6] != 0));

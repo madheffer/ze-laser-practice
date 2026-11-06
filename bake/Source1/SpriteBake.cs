@@ -1,5 +1,5 @@
-// A Source 1 map's env_sprite / env_glow sprites -> sprites/<name>.png + sprites/sprites.json, which the player draws
-// (web/src/world/sprites-source1.js):
+// A Source 1 map's env_sprite / env_glow sprites (and env_smoketrail's puff materials) -> sprites/<name>.png +
+// sprites/sprites.json, which the player draws (web/src/world/sprites-source1.js, smoketrail-source1.js):
 //   sprites.json   { "<model as the entity names it, lower case>": { file, width, height, orientation } }
 // An entity names a sprite material ("sprites/glow.vmt") or an old sprite file ("sprites/glow01.spr"), which Source's
 // model loader opens as the material of the same name (materials/sprites/glow01.vmt). width / height are the
@@ -15,14 +15,21 @@ static class SpriteBake
 {
     const int MaxSide = 512, MaxSprites = 512;
     static readonly HashSet<string> Classes = new(StringComparer.OrdinalIgnoreCase) { "env_sprite", "env_glow", "env_sprite_oriented" };
+    // the client's dust puff materials (g_Mat_DustPuff: c_smoke_trail.cpp), which env_smoketrail's particles use
+    public static readonly string[] SmokeTrailMaterials = ["particle/particle_smokegrenade.vmt", "particle/particle_noisesphere.vmt"];
 
     public static int Bake(JsonObject lumps, GameFiles files, string outDir, Action<string> log)
     {
         var names = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var (_, arr) in lumps)
             foreach (var d in arr?.AsArray() ?? [])
-                if (d?["kv"] is JsonObject kv && Classes.Contains(kv["classname"]?.GetValue<string>() ?? "") && kv["model"]?.GetValue<string>() is { Length: > 0 } m && names.Count < MaxSprites)
-                    names.Add(GameFiles.Norm(m));
+            {
+                if (d?["kv"] is not JsonObject kv || names.Count >= MaxSprites) continue;
+                var cls = kv["classname"]?.GetValue<string>() ?? "";
+                if (Classes.Contains(cls) && kv["model"]?.GetValue<string>() is { Length: > 0 } m) names.Add(GameFiles.Norm(m));
+                // env_smoketrail's puffs: C_SmokeTrail draws them with g_Mat_DustPuff[0 / 1], not its smokesprite keyvalue
+                if (cls.Equals("env_smoketrail", StringComparison.OrdinalIgnoreCase)) foreach (var p in SmokeTrailMaterials) names.Add(p);
+            }
         var dir = Path.Combine(outDir, "sprites");
         if (Directory.Exists(dir)) Directory.Delete(dir, true);
         var index = new JsonObject();

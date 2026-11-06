@@ -193,11 +193,33 @@ Sounds, effects and sprites (bake/Source1/Source1Sounds.cs, Source1Particles.cs 
   (Source1/Dmx.cs), each function converted to the CS2 class the particle runtime runs (PcfOps.cs: Source 1's
   defaults written out, its old operator names renamed as Source does), keyed by system name. A material or texture
   CS:GO doesn't have draws the error checker, as Source draws its error material.
-- `sprites/`: env_sprite / env_glow textures (`sprites.json`, manifest `sprites`), drawn facing the view.
+- `sprites/`: env_sprite / env_glow textures (`sprites.json`, manifest `sprites`), drawn facing the view, and the two
+  dust-puff materials env_smoketrail's particles use (SpriteBake.SmokeTrailMaterials).
+- `correction/`: every color_correction's lookup (`.raw`, 32^3 RGB, copied as is; `correction.json`, manifest
+  `correction`; ColorCorrectionBake.cs).
+- `sky/<name>/`: each skybox_swapper's sky (manifest `sky2dSets`), beside worldspawn's `sky/`.
+- `"_s1sky"` on each entity in the sky_camera's BSP area (SkyArea.cs): the player draws it as the 3D skybox.
+Files come from the map's pakfile, then CS:GO's `csgo/pak01_dir.vpk`, then `platform/platform_pak01_dir.vpk` (the
+engine's last search path: `hlmv/gray`). UnlitGeneric faces take no lightmap (white001_nochop lasers in an unlit room).
 
-For a map already baked, redo only those: `lasers-bake <map.bsp> web/public/maps --only sounds,fx,sprites` (bumps the
-manifest version, keeps everything else). Not baked yet: lighting/, tiers, chunks (the whole world glb loads: 27 MB
+For a map already baked, redo only those: `lasers-bake <map.bsp> web/public/maps --only sounds,fx,sprites,correction`
+(bumps the manifest version, keeps everything else). Not baked yet: lighting/, tiers, chunks (the whole world glb loads: 27 MB
 for ze_ffvii_malgo_reactor, static props not instanced).
+
+### Cropping
+
+A map whose stages live in one corner can ship only that corner:
+
+```bash
+node tools/crop-world.mjs web/public/maps/<map> --box minX minY minZ maxX maxY maxZ
+```
+
+Drops the world glb's and the collision files' triangles outside the box (a triangle reaching into it stays whole),
+removes textures nothing uses any more and stamps `crop` in the manifest. Entities, hulls and models stay (a stage's
+`view` box keeps their models from loading until they come in). Run it after every bake of the map, before chunking.
+ze_xenovation_v3_5: `--box -9600 10600 -15400 -900 16000 -3000 --box -15200 0 -11600 -10000 16400 -6000 --box -1900 2300 800 1900 15700 3300`
+(relay10's shaft with the tp16 room and the zombie cage, level 1's laser corridor, level 2's arena: world 3.2 MB -> 358 KB). Its source is the map's .bsp (`ze_xenovation_v3_5.zip`, not on
+the workshop: bake it from the .bsp).
 
 ## Single steps
 

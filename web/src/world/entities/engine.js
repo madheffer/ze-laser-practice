@@ -27,6 +27,8 @@ import './classes/beams.js';
 import './classes/sprites.js';
 import './classes/sparks.js';
 import './classes/scripts.js';
+import './classes/color-correction.js';
+import './classes/skybox-swapper.js';
 import { runScriptCode } from './classes/vscripts.js';
 import { fogState } from './classes/fog.js';
 import { skyState } from './classes/sky.js';
@@ -57,6 +59,17 @@ function skyLumpsOf(sky, lumps) {
     if (lumps[k] && o?.length === 3 && o.every(Number.isFinite) && Number.isFinite(scale) && scale > 0 && scale <= 1024) out.set(k, { origin: o, scale });
   }
   return out;
+}
+
+// "_s1sky": "<x> <y> <z> <scale>" -> { origin, scale } (one object per value: skyMatrix caches by it), or null
+const s1Skies = new Map();
+function source1Sky(v) {
+  const key = String(v);
+  if (s1Skies.has(key)) return s1Skies.get(key);
+  const n = key.trim().split(/\s+/).map(Number);
+  const sky = n.length === 4 && n.every(Number.isFinite) && n[3] > 0 && n[3] <= 1024 ? { origin: n.slice(0, 3), scale: n[3] } : null;
+  if (s1Skies.size < 16) s1Skies.set(key, sky);
+  return sky;
 }
 
 function addTo(index, key, e) {
@@ -172,6 +185,8 @@ export class EntityEngine {
   }
 
   spawnHook(e) {
+    // a Source 1 entity in its sky_camera's area (lasers-bake source1 SkyArea.cs "_s1sky"): drawn as the 3D skybox
+    if (this.source1 && !e.sky && e.kv._s1sky) e.sky = source1Sky(e.kv._s1sky);
     C[e.cls]?.spawn?.(e);
     this.emit('spawn', e);
     // CS2 entities fire OnSpawn as they spawn (ze_dreamin's template relays start every moving attack with it)
