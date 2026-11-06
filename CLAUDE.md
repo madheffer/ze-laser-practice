@@ -61,7 +61,8 @@ dotnet build bake -c Release        # then see README "Run it locally" for the b
   `window.__lasers` is the debug handle: `startScenario(i, mode)`, `pause()` (assigning `.paused` does nothing), `advance(seconds)` (synchronous sim; a hidden
   tab gets no animation frames), `scenarios()`, `engine`, `player`, `run`, `settings`, `audio`, `vm`;
   `window.__lasersInput = (t) => ({forward, side, jump, duck, walk})` drives the player. Tests in the user's Chrome
-  are audible: keep the game paused (audio is silent while paused) and never leave test values saved in their
+  are audible: keep the game paused (solo audio is silent while paused; a live round's plays on behind the menu, so
+  mute it with `__lasers.audio.setVolumes({ sfx: 0, music: 0 })`) and never leave test values saved in their
   settings (`localStorage['lasers.settings']`).
 - **Bash heredocs can mangle backslashes on Windows Git Bash** (`\\` -> `\`): write scripts with the Write tool.
 - **Deploy: [deploy/README.md](deploy/README.md).** `git push box main` builds the image on the box (`lasers:latest`,

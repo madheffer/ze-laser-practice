@@ -144,7 +144,14 @@ class Round {
     if (ids.length) this.specId = ids[(ids.indexOf(this.specId) + 1) % ids.length];
     G.audio?.deathFade?.('clear'); // spectating: CS2's death-cam mix is over (audio/layers.js)
   }
-  spectateLabel() { const v = this.spectateView(); return v ? `Spectating ${this.name(v.id)}` : 'You died'; }
+  // the spectator bar (ui/hud.js): who you watch, and that Mouse 1 changes it when there's anyone else to watch
+  spectateLabel() {
+    const v = this.spectateView();
+    if (!v) return 'You died';
+    return `Spectating ${this.name(v.id)}${this.alive.filter((p) => p.id !== this.me).length > 1 ? ' · Mouse 1: next' : ''}`;
+  }
+  // someone alive to watch: your death goes straight to their eyes (no death cam)
+  get watchable() { return this.alive.some((p) => p.id !== this.me); }
   // what the camera has of a player (app/coop-diag.js): how many positions, the newest one's run time
   peerSamples(id) { const p = G.peers.list.get(id); const q = p?.track?.samples || p?.samples || []; return { n: q.length, last: q[q.length - 1]?.t ?? 0 }; }
 
@@ -159,7 +166,7 @@ class Round {
   }
 
   // the server says someone died (you too)
-  markDead(id, _cause, t, note) {
+  markDead(id, cause, t, note) {
     const p = this.players.get(id);
     if (!p || !p.alive || this.ended) return;
     p.alive = false; p.deadAt = t;
@@ -167,6 +174,11 @@ class Round {
     const self = id === this.me;
     if (self && S.run && !S.run.spectating) { S.run.spectating = true; S.run.deadAt = t; }
     if (self) diag.died(this); // what the death camera has, for the server's log
+    // your own death in one line: what got you, and that you watch the others until the round is over (its end card)
+    if (self && !note) {
+      const v = this.spectateView();
+      systemLine([[` You died (${cause})${v ? `: spectating ${this.name(v.id)} until the round ends` : ''}`, NOTE_COLOR]]);
+    }
     // CS2's feed names no cause: every death here is the map's (a trigger_hurt / the world: attacker -1), so it reads
     // "<name> [skull] <name>" (ui/killfeed.js). Leaving or not loading is a disconnect; the server's why goes to chat.
     if (note) systemLine([[` ${p.name} ${note}`, NOTE_COLOR]]);
@@ -346,6 +358,7 @@ function onLeft(why) {
   lobby.busy = false;
   G.peers.clear();
   if (run && !run.done && run.spectating) { run.spectating = false; finish('dead'); }
+  if (S.paused) G.audio.pause(); // the round's sound played on behind the menu (main.js G.pause); solo pauses
   G.lobby.render();
   if (why === 'kicked') G.lobby.note('The room owner removed you from the room');
   else if (why === 'disconnected') G.lobby.note('Lost the connection to the co-op server');

@@ -14,6 +14,8 @@
 .pz-main { padding: 26px 26px 24px; display: flex; flex-direction: column; min-width: 0; }
 .pz-kicker { margin: 0; font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--dim); }
 .pz-title { margin: 6px 0 2px; font: 800 34px/1 'Stratum2', 'Segoe UI', sans-serif; letter-spacing: 0.08em; text-transform: uppercase; }
+.pz-live { margin: 4px 0 2px; font-size: 13px; font-weight: 600; color: #ffb35c; }
+.pz-live[hidden] { display: none; }
 .pz-stage { margin: 0 0 14px; font-size: 15px; color: #c8d3de; }
 .pz-stats { display: flex; gap: 22px; margin: 0 0 20px; flex-wrap: wrap; }
 .pz-stats div { display: flex; flex-direction: column-reverse; gap: 2px; }

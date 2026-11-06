@@ -38,8 +38,10 @@ export class PauseScreen {
 
     const main = el('section', 'pz-main');
     this.kicker = el('p', 'pz-kicker');
-    const title = el('h1', 'pz-title', 'Paused');
+    const title = this.title = el('h1', 'pz-title', 'Paused');
     title.id = 'pz-title';
+    // a round never pauses (the server runs it): this menu says so instead of "Paused"
+    this.live = el('p', 'pz-live', 'The round keeps going while this is open');
     this.stage = el('p', 'pz-stage');
     this.stats = el('dl', 'pz-stats');
     const acts = el('div', 'pz-actions');
@@ -51,7 +53,7 @@ export class PauseScreen {
     this.leaveBtn = btn('Leave room', 'ghost pz-danger', () => { if (confirm('Leave the room?')) this.net.leave(); });
     this.homeBtn = btn('Home', 'ghost', () => this.on.home());
     acts.append(this.resumeBtn, this.restartBtn, this.stagesBtn, this.endBtn, settingsBtn, this.leaveBtn, this.homeBtn);
-    main.append(this.kicker, title, this.stage, this.stats, acts);
+    main.append(this.kicker, title, this.live, this.stage, this.stats, acts);
 
     this.roomCard = el('aside', 'pz-room');
     this.roomCard.append(el('span', 'pz-label', 'Room code'));
@@ -85,6 +87,9 @@ export class PauseScreen {
     const run = S.run, room = net.room, mp = S.mp;
     const mapTitle = S.map ? displayName(S.mapIndex.find((m) => m.name === S.map.name)?.title || S.map.name) : '';
     const kind = mp ? 'Online' : 'Solo';
+    const live = !!mp && !mp.ended;
+    this.title.textContent = live ? 'Menu' : 'Paused';
+    this.live.hidden = !live;
     this.kicker.textContent = [mapTitle, kind, run?.endless ? 'Endless' : ''].filter(Boolean).join(' · ');
     this.stage.textContent = S.scenario?.name || 'Free roam';
     const cells = [];
@@ -97,6 +102,7 @@ export class PauseScreen {
     const host = net.isHost;
     const inRoom = !!room;
     this.restartBtn.hidden = inRoom && !host;
+    this.restartBtn.querySelector('kbd').hidden = inRoom; // Backspace is solo only (main.js): in a room it's this button
     this.stagesBtn.hidden = inRoom;
     this.endBtn.hidden = !(inRoom && host && mp && !mp.ended);
     this.leaveBtn.hidden = !inRoom;

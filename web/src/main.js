@@ -94,7 +94,9 @@ G.pause = () => {
   G.vm.trigger(false);
   G.vm.trigger2(false);
   clearKeys();
-  G.audio.pause();
+  // a live round doesn't stop for the menu (the server runs it), so neither does its sound: the lasers coming at you
+  // are still heard. Its end (or leaving it with the menu up: app/coop.js onLeft) silences it like any pause
+  if (!(S.mp && !S.mp.ended)) G.audio.pause();
   G.menu.update();
 };
 G.unpause = () => {
@@ -199,7 +201,9 @@ installInput(canvas, {
   lastWeapon: () => { const before = G.vm.weapon; G.vm.swapLast(); if (G.vm.weapon !== before) { G.hud.showWeapons(G.vm.weapon, G.vm.gunName); drawSounds(); } },
   reload: () => G.vm.reload(),
   replayKey, // a replay's keys (app/replay.js)
-  restart: () => restartRun(),
+  // Backspace: solo only. In a room it would restart the round for everyone (a dead owner's solo habit did), so
+  // there the owner restarts from the pause screen
+  restart: () => { if (!net.inRoom) restartRun(); },
 });
 
 // Picking a map loads only what its stage list needs (the scenario file, and the map's items from index.json for the

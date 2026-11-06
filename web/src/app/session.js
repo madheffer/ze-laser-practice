@@ -231,7 +231,9 @@ export function finish(result) {
     if (run.spectating) return;
     run.spectating = true;
     run.deadAt = stageTime();
-    G.audio.deathFade?.('death'); // CS2's death-cam mix: DeathFadeLayer to 0.15 over 2 s (audio/layers.js)
+    // CS2's death-cam mix (DeathFadeLayer to 0.15 over 2 s, audio/layers.js) only with nobody left to watch: with a
+    // teammate alive you are in their eyes at once (app/coop.js spectateView), hearing what they hear
+    if (!S.mp.watchable) G.audio.deathFade?.('death');
     G.vm.trigger(false); G.vm.trigger2(false);
     S.mp.died(hazardName(run.killedBy));
     return;
