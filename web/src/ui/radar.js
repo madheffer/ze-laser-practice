@@ -109,10 +109,9 @@ export class Radar {
       }
       // teammates in a room, where the game draws them (interpInterval behind)
       if (G.peers && S.mp) {
-        const t = S.run.t; // world/peers.js applies each player's own delay
         for (const [id, peer] of G.peers.list) {
           if (peer.alive === false) continue;
-          const s = G.peers.sample(id, t);
+          const s = G.peers.sample(id); // this frame's, each player's own delay behind (world/peer-track.js)
           if (s) this.player(icons, at(s.o[0], s.o[1]), (90 - s.yaw) * DEG + turn, CT, u);
         }
       }

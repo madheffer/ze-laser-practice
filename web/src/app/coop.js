@@ -137,7 +137,7 @@ class Round {
 
   spectateView() {
     if (this.specId == null || !this.players.get(this.specId)?.alive) this.specId = this.alive.find((p) => p.id !== this.me)?.id ?? null;
-    return this.specId == null ? null : G.peers.eye(this.specId, S.run.t);
+    return this.specId == null ? null : G.peers.eye(this.specId);
   }
   spectateNext() {
     const ids = this.alive.filter((p) => p.id !== this.me).map((p) => p.id);
@@ -289,7 +289,9 @@ function onGame(d, at = performance.now()) {
         // every tick of the batch (tr); an older server sends only the newest (o)
         const tr = Array.isArray(d.tr) ? d.tr.slice(-RELAY_TICKS).filter((s) => Array.isArray(s) && s.length === 4 && vec(s.slice(0, 3), 1e6) && num(s[3], 0, 1)) : [];
         const positions = tr.length ? tr : [[...d.o, d.duck]];
-        G.peers.pushBatch(d.from, { at: d.at, positions, yaw: d.yaw, pitch: d.pitch, hp: num(d.hp, 0, 1e6) ? d.hp : 0, tick: TICK }, run.t);
+        // when it arrived on the round clock, to the millisecond (run.t moves a tick at a time): how late it is
+        const arrived = run.go ? Math.max(run.t, (at - run.wall0) / 1000) : run.t;
+        G.peers.pushBatch(d.from, { at: d.at, positions, yaw: d.yaw, pitch: d.pitch, hp: num(d.hp, 0, 1e6) ? d.hp : 0, tick: TICK }, arrived);
       }
       break;
     case 'clock':

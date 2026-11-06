@@ -2,6 +2,8 @@
 
 export const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 export const clamp01 = (v) => clamp(v, 0, 1);
+// a to b by t (degrees), the short way round
+export const lerpAngle = (a, b, t) => a + ((((b - a) % 360) + 540) % 360 - 180) * t;
 
 // Move `from` toward `to` by at most `step`, landing exactly on `to` (movers, spin-up, handles).
 export const approach = (from, to, step) => {

@@ -4,7 +4,7 @@ import { S } from './state.js';
 import { settings } from './settings.js';
 import { cameraPosition } from './camera.js';
 import { angleForward, DEG } from '../world/entities/math.js';
-import { clamp } from '../lib/math.js';
+import { clamp, lerpAngle } from '../lib/math.js';
 import { ANG_SCALE } from '../lib/replay-codec.js';
 import { keyHeld } from './input.js';
 
@@ -12,7 +12,6 @@ export const CAMS = ['first', 'third', 'free'];
 const FREE_SPEED = 500; // u/s, x3 with Shift
 
 const free = { pos: [0, 0, 0], yaw: 0, pitch: 0 };
-const lerpAngle = (a, b, t) => a + ((((b - a) % 360) + 540) % 360 - 180) * t;
 
 // the view between the last two recorded ticks (a: 0..1 through the current tick), so slow motion stays smooth
 function recordedView(a) {

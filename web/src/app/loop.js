@@ -137,6 +137,8 @@ export function frame(now) {
   // CS2's CalcView: your eyes + 45% of the aim punch + the view punch (lib/recoil.js, the viewmodel's shots)
   const punch = G.vm?.recoil ? G.vm.recoil.cameraOffset() : [0, 0];
   let view = { yaw: player.yaw + punch[1], pitch: player.pitch + punch[0] };
+  // the other players this frame: your run time between ticks (as the camera is), each drawn their own delay behind
+  G.peers?.frame(S.run && S.mp ? S.run.t + (live ? acc : 0) : null);
   // dead in a round: watch a teammate through their eyes (app/coop.js picks who)
   const spec = S.run?.spectating ? S.mp?.spectateView() : null;
   if (spec) { eye = spec.eye; view = spec; }
@@ -147,8 +149,7 @@ export function frame(now) {
   if (rv) { G.renderer.setView(rv.pos, rv.yaw, rv.pitch); tp = rv.body; }
   else G.renderer.setView(cameraPosition(S.world, eye, view.yaw, view.pitch, tp, settings.tpDist), view.yaw, view.pitch);
   G.body?.update({ visible: tp, origin: o, yaw: player.yaw, ducked: player.ducked, duckAmount: player.duckAmount, onGround: player.onGround });
-  // your run time this frame, between ticks (as the camera is): each player is drawn their own delay behind it
-  G.peers?.update(S.run && S.mp ? S.run.t + (live ? acc : 0) : null, G.renderer.camera, spec?.id);
+  G.peers?.update(G.renderer.camera, spec?.id);
   G.renderer.showHitboxes = rule('hitboxes'); // a round's are the room's
   G.stream?.update(G.renderer.camera.position.toArray(camPos), G.renderer.lighting?.viewDistance ?? Infinity); // the world's chunks around the camera (Source units)
   G.renderer.lighting?.update(engine, G.renderer.camera); // the map's fog (its own entities + I/O), far Z, the sky
