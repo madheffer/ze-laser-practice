@@ -17,11 +17,11 @@ import { startScenario, stageTime, finish } from './session.js';
 import { bossTargets, applyBossDamage } from './bosses.js';
 import { showRoundEnd } from './coop-end.js';
 import { isMapName } from '../lib/paths.js';
-import { TICK } from '../world/run-engine.js';
+import { TICK, queueMateUse } from '../world/run-engine.js';
 import { lastFrameAt } from './loop.js';
 import { systemLine } from './chat.js';
 import { ownerLine } from '../ui/room-chat.js';
-import { itemState, spendUse, usableHeals } from '../world/items.js';
+import { itemState, spendUse, mapLoadout } from '../world/items.js';
 import { installCoopDiag } from './coop-diag.js';
 import { beginRoster, applyWait, markOut, rosterGo, clearRoster, waitLine, startReports, simulatedPing, lockPing, unlockPing } from './coop-load.js';
 
@@ -50,10 +50,14 @@ class Round {
     this.rules = d.rules;
     this.mode = d.mode;
     this.leader = d.leader;
-    this.holders = d.holders; // who started with the map's heal (the room's choice)
+    // who started with the map's heal / its ultima (the room's choice, one item each: lib/room-rules.js itemHolders);
+    // ultimaAuto: nobody holds the ultima, it goes off by itself at the room's ultimaAt
+    this.holders = d.holders; this.ultimaHolder = d.ultima; this.ultimaAuto = d.ultimaAuto;
+    this.kit = mapLoadout(S.map?.items);
     // teammates' items, for the item HUD: the same EntWatch bookkeeping as yours, from their presses
-    const heals = usableHeals(S.map?.items);
-    this.peerItems = new Map(d.holders.filter((id) => id !== net.you).map((id) => [id, heals.map((it) => ({ ...it, uses: 0, readyAt: 0 }))]));
+    this.peerItems = new Map();
+    for (const id of d.holders) if (id !== net.you && this.kit.heal) this.peerItems.set(id, [{ ...this.kit.heal, uses: 0, readyAt: 0 }]);
+    if (d.ultima != null && d.ultima !== net.you && this.kit.ultima) this.peerItems.set(d.ultima, [{ ...this.kit.ultima, uses: 0, readyAt: 0 }]);
     this.players = new Map(d.roster.map((m) => [m.id, { id: m.id, name: m.name, alive: true, deadAt: null, hits: 0 }]));
     this.me = net.you;
     this.ended = false;
@@ -68,7 +72,17 @@ class Round {
   get isHost() { return net.isHost; } // the room owner (Play again on the end card)
 
   // ---- items (app/items.js, ui/itemhud.js)
-  heldItems() { return this.holders.includes(this.me) ? usableHeals(S.map?.items) : []; }
+  heldItems() {
+    if (this.ultimaHolder === this.me && this.kit.ultima) return [this.kit.ultima];
+    return this.holders.includes(this.me) && this.kit.heal ? [this.kit.heal] : [];
+  }
+  // the teammates' items your copy of the map runs (world/items.js giveMates): someone else's ultima, pressed when
+  // they press it ('use' with its tick), or the team's going off by itself
+  mateItems() {
+    if (!this.kit.ultima) return [];
+    if (this.ultimaAuto) return [{ id: 'team', item: this.kit.ultima, autoAt: this.rules.ultimaAt }];
+    return this.ultimaHolder != null && this.ultimaHolder !== this.me ? [{ id: this.ultimaHolder, item: this.kit.ultima }] : [];
+  }
   myName() { return this.name(this.me); }
   itemRows() {
     const now = S.engine?.time ?? 0, rows = [];
@@ -242,6 +256,7 @@ async function onStart(d) {
     r: d.r, map: d.map, stage: d.stage == null ? null : cleanText(d.stage, 80), mode: d.mode, kind: ROOM_KINDS[0], // one mode
     rules: { ...cleanRules(d.rules), seed: d.seed }, roster, leader: Number.isInteger(d.leader) ? d.leader : 0,
     holders: Array.isArray(d.holders) ? d.holders.filter((id) => roster.some((m) => m.id === id)) : [],
+    ultima: Number.isInteger(d.ultima) && roster.some((m) => m.id === d.ultima) ? d.ultima : null, ultimaAuto: d.ultimaAuto === true,
   };
   // the round's messages that arrive while we load (its 'wait', or the 'go' and our 'dead' if we load too slowly)
   // are kept and played once the round exists here
@@ -323,7 +338,12 @@ function onGame(d, at = performance.now()) {
     case 'dead': if (Number.isInteger(d.id)) mp.markDead(d.id, cleanText(d.by, 40) || 'the map', num(d.at, 0, 1e6) ? d.at : stageTime(), cleanText(d.note, 30)); break;
     case 'bd': if (!mp.ended) applyHits(d.h); break;
     case 'leader': if (Number.isInteger(d.id)) mp.leader = d.id; break;
-    case 'use': if (Number.isInteger(d.id) && !mp.ended) mp.peerUsed(d.id); break;
+    case 'use':
+      if (!Number.isInteger(d.id) || mp.ended) break;
+      mp.peerUsed(d.id);
+      // the ultima they hold goes off in your copy too, on the tick the server picked
+      if (Number.isInteger(d.k) && d.k >= 0 && S.run && d.id === mp.ultimaHolder) queueMateUse(S.run, d.id, d.k);
+      break;
     case 'end': if (Array.isArray(d.stats) && Array.isArray(d.winners)) mp.applyEnd(cleanEnd(d)); break;
   }
 }

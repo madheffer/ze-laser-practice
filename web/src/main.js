@@ -13,6 +13,7 @@ import { CS } from './world/movement.js';
 import { playerFor } from './world/movement-csgo.js';
 import { Renderer } from './world/render.js';
 import { ViewShake } from './app/view-shake.js';
+import { ScreenFade } from './app/screen-fade.js';
 import { parseVec } from './world/entities/index.js';
 import { GameAudio } from './audio/audio.js';
 import { Viewmodel } from './weapons/viewmodel.js';
@@ -50,7 +51,7 @@ import { bootDone, bootFailed } from './ui/boot.js';
 import { stepProgress } from './app/readiness.js';
 import { installReplays, bootReplays, replayKey, hasReplayLink } from './app/replay-boot.js';
 import { Peers } from './world/peers.js';
-import { usableHeals } from './world/items.js';
+import { usableHeals, usableUltimas } from './world/items.js';
 import { applyGamma } from './ui/gamma.js';
 import { ScreenEffects } from './fx/screen-effects.js';
 import { loadLightmaps } from './world/lightmaps.js';
@@ -66,6 +67,7 @@ import { simulatedPing } from './app/coop-load.js';
 const canvas = $('#view');
 G.renderer = new Renderer(canvas);
 G.shake = new ViewShake(); // env_shake (app/view-shake.js)
+G.fade = new ScreenFade($('#screenfade')); // env_fade (app/screen-fade.js)
 G.audio = new GameAudio();
 G.vm = new Viewmodel(G.renderer.renderer);
 const litByParticles = (root) => G.renderer.lighting.patchDynamic(root); // the particle lights (world/lighting.js)
@@ -390,11 +392,12 @@ G.lobby = new Lobby($('#lobby'), {
   net, state: lobby, getMap: () => S.map?.name || '',
   mapTitle: (name) => S.mapIndex.find((m) => m.name === name)?.title || name,
   hasHeal: () => usableHeals(S.map?.items).length > 0,
+  ultima: () => usableUltimas(S.map?.items)[0] || null, // the map's ultima (world/items.js), for the room's picker
   onRoomScreen: () => G.room.comeBack(),
 });
 installCoop();
 // the room screen between rounds, and the pause screen during a run (with the room code in a room)
-G.room = new RoomScreen($('#room'), { net, lobby: G.lobby, hasHeal: () => usableHeals(S.map?.items).length > 0 });
+G.room = new RoomScreen($('#room'), { net, lobby: G.lobby, hasHeal: () => usableHeals(S.map?.items).length > 0, ultima: () => usableUltimas(S.map?.items)[0] || null });
 G.pauseScreen = new PauseScreen($('#pause'), {
   net,
   on: {

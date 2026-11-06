@@ -511,6 +511,27 @@ Invite link and who is alive (with each player's ping). Change stage and Setting
 - **Heal option**: the stage list header shows "Hold the heal: <item>" on maps that have one. You hold it from the stage
   start (spawned, parented to you, its `OnPlayerPickup` fired) and **E** presses its button; EntWatch's cooldown /
   uses are enforced, the map's own logic decides the rest (mist disables it in the escape, re-enables it on the throne).
+- **Ultima** (the team's nuke: a countdown, then a blast that fills the screen and hides the lasers). Found in the map's
+  data, not by name: a human item two template hops from a start-disabled `trigger_hurt` of 100000+ that only zombies
+  pass, armed (`Enable`) 5 s or more after something fires it; that delay is its fuse. offliner: Shockwave (15 s, green
+  shockwave), westersand: Holy Magick (20 s, white flash + shake; it also hits the boss), tyranny2: Sacred Staff (10 s),
+  ze_ffvii_cosmo_canyon_v5_p: Ultima Materia (15 s, green flash + shake). A new map's needs no code when it is wired the
+  same way. E fires what GFL's EntWatch handler names: the item's `func_button` (Press), or the `logic_relay` a map's
+  script fires on +use (Trigger: cosmo's cs_script `ItemTick` does `EntFire(Item_Relay_Ultima, "Trigger")`; its own
+  extra gates, `shinra_tp` / `gi_nattak_silence`, aren't modelled).
+  Solo, the stage list header picks **Off / You hold it (E) / Teammate sets it off N s in** (0 = at the start, before
+  the lasers). A teammate is a stand-in player at the team's spawn (`engine.addMate`): the map's own pickup, filters
+  (they test the activator, as CS2's do), particles, `env_fade`, `env_shake` and sounds all run. Replays record it; the
+  server's solo check replays it the same way (`world/items.js soloLoadout`).
+- **One item per player** (a hard rule). Solo: holding the ultima puts the heal down and the other way round. Rooms
+  (`lib/room-rules.js itemHolders`): Heal = nobody / everyone / random / a player; Ultima = nobody / goes off by itself
+  at N s / random / a player, who sets it off with E (a held ultima never goes off by itself). Named picks are kept, a
+  random pick is made among players holding nothing yet, "everyone" skips the ultima's holder, and the form won't
+  pick one player for both. Everyone's copy of the map runs the ultima: its holder's E goes to the server, which
+  picks a tick 16 ticks (0.25 s) ahead and has every client and every server copy press it there (`queueMateUse`).
+- **Screen fades** (`env_fade`, `world/entities/classes/fade.js` -> `app/screen-fade.js`): Source's ScreenFade math
+  (view_effects.cpp) on the game clock: fade to the colour over `duration`, hold `holdtime`, then gone; fade from (flag
+  1), modulate (2), only the activator (4), stay out (8). CS2 dropped CS:GO's `reversefadeduration` / FadeReverse.
 - **Item HUD** (under the minimap, as EntWatch draws it): `R` ready / seconds left / `x/y` uses, short name in its
   colour, holder. In a room the co-op side adds who holds what (`S.mp.itemRows()`).
 - **Minimap**: CS2's own radar (`lasers-bake --overview <vpk> <map folder>` -> `overview/`: `resource/overviews`

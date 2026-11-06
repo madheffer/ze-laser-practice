@@ -54,8 +54,9 @@ function range(label, min, max, step, value, fmt = (v) => String(v)) {
 }
 
 // settings: the starting values; mode: 'create' | 'edit'; owner name for the placeholder; players: [{ id, name }] in
-// the room (who can carry the heal); heal: the loaded map has a heal a human can carry (else no Heal picker)
-export function roomForm(settings, { mode, ownerName, members = 1, players = [], heal: healOn = false, onSubmit, onCancel }) {
+// the room (who can carry the heal); heal: the loaded map has a heal a human can carry (else no Heal picker); ultima:
+// the loaded map's ultima item (world/items.js: { name, ultima: its fuse in s }), else no Ultima picker
+export function roomForm(settings, { mode, ownerName, members = 1, players = [], heal: healOn = false, ultima: ultimaItem = null, onSubmit, onCancel }) {
   const s = cleanSettings(settings, members);
   const r = s.rules;
   const form = el('form', 'room-form', { novalidate: '' });
@@ -113,6 +114,27 @@ export function roomForm(settings, { mode, ownerName, members = 1, players = [],
   const healHint = text('small', 'rf-hint', "The map's own heal aura, E to use: everyone their own, or one player carries it and the group gathers round (random = picked each round).");
   bosses.append(fixed.el, humans.el, bossHp.el, autoFire.el, perfect.el, fall.el);
   if (healOn) bosses.append(healLabel, healHint);
+  // the map's ultima (offliner's Shockwave, westersand's Holy Magick): one player holds it and sets it off with E, or
+  // nobody does and it goes off by itself. One item per player: a player picked for one can't be picked for the other
+  const ultId = `lf-${++uid}`;
+  const ultLabel = el('label', 'field inline', { for: ultId });
+  const ult = el('select', '', { id: ultId });
+  const ultOpts = [['none', 'Nobody'], ['auto', 'Goes off by itself'], ['random', 'Random player'], ...players.map((p) => [String(p.id), p.name])];
+  ult.append(...ultOpts.map(([v, t]) => { const o = el('option'); o.value = v; o.textContent = t; return o; }));
+  ult.value = ultOpts.some(([v]) => v === String(r.ultima)) ? String(r.ultima) : 'none';
+  ultLabel.append(ultimaItem ? `Ultima: ${ultimaItem.name}` : 'Ultima', ult);
+  const ultAt = range('Goes off', 0, 120, 1, Math.min(120, r.ultimaAt), (v) => `${v} s after the start`);
+  const ultHint = text('small', 'rf-hint', `${ultimaItem?.ultima ?? 0} s countdown, then a blast that fills the screen. Its holder sets it off with E. Nobody holds two items.`);
+  const isPlayer = (v) => Number.isInteger(Number(v)) && v !== '';
+  const syncPicks = () => {
+    ultAt.el.hidden = ult.value !== 'auto';
+    for (const o of ult.options) o.disabled = isPlayer(o.value) && o.value === heal.value;
+    for (const o of heal.options) o.disabled = isPlayer(o.value) && o.value === ult.value;
+  };
+  ult.addEventListener('change', syncPicks);
+  heal.addEventListener('change', syncPicks);
+  syncPicks();
+  if (ultimaItem) bosses.append(ultLabel, ultAt.el, ultHint);
 
   // ---- cheats
   const cheats = el('fieldset', 'card cheats');
@@ -140,12 +162,13 @@ export function roomForm(settings, { mode, ownerName, members = 1, players = [],
   const read = () => cleanSettings({
     name: name.value, public: vis.value === 'public', max: Number(max.value),
     rules: { humans: humans.value, fixedHumans: fixed.value, bossHp: bossHp.value, autoFire: autoFire.value, perfectTeam: perfect.value, fallDamage: fall.value,
-      heal: !healOn ? r.heal : ['none', 'all', 'random'].includes(heal.value) ? heal.value : Number(heal.value), god: god.value, hitboxes: hitboxes.value, autoBhop: bhop.value },
+      heal: !healOn ? r.heal : ['none', 'all', 'random'].includes(heal.value) ? heal.value : Number(heal.value),
+      ultima: !ultimaItem ? r.ultima : ['none', 'auto', 'random'].includes(ult.value) ? ult.value : Number(ult.value), ultimaAt: ultimaItem ? ultAt.value : r.ultimaAt, god: god.value, hitboxes: hitboxes.value, autoBhop: bhop.value },
   }, members);
   form.addEventListener('submit', (ev) => { ev.preventDefault(); onSubmit(read()); });
   cancel.addEventListener('click', () => onCancel());
   reset.addEventListener('click', () => {
-    const fresh = roomForm({ ...SETTINGS_DEFAULTS, name: name.value, public: vis.value === 'public', max: Number(max.value), rules: RULE_DEFAULTS }, { mode, ownerName, members, players, heal: healOn, onSubmit, onCancel });
+    const fresh = roomForm({ ...SETTINGS_DEFAULTS, name: name.value, public: vis.value === 'public', max: Number(max.value), rules: RULE_DEFAULTS }, { mode, ownerName, members, players, heal: healOn, ultima: ultimaItem, onSubmit, onCancel });
     form.replaceWith(fresh);
     fresh.querySelector('button[type=submit]')?.focus();
   });

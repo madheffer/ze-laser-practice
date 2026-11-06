@@ -6,7 +6,7 @@ import { DEG } from '../world/entities/index.js';
 import { createRunEngine, hazardName as hazardText, COUNTDOWN, legacyCountdown, freeSpawn } from '../world/run-engine.js';
 import { standsFree } from '../world/movement.js';
 import { viewBox } from '../world/view-box.js';
-import { heldItems } from './items.js';
+import { heldItems, heldMates } from './items.js';
 import { prepareStage } from './readiness.js';
 import { warmTemplates } from '../world/warm.js';
 import { DEFAULT_GUN } from '../lib/weapons.js';
@@ -94,7 +94,7 @@ export function startScenario(i, mode = 'normal') {
     fits: (o, solids) => standsFree(S.world, o, solids), // never spawn inside the floor or a moving brush
     countdown: S.replay ? (S.replay.meta.countdown ?? legacyCountdown(scenario)) : COUNTDOWN,
     scenario, mapUpdated: S.mapUpdated, mode, seed: run.seed,
-    humans: rule('humans'), bossHp: rule('bossHp'), items: heldItems(), run,
+    humans: rule('humans'), bossHp: rule('bossHp'), items: heldItems(), mates: heldMates(), run,
     // kept on the run: a replay's seek mutes the map the same way (app/replay.js)
     hooks: run.hooks = {
       attach(engine) {
@@ -120,6 +120,8 @@ export function startScenario(i, mode = 'normal') {
         });
         // a Source 1 map's sparks / tesla beams and screen shakes (entities/classes/sparks.js), not while replaying silently
         G.shake.clear();
+        G.fade.clear(); // and its screen fades (env_fade: classes/fade.js -> app/screen-fade.js)
+        engine.on('fade', (ev) => { if (!run.silent && (!ev.only || ev.only === engine.playerEnt)) G.fade.request(ev, engine.time); });
         engine.on('tempfx', (ev) => { if (!run.silent) G.renderer.tempFx.request(ev, engine.time); });
         engine.on('shake', (ev) => {
           if (run.silent) return;
@@ -190,7 +192,7 @@ export function startScenario(i, mode = 'normal') {
     run.rec = new ReplayRecorder({
       seed: run.seed, map: map.name, mapVersion: map.version || '', stage: scenario.id, mode: run.mode, countdown: run.startAt,
       weapon: scenario.weapon || 'knife', gun: DEFAULT_GUN,
-      rules: { humans: rule('humans'), bossHp: rule('bossHp'), autoFire: rule('autoFire'), perfectTeam: rule('perfectTeam'), fallDamage: rule('fallDamage'), healItem: !!settings.healItem },
+      rules: { humans: rule('humans'), bossHp: rule('bossHp'), autoFire: rule('autoFire'), perfectTeam: rule('perfectTeam'), fallDamage: rule('fallDamage'), healItem: !!settings.healItem, ultimaItem: settings.ultimaItem, ultimaAt: settings.ultimaAt },
     });
   }
   // every stage starts with the PP-Bizon (a replay: the gun its run started with, then its buys: app/replay-play.js)

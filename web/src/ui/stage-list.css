@@ -134,6 +134,13 @@
 .heal-toggle input::after { content: ''; position: absolute; left: 2px; top: 2px; width: 16px; height: 16px; border-radius: 50%; background: #a8b4c0; transition: transform 0.15s; }
 .heal-toggle input:checked { background: #6a2a55; border-color: #ff9ad5; }
 .heal-toggle input:checked::after { transform: translateX(16px); background: #fff; }
+/* the ultima picker (stage-list.js itemOptions): a select + seconds, not a switch */
+.ultima-pick { cursor: default; }
+.ultima-pick b { color: #ffe9a8; }
+.ultima-pick select, .ultima-pick input[type=number] { appearance: auto; -webkit-appearance: auto; position: static; width: auto; height: auto; border-radius: 4px; background: #101820; color: inherit; border: 1px solid #34414f; font: inherit; padding: 1px 4px; }
+.ultima-pick input[type=number] { width: 4.5em; }
+.ultima-pick input[type=number]::after { content: none; }
+.ultima-at[hidden] { display: none; }
 
 /* ---- phones: two a row, a little tighter */
 @media (max-width: 600px) {

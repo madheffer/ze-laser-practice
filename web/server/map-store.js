@@ -9,7 +9,7 @@ import { isMapName } from '../src/lib/paths.js';
 import { applyStripper } from '../src/lib/stripper.js';
 import { normaliseHulls } from '../src/world/hulls.js';
 import { TriangleBVH } from '../src/world/collision.js';
-import { mapItems, usableHeals } from '../src/world/items.js';
+import { mapItems } from '../src/world/items.js';
 import { soundDurations } from '../src/lib/sound-durations.js';
 import { loadPhysics } from '../src/world/physics-world.js';
 
@@ -53,9 +53,9 @@ export function mapStore(dir) {
         ? { bvh: new TriangleBVH(new Float32Array(fxCol.buffer.slice(fxCol.byteOffset, fxCol.byteOffset + fxCol.byteLength))),
             layers: new Uint32Array(fxLayers.buffer.slice(fxLayers.byteOffset, fxLayers.byteOffset + fxLayers.byteLength)) }
         : null;
-      // the map's EntWatch items, as the browser reads them (world/items.js): a round's heal holders get its heals
+      // the map's EntWatch items, as the browser reads them (world/items.js): a round's holders get theirs
       const physics = physicsOk && physicsBin ? physicsBin.buffer.slice(physicsBin.byteOffset, physicsBin.byteOffset + physicsBin.byteLength) : null;
-      return { map, entities, hulls, bounds, animations, soundDurations: soundDurations(soundevents), bvh: new TriangleBVH(tris), fx, physics, heals: usableHeals(mapItems(entities, entwatch)) };
+      return { map, entities, hulls, bounds, animations, soundDurations: soundDurations(soundevents), bvh: new TriangleBVH(tris), fx, physics, items: mapItems(entities, entwatch) };
     })();
     p.catch(() => cache.delete(map));
     cache.set(map, p);

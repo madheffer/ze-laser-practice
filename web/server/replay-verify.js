@@ -11,6 +11,7 @@
 // run store (setVerdict). Jobs run one at a time, in slices, so a long replay never blocks the server.
 import { PlayerCheck } from './coop-check.js';
 import { legacyCountdown } from '../src/world/run-engine.js';
+import { soloLoadout } from '../src/world/items.js';
 import { POS_SCALE } from '../src/lib/replay-codec.js';
 
 const MAX_QUEUE = 40; // replays waiting; more are left unverified
@@ -50,7 +51,7 @@ export function replayVerifier({ loadMap, findStage, store, log = () => {} }) {
     const pc = new PlayerCheck({
       assets, scenario: stage.full, mode: run.mode, seed: meta.seed,
       rules: { ...meta.rules, god: false },
-      items: meta.rules.healItem ? assets.heals : [],
+      ...soloLoadout(meta.rules, assets.items), // { items, mates }: what the run held, as the page worked it out
       countdown: meta.countdown ?? legacyCountdown(stage.full),
       onDeath: (cause, t) => { if (!death) death = { cause, t }; },
       onOutcome: (r) => { if (!outcome) outcome = { r, t: pc.stageTime }; },

@@ -25,8 +25,12 @@ export const RULE_DEFAULTS = Object.freeze({
   // seed) or a player's id (an aura the group gathers round, so ONE human holds it, as on a server), or 'all'
   // (everyone their own: each player's run is separate, so an aura heals only its holder)
   heal: 'none',
+  // the map's ultima (world/items.js: offliner's Shockwave, westersand's Holy Magick): 'none', 'random' or a player's id
+  // (they hold it and set it off with E; it never goes off by itself), or 'auto' (nobody holds it: it goes off
+  // ultimaAt s after the stage starts, for everyone)
+  ultima: 'none', ultimaAt: 0,
 });
-const RANGES = { humans: [1, 64], bossHp: [1, 100] };
+const RANGES = { humans: [1, 64], bossHp: [1, 100], ultimaAt: [0, 300] };
 
 export const SETTINGS_DEFAULTS = Object.freeze({ name: '', public: false, kind: 'coop', max: 4 });
 
@@ -45,6 +49,7 @@ export function cleanRules(r) {
     const d = RULE_DEFAULTS[k], v = r[k];
     if (typeof d === 'boolean' && typeof v === 'boolean') out[k] = v;
     else if (k === 'heal') out.heal = ['none', 'all', 'random'].includes(v) ? v : Number.isInteger(v) && v > 0 ? v : 'none';
+    else if (k === 'ultima') out.ultima = ['none', 'auto', 'random'].includes(v) ? v : Number.isInteger(v) && v > 0 ? v : 'none';
     else if (typeof d === 'number' && typeof v === 'number' && Number.isFinite(v)) {
       const [lo, hi] = RANGES[k];
       out[k] = Math.round(Math.min(hi, Math.max(lo, v)));
@@ -67,19 +72,43 @@ export function cleanSettings(s, members = 1) {
   };
 }
 
-// the round's heal holders: the room's setting against who is in the round ('random': one of them, picked from the
-// round's seed, so it is the same pick wherever it's worked out)
-export function healHolders(heal, ids, seed = 0) {
-  if (!ids.length) return [];
-  if (heal === 'all') return [...ids];
-  if (heal === 'random') return [[...ids].sort((a, b) => a - b)[Math.abs(seed | 0) % ids.length]];
-  return typeof heal === 'number' && ids.includes(heal) ? [heal] : [];
+// Who holds what this round: the room's heal / ultima settings against who is in it, on a map that has them (`has`:
+// { heal, ultima }). NOBODY HOLDS MORE THAN ONE ITEM: a player picked by name keeps that pick, a random pick is made
+// among the players who hold nothing yet, 'all' (the heal) skips the ultima's holder, and a heal picked for the
+// ultima's holder goes to a random other player instead. Random picks come from the round's seed, so they are the
+// same wherever this runs. -> { heal: [ids], ultima: id | null, auto: the ultima goes off by itself }
+export function itemHolders(rules, ids, seed = 0, has = { heal: true, ultima: false }) {
+  const pool = [...ids].sort((a, b) => a - b);
+  const s = Math.abs(seed | 0);
+  const pick = (from, salt) => (from.length ? from[(s + salt) % from.length] : null);
+  const heal = has.heal ? rules?.heal : 'none', ult = has.ultima ? rules?.ultima : 'none';
+  let ultima = typeof ult === 'number' && pool.includes(ult) ? ult : null;
+  let heals = [];
+  if (heal === 'all') heals = pool;
+  else if (typeof heal === 'number' && pool.includes(heal) && heal !== ultima) heals = [heal];
+  if (ult === 'random') ultima = pick(pool.filter((id) => !heals.includes(id) || heal === 'all'), 7919);
+  if (heal === 'random' || (typeof heal === 'number' && heal === ultima)) heals = [pick(pool.filter((id) => id !== ultima), 0)].filter((id) => id != null);
+  heals = heals.filter((id) => id !== ultima);
+  return { heal: heals, ultima, auto: ult === 'auto' };
 }
 
 // how many humans the boss HP is for, with `players` real ones in the run (see fixedHumans above)
 export const bossHumans = (rules, players = 1) => (rules?.fixedHumans ? Math.max(players, rules.humans) : Math.max(1, players));
 // the room's chip / summary for it
 export const humansLabel = (rules) => (rules?.fixedHumans ? `Boss HP for ${rules.humans} humans` : 'Boss HP for the lobby');
+
+// the room's item chips (lobby / room screen): who holds the heal and the ultima. has: { heal: bool, ultima: the map's
+// ultima name or null }; nameOf(id): a member's name
+export function itemLabels(r, has, nameOf) {
+  const who = (v) => (v === 'random' ? 'a random player' : typeof v === 'number' ? nameOf(v) || 'nobody (left)' : null);
+  const out = [];
+  if (has.heal) { if (r.heal === 'all') out.push('Heal: everyone their own'); else if (who(r.heal)) out.push(`Heal: ${who(r.heal)}`); }
+  if (has.ultima) {
+    if (r.ultima === 'auto') out.push(`${has.ultima}: goes off ${r.ultimaAt} s in`);
+    else if (who(r.ultima)) out.push(`${has.ultima}: ${who(r.ultima)}`);
+  }
+  return out;
+}
 
 export const cheatsOn = (rules) => CHEATS.filter((k) => rules?.[k] === true);
 export const CHEAT_LABELS = { god: 'God mode', hitboxes: 'Laser hitboxes', autoBhop: 'Auto bunnyhop' };

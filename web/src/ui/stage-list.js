@@ -8,6 +8,7 @@ import { $ } from '../lib/dom.js';
 import { groupStages } from '../lib/stage-groups.js';
 import { settings, saveSettings } from '../app/settings.js';
 import { displayName } from './maps.js';
+import { mapLoadout } from '../world/items.js';
 import { el, stageCard, shotUrls, personalBest, showDetails, hideDetails, FREE_ROAM } from './stage-card.js';
 
 // the card renderers, for other screens (the room picker): pure functions, styled by stage-list.css
@@ -47,8 +48,7 @@ export function renderStageList(info, onPick) {
   row.append(title, boards);
   head.replaceChildren(row, sub);
   if (parts.length > 2) head.append(chips(parts, sections));
-  const heal = healToggle();
-  if (heal) head.append(heal);
+  head.append(...itemOptions());
   installGridKeys(list);
 }
 
@@ -144,19 +144,50 @@ function installGridKeys(list) {
   });
 }
 
-// The map's heal option: only on a map that has a heal item (world/items.js: EntWatch / the map's data), named after it.
-// You hold it from the stage start and E uses it; the map's own logic decides where it works (mist: not in the escape).
-function healToggle() {
-  const heals = (S.map?.items || []).filter((it) => it.heal && it.usable);
-  if (!heals.length) return null;
-  const it = heals[0];
-  const label = el('label', 'heal-toggle');
-  const box = el('input', '', { type: 'checkbox' });
-  box.checked = !!settings.healItem;
-  box.addEventListener('change', () => { settings.healItem = box.checked; saveSettings(); });
-  const text = el('span');
-  text.append('Hold the heal: ', el('b', '', {}, it.name), ' ', el('kbd', 'kb', {}, 'E'));
-  text.append(el('small', '', {}, `${it.cooldown ? `${it.cooldown} s cooldown · ` : ''}works where the map allows it (bosses, finales)`));
-  label.append(box, text);
-  return label;
+// The map's item options, on a map that has them (world/items.js mapLoadout: EntWatch / the map's data), named after
+// the item. You hold ONE item at most: the heal, or the ultima (E sets it off). Or a teammate holds the ultima and sets
+// it off a set time into the stage, so you practise the lasers through its blast. The map's own logic does the rest.
+function itemOptions() {
+  const { heal, ultima } = mapLoadout(S.map?.items);
+  const out = [];
+  let healBox = null, ultSel = null;
+  if (heal) {
+    const label = el('label', 'heal-toggle');
+    healBox = el('input', '', { type: 'checkbox' });
+    healBox.checked = !!settings.healItem && settings.ultimaItem !== 'hold';
+    healBox.addEventListener('change', () => {
+      settings.healItem = healBox.checked;
+      if (healBox.checked && settings.ultimaItem === 'hold') { settings.ultimaItem = 'none'; if (ultSel) ultSel.sync(); }
+      saveSettings();
+    });
+    const text = el('span');
+    text.append('Hold the heal: ', el('b', '', {}, heal.name), ' ', el('kbd', 'kb', {}, 'E'));
+    text.append(el('small', '', {}, `${heal.cooldown ? `${heal.cooldown} s cooldown · ` : ''}works where the map allows it (bosses, finales)`));
+    label.append(healBox, text);
+    out.push(label);
+  }
+  if (ultima) {
+    const box = el('div', 'heal-toggle ultima-pick');
+    const sel = el('select', '', { 'aria-label': `${ultima.name}: who sets it off` });
+    for (const [v, t] of [['none', 'Off'], ['hold', 'You hold it (E)'], ['auto', 'Teammate sets it off']]) sel.append(el('option', '', { value: v }, t));
+    const at = el('input', '', { type: 'number', min: '0', max: '300', step: '1', 'aria-label': 'Seconds after the stage starts' });
+    const atWrap = el('span', 'ultima-at');
+    atWrap.append(at, ' s in');
+    const text = el('span');
+    text.append('Ultima: ', el('b', '', {}, ultima.name), ' ', sel, ' ', atWrap);
+    text.append(el('small', '', {}, `${ultima.ultima} s countdown, then a blast that fills the screen · 0 s = at the start, before the lasers`));
+    box.append(text);
+    const sync = () => { sel.value = settings.ultimaItem; at.value = String(settings.ultimaAt); atWrap.hidden = settings.ultimaItem !== 'auto'; };
+    sel.addEventListener('change', () => {
+      settings.ultimaItem = sel.value;
+      // one item: holding the ultima puts the heal down
+      if (sel.value === 'hold' && healBox?.checked) { healBox.checked = false; settings.healItem = false; }
+      saveSettings(); sync();
+    });
+    at.addEventListener('change', () => { const v = Math.round(Number(at.value)); settings.ultimaAt = Number.isFinite(v) ? Math.min(300, Math.max(0, v)) : 0; saveSettings(); sync(); });
+    ultSel = { sync };
+    sync();
+    out.push(box);
+  }
+  return out;
 }

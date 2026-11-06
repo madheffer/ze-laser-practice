@@ -8,7 +8,7 @@
 import './lobby.css';
 import { loadJson, saveJson } from '../lib/storage.js';
 import { ROOM_CODE } from '../net/coop-client.js';
-import { cleanSettings, cleanText, cheatsOn, CHEAT_LABELS, humansLabel, SETTINGS_DEFAULTS, RULE_DEFAULTS } from '../lib/room-rules.js';
+import { cleanSettings, cleanText, cheatsOn, CHEAT_LABELS, humansLabel, itemLabels, SETTINGS_DEFAULTS, RULE_DEFAULTS } from '../lib/room-rules.js';
 import { RoomBrowser } from './lobby-browse.js';
 
 const KEY = 'lasers.coop'; // { name, room: last room settings you created }
@@ -26,7 +26,7 @@ export class Lobby {
   // net: CoopClient; state: { busy }; getMap(): the map loaded now; mapTitle(name): its display title; hasHeal(): the
   // loaded map has a heal a human can carry (the Heal picker shows only then)
   // onRoomScreen(): back to the room screen (ui/room.js)
-  constructor(root, { net, state, getMap = () => '', mapTitle = (n) => n, hasHeal = () => false, onRoomScreen = () => {} }) {
+  constructor(root, { net, state, getMap = () => '', mapTitle = (n) => n, hasHeal = () => false, ultima = () => null, onRoomScreen = () => {} }) {
     this.onRoomScreen = onRoomScreen;
     this.onRoomSettings = () => {}; // Settings → Room (set by ui/room.js, which owns the settings panel)
     this.root = root;
@@ -35,6 +35,7 @@ export class Lobby {
     this.getMap = getMap;
     this.mapTitle = mapTitle;
     this.hasHeal = hasHeal;
+    this.ultima = ultima; // the map's ultima item (world/items.js), or null
     const saved = loadJson(KEY);
     this.name = cleanText(saved.name, 20);
     this.lastSettings = cleanSettings(saved.room && typeof saved.room === 'object' ? saved.room : { ...SETTINGS_DEFAULTS, rules: RULE_DEFAULTS });
@@ -173,8 +174,7 @@ export class Lobby {
     const chips = [
       [humansLabel(r)], [`Boss HP ${r.bossHp}%`], [r.autoFire ? (r.perfectTeam ? 'Perfect team' : 'Team fires') : 'No team fire'],
       [r.fallDamage ? 'Fall damage' : 'No fall damage'],
-      ...(!this.hasHeal() ? [] : r.heal === 'all' ? [['Heal: everyone their own']] : r.heal === 'random' ? [['Heal: a random player']]
-        : typeof r.heal === 'number' ? [[`Heal: ${net.member(r.heal)?.name || 'nobody (left)'}`]] : []),
+      ...itemLabels(r, { heal: this.hasHeal(), ultima: this.ultima()?.name || null }, (id) => net.member(id)?.name).map((t) => [t]),
       ...cheatsOn(r).map((k) => [CHEAT_LABELS[k], 'cheat']),
     ];
     if (!cheatsOn(r).length) chips.push(['No cheats', 'clean']);

@@ -131,23 +131,24 @@ export function passesFilter(engine, e) {
 // filternames and for breakables' damagefilter (the shots are always a human's: yours or the simulated team's).
 // Name filters test the player's current targetname, which the map sets (westersand's spawn room names every
 // human "None", deadcore's meteors tag their target): a scenario starting past those sets it with player.name.
-export function filterPasses(engine, fname, depth = 0) {
+// `who`: the player tested, you unless a filter's TestActivator names a teammate (engine.addMate) as its activator
+export function filterPasses(engine, fname, depth = 0, who = engine.playerEnt) {
   if (!fname) return true;
   const f = engine.findOne(fname);
   if (!f || depth > 8) return true; // a filter_multi loop is the map's bug, not a reason to hang
   const neg = bool(f.kv.negated);
   let pass = true;
-  if (f.cls === 'filter_activator_team') pass = num(f.kv.filterteam) === engine.playerEnt.team;
+  if (f.cls === 'filter_activator_team') pass = num(f.kv.filterteam) === who.team;
   else if (f.cls === 'filter_activator_class') pass = String(f.kv.filterclass).toLowerCase() === 'player';
   else if (f.cls === 'filter_activator_context') {
     const want = String(f.kv.responsecontext || '').split(':')[0].toLowerCase();
-    pass = !!engine.playerEnt.contexts?.has(want);
+    pass = !!who.contexts?.has(want);
   } else if (f.cls === 'filter_activator_name') {
-    pass = nameMatches(f.kv.filtername, engine.playerEnt.name);
+    pass = nameMatches(f.kv.filtername, who.name);
   } else if (f.cls === 'filter_multi') {
     // filtertype 0: all of filter01..05 must pass (AND), 1: any (OR); unset slots don't count
     const subs = [1, 2, 3, 4, 5].map((i) => f.kv[`filter0${i}`]).filter(Boolean);
-    const results = subs.map((s) => filterPasses(engine, s, depth + 1));
+    const results = subs.map((s) => filterPasses(engine, s, depth + 1, who));
     pass = num(f.kv.filtertype) === 1 ? results.some(Boolean) : results.every(Boolean);
   } else return true;
   return neg ? !pass : pass;
@@ -202,11 +203,13 @@ register('env_explosion', {
   },
 });
 
-// filter_*.TestActivator: OnPass / OnFail for the activator (always you: the only player here)
+// filter_*.TestActivator: OnPass / OnFail for the activator: you, or a teammate holding an item (engine.addMate: a
+// room's ultima holder pressing it); anything else (no player) is tested as you, as before
 const filterTest = {
   input(e, inp, p, act) {
     if (inp !== 'testactivator') return false;
-    e.fireOutput(filterPasses(e.engine, e.name) ? 'OnPass' : 'OnFail', act);
+    const who = act?.mate ? act : e.engine.playerEnt;
+    e.fireOutput(filterPasses(e.engine, e.name, 0, who) ? 'OnPass' : 'OnFail', act);
     return true;
   },
 };

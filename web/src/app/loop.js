@@ -9,6 +9,7 @@ import { bossFire, bossStatus, bossShown, trackSegments, shootAs } from './bosse
 import { applyPose, eventsAfter, eventsDuring } from './replay-play.js';
 import { replayView } from './replay-view.js';
 import { useItems as pressItems } from '../world/items.js';
+import { pressMateUses } from '../world/run-engine.js';
 import { startScenario, hurtPlayer, healPlayer, finish, stageTime, landing } from './session.js';
 import { startIfDue, mapRuns, winDue, sentOut } from '../world/run-engine.js';
 import { bossHudHtml } from '../ui/hud.js';
@@ -137,6 +138,7 @@ export function frame(now) {
   let eye = [o[0], o[1], o[2] + player.eyeHeight()];
   // a map's screen shake (env_shake, app/view-shake.js) moves the view origin, on the game clock
   if (engine && G.shake) { const sh = G.shake.frame(engine.time + (live ? acc : 0), live ? realDt : 0); eye = [eye[0] + sh[0], eye[1] + sh[1], eye[2] + sh[2]]; }
+  G.fade?.frame(engine ? engine.time + (live ? acc : 0) : 0); // a map's screen fade (env_fade, app/screen-fade.js), on the game clock too
   // CS2's CalcView: your eyes + 45% of the aim punch + the view punch (lib/recoil.js, the viewmodel's shots)
   const punch = G.vm?.recoil ? G.vm.recoil.cameraOffset() : [0, 0];
   let view = { yaw: player.yaw + punch[1], pitch: player.pitch + punch[0] };
@@ -204,6 +206,8 @@ export function step() {
     const n = Math.ceil(run.startAt - run.t - 1e-6);
     if (n !== run.countdownShown && n >= 1 && n <= 3) { run.countdownShown = n; if (!S.replay?.fast) G.audio.play('countdown.tick'); }
   }
+  // a teammate's item press (a round's ultima holder), on the tick the server picked for every copy (world/run-engine.js)
+  pressMateUses(run, run.ticks);
   // a spectator's map keeps running (lasers, the boss, the end), without them in it
   if (run.spectating) {
     if (mapRuns(run)) engine.tick(CS.tick); // a mid-map stage holds still through its countdown

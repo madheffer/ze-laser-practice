@@ -113,13 +113,20 @@ export function keyValue(engine, e, param) {
 }
 
 // Inputs aimed at you. Maps change a human's gravity, speed and health this way: ze_mist_p's escape-boss
-// trigger sets "gravity 0.1", its boss door sets 180 max health.
-export function playerInput(engine, q) {
+// trigger sets "gravity 0.1", its boss door sets 180 max health. `who`: you, or a teammate holding an item
+// (engine.addMate), who only keeps a name and contexts (KeyValue targetname, Add / RemoveContext): nothing else lands.
+export function playerInput(engine, q, who = engine.playerEnt) {
   const inp = q.input.toLowerCase();
-  const P = engine.player; // { setHealth, setMaxHealth, setGravity, setSpeed, setRunSpeed, setVelocity, setDamageFilter }
-  const me = engine.playerEnt;
+  const me = who;
+  const P = me === engine.playerEnt ? engine.player : null; // { setHealth, setMaxHealth, setGravity, setSpeed, setRunSpeed, setVelocity, setDamageFilter }
   // a player has no outputs a map would add: CS2's AddOutput on a pawn changes nothing we model
   if (inp === 'addoutput') { engine.warnOnce('player.addoutput', 'AddOutput on the player ignored'); return; }
+  if (me.mate) {
+    if (inp.startsWith('keyvalue')) { const r = parseKeyValue(engine, q.param, 'player'); if (r?.key === 'targetname') { me.name = r.t[1]; me.key = stripName(r.t[1]); } return; }
+    if (inp === 'addcontext') (me.contexts ||= new Set()).add(String(q.param).split(':')[0].toLowerCase());
+    else if (inp === 'removecontext') me.contexts?.delete(String(q.param).split(':')[0].toLowerCase());
+    return;
+  }
   if (inp.startsWith('keyvalue')) {
     const r = parseKeyValue(engine, q.param, 'player');
     if (!r) return;

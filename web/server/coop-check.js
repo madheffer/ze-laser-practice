@@ -12,7 +12,7 @@
 //     and have a clear line from the player's eye to the boss.
 //   - the stage's own win / lose (the map's win input or winAfter), instead of trusting a client.
 // Violations are counted per kind; a few within two seconds and the player is out of the round.
-import { createRunEngine, hazardName, TICK, COUNTDOWN, startIfDue, mapRuns, winDue, sentOut } from '../src/world/run-engine.js';
+import { createRunEngine, hazardName, TICK, COUNTDOWN, startIfDue, mapRuns, winDue, sentOut, pressMateUses, queueMateUse } from '../src/world/run-engine.js';
 import { useItems } from '../src/world/items.js';
 import { CollisionWorld, makeTrace } from '../src/world/collision.js';
 import { bulletWorld, BULLET_MASK } from '../src/world/bullets.js';
@@ -47,12 +47,13 @@ const len3 = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 
 export class PlayerCheck {
   // assets: map-store's; scenario: the stage's full entry (or null for free roam)
-  // items: the map items this player holds from the start (a round's heal holders)
+  // items: the map item this player holds from the start (one at most); mates: teammates' items this copy runs
+  // (world/items.js giveMates: a round's ultima holder, or the team's ultima going off by itself)
   // countdown: seconds from the spawn to the stage start (a solo replay passes the one it was recorded with)
   // the copy is done: its physics world goes (world/physics-world.js holds it in the WebAssembly heap)
   dispose() { this.run?.engine?.physics?.destroy(); }
 
-  constructor({ assets, scenario, mode, seed, rules, items = [], countdown = COUNTDOWN, onDeath, onOutcome, onCheat, onPenned = null, log = () => {} }) {
+  constructor({ assets, scenario, mode, seed, rules, items = [], mates = [], countdown = COUNTDOWN, onDeath, onOutcome, onCheat, onPenned = null, log = () => {} }) {
     this.scenario = scenario;
     this.rules = rules;
     this.onDeath = onDeath; this.onOutcome = onOutcome; this.onCheat = onCheat; this.log = log;
@@ -84,7 +85,7 @@ export class PlayerCheck {
       physics: assets.physics, // CS2's physics as the clients run it (map-store.js, world/physics-world.js)
       // the client's spawn test (app/session.js): the same spot, so the spawn check below agrees
       fits: (o, solids) => standsFree(this.world, o, solids), countdown,
-      scenario, mode, seed, humans: rules.humans, bossHp: rules.bossHp, items,
+      scenario, mode, seed, humans: rules.humans, bossHp: rules.bossHp, items, mates,
       hooks: {
         attach(engine) {
           engine.player = {
@@ -153,6 +154,8 @@ export class PlayerCheck {
 
   // the player pressed their item after tick k (the map's own cooldown limits how often it does anything)
   use(k) { if (this.alive && Number.isInteger(k) && k >= this.ticks && this.uses.length < 8) this.uses.push(k); }
+  // teammate `id` pressed the item they hold in this copy (a round's ultima holder): pressed after round tick k
+  mateUse(id, k) { queueMateUse(this.run, id, k); }
 
   // boss damage the round applied at round tick `tick` (every client applies it as it arrives)
   queueBossDamage(tick, hits) { this.bd.push({ tick, hits }); }
@@ -185,6 +188,7 @@ export class PlayerCheck {
     startIfDue(run, this.t); // the countdown (world/run-engine.js), as the client's loop.js step
     // an item press between ticks k and k + 1 is queued for the next engine tick, on the client too
     while (this.uses.length && this.uses[0] < this.ticks) { this.uses.shift(); if (run.items?.length && run.started) useItems(engine, run.items); }
+    pressMateUses(run, this.ticks); // a teammate's ultima press, on the tick the round picked (mateUse)
     if (mapRuns(run)) engine.tick(TICK); // a mid-map stage holds still through its countdown
     while (this.bd.length && this.bd[0].tick <= this.ticks) {
       for (const [id, dmg, n, team] of this.bd.shift().hits) {

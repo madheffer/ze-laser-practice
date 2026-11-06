@@ -134,6 +134,7 @@ export function attachCoopRelay(httpServer, { log = () => {}, store = openStore(
     }
     // the heal holder they were (rules.heal = their id) is nobody now: a random player carries it instead
     if (room.settings.rules.heal === c.id) room.settings = { ...room.settings, rules: { ...room.settings.rules, heal: 'random' } };
+    if (room.settings.rules.ultima === c.id) room.settings = { ...room.settings, rules: { ...room.settings.rules, ultima: 'random' } }; // the ultima's too
     room.round?.updateLeader();
     announce(room);
     if (why === 'kicked') send(c, { t: 'kicked' });

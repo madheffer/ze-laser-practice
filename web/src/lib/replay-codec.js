@@ -160,6 +160,8 @@ export function cleanMeta(m) {
       humans: Math.round(num(rules.humans, 1, 64, 20)), bossHp: Math.round(num(rules.bossHp, 1, 100, 100)),
       autoFire: rules.autoFire !== false, perfectTeam: rules.perfectTeam === true, fallDamage: rules.fallDamage === true,
       healItem: rules.healItem === true,
+      // the map's ultima (world/items.js soloLoadout): yours ('hold'), the team's going off by itself ('auto'), or none
+      ultimaItem: ['hold', 'auto'].includes(rules.ultimaItem) ? rules.ultimaItem : 'none', ultimaAt: num(rules.ultimaAt, 0, 300, 0),
     },
   };
 }

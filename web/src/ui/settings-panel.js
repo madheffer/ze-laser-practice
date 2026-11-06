@@ -13,10 +13,11 @@ function el(tag, cls, t) { const e = document.createElement(tag); if (cls) e.cla
 
 export class SettingsPanel {
   // net: CoopClient; lobby: ui/lobby.js's Lobby (remembers room settings); hasHeal(): the room's map has a heal
-  constructor({ net, lobby, hasHeal = () => false }) {
+  constructor({ net, lobby, hasHeal = () => false, ultima = () => null }) {
     this.net = net;
     this.lobby = lobby;
     this.hasHeal = hasHeal;
+    this.ultima = ultima; // the room's map's ultima item (world/items.js), or null
     this.home = $('#panel-settings');
     this.view = 'game';
     this.dirty = false;
@@ -85,7 +86,7 @@ export class SettingsPanel {
     this.dirty = false;
     this.roomNote.textContent = host ? '' : `Only ${this.net.member(room.owner)?.name || 'the host'} can change these.`; // the host's form says when changes apply
     const form = roomForm(room.settings, {
-      mode: 'edit', ownerName: cleanName(this.net.member(room.owner)?.name), members: room.members.length, players: room.members, heal: this.hasHeal(),
+      mode: 'edit', ownerName: cleanName(this.net.member(room.owner)?.name), members: room.members.length, players: room.members, heal: this.hasHeal(), ultima: this.ultima(),
       onSubmit: (s) => { this.lobby.rememberSettings(s); this.net.setSettings(s); this.dirty = false; this.roomNote.textContent = 'Saved: applies from the next round.'; },
       onCancel: () => this.renderRoom(true), // back to what the room has
     });

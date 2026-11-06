@@ -26,6 +26,7 @@ import './classes/server.js';
 import './classes/beams.js';
 import './classes/sprites.js';
 import './classes/sparks.js';
+import './classes/fade.js';
 import './classes/scripts.js';
 import './classes/color-correction.js';
 import './classes/skybox-swapper.js';
@@ -102,7 +103,7 @@ export class EntityEngine {
     this.warned = new Set();
     this.moveStamps = new WeakMap();
     this.touching = new Set();
-    this.listeners = { spawn: [], kill: [], hit: [], log: [], sound: [], cvar: [], say: [], tempfx: [], shake: [] }; // say: point_servercommand "say ..." (classes/server.js); tempfx / shake: classes/sparks.js
+    this.listeners = { spawn: [], kill: [], hit: [], log: [], sound: [], cvar: [], say: [], tempfx: [], shake: [], fade: [] }; // say: point_servercommand "say ..." (classes/server.js); tempfx / shake: classes/sparks.js; fade: classes/fade.js
     // The player as an I/O target / activator. worldOrigin() so "at the activator / at !player" spawns work, and
     // getWorld() + children so SetParent(!activator) makes an entity follow you (westersand's Xzone marker). The
     // session sets playerMatrix (a THREE.Matrix4, or anything with column-major `elements`); without one, e.g.
@@ -119,6 +120,7 @@ export class EntityEngine {
     // the simulated team, as the activator of its bullets: a human (team 3) who isn't you, so a map output aimed at
     // !activator on a boss hit (ze_dreamin's Reflection: point_hurt !activator) lands on them, not on you
     this.teamEnt = { name: '!team', key: '!team', cls: 'player', team: 3, alive: true, parent: null, children: new Set(), getWorld: () => new THREE.Matrix4(), worldOrigin: () => [0, 0, 0] };
+    this.mates = []; // teammates holding a map item in this copy of the map (addMate)
     this.templateLumps = new Set();
     this.humans = 1;
     this.traceBox = null; // (start, end, halfExtents) -> trace against the static world; session.js sets it (physics.js)
@@ -137,6 +139,26 @@ export class EntityEngine {
   }
 
   random() { return this.rng(); }
+
+  // A teammate as a player the map's I/O can reach: a human (team 3) holding a map item in this copy of the map
+  // (world/items.js: a room's ultima holder, or the team's own ultima). Like you they take !activator inputs (KeyValue
+  // targetname, AddContext: their item's pickup marks them) and a filter tests them when they are its activator
+  // (classes/triggers.js), but nothing the map does hurts or moves them. They stand where placeMates puts them.
+  addMate(id) {
+    const m = {
+      name: `!mate${id}`, key: `!mate${id}`, cls: 'player', team: 3, alive: true, mate: true, mateId: id, parent: null, children: new Set(),
+      matrix: new THREE.Matrix4(), getWorld() { return this.matrix; }, worldOrigin() { const e = this.matrix.elements; return [e[12], e[13], e[14]]; },
+    };
+    this.mates.push(m);
+    return m;
+  }
+  // the teammates to `origin` (the team's spawn), what they hold coming along
+  placeMates(origin) {
+    for (const m of this.mates) {
+      m.matrix.makeTranslation(origin[0], origin[1], origin[2]);
+      for (const c of m.children) this.moved(c);
+    }
+  }
   on(ev, fn) { this.listeners[ev].push(fn); }
   emit(ev, ...a) { for (const fn of this.listeners[ev]) fn(...a); }
   warnOnce(k, msg) { if (!this.warned.has(k)) { this.warned.add(k); this.emit('log', msg); } }
@@ -304,6 +326,7 @@ export class EntityEngine {
     const key = stripName(p);
     // the player renamed by the map (AddOutput targetname on !activator: ze_deadcore's meteors tag their target)
     if (key === this.playerEnt.key) return [this.playerEnt];
+    for (const m of this.mates) if (key === m.key) return [m];
     if (key.endsWith('*')) {
       const pre = key.slice(0, -1);
       const out = [];
@@ -375,7 +398,7 @@ export class EntityEngine {
     if (!targets.length) return;
     for (const t of targets) {
       if (!t.alive) continue;
-      if (t === this.playerEnt) { this.playerInput(q); continue; }
+      if (t === this.playerEnt || t.mate) { this.playerInput(q, t); continue; }
       this.input(t, q.input, q.param, q.activator, q.caller);
     }
   }
@@ -439,7 +462,7 @@ export class EntityEngine {
   }
 
   addOutput(e, param) { if (this.source1) addOutputSource1(this, e, param); else addOutput(this, e, param); }
-  playerInput(q) { playerInput(this, q); }
+  playerInput(q, who) { playerInput(this, q, who); }
 
   // the fog the player sees now (classes/fog.js): read by the renderer each frame
   fogState() { return fogState(this); }

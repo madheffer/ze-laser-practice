@@ -8,7 +8,8 @@
 //   - it decides the end and who did best (end): the survivors win when the stage clears (the last one alive plays
 //     on alone), fewest hits is the best run; all down, whoever lasted longest.
 // Players only ever talk to the server, so nobody learns anyone else's address.
-import { cleanText, healHolders, bossHumans } from '../src/lib/room-rules.js';
+import { cleanText, itemHolders, bossHumans } from '../src/lib/room-rules.js';
+import { mapLoadout } from '../src/world/items.js';
 import { TICK, COUNTDOWN } from '../src/world/run-engine.js'; // COUNTDOWN: s a round's run waits before the stage starts
 import { PlayerCheck, MAX_PING } from './coop-check.js';
 
@@ -24,6 +25,7 @@ const STALL_MS = 10_000;
 const WAIT_MS = 500; // the loading roster ('wait': who is ready, everyone's progress) goes out at most this often
 const CLOCK_MS = 250, BOSS_MS = 100;
 const BD_DELAY_TICKS = 3; // boss damage reaches clients about this late
+const MATE_LEAD = 16; // ticks (0.25 s) from the ultima holder's E to the tick every copy presses it (onUse)
 const MAX_SAMPLES = 160; // per state message (2.5 s of ticks, for a tab catching up)
 const RELAY_TICKS = 8; // a state message's ticks relayed to the others (a 30 Hz batch holds 2-3)
 const TEAM_HITS_PER_HUMAN = 12; // per second per simulated human, before the boss-HP scale (the squad lands ~7)
@@ -52,11 +54,16 @@ export class Round {
     this.ended = false;
     this.players = new Map(room.members.map((c) => [c.id, { id: c.id, name: c.name, steamId: c.user?.steamId || null, alive: true, deadAt: null, cheat: '', budget: { at: 0, n: 0 },
       load: 0, loadAt: Date.now(), readyMs: null, left: false, ping: 0 }])); // left: gone or never loaded (out, not beaten)
-    // who starts holding the map's heal: the room's choice against who is in this round
-    this.holders = assets.heals.length ? healHolders(rules.heal, [...this.players.keys()], this.seed) : [];
+    // who starts holding the map's heal and its ultima: the room's choice against who is in this round, one item each
+    // (lib/room-rules.js itemHolders). Each copy also runs the ultima someone else holds (pressed when they press it,
+    // onUse) or the team's that goes off by itself (world/items.js giveMates)
+    const kit = mapLoadout(assets.items);
+    this.kit = kit;
+    const who = itemHolders(rules, [...this.players.keys()], this.seed, { heal: !!kit.heal, ultima: !!kit.ultima });
+    this.holders = who.heal; this.ultimaHolder = who.ultima; this.ultimaAuto = who.auto && !!kit.ultima;
     for (const p of this.players.values()) {
       p.check = new PlayerCheck({
-        assets, scenario: stage.full, mode, seed: this.seed, rules, items: this.holders.includes(p.id) ? assets.heals : [],
+        assets, scenario: stage.full, mode, seed: this.seed, rules, items: this.itemsOf(p.id), mates: this.matesOf(p.id),
         onDeath: (cause, t) => this.kill(p, cause, t),
         onOutcome: (result) => { if (!p.cheat) this.end(result === 'win' ? 'win' : 'lose'); },
         onCheat: (kind) => { p.cheat = kind; this.kill(p, '', p.check.stageTime, `was removed by the anti-cheat (${kind})`); },
@@ -78,7 +85,7 @@ export class Round {
   startMessage() {
     return {
       t: 'start', r: this.r, seed: this.seed, map: this.map, stage: this.stage.id, mode: this.mode, kind: this.kind,
-      rules: this.rules, leader: this.leader, holders: this.holders, roster: [...this.players.values()].map((p) => ({ id: p.id, name: p.name })),
+      rules: this.rules, leader: this.leader, holders: this.holders, ultima: this.ultimaHolder, ultimaAuto: this.ultimaAuto, roster: [...this.players.values()].map((p) => ({ id: p.id, name: p.name })),
     };
   }
 
@@ -236,12 +243,27 @@ export class Round {
     for (const [id, dmg, n] of p.check.checkHits(hits, mult)) this.addDamage(id, dmg, n);
   }
 
-  // an item press: checked on the presser's copy, and shown on everyone's item HUD
+  // the one item player `id` holds (lib/room-rules.js itemHolders), and the teammates' items their copy runs
+  itemsOf(id) { return id === this.ultimaHolder ? [this.kit.ultima] : this.holders.includes(id) ? [this.kit.heal] : []; }
+  matesOf(id) {
+    if (this.ultimaAuto) return [{ id: 'team', item: this.kit.ultima, autoAt: this.rules.ultimaAt }];
+    return this.ultimaHolder != null && this.ultimaHolder !== id ? [{ id: this.ultimaHolder, item: this.kit.ultima }] : [];
+  }
+
+  // an item press: checked on the presser's copy, and shown on everyone's item HUD. The ultima's goes off in every
+  // copy of the map: each presses it MATE_LEAD ticks from now (every client and every server copy on that tick; a
+  // client already past it presses it at once)
   onUse(c, m) {
     const p = this.players.get(c.id);
-    if (!p?.alive || this.ended || !this.started || !this.holders.includes(c.id)) return;
+    if (!p?.alive || this.ended || !this.started || !(this.holders.includes(c.id) || this.ultimaHolder === c.id)) return;
     p.check.use(m.k);
-    this.broadcast({ t: 'use', r: this.r, id: c.id }, c);
+    let k;
+    if (this.ultimaHolder === c.id && !p.ultimaUsed) {
+      p.ultimaUsed = true; // EntWatch's uses are the map's (its button locks); one broadcast is all a holder gets
+      k = this.roundTick + MATE_LEAD;
+      for (const q of this.players.values()) if (q !== p) q.check.mateUse(c.id, k);
+    }
+    this.broadcast({ t: 'use', r: this.r, id: c.id, ...(k != null ? { k } : {}) }, c);
   }
 
   onReload(c, w) { const p = this.players.get(c.id); if (p?.alive && !this.ended && this.started) p.check.reload(w === 'pistol' ? 'pistol' : 'gun'); }

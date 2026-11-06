@@ -19,7 +19,7 @@ import { EntityEngine, parseVec } from './entities/index.js';
 import { mapCvars } from './entities/classes/server.js';
 import { configureScripts } from './entities/classes/scripts.js';
 import { migrates20260121 } from './entities/render-mode.js';
-import { giveItems } from './items.js';
+import { armMates, giveItems, giveMates, mateUse } from './items.js';
 import { installEndless } from '../app/endless.js';
 import { inputMatcher, nameKey, nameMatches, stripPrefix } from '../lib/names.js';
 import { own } from '../lib/storage.js';
@@ -37,7 +37,7 @@ export const legacyCountdown = (scenario) => (scenario?.fastForward ? 0 : 1);
 const DAMAGE_PER_HIT = 30;
 const PERFECT_HITS_PER_HUMAN = 5;
 
-export function createRunEngine({ entities, hulls, bounds, animations, soundDurations = null, traceBox, physics = null, fits = null, countdown = COUNTDOWN, scenario, mapUpdated = null, mode = 'normal', seed, humans = 20, bossHp = 100, items = [], hooks = {}, run: into = {} }) {
+export function createRunEngine({ entities, hulls, bounds, animations, soundDurations = null, traceBox, physics = null, fits = null, countdown = COUNTDOWN, scenario, mapUpdated = null, mode = 'normal', seed, humans = 20, bossHp = 100, items = [], mates = [], hooks = {}, run: into = {} }) {
   const endless = mode === 'endless' && !!scenario?.endless;
   // soundDurations: event name -> seconds (lib/sound-durations.js), for point_soundevent's OnSoundFinished
   const engine = new EntityEngine(entities, { hulls, bounds, animations, soundDurations }, { seed });
@@ -103,6 +103,10 @@ export function createRunEngine({ entities, hulls, bounds, animations, soundDura
   // disables the heal at +80 s, the throne re-enables it; relay_dragon locks the others). Solo: the map's heals when the
   // heal option is on (app/items.js heldItems); in a room whatever the room gave this player.
   run.items = giveItems(engine, Array.isArray(items) ? items : []);
+  // mates: teammates' items in this copy of the map (world/items.js giveMates), at the spawn: a room's ultima holder
+  // (pressed when they press it: queueMateUse) or the team's ultima that goes off by itself (armed at the start)
+  run.mates = giveMates(engine, Array.isArray(mates) ? mates : []);
+  run.mateUses = [];
 
   // Later stages start by replaying the map's own sequence up to that point, silently, then placing you.
   if (scenario?.fastForward) {
@@ -117,12 +121,13 @@ export function createRunEngine({ entities, hulls, bounds, animations, soundDura
     hooks.silent?.(false);
     // its start inputs went in at the replay's start: the countdown only holds the map still (startIfDue)
     run.preFired = true;
-    if (run.startAt <= 0) { run.started = true; run.startTime = engine.time; }
+    if (run.startAt <= 0) { run.started = true; run.startTime = engine.time; armMates(engine, run.mates); }
   }
 
   const spawn = spawnPoint(engine, scenario);
   if (fits) { const solids = engine.solids(); spawn.origin = freeSpawn(spawn.origin, (o) => fits(o, solids)); }
   hooks.place?.(spawn);
+  engine.placeMates(spawn.origin); // the teammates holding items stand with the team
   // `setup`: inputs that put the map where its own sequence would be by now, for a stage that starts past the relays
   // that do it (ze_deadcore's drills move des2, its catch-all fall destination, where the map keeps it for that part)
   for (const s of scenario?.setup || []) engine.fire(s.target, s.input, s.param || '', s.delay || 0, engine.playerEnt, null);
@@ -214,7 +219,21 @@ export function startIfDue(run, t) {
   run.started = true;
   run.startTime = run.engine.time;
   if (!run.preFired) run.fireStart();
+  armMates(run.engine, run.mates); // the team's ultima that goes off by itself (world/items.js)
   return true;
+}
+
+// A teammate pressed their item: pressed in this copy after tick k (the tick a round's server picked for every copy),
+// as your own E is (server/coop-check.js uses). pressMateUses(run, ticks) each tick, before the map ticks.
+export function queueMateUse(run, id, k) {
+  if (Number.isInteger(k) && run.mateUses && run.mateUses.length < 16) run.mateUses.push({ id, k });
+}
+export function pressMateUses(run, ticks) {
+  const q = run.mateUses;
+  if (!q?.length || !run.started) return;
+  for (let i = 0; i < q.length;) {
+    if (q[i].k < ticks) { mateUse(run.engine, run.mates, q[i].id); q.splice(i, 1); } else i++;
+  }
 }
 // does the map tick this tick: not while a mid-map stage counts down (it waits where its replay left it)
 export const mapRuns = (run) => run.started || !run.preFired;

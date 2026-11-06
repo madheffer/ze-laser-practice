@@ -9,7 +9,7 @@
 // ui/settings-panel.js) open in a sheet over it. Names and room text come from the server: textContent only.
 import './room.css';
 import { S, G } from '../app/state.js';
-import { cheatsOn, CHEAT_LABELS, humansLabel } from '../lib/room-rules.js';
+import { cheatsOn, CHEAT_LABELS, humansLabel, itemLabels } from '../lib/room-rules.js';
 import { SettingsPanel } from './settings-panel.js';
 import { settings } from '../app/settings.js';
 import { $ } from '../lib/dom.js';
@@ -34,14 +34,15 @@ const PING_LOCKED = 'Locked until the round ends.';
 
 export class RoomScreen {
   // net: CoopClient; lobby: ui/lobby.js's Lobby (your name, saved room settings); hasHeal(): the picked map has a heal
-  constructor(root, { net, lobby, hasHeal = () => false }) {
+  constructor(root, { net, lobby, hasHeal = () => false, ultima = () => null }) {
     this.root = root;
     this.net = net;
     this.lobby = lobby;
     this.hasHeal = hasHeal;
+    this.ultima = ultima; // the map's ultima item (world/items.js), or null
     this.away = false; // the menu's lobby strip is open instead (its Back to room button comes back)
     // Settings (Game | Room): one panel, in the menu's Settings tab or this screen's sheet
-    this.panel = new SettingsPanel({ net, lobby, hasHeal });
+    this.panel = new SettingsPanel({ net, lobby, hasHeal, ultima });
     // the menu's lobby strip: Room settings opens the menu's Settings tab on Room
     lobby.onRoomSettings = () => { G.menu.selectTab($('#tab-settings')); this.panel.show('room'); G.menu.update(); };
     this.picker = new RoomPicker({ maps: () => S.mapIndex, onPick: (map, stage, mode) => this.pickStage(map, stage, mode) });
@@ -237,8 +238,7 @@ export class RoomScreen {
     const chips = [
       [humansLabel(r)], [`Boss HP ${r.bossHp}%`], [r.autoFire ? (r.perfectTeam ? 'Perfect team' : 'Team fires') : 'No team fire'],
       [r.fallDamage ? 'Fall damage' : 'No fall damage'], [`Up to ${s.max} players`],
-      ...(!this.hasHeal() ? [] : r.heal === 'all' ? [['Heal: everyone their own']] : r.heal === 'random' ? [['Heal: a random player']]
-        : typeof r.heal === 'number' ? [[`Heal: ${net.member(r.heal)?.name || 'nobody (left)'}`]] : []),
+      ...itemLabels(r, { heal: this.hasHeal(), ultima: this.ultima()?.name || null }, (id) => net.member(id)?.name).map((t) => [t]),
       ...cheatsOn(r).map((k) => [CHEAT_LABELS[k], 'cheat']),
     ];
     if (!cheatsOn(r).length) chips.push(['No cheats', 'clean']);

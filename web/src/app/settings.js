@@ -20,6 +20,9 @@ export const DEFAULTS = {
   sens: 2.0, autoBhop: false, god: false, hitboxes: false, timescale: 1,
   humans: 20, fixedHumans: false, bossHp: 100, autoFire: false, fallDamage: false, fullscreen: true,
   healItem: false, // hold the map's heal item (EntWatch / map data: mist's Cleansing Aura, westersand's Heal Magick), E to use it
+  // the map's ultima (world/items.js: offliner's Shockwave, westersand's Holy Magick): 'none', 'hold' (yours, E; you
+  // then hold nothing else) or 'auto' (a teammate sets it off ultimaAt s after the stage starts)
+  ultimaItem: 'none', ultimaAt: 0,
   sfx: 0.5, music: 0.5,
   voice: 0.8, // teammates' voice in a room (app/voice.js), 0-1 like the other two
   perfectTeam: false, // true = the other humans never stop shooting (the old fast kill)
@@ -43,11 +46,11 @@ export const DEFAULTS = {
 // Allowed range per numeric setting; a saved value outside it is clamped (the menu can't produce one).
 const RANGES = {
   sens: [0.001, 100], timescale: [0.01, 4], humans: [1, 64], bossHp: [1, 100], ping: [0, 500],
-  sfx: [0, 1], music: [0, 1], voice: [0, 1], tpDist: [15, 150], gamma: [1, 2.5], renderScale: [0.25, 1], pixelCap: [0.5, 3], quality: [0, 3], streamDistance: [0, 2], touchSens: [0.2, 3],
+  sfx: [0, 1], music: [0, 1], voice: [0, 1], tpDist: [15, 150], gamma: [1, 2.5], renderScale: [0.25, 1], pixelCap: [0.5, 3], quality: [0, 3], streamDistance: [0, 2], touchSens: [0.2, 3], ultimaAt: [0, 300],
 };
 const DROPPED = new Set(['myaw', 'fov', 'stamina', 'volume']);
 // string settings: one of these values
-const CHOICES = { graphics: ['low', 'medium', 'high', 'custom'] };
+const CHOICES = { graphics: ['low', 'medium', 'high', 'custom'], ultimaItem: ['none', 'hold', 'auto'] };
 const FORBIDDEN = new Set(['__proto__', 'constructor', 'prototype']);
 
 const KEY = 'lasers.settings';
