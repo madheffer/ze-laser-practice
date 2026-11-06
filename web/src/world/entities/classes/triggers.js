@@ -13,7 +13,10 @@ const triggerBase = {
   input(e, inp, p, act) {
     switch (inp) {
       case 'enable': if (!e.enabled) { e.enabled = true; } return true;
-      case 'disable': e.enabled = false; e.engine.untouch(e); return true;
+      // a disabled trigger drops its touchers, so the next Enable is the whole team touching it afresh and its HP adds
+      // count again (engine.js fireOutput's _hpTouched): ze_mist_p re-enables tr_dragonaddhp for each of the dragon's
+      // 16 segments, and without this every segment after the first got no HP and the fight broke down after segment 2
+      case 'disable': e.enabled = false; e._hpTouched = false; e.engine.untouch(e); return true;
       case 'toggle': return triggerBase.input(e, e.enabled ? 'disable' : 'enable', p, act);
       // a new damage also becomes damage model 1's base (m_flOriginalDamage)
       case 'sethurtdamage': case 'setdamage': e.kv.damage = p; e.state.curDamage = undefined; return true;
