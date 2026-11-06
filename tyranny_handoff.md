@@ -67,27 +67,28 @@ Probes, each run natively and in WASM with identical output and state hash:
 - Without the runtime or `physics.bin`, the old approximation in `physics.js` still runs.
 - Cost: about 0.1 ms per tick on tyranny2.
 
-## Guesses that still need fixing (UNSETTLED)
+## The ten guesses: settled from the binaries (2026-11-07)
 
-Each of these is marked UNSETTLED in the code. Every one must be decompiled and replaced with what CS2 does.
+Every one is now read from cs2_server_20260923.dll / vphysics2_20260924.dll; addresses in `rubikon/CS2_RUNTIME.md`.
 
-1. **Physics step order** (`physics-rubikon.js`, `engine.js`): the step runs after the tick's I/O events and before
-   the entities think. Find where CPhysicsGameSystem's simulate sits in the server frame against entity thinks.
-2. **A parented physbox becomes keyframed** (`physics-rubikon.js`): CPhysBox passes motion type 1 to
-   VPhysicsInitNormal (180d087f0); only motion type 2 with a parent turns into 3. Find what SetParent does to a physics
-   object (CBaseEntity::SetParent and its physics callbacks) and whether the hierarchy keyframes it.
-3. **The thruster's Scale input** (`WorldApi.ThrusterOn`): treated as a multiplier on force. Decompile the input.
-4. **Moving brushes' collision record** (`WorldApi.SpawnKeyframed`, `BrushRecord`): interacts-as solid, interacts-with
-   0xc3001, group 4. Decompile CFuncBrush / CBaseToggle / CFuncMoveLinear / door / train physics creation.
-5. **The collision record's flag byte** (+0x3f, `PhysBox.cs`): 7, taken from resourcecompiler's entity record.
-   Read CCollisionProperty's init.
-6. **Trigger "Everything" includes players** (`math.js touchesPlayers`): from the FGD wording, not traced in server.dll.
-7. **func_clip_vphysics collision groups** (`physics.js`): not decompiled; it blocks only physics objects here.
-8. **The keyframe wake test's turn angle** (`Keyframe.SetTarget`): operation order not matched to the disassembly
-   (it only decides a wake at the 2 degree threshold).
-9. **Thruster OnActivate** (`Thruster.cs`): a semantic port of the server's SSE transform code, not bit-matched.
-10. **KeepUpright ConjugateRotate / Correction** (`KeepUpright.cs`): operation order from the decompile, not checked
-    against the disassembly.
+1. **Step order**: GameFrame runs thinks, then I/O, then physics (post-think event -> OnSimulate). The step now runs
+   after the thinks; PushDynamicTransforms moves physboxes right after it. (The engine still runs I/O before thinks.)
+2. **Parented physbox**: keyframed when its parent has a skeleton instance (a model entity), by the node's motion
+   apply (`FUN_180cb69b0`), on spawn and SetParent; EnableMotion does not free it; ClearParent frees only one that was
+   parented after spawn. A parented entity never follows its body. (Rakiora's hitbox rides its train.)
+3. **Thruster Scale**: running push = scale x the start's push, starting it if off. Also found: **forcetime** (never
+   implemented before): the stop think at the tick SetNextThink rounds to. The Troll/Diablo steering thrusters pulse
+   for 2 or 6 ticks per Activate now.
+4. **Brush records**: per class (`BrushPhysics.cs`); func_train makes no physics in CS2.
+5. **Flag byte**: m_nCollisionFunctionMask, 7 from CCollisionProperty's constructor (unchanged value).
+6. **Trigger "Everything"**: includes players (CBaseTrigger 1803df180); flag 32 turns players away.
+7. **func_clip_vphysics**: group 3, interacts-with physics_prop only.
+8. **Keyframe wake test**, 9. **Thruster OnActivate**, 10. **KeepUpright**: ported lane for lane (`Transforms.cs`);
+   OnActivate also writes the relative angles back onto the thruster, which later KeyValues(angles) re-aim.
+
+The default layer mask (`18045b2a0`) is CONTENTS_SOLID (0x4c1), from vphysics2's own default rules; CS2 overrides
+nothing. So physboxes meet the world, players and func_clip_vphysics, not ordinary brushes, movers or other physboxes
+(CS2_RUNTIME.md "The default layer mask"). When a map's physbox misbehaves, check this before suspecting a lift.
 
 Not ported at all (listed at the end of `rubikon/CS2_RUNTIME.md`):
 - SetTransform / teleport (body vfn 0x1b8, 1801bd3b0).
@@ -97,50 +98,36 @@ Not ported at all (listed at the end of `rubikon/CS2_RUNTIME.md`):
 - Body removal: a killed physbox turns static and stops colliding instead.
 - The player as a physics obstacle: physboxes don't feel players. Players still collide with physboxes as solids.
 
-## Getting the other physbox maps working (deadcore excluded)
+## The other physbox maps (2026-11-07)
 
-These maps already have a `physics.bin`, so their physboxes now run on CS2 physics as soon as the runtime loads:
-ze__hell_p, ze_alien_shooter, ze_dreamin, ze_ffxii_westersand_v8, ze_gris_p, ze_minecraft_sakura, ze_mist_p,
-ze_neochrome, ze_offliner, ze_the_shifting_pool, ze_visualizer.
+Every physics.bin is current (the same bake run and version as tyranny2). A headless sweep ran every scenario of the 11
+maps for 45 s on the WebAssembly runtime (scratch `sweep.mjs`: map-store, createRunEngine, each physbox's motion):
 
-Physboxes that will now move on their own (unparented, motion enabled):
-- ze_alien_shooter: `boss_physbox` (headless check: it rests where it spawns).
-- ze_dreamin: `box_1` to `box_4`, `CY01Physic`, `explo_unit&0000`; also `DONT_shoot_from_here` (debris).
-- ze_ffxii_westersand_v8: `Bonus_Attack_Physbox&0000`.
-- ze_visualizer: `Stage_Switcher_Phybox_Lv1` to `Lv6`.
-- ze__hell_p, ze_gris_p, ze_minecraft_sakura, ze_mist_p, ze_neochrome, ze_offliner, ze_the_shifting_pool: none
-  unparented and motion enabled; their physboxes are motion disabled or parented (keyframed, guess 2 above).
+- Fixed: **ze__hell_p**'s boss room failed to spawn (`drag over a shape of type 3`): mesh shapes' drag bounds / areas
+  ported (CRnMeshShape vfns 0x88 `1802420e0`, 0x90 `180242f90`).
+- Fixed: a func_brush turned off keeps its record and loses function mask bits 0-2 (TurnOff `180e3d060`, TurnOn
+  `180e3d120`), and an attribute change now refilters the shapes' contacts (`FUN_180255860`).
+- As CS2 does it, by the binaries: ze_dreamin's `box_1` falls through its start-disabled `brush_1`; the other boxes rest
+  on their brushes (conditionallysolid with npcclip / passbullets, which a physbox's interacts-with meets). A box that
+  has gone to sleep stays up when its brush is disabled later: nothing on the TurnOff path wakes it and
+  sv_phys_sleep_enable defaults to 1 (GFL's configs don't change it).
+- westersand's Belias tiles go dynamic (the map's EnableMotion) and fall about 1000 units: the attack. tyranny2's
+  tornado / barrel physboxes settle; parented hitboxes (mist's dragon, westersand's Judge, dreamin's boss target) ride
+  their parents keyframed. alien_shooter, sakura, neochrome, offliner, shifting_pool, visualizer: nothing moves on its
+  own in these stages.
 
-For each map:
-1. Make sure the runtime is built: `node tools/build-rubikon.mjs`.
-2. Re-bake `physics.bin` if the map was baked before the current RubikonBake (it reads part damping, mass centre
-   override, surfaces with thickness): `node tools/bake-map.mjs <map> --steps physics`. Then rerun the chunks step if
-   anything else was re-baked (memory: map assets pipeline).
-3. Headless check of each stage with a physbox:
-   `node <scratch>/phys-run.mjs <map> <stageId> <seconds> <entity names...>` (a copy of the script is easy to rebuild:
-   map-store load, `createRunEngine({ physics })`, tick, print `e.pos` and `e.state.body`). Set `PULSE=<thruster>` to
-   pulse a thruster's Activate / Deactivate when no player is there to trip the map's triggers.
-   Look for: bodies that fall through the world (missing collision), bosses that drift when they should hold still,
-   anything that sleeps when the map expects it to move.
-4. Browser check on :5807 in Chrome: `__lasers.startScenario(i)`, `__lasers.advance(s)`, read
-   `__lasers.engine.find(name)[0].pos`. Keep the game paused and audio muted; never save test values in
-   `localStorage['lasers.settings']`.
-5. What to fix when a map misbehaves, using the new findings:
-   - **A boss / hitbox physbox that should hold still**: check spawnflag 0x8000 and damagetoenablemotion /
-     forcetoenablemotion (all three disable motion in CS2). If the map relies on something else, decompile it; don't
-     freeze it by hand.
-   - **Mass-dependent behaviour** (thrusters, pushes): massscale and gamemass now apply exactly; thrust is
-     force x 1000 / mass. Don't retune numbers in JS.
-   - **A physbox that should pass through players**: spawnflag 0x4000 puts it in collision group 5 (debris) with the
-     debris layer. The JS player collision still uses `physbox.solid` (`!(sf & 16384)`), which agrees.
-   - **A physbox riding a mover / lift** (westersand, dreamin): movers are keyframed bodies now. If it slides off or
-     falls through, it is guess 4 (the brush's collision record).
-   - **Parented physboxes**: guess 2. Fix it once from the binary and every map benefits.
-   - **Template-spawned physboxes and thrusters**: handled lazily (the controller is made once its body exists).
-     Thrusters that are re-aimed with KeyValues(angles) take the new angles on their next Activate, and KeyValues force
-     takes effect on the next Activate (SetupForces runs once per start, as in CS2).
-6. Record every new fact with its address in `rubikon/CS2_RUNTIME.md`, and update the README's "changed" column if a
-   copied file is edited.
+**The model's layers in the entity record** (fixed): when its physics is created an entity ORs its model's
+interaction layers into its record (server `FUN_180d0a6e0`, vphysics2 aggregate vfn 0xe8 `180046280`), so default
+brushes and physboxes carry solid / blocklos / blocklight and physboxes meet brushes, movers and each other. Before
+this, physboxes met only the world and clips. ze_visualizer's stage switcher now works: with Stage_Switcher_Brush_Main
+off, only the box over the disabled level brush falls into its trigger and fires that level's relay.
+
+**Triggers touched by physboxes** (on): rubikon `TriggerPhysics.cs` (the record from InitTrigger, the pair test
+through the real filter) and `web/src/world/entities/classes/physics-touch.js` (hull overlap, CBaseTrigger's flag test
+and filter, outputs, after the step). A box that has gone to sleep stays put when the brush under it turns off (no wake
+on that path, sleeping on by default). Visualizer's selector works without one if, as in CS:S, func_brush survives a round
+restart while the boxes respawn awake (UNVERIFIED: CS2's round-restart preserve list is not read).
+dreamin's trigger_1..4 start disabled and nothing enables them. Not ported: hurt / push / teleport effects on physboxes.
 
 ## Deploy note
 The image build needs the .NET 10 SDK with the wasm-tools workload to run `tools/build-rubikon.mjs`, or a prebuilt

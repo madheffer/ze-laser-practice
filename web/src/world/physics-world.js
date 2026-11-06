@@ -56,13 +56,17 @@ class PhysicsWorld {
       [k.collisionGroup || '', k.interactsAs || '', k.interactsWith || '', k.interactsExclude || '']);
   }
 
-  // a brush entity's keyframed body (rubikon/wasm/WorldApi.cs SpawnKeyframed)
-  spawnKeyframed(key, pos, quat) { return api.SpawnKeyframed(this.id, key, v3(pos), q4(quat)); }
+  // a brush or prop entity's keyframed body with its class's collision record (rubikon/src/Game/BrushPhysics.cs);
+  // -1 when the model has no physics or the class makes none
+  spawnKeyframed(key, pos, quat, cls) { return api.SpawnKeyframed(this.id, key, v3(pos), q4(quat), String(cls || '')); }
 
   // the server's per-tick keyframe; false when it would be a teleport (not ported)
   drive(body, pos, quat, teleport = false) { return api.Drive(this.id, body, v3(pos), q4(quat), !!teleport); }
 
   setMotion(body, on) { api.SetMotion(this.id, body, !!on); }
+  // would a trigger with these spawnflags get touch events from the body (rubikon/src/Game/TriggerPhysics.cs)
+  triggerTouches(body, spawnflags, enabled) { return api.TriggerTouches(this.id, body, spawnflags | 0, !!enabled); }
+  setMotionType(body, motion) { api.SetMotionType(this.id, body, motion | 0); } // a parent change: 1 or 3, velocities kept
   setAwake(body, on) { api.SetAwake(this.id, body, !!on); }
   remove(body) { api.Remove(this.id, body); }
   setBrushSolid(body, on) { api.SetBrushSolid(this.id, body, !!on); }
@@ -70,7 +74,10 @@ class PhysicsWorld {
   addThruster(body, spawnflags, force, angles, pos, quat) {
     return api.AddThruster(this.id, body, spawnflags | 0, force || 0, v3(angles), v3(pos), q4(quat));
   }
-  thrusterOn(handle, on, force = 0, scale = 1, angles = [0, 0, 0]) { api.ThrusterOn(this.id, handle, !!on, force, scale, v3(angles)); }
+  thrusterAngles(handle) { return Array.from(api.ThrusterAngles(this.id, handle)); }
+  thrusterStart(handle, force, angles) { return api.ThrusterStart(this.id, handle, force || 0, v3(angles)); }
+  thrusterStop(handle) { api.ThrusterStop(this.id, handle); }
+  thrusterScale(handle, scale) { api.ThrusterScale(this.id, handle, scale || 0); }
 
   addKeepUpright(body, goalAxis, limit, active, dampAll) {
     return api.AddKeepUpright(this.id, body, v3(goalAxis), limit || 0, !!active, !!dampAll);

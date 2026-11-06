@@ -513,6 +513,14 @@ public static class RnMassUpdate
                     float Hi(float p, float q) => (r + p) <= (r + q) ? r + q : r + p;
                     return (new Vector3(Lo(a.X, b.X), Lo(a.Y, b.Y), Lo(a.Z, b.Z)), new Vector3(Hi(a.X, b.X), Hi(a.Y, b.Y), Hi(a.Z, b.Z)));
                 }
+            case 3:
+                {
+                    // CRnMeshShape vfunc 0x88 (1802420e0): the mesh's box times the shape's per-axis scale (+0xb8), 1/16 out
+                    var m = shape.Mesh!;
+                    var sc = shape.MeshScale;
+                    return (new Vector3((sc.X * m.Min.X) - 0.0625f, (sc.Y * m.Min.Y) - 0.0625f, (sc.Z * m.Min.Z) - 0.0625f),
+                            new Vector3((sc.X * m.Max.X) + 0.0625f, (sc.Y * m.Max.Y) + 0.0625f, (sc.Z * m.Max.Z) + 0.0625f));
+                }
             default:
                 throw new NotSupportedException($"drag over a shape of type {shape.Type}");
         }
@@ -544,6 +552,8 @@ public static class RnMassUpdate
                                        (((sy + sy) * r) + circle) / ((MathF.Abs(dz) + d) * (MathF.Abs(dy) + d)),
                                        (((sz + sz) * r) + circle) / ((MathF.Abs(dz) + d) * (MathF.Abs(dx) + d)));
                 }
+            case 3:
+                return shape.Mesh!.OrthographicAreas; // CRnMeshShape vfunc 0x90 (180242f90): the mesh's own (+0xa8), unscaled
             default:
                 throw new NotSupportedException($"drag over a shape of type {shape.Type}");
         }

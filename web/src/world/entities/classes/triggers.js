@@ -33,7 +33,7 @@ for (const k of ['trigger_multiple', 'trigger_once', 'trigger_hurt', 'trigger_pu
   register(k, { trigger: true, input: triggerBase.input });
 }
 
-const TOUCH_CLASSES = ['trigger_hurt', 'trigger_multiple', 'trigger_once', 'trigger_push', 'trigger_teleport', 'trigger_gravity', 'trigger_soundscape'];
+export const TOUCH_CLASSES = ['trigger_hurt', 'trigger_multiple', 'trigger_once', 'trigger_push', 'trigger_teleport', 'trigger_gravity', 'trigger_soundscape'];
 const EPS = 1e-6;
 
 // ------------------------------------------------------------------ trigger_hurt
@@ -145,7 +145,7 @@ export function filterPasses(engine, fname, depth = 0, who = engine.playerEnt) {
   const neg = bool(f.kv.negated);
   let pass = true;
   if (f.cls === 'filter_activator_team') pass = num(f.kv.filterteam) === who.team;
-  else if (f.cls === 'filter_activator_class') pass = String(f.kv.filterclass).toLowerCase() === 'player';
+  else if (f.cls === 'filter_activator_class') pass = String(f.kv.filterclass).toLowerCase() === String(who.cls || 'player').toLowerCase();
   else if (f.cls === 'filter_activator_context') {
     const want = String(f.kv.responsecontext || '').split(':')[0].toLowerCase();
     pass = !!who.contexts?.has(want);
@@ -222,7 +222,7 @@ const filterTest = {
 for (const k of ['filter_activator_team', 'filter_activator_class', 'filter_activator_context', 'filter_activator_name', 'filter_multi']) register(k, filterTest);
 
 // trigger_multiple's re-fire interval: its `wait`, and 0 means 0.2 s (Source SDK CTriggerMultiple::Spawn)
-function multipleWait(e) {
+export function multipleWait(e) {
   const w = num(e.kv.wait, 0.2);
   return w > 0 ? w : w < 0 ? Infinity : 0.2; // negative: fires once per touch
 }

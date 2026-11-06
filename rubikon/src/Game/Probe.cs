@@ -67,7 +67,7 @@ public static class Probe
         var tq = Quaternion.CreateFromAxisAngle(Vector3.UnitZ, yaw) * Quaternion.CreateFromAxisAngle(Vector3.UnitY, pitch) * Quaternion.CreateFromAxisAngle(Vector3.UnitX, roll);
         t.OnActivate(at + offset, tq);
         ref var s = ref body.State;
-        t.SetupForces(new Vec3(at.X, at.Y, at.Z), s.Orientation);
+        t.Start(new Vec3(at.X, at.Y, at.Z), s.Orientation);
         t.Controller = world.CreateController(t);
         t.Controller.Attach(body);
         if (keepUprightLimit > 0f)

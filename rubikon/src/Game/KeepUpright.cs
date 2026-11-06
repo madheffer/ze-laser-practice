@@ -29,7 +29,7 @@ public sealed class KeepUpright : IMotionEvent
         if (!Active) return;
         ref var b = ref body.State;
         var w = LocalAngularVelocity(b);                        // body vfn 0x248
-        var goal = ConjugateRotate(TransformRotation(b), WorldGoalAxis); // vfn 0x1b0, then 180e8de00
+        var goal = ConjugateRotate(Transforms.BodyRotation(b.Orientation), WorldGoalAxis); // vfn 0x1b0, then 180e8de00
         Vec3 add;
         if (!DampAllRotation)
             add = Correction(LocalTestAxis, goal, w, 1f, 1f / dt, AngularLimit);
@@ -56,62 +56,21 @@ public sealed class KeepUpright : IMotionEvent
         return new Vec3((v.X - (ux + ux)) * deg, (v.Y - (uy + uy)) * deg, (v.Z - (uz + uz)) * deg);
     }
 
-    // body vfn 0x1b0 (vphysics2 180011fb0), its rotation: the orientation as a matrix, back to a quaternion
-    // (MatrixQuaternion: the trace branch, else the largest diagonal), normalized by dpps (Intel SDM: (x*x + y*y) +
-    // (z*z + w*w)), the identity when it has no length
-    static Quat TransformRotation(in RnBodyState b)
-    {
-        var q = b.Orientation;
-        float x = q.X, y = q.Y, z = q.Z, w = q.W;
-        var a7 = (z * z) + (y * y);
-        var a23 = (w * y) + (z * x); a23 += a23;
-        var a26 = (z * x) - (w * y); a26 += a26;
-        var a15 = (z * z) + (x * x);
-        var a17 = (y * y) + (x * x);
-        var m00 = 1f - (a7 + a7);
-        var a8 = (y * x) - (w * z); a8 += a8;
-        var a11 = (w * z) + (y * x); a11 += a11;
-        var m11 = 1f - (a15 + a15);
-        var m22 = 1f - (a17 + a17);
-        var a19 = (z * y) + (w * x); a19 += a19;
-        var a9 = (z * y) - (w * x); a9 += a9;
-        var trace = (m00 + m11) + m22;
-        float cx, cy, cz, cw;
-        if (trace < 0f)
-        {
-            if (m00 <= m11 || m00 <= m22)
-            {
-                if (m11 <= m22) { cx = a23 + a26; cy = a9 + a19; cz = ((m22 - m00) - m11) + 1f; cw = a11 - a8; }
-                else { cx = a8 + a11; cy = ((m11 - m22) - m00) + 1f; cz = a9 + a19; cw = a23 - a26; }
-            }
-            else { cx = ((m00 - m11) - m22) + 1f; cy = a8 + a11; cz = a23 + a26; cw = a19 - a9; }
-        }
-        else { cx = a19 - a9; cy = a23 - a26; cz = a11 - a8; cw = trace + 1f; }
-        var len = MathF.Sqrt(((cx * cx) + (cy * cy)) + ((cz * cz) + (cw * cw)));
-        if (len == 0f) return new Quat { X = 0f, Y = 0f, Z = 0f, W = 1f };
-        return new Quat { X = cx / len, Y = cy / len, Z = cz / len, W = cw / len };
-    }
-
-    // 180e8de00: the vector turned by the conjugate rotation (the transform's quaternion with x, y, z negated, normalized
-    // by dpps). Operation order from the decompile, not yet checked against the disassembly
+    // 180e8de00 (checked against its disassembly): the transform's rotation (+0x10) with x, y, z negated (xorps
+    // 181e857d0), normalized by dpps (divps; a zero length takes 181f46f00, filled at load: the identity), turning v as
+    // Transforms.Rotate does: (q x t) + (v + w t)
     static Vec3 ConjugateRotate(Quat t, Vec3 v)
     {
         float x = -t.X, y = -t.Y, z = -t.Z, w = t.W;
         var len = MathF.Sqrt(((x * x) + (y * y)) + ((z * z) + (w * w)));
-        if (len == 0f) { x = 0f; y = 0f; z = 0f; w = 1f; }
-        else { x /= len; y /= len; z /= len; w /= len; }
-        var f6 = (v.Z * y) - (v.Y * z); f6 += f6;
-        var f7 = (v.X * z) - (v.Z * x); f7 += f7;
-        var f8 = (v.Y * x) - (v.X * y); f8 += f8;
-        return new Vec3((((f8 * y) - (f7 * z)) + v.X) + (w * f6),
-                        (((f6 * z) - (f8 * x)) + v.Y) + (w * f7),
-                        (((f7 * x) - (f6 * y)) + v.Z) + (w * f8));
+        var q = len == 0f ? Quat.Identity : new Quat(x / len, y / len, z / len, w / len);
+        return Transforms.Rotate(q, v);
     }
 
-    // 180e69700: the axis of the turn from test to goal (their cross product, normalized) times (invDt x the angle
-    // between them in degrees - gain x the angular velocity about that axis), then normalized and held to the limit.
-    // Operation order from the decompile, not yet checked against the disassembly. A cross product shorter than 1e-17
-    // (FUN_181471150, a scaled normalize) is normalized directly here
+    // 180e69700 (checked against its disassembly): the axis of the turn from test to goal (their cross product,
+    // normalized) times (invDt x the angle between them in degrees - gain x the angular velocity about that axis), then
+    // normalized and held to the limit (minss limit, len). A length outside [1e-17, 1e17] (and not 0) is normalized by
+    // FUN_181471150 in double precision
     static Vec3 Correction(Vec3 test, Vec3 goal, Vec3 w, float gain, float invDt, float limit)
     {
         var ax = (test.Y * goal.Z) - (goal.Y * test.Z);
@@ -121,8 +80,9 @@ public sealed class KeepUpright : IMotionEvent
         float nx, ny, nz;
         if (sin < 1e-17f || 1e+17f < sin)
         {
-            if (sin != 0f) { nx = ax / sin; ny = ay / sin; nz = az / sin; }
-            else { nx = 0f; ny = 0f; nz = 0f; }
+            if (sin != 0f) sin = NormalizeDouble(ref ax, ref ay, ref az);
+            else { ax = 0f; ay = 0f; az = 0f; sin = 0f; }
+            nx = ax; ny = ay; nz = az;
         }
         else { var r = 1f / sin; nx = r * ax; ny = r * ay; nz = r * az; }
         var cos = ((goal.Y * test.Y) + (test.Z * goal.Z)) + (test.X * goal.X);
@@ -135,12 +95,25 @@ public sealed class KeepUpright : IMotionEvent
         float dx, dy, dz;
         if (len < 1e-17f || 1e+17f < len)
         {
-            if (len != 0f) { dx = rx / len; dy = ry / len; dz = rz / len; }
+            if (len != 0f) { len = NormalizeDouble(ref rx, ref ry, ref rz); dx = rx; dy = ry; dz = rz; }
             else { dx = 0f; dy = 0f; dz = 0f; len = 0f; }
         }
         else { var r = 1f / len; dx = r * rx; dy = r * ry; dz = r * rz; }
-        if (len <= limit) limit = len;
-        return new Vec3(dx * limit, dy * limit, dz * limit);
+        var m = limit < len ? limit : len; // minss xmm1(limit), xmm0(len)
+        return new Vec3(dx * m, dy * m, dz * m);
+    }
+
+    // FUN_181471150: the vector normalized in double precision (sqrt((y*y + x*x) + z*z), times 1.0 / length, each rounded
+    // to float), returning (float)min(length, FLT_MAX)
+    static float NormalizeDouble(ref float x, ref float y, ref float z)
+    {
+        double dx = x, dy = y, dz = z;
+        var len = Math.Sqrt(((dy * dy) + (dx * dx)) + (dz * dz));
+        var r = 1.0 / len;
+        x = (float)(r * dx);
+        y = (float)(r * dy);
+        z = (float)(r * dz);
+        return (float)(len < 3.4028234663852886e+38 ? len : 3.4028234663852886e+38);
     }
 
     public static Vec3 UpVector(Quaternion orientation)

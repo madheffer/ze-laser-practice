@@ -11,10 +11,10 @@ export function parseVec(s, def = [0, 0, 0]) {
 }
 export const num = (s, d = 0) => { const v = parseFloat(s); return Number.isFinite(v) ? v : d; };
 
-// Does a trigger touch players? Its "Clients" (1) or "Everything" (64) spawnflag (CS2 FGD), then its filter decides
-// (ze_tyranny2's boss steering triggers are 64 only). UNSETTLED: CS2's trigger flag test isn't decompiled yet; that
-// "Everything" includes players is the FGD's wording, not traced in server.dll
-export const touchesPlayers = (kv) => (num(kv.spawnflags) & (1 | 64)) !== 0;
+// Does a trigger touch players? CBaseTrigger's flag test (server 1803df180, vtable slot 0x878) passes anything with 64
+// ("Everything", ze_tyranny2's boss steering triggers), a client (FL_CLIENT) with 1; then 32 ("only clients in
+// vehicles") turns a player away unless it is in a vehicle (never, in CS2), and the filter entity decides
+export const touchesPlayers = (kv) => { const sf = num(kv.spawnflags); return (sf & (1 | 64)) !== 0 && !(sf & 32); };
 export const bool = (s) => s === true || s === 'true' || s === '1' || s === 1;
 
 // Source QAngle (pitch, yaw, roll in degrees) -> quaternion. Rz(yaw) * Ry(pitch) * Rx(roll).

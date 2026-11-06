@@ -69,7 +69,7 @@ Ported: `MotionController`.
 - body vfn 0x1b0 (`180011fb0`), its rotation: the orientation to a matrix and back (MatrixQuaternion), normalized by
   dpps; vfn 0x248 (`180014550`): the world-to-body rotate of +0x114, x 57.295776.
 
-Ported: `KeepUpright` (180e8de00 and 180e69700 in the decompile's operation order; not yet checked in disassembly).
+Ported: `KeepUpright` (180e8de00 and 180e69700 checked against the disassembly: "Transform code" below).
 
 ## vphysics2 CPhysicsBody (vtable `1803f44e0`), the calls above
 
@@ -127,7 +127,7 @@ Ported in `src/Game/PhysBox.cs`; checked by `--thruster ... <spawnflags> <masssc
   move type is 5; the entity and owner handles; the hierarchy id. It reaches each shape through the entity's vfn 0x5e0
   -> aggregate vfn 0xf0 (`180046220`) -> body `1801ba7e0` -> shape `180256d00`: source2-compiler's capture-checked
   `Layered` (the record's fields, the base's layers added unless they are the default mask, the base's group when
-  below 4). The record's flag byte (+0x3f) is not read yet (7, as resourcecompiler's). The phys_thruster force is
+  below 4). The record's flag byte (+0x3f) is m_nCollisionFunctionMask, 7 from the constructor ("Brush entities"). The phys_thruster force is
   +0x4b8 straight from the "force" keyvalue (datamap `180e5af80`), so F = force x 1000 and the thrust is F x invMass.
 
 ## Keyframed movers
@@ -145,8 +145,136 @@ Ported in `src/Game/Keyframe.cs`; checked by `--keyframe` (native = WebAssembly)
   target is more than 1/32 unit away or turned more than 0.0349 rad), or the transform set outright (body vfn 0x1b8,
   `1801bd3b0`, not ported) on a teleport or with no controller.
 
+## The server frame
+
+- **CSource2Server::GameFrame** (`180dd4970`): the pre-think event (game system slot 0xf8), the think pass
+  (CSimThinkManager vtable `181805a48` vfn 0, `1805af790`: each entity's PhysicsSimulate / think), the entity I/O queue
+  (`FUN_18138c120` on the entity system: "target entity not found", 10000 events at most), then the post-think event
+  (slot 0x100) whose CPhysicsGameSystem handler (`180583f00`) runs OnSimulate (`18059ef60`): PullKinematicTransforms
+  (`1805a5ca0`), SimulateFrame (`1805ba760`), PushDynamicTransforms (`1805a7260`). Physics runs after the thinks and
+  the I/O. The slot 0xe0 handler (`1805c1840`) is not dispatched by server.dll. Ported: `entities/engine.js` tick
+  (the engine keeps its I/O-before-thinks order).
+- **PushDynamicTransforms** (`1805c29c0`): a node whose m_nHierarchyType (+0xec, schema) is not 0 is skipped, so a
+  parented entity never follows its body; else, with one dynamic body, the node takes the body's transform.
+
+## Physbox motion and the hierarchy
+
+- Spawn is two passes (`181383560`): every entity's keyvalues (`FUN_181373f70`), then Spawn grouped by hierarchy depth
+  (`180c24000`, CGameEntitySystem slot 0x98 -> `18138cff0`: vfn 0x48 with the keyvalues). parentname is the scene
+  node's keyvalue (`180c24190`, "unrecognized parent"), so the parent exists before CreateVPhysics.
+- **Move type recompute** (CBaseEntity vfn 0x2b0, `1803de760`): m_nActualMoveType (+0x2f5) = m_MoveType (+0x2f3),
+  except with a parent: MOVETYPE_NONE unless PUSH with m_flMoveDoneTime > 0 or OBSERVER; on a change, entity vfn 0x5e0
+  and the physics motion FUN_1801a4a40(vfn 0x2b8 (`180d13510`: move type == 5) ? 1 : 3). SetMoveType (`1803e4ba0`)
+  and the parent change (`180c2caa0`) run it.
+- **The motion type** (`FUN_180cb1900`, node +0x120 +0x282) re-applies only when it changes (`FUN_180cb69b0`): when the
+  node's parent has a skeleton instance (parent node vfn 0x68), one body is keyframed (3) unless the parent's
+  aggregate is dynamic (motion 1) and m_nHierarchyType is 3; otherwise the stored type (3 keyframed, 2 static, else 1);
+  the children are re-applied. The aggregate's creation (`180cb3350`) and SetParent (`180be2670` -> node vfn 0xa8,
+  `180caf840`) apply it; ClearParent does not (only the recompute's change). VPhysicsInitNormal sets 1 after its
+  SetMoveType. EnableMotion / DisableMotion (`FUN_1803df550`) set 1 / 3 with no parent test (DisableMotion zeroes the
+  velocities). So a physbox under a model entity (train, door, prop, physbox) is keyframed and follows it; one under a
+  point entity keeps its own motion. Ported: `physics-rubikon.js` applyMotion (a parent with a model is taken as one
+  with a skeleton instance).
+
+## Brush entities
+
+Each class's CreateVPhysics (slot 0x238) calls VPhysicsInitNormal (`180d087f0`) with motion type 3 (move type 6), its
+group (FUN_180d07730: debris / touchall re-derived) and an interacts-with that replaces the record's (cleared, then
+set). CFuncBrush `180e1af60` 0; CBaseDoor `180d399f0` 0x80c3001; CRotDoor `180d39a50`, CFuncMoveLinear `180d8b6e0`,
+CFuncTrackTrain `180fbefd0`, CFuncRotating `180d8b7f0`, CBreakable `180d8b670`, CDynamicProp `180b9a3d0`, CFuncWall
+`180ce6660` (group 4) 0xc3001; CBaseButton / CMomentaryRotButton `180ce61b0` 0xc3001 and interacts-as bit 23;
+CFuncVPhysicsClip `180ce6490` group 3, 0x200000 (physics_prop), its solid bit cleared; CFuncMover / CFuncRotator group 3
+with extras (not used here). CBaseEntity / CBaseModelEntity / CBaseToggle / CFuncTrain `1803c9f60`: none.
+CCollisionProperty's constructor (`180cd6e90`): interacts-as 0x20000 (touchall), with / exclude 0, group 4, function
+mask 7 (+0x3c = 0x07000000). The record builder (`180d11800`) adds physics_prop only for m_MoveType 5. Schema:
+VPhysicsCollisionAttribute_t at property +0x10 (as +0x8, with +0x10, exclude +0x18, entity +0x20, owner +0x24,
+hierarchy +0x28, group +0x2e, m_nCollisionFunctionMask +0x2f, the shape's +0x77 flags). Ported: `BrushPhysics.cs`.
+
+## Triggers
+
+- CBaseTrigger's flag test (`1803df180`, slot 0x878): 64 anything; 1 FL_CLIENT (flags bit 7); 2 NPCs; 8 move type
+  VPHYSICS; 0x400 groups 5 / 6; 0x2000 interacts-as bit 38; then 32 / 512 vehicle conditions for players; then the
+  filter (m_hFilter +0x9b0). Ported: `entities/math.js` touchesPlayers.
+
+## phys_thruster inputs and forcetime
+
+- start (`180e73b40`) keeps SetupForces' result twice: running +0x4d4 / +0x4e0 and base +0x4ec / +0x4f8; forcetime
+  (+0x4bc) != 0 schedules the stop at now + forcetime (SetNextThink `1803e4db0`: tick (int)(t x 64 + 0.5)).
+- Scale (`180e3fc80`): starts it when not running, running = scale x base (`180e8e520`), then the controller's vfn
+  0x60 (`1800579c0`: every attached body's Wake). Deactivate (`180e3fa80`) and the think call the stop (`180e73a40`:
+  controller destroyed, body woken, think cleared). SetupForces reads m_angRotation (node +0xb8, the local angles).
+- OnActivate with 8 (`180e84c70`): body vfn 0x1b0 (`180011fb0`), inverted (`181473ba0`), concatenated with the
+  thruster's transform (`1814738d0`); the offset is its position, its rotation's angles (`181473400` -> `181470cb0`)
+  go back onto the thruster (`1803e4440`). Ported lane for lane in `Transforms.cs`.
+
+## Transform code (lane order)
+
+`Transforms.cs`: the rotate every one of these uses ((q x t) + (v + w t), t = 2 (q x v)); 181473ba0 (scale 1: the
+unnormalized conjugate turns the position; else normalized, times -1/s, zero lengths FLT_EPSILON); 1814738d0 (qa qb as
+masked swizzles 181e857e0 / 181e857f0 / 181e85800); 181473400 (the matrix from q2 = q + q); 181470cb0 (MatrixAngles,
+0.001 threshold). 1802c5230's wake test turns target x conj(body) (masks 180449190..1c0). 180e8de00 and 180e69700
+(KeepUpright) checked; 180e69700's out-of-range normalize is `181471150` (double). Native = WebAssembly
+(`--thruster`, `--keyframe` hashes).
+
+## The default layer mask
+
+- vphysics2's static constructor (`1800065c0`) zeroes it; RnCollision_RegisterDefaultRules (`180296fa0`, from
+  VPhysics2_InitCollisionGroups `18006e1d0`) writes mask +0x220 = 1, solid bits +0x228 = 1, +0x230 = 0, the default
+  preset index +0x218 = -1, registers the presets (`180298b30`) and then makes CONTENTS_SOLID the default
+  (`180297ddb`: +0x218 = its index, +0x220 = its mask, 0x4c1: solid, blocklos, blocklight, blocksound). CS2 overrides
+  none of it (gameinfo's Physics block has only BuildMeshWings; server.dll registers no layers).
+- The shape merge (`180256c80` base, `180256d00` record): a base equal to the default mask (and not group 3) leaves no
+  base layers; with a base group below 4 or base layers holding a solid bit, interacts-as = base | (record & ~1), else
+  record | (base & ~1) (`18045b2a8` = 1, `18045b2b0` = 0); a group-4 record with no layers and function flag 1 takes
+  the default. For the models these maps use (empty InteractAs, group "default": trains, brushes, movers, physboxes,
+  clips) that is the record's layers, as `GameWorld.Layered` gives.
+- The entity records then take the model's layers at creation ("The model's layers in the entity record"), so a
+  physbox meets the world, players, func_clip_vphysics, brushes, movers and other physboxes.
+
+## Brush solidity and contact refilter
+
+- CFuncBrush TurnOff (vfn 0x878, `180e3d060`): unless solidity 2, FUN_180ce76c0 clears the function mask's bits 0-2;
+  EF_NODRAW; m_iDisabled 1. TurnOn (`180e3d120`): unless solidity 1, FUN_180cea920 sets them. The record reaches the
+  physics through entity vfn 0x5e0 (`1803c81a0`) -> `180ca18e0` -> aggregate vfn 0xf0 -> body `1801ba7e0` -> shape
+  `180256d00` with refilter: `FUN_180255860` destroys each contact whose bodies the world ignores (`FUN_1801faf20`,
+  world +0x790), whose pair flags changed or that ShouldCollide refuses, then marks the shape for the query. Destroying
+  a contact (`1801f7450`) wakes nothing. Ported: `WorldApi.SetBrushSolid`, `GameWorld.SetEntityAttributes`.
+- sv_phys_sleep_enable (`180076a40`) defaults to 1.
+
+## Mesh shapes in the mass update
+
+CRnMeshShape vfn 0x88 (`1802420e0`): the mesh box times the shape's per-axis scale (+0xb8), 1/16 out; vfn 0x90
+(`180242f90`): the mesh's orthographic areas (+0xa8), unscaled. Ported: `RnMassUpdate` Bounds / Areas.
+
+## Trigger touches
+
+- Touches are vphysics2's: a pair whose contact flags keep bit 2 (the pair filter: both function masks with 4, different
+  entity ids) counts touching shape pairs per body pair (world +0xa4..+0xc8); the end side is `1801feca0`, events are
+  collected for the game by world vfn 0x3d0 (`180059170`). OnSimulate (`18059ef60`) dispatches them right after the
+  step (`18057ad70`): StartTouch / EndTouch on both entities.
+- CBaseTrigger spawn (`1803e5d60`): exclude bit 30; 0x810 adds spawnflag 2, 32 and 512 add 1; the subclass sets
+  function mask 0x20 (`180ceae90`). InitTrigger (`1803d7230`): interacts-as the trigger layer (bit 2, touchall
+  removed); interacts-with 0x400 debris, 64 touchall, 8 physics_prop, 1 player, 2 npc, 0x2000 bit 38; mask without 0x48
+  (spawnflag 0x10000000: `180ceacb0`, unused here); a radius makes a sphere, else the model; disabled clears bits 0-2.
+  Triggers create no physics through slot 0x238. Their model shapes are group "default" with empty layers.
+- CBaseTrigger::StartTouch then runs the flag test (`1803df180`) and the filter (m_hFilter). Ported:
+  `TriggerPhysics.cs` (record, pair test through `CollisionFilter`), `physics-touch.js` (overlap of hulls, the flag
+  test, outputs, after the step). Not ported: the shape-exact overlap (hulls here), hurt / push / teleport effects
+  on physboxes.
+
+## The model's layers in the entity record
+
+When VPhysicsInitNormal creates the physics (`FUN_180d0a6e0`), an entity of solid type 1 or 6 (VPhysicsInitNormal
+sets 6) takes the model's layers into its record: interacts-as |= the aggregate's (CPhysAggregateInstance vfn 0xe8,
+vphysics2 `180046280`: the first palette entry, or the first later one of group 4 or above when the first is below 4;
+an empty group-4 interacts-as reads as the default mask) without blocksound (bit 10) unless that entry is group 3
+(`FUN_180ceaa80`); interacts-exclude |= its exclude (`FUN_180ceab10`). So a default-layer brush or physbox record holds
+solid, blocklos and blocklight, and physboxes meet brushes, movers and each other. Ported: `GameWorld.ModelLayers` /
+`MergeModelLayers`, called by `PhysBox.Spawn` and `WorldApi.SpawnKeyframed`. Checked: a physbox dropped on a
+keyframed physbox rides it (`--keyframe`, native = WebAssembly).
+
 ## Not yet read
 
 - SetTransform (body vfn 0x1b8, `1801bd3b0` -> `1801bcf70`, `1801bca60`): a teleport; a func_physbox start asleep
-  (spawnflag 0x100000); buoyancy and fluid drag; the collision record's flag byte; the contact refilter after a
+  (spawnflag 0x100000); buoyancy and fluid drag; the contact refilter after a
   mid-simulation collision change (shape `180256d00` with refilter: `FUN_180255860`, `FUN_1802d6c90`).

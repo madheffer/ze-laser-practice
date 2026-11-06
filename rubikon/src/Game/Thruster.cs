@@ -13,14 +13,19 @@ public sealed class Thruster : IMotionEvent
 {
     /// <summary>+0x360: 1 start on, 2 force, 4 torque, 8 orient locally, 16 ignore mass (never read), 32 ignore position.</summary>
     public int SpawnFlags;
-    /// <summary>+0x4b8: the force keyvalue (Scale input sets it).</summary>
+    /// <summary>+0x4b8: the force keyvalue (KeyValues force changes it; read by the next start's SetupForces).</summary>
     public float Force;
-    /// <summary>The scene node's local angles (+0x270 +0xb8: pitch, yaw, roll in degrees); with 8, relative to the body.</summary>
+    /// <summary>
+    /// The scene node's local angles (m_angRotation, +0x270 +0xb8: pitch, yaw, roll in degrees), read by SetupForces at
+    /// every start. With 8 OnActivate sets them (180e84c70 -> 1803e4440) to the thruster's rotation relative to the body.
+    /// </summary>
     public Vector3 LocalAngles;
     /// <summary>+0x508: the offset from the body's frame, in the body's frame (0 unless orient locally).</summary>
     public Vec3 LocalOrigin;
-    /// <summary>+0x4d4 / +0x4e0: the velocity changes per second SetupForces worked out.</summary>
+    /// <summary>+0x4d4 / +0x4e0: the velocity changes per second the controller adds (the Scale input rescales them).</summary>
     public Vec3 Linear, Angular;
+    /// <summary>+0x4ec / +0x4f8: SetupForces' result as the start kept it, what Scale multiplies (180e8e520).</summary>
+    public Vec3 BaseLinear, BaseAngular;
     /// <summary>+0x4c0: the attached body.</summary>
     public RnBody? Body;
     /// <summary>+0x4a8 (+0x95 x 8): the controller while running.</summary>
@@ -30,24 +35,39 @@ public sealed class Thruster : IMotionEvent
     bool Local => (SpawnFlags & 8) != 0; // the event's +8 byte (180e91610: entity +0x4d0 = spawnflags bit 3)
 
     /// <summary>
-    /// OnActivate (slot 0x778, 180e84c70), at spawn: with 8 the thruster's transform relative to the body (its
-    /// position the offset, its rotation the local angles); with 32 the offset is zeroed.
-    /// SEMANTIC PORT: the server's transform inverse / concat (181473ba0, 1814738d0) and MatrixAngles (181473400 ->
-    /// 181470cb0) are SSE transform code not matched bit for bit; this is the same transform in plain float math.
+    /// OnActivate (slot 0x778, 180e84c70), at spawn: with 8 the thruster's transform relative to the body's (body vfn
+    /// 0x1b0, inverted by 181473ba0, concatenated with the thruster's by 1814738d0): its position is the offset (+0x508),
+    /// its rotation's angles (181473400) become the thruster's local angles; with 32 the offset is zeroed. Lane for lane
+    /// as the server's SSE code (Transforms); the thruster's own transform is the game's, from its angles.
     /// </summary>
     public void OnActivate(Vector3 thrusterPosition, Quaternion thrusterOrientation)
     {
         if (Body == null) return;
         if (Local)
         {
-            ref var b = ref Body.State;
-            var o = BodyOps.LocalToWorldPoint(b, default);
-            var inv = Quaternion.Conjugate(new Quaternion(b.Orientation.X, b.Orientation.Y, b.Orientation.Z, b.Orientation.W));
-            var rel = Vector3.Transform(thrusterPosition - new Vector3(o.X, o.Y, o.Z), inv);
-            LocalOrigin = new Vec3(rel.X, rel.Y, rel.Z);
-            LocalAngles = MatrixAngles(Quaternion.Normalize(inv * thrusterOrientation));
+            var inv = Transforms.Inverse(Transforms.BodyTransform(Body.State));
+            var rel = Transforms.Concat(inv, new GameTransform(new Vec3(thrusterPosition.X, thrusterPosition.Y, thrusterPosition.Z), 1f,
+                new Quat(thrusterOrientation.X, thrusterOrientation.Y, thrusterOrientation.Z, thrusterOrientation.W)));
+            LocalOrigin = rel.Position;
+            var a = Transforms.QuaternionAngles(rel.Rotation);
+            LocalAngles = new Vector3(a.X, a.Y, a.Z);
         }
         if ((SpawnFlags & 32) != 0) LocalOrigin = default;
+    }
+
+    /// <summary>The start's SetupForces (180e73b40): the result is both the running push and the base Scale works from.</summary>
+    public void Start(Vec3 entityPosition, Quat entityOrientation)
+    {
+        SetupForces(entityPosition, entityOrientation);
+        BaseLinear = Linear;
+        BaseAngular = Angular;
+    }
+
+    /// <summary>The Scale input (180e3fc80 -> 180e8e520): the running push is scale x the base, lane by lane.</summary>
+    public void Scale(float scale)
+    {
+        Linear = new Vec3(scale * BaseLinear.X, scale * BaseLinear.Y, scale * BaseLinear.Z);
+        Angular = new Vec3(scale * BaseAngular.X, scale * BaseAngular.Y, scale * BaseAngular.Z);
     }
 
     /// <summary>
@@ -107,17 +127,5 @@ public sealed class Thruster : IMotionEvent
         float sy = CrtMath.Sin(a.Y * 0.017453292f), cy = CrtMath.Cos(a.Y * 0.017453292f);
         float sp = CrtMath.Sin(a.X * 0.017453292f), cp = CrtMath.Cos(a.X * 0.017453292f);
         return new Vec3(cy * cp, sy * cp, -sp);
-    }
-
-    // Source's MatrixAngles of a rotation (pitch, yaw, roll in degrees). SEMANTIC PORT (see OnActivate)
-    static Vector3 MatrixAngles(Quaternion q)
-    {
-        var m = Matrix4x4.CreateFromQuaternion(q); // row-vector convention: rows are the rotated axes
-        float fx = m.M11, fy = m.M12, fz = m.M13, lx = m.M21, ly = m.M22, lz = m.M23, uz = m.M33;
-        var xy = MathF.Sqrt((fx * fx) + (fy * fy));
-        const float r2d = 57.29578f;
-        if (xy > 0.001f)
-            return new Vector3(CrtMath.Atan2(-fz, xy) * r2d, CrtMath.Atan2(fy, fx) * r2d, CrtMath.Atan2(lz, uz) * r2d);
-        return new Vector3(CrtMath.Atan2(-fz, xy) * r2d, CrtMath.Atan2(-lx, ly) * r2d, 0f);
     }
 }

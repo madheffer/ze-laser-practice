@@ -22,6 +22,7 @@ public sealed class GameWorld
     readonly List<List<RnMassUpdate.Shape>> _massShapes = [];
     // each shape's palette entry, the base an entity record goes on (vphysics2 180256c80 keeps it at shape +0x78 / +0xac)
     readonly List<List<CollisionAttributes>> _baseAttributes = [];
+    readonly List<PhysModel?> _bodyModels = [];
 
     /// <summary>The name hash of the surface property "default", which a shape without one gets (SettleWorld.DefaultSurface).</summary>
     public const uint DefaultSurface = 1977497166;
@@ -52,9 +53,52 @@ public sealed class GameWorld
         World.AddBody(NewBody(new Vec3(0f, 0f, 0f), 1f, Quat.Identity));
         _massShapes.Add([]);
         _baseAttributes.Add([]);
+        _bodyModels.Add(null);
     }
 
     public bool HasModel(string key) => _models.ContainsKey(key);
+
+    /// <summary>
+    /// The aggregate's interaction layers (CPhysAggregateInstance vfn 0xe8, vphysics2 180046280): the model's collision
+    /// attribute palette entry to stand for it (the first, unless it is below group 4 and a later one is not, which then
+    /// takes over), its interacts-as (the default mask for an empty group-4 one: the palette here holds that already),
+    /// its exclude and its group. Null for a body with no palette.
+    /// </summary>
+    public (ulong As, ulong Exclude, byte Group)? ModelLayers(int index)
+    {
+        var m = index >= 0 && index < _bodyModels.Count ? _bodyModels[index] : null;
+        if (m == null || m.Attributes.Count == 0) return null;
+        var sel = Entry(m, 0);
+        for (var i = 1; i < m.Attributes.Count; i++)
+        {
+            if (sel.Group >= 4) continue;
+            var c = Entry(m, i);
+            if (c.Group >= 4) sel = c;
+        }
+        return (sel.InteractsAs, sel.InteractsExclude, sel.Group);
+    }
+
+    // a palette entry as 180046280 reads it: an empty interacts-as is the default mask only in group 4
+    CollisionAttributes Entry(PhysModel m, int i)
+    {
+        var c = Attributes(m, i);
+        if (m.Attributes[i].InteractAs.Length == 0 && c.Group != 4) c.InteractsAs = 0;
+        return c;
+    }
+
+    /// <summary>
+    /// The entity's record takes the model's layers when its physics is created (server FUN_180d0a6e0, solid type 1 or
+    /// 6, which VPhysicsInitNormal sets): interacts-as |= the aggregate's (vfn 0xe8) without blocksound (bit 10) unless
+    /// that entry is group 3 (FUN_180ceaa80), interacts-exclude |= its exclude when it has one (FUN_180ceab10).
+    /// </summary>
+    public void MergeModelLayers(int index, ref CollisionAttributes record)
+    {
+        if (ModelLayers(index) is not { } l) return;
+        var add = l.As;
+        if ((add & 0x400) != 0 && l.Group != 3) add &= ~0x400ul;
+        record.InteractsAs |= add;
+        if (l.Exclude != 0) record.InteractsExclude |= l.Exclude;
+    }
 
     /// <summary>A body for a model's first part, static at the frame. Returns its index, or -1 when the model has no physics.</summary>
     public int AddBody(string modelKey, Vector3 position, Quaternion orientation, float scale = 1f)
@@ -91,6 +135,7 @@ public sealed class GameWorld
             RnMassUpdate.Run(ref b.State, joined, origin, q);
         _massShapes.Add(joined);
         _baseAttributes.Add(bases);
+        _bodyModels.Add(model);
         return b.Index;
     }
 
@@ -126,13 +171,25 @@ public sealed class GameWorld
     /// <summary>
     /// The entity's collision record on every shape of its body (the aggregate's vfn 0xf0, vphysics2 180046220 ->
     /// body 1801ba7e0 -> shape 180256d00 with refilter): source2-compiler's capture-checked <c>Layered</c>. For a body
-    /// with no contacts yet (at spawn); the contact refilter that follows a change mid-simulation is not ported.
+    /// that has contacts, they are refiltered as the game's shape setter does (FUN_180255860).
     /// </summary>
     public void SetEntityAttributes(int index, CollisionAttributes record)
     {
-        var shapes = World.Bodies[index].Shapes;
+        var body = World.Bodies[index];
+        var shapes = body.Shapes;
         for (var i = 0; i < shapes.Count; i++)
             shapes[i].Attributes = Layered(_baseAttributes[index][i], record);
+        // with refilter (180256d00's third argument): FUN_180255860 destroys each contact of the shape whose pair the
+        // world ignores (FUN_1801faf20: world +0x790, a set this port never fills), whose pair flags (FUN_1802faf00) are
+        // no longer the contact's (+0x78) or that ShouldCollide (FUN_1801bdea0) refuses; then the shape is marked for the
+        // pre-step query (FUN_1802d6c90), so a pair the change allows gets its contact
+        if (World.Broadphase is not { } bp) return;
+        foreach (var c in ContactLifecycle.ContactsOf(body).ToList())
+        {
+            var f = CollisionFilter.Flags(bp.GroupTable, c.A.Proxy.Attributes, c.B.Proxy.Attributes);
+            if (f != c.Flags78 || !CollisionFilter.BodiesMayCollide(c.A.Proxy, c.B.Proxy, f)) ContactLifecycle.Destroy(World, c);
+        }
+        foreach (var shape in shapes) bp.Touch(shape.ProxyId);
     }
 
     // source2-compiler Maps/SettleWorld.Aggregate.cs Layered (a12333d), the shape's attributes once 180044bc0 has set

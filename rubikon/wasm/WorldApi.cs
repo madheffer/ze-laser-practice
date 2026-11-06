@@ -37,7 +37,11 @@ public static partial class WorldApi
     }
 
     [JSExport]
-    public static void Destroy(int id) => Worlds.Remove(id);
+    public static void Destroy(int id)
+    {
+        Worlds.Remove(id);
+        foreach (var k in Records.Keys.Where(k => k.Item1 == id).ToList()) Records.Remove(k);
+    }
 
     [JSExport]
     public static bool HasModel(int id, string key) => S(id).World.HasModel(key);
@@ -61,28 +65,43 @@ public static partial class WorldApi
         });
 
     /// <summary>
-    /// A brush entity's keyframed body (a mover, door, train or solid brush the map moves): its model, keyframed at the
-    /// entity's frame, with the record a solid brush gets. -1 when the model has no physics.
+    /// A brush or prop entity's keyframed body (a mover, door, train or solid brush the map moves): its model, keyframed
+    /// at the entity's frame, with the collision record its class's CreateVPhysics gives it (BrushPhysics). -1 when the
+    /// model has no physics or the class makes none (func_train).
     /// </summary>
     [JSExport]
-    public static int SpawnKeyframed(int id, string key, double[] pos, double[] quat)
+    public static int SpawnKeyframed(int id, string key, double[] pos, double[] quat, string className)
     {
+        if (BrushPhysics.Record(className) is not { } record) return -1;
         var w = S(id).World;
         var b = w.AddBody(key, V(pos), Q(quat));
         if (b < 0) return -1;
         w.SetBodyType(b, 1);
-        // UNSETTLED: a brush entity's collision record is not decompiled (CFuncBrush / CBaseToggle); the solid
-        // interactions a simulated class gets, so physics objects meet it
-        w.SetEntityAttributes(b, BrushRecord);
+        w.MergeModelLayers(b, ref record); // VPhysicsInitNormal's FUN_180d0a6e0
+        w.SetEntityAttributes(b, record);
+        Records[(id, b)] = record;
         return b;
     }
 
-    static readonly CollisionAttributes BrushRecord = new() { InteractsAs = 1, InteractsWith = 0xc3001, EntityId = -1, OwnerId = -1, Flags = 7, Group = 4 };
+    static readonly Dictionary<(int, int), CollisionAttributes> Records = [];
 
-    /// <summary>A keyframed brush turned solid or not (a func_brush toggled, a door's solidity): its record or none.</summary>
+    /// <summary>
+    /// A keyframed brush turned solid or not. CFuncBrush's TurnOff (180e3d060) clears the collision function mask's
+    /// bits 0-2 (FUN_180ce76c0: solid contact, trace, touch) and TurnOn (180e3d120) sets them back (FUN_180cea920); the
+    /// layers and group stay. Pairs whose group entry has bit 0 then make no contact with it.
+    /// </summary>
     [JSExport]
     public static void SetBrushSolid(int id, int body, bool solid)
-        => S(id).World.SetEntityAttributes(body, solid ? BrushRecord : new CollisionAttributes { EntityId = -1, OwnerId = -1 });
+    {
+        if (!Records.TryGetValue((id, body), out var r)) return;
+        r.Flags = solid ? (byte)(r.Flags | 7) : (byte)(r.Flags & ~7);
+        S(id).World.SetEntityAttributes(body, r);
+    }
+
+    /// <summary>Would a trigger (its spawnflags, enabled or not) get touch events from this body (TriggerPhysics.Touches)?</summary>
+    [JSExport]
+    public static bool TriggerTouches(int id, int body, int spawnFlags, bool enabled)
+        => TriggerPhysics.Touches(S(id).World, body, TriggerPhysics.Record(spawnFlags, enabled));
 
     /// <summary>The server's per-tick keyframe (Keyframe.Drive); false when it would be a teleport (not ported).</summary>
     [JSExport]
@@ -91,6 +110,10 @@ public static partial class WorldApi
     /// <summary>EnableMotion / DisableMotion.</summary>
     [JSExport]
     public static void SetMotion(int id, int body, bool on) => PhysBox.SetMotion(S(id).World, body, on);
+
+    /// <summary>The motion type a move type change gives (1803de760 -> FUN_1801a4a40): 1 (by part flags) or 3 (keyframed), velocities kept.</summary>
+    [JSExport]
+    public static void SetMotionType(int id, int body, int motion) => PhysBox.SetMotionType(S(id).World, body, motion);
 
     /// <summary>Wake (body vfn 0x400) or Sleep.</summary>
     [JSExport]
@@ -114,7 +137,7 @@ public static partial class WorldApi
         w.SetBodyType(body, 0);
     }
 
-    /// <summary>A phys_thruster on a body (OnActivate at spawn). Returns its handle; it starts with <see cref="ThrusterOn"/>.</summary>
+    /// <summary>A phys_thruster on a body (OnActivate at spawn). Returns its handle; it starts with <see cref="ThrusterStart"/>.</summary>
     [JSExport]
     public static int AddThruster(int id, int body, int spawnFlags, double force, double[] angles, double[] pos, double[] quat)
     {
@@ -125,32 +148,51 @@ public static partial class WorldApi
         return s.Events.Count - 1;
     }
 
-    /// <summary>The thruster's start (180e73b40, once when not running: SetupForces, its controller) or stop (180e73a40).</summary>
+    /// <summary>The thruster's local angles after OnActivate (with orient locally, the ones it set on the entity).</summary>
     [JSExport]
-    public static void ThrusterOn(int id, int handle, bool on, double force, double scale, double[] angles)
+    public static double[] ThrusterAngles(int id, int handle)
+        => S(id).Events[handle] is Thruster t ? [t.LocalAngles.X, t.LocalAngles.Y, t.LocalAngles.Z] : [0, 0, 0];
+
+    /// <summary>
+    /// The thruster's start (180e73b40, only when not running): SetupForces from the force and the entity's local angles
+    /// as they are now (m_force, m_angRotation: KeyValues may have changed them), its controller with the body attached,
+    /// the body woken. False when it was running already.
+    /// </summary>
+    [JSExport]
+    public static bool ThrusterStart(int id, int handle, double force, double[] angles)
     {
         var s = S(id);
-        if (s.Events[handle] is not Thruster t || t.Body == null) return;
-        if (on)
-        {
-            if (t.Controller != null) return;
-            // without orient-locally the thruster's own angles now (a map re-aims it with KeyValues before Activate)
-            if ((t.SpawnFlags & 8) == 0) t.LocalAngles = V(angles);
-            // m_force (+0x4b8) as the map last set it (KeyValues force); UNSETTLED: the Scale input is not decompiled,
-            // it scales the force here
-            t.Force = (float)(force * scale);
-            ref var b = ref t.Body.State;
-            var o = BodyOps.LocalToWorldPoint(b, default);
-            t.SetupForces(o, b.Orientation);
-            t.Controller = s.World.CreateController(t);
-            t.Controller.Attach(t.Body);
-            ContactLifecycle.Wake(s.World.World, t.Body, false);
-        }
-        else if (t.Controller != null)
-        {
-            s.World.DestroyController(t.Controller);
-            t.Controller = null;
-        }
+        if (s.Events[handle] is not Thruster t || t.Body == null || t.Controller != null) return false;
+        t.LocalAngles = V(angles);
+        t.Force = (float)force;
+        ref var b = ref t.Body.State;
+        var o = BodyOps.LocalToWorldPoint(b, default);
+        t.Start(o, b.Orientation);
+        t.Controller = s.World.CreateController(t);
+        t.Controller.Attach(t.Body);
+        ContactLifecycle.Wake(s.World.World, t.Body, false);
+        return true;
+    }
+
+    /// <summary>The stop (180e73a40): the controller destroyed, the body woken.</summary>
+    [JSExport]
+    public static void ThrusterStop(int id, int handle)
+    {
+        var s = S(id);
+        if (s.Events[handle] is not Thruster t || t.Controller == null) return;
+        s.World.DestroyController(t.Controller);
+        t.Controller = null;
+        if (t.Body != null) ContactLifecycle.Wake(s.World.World, t.Body, false);
+    }
+
+    /// <summary>The Scale input after its start (180e3fc80): the push is scale x the start's, every attached body woken (controller vfn 0x60).</summary>
+    [JSExport]
+    public static void ThrusterScale(int id, int handle, double scale)
+    {
+        var s = S(id);
+        if (s.Events[handle] is not Thruster t || t.Controller == null) return;
+        t.Scale((float)scale);
+        if (t.Body != null) ContactLifecycle.Wake(s.World.World, t.Body, false);
     }
 
     /// <summary>A phys_keepupright on a body: its world goal axis (the entity's up), angular limit, on, dampallrotation.</summary>

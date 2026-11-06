@@ -33,9 +33,10 @@ public static class PhysBox
     /// <summary>Spawns the physbox's body; returns its index, or -1 when the model has no physics.</summary>
     public static int Spawn(GameWorld w, string modelKey, Vector3 origin, Quaternion angles, PhysBoxKeys k)
     {
-        // CreateVPhysics (180ebce10) -> VPhysicsInitNormal (180d087f0): the body, motion type 1 (dynamic; a parented
-        // entity passes 2 -> 3 only from other callers), the collision property's group (4 when it has none) and
-        // interacts-with 0xc3001 added, solid type 6, move type 5 (VPHYSICS)
+        // CreateVPhysics (180ebce10) -> VPhysicsInitNormal (180d087f0): the body, motion type 1 (dynamic, parented or not:
+        // the parent is set before Spawn, and VPhysicsInitNormal sets motion 1 after SetMoveType's recompute; only motion
+        // type 2 from other callers turns into 3 with a parent), the collision property's group (4 when it has none),
+        // interacts-with set to 0xc3001, solid type 6, move type 5 (VPHYSICS)
         var b = w.AddBody(modelKey, origin, angles);
         if (b < 0) return -1;
         w.MakeDynamic(b);
@@ -44,9 +45,11 @@ public static class PhysBox
             InteractsWith = SimulatedInteractsWith,
             EntityId = -1,
             OwnerId = -1,
-            Flags = 7, // UNSETTLED: the collision property's flag byte (+0x3f); 7 as resourcecompiler's entity record
+            Flags = 7, // m_nCollisionFunctionMask (property +0x3f): CCollisionProperty's constructor (180cd6e90) sets 7
             Group = 4,
         };
+        // the physics' creation in VPhysicsInitNormal (FUN_180d0a6e0): the model's layers into the record
+        w.MergeModelLayers(b, ref record);
         // the keyvalue strings, each added to its mask (FUN_180ceaa80 / FUN_180ceaba0 / FUN_180ceab10)
         if (!string.IsNullOrEmpty(k.CollisionGroup) && w.GroupIndex(k.CollisionGroup) is var g and >= 0) record.Group = (byte)g;
         if (!string.IsNullOrEmpty(k.InteractsAs)) record.InteractsAs |= w.LayerMask(k.InteractsAs);
@@ -94,6 +97,12 @@ public static class PhysBox
         s.AngularVelocity = default;
         w.SetBodyType(index, 1);
     }
+
+    /// <summary>
+    /// The motion type a parent change sets (the move type recompute 1803de760 -> FUN_1801a4a40 -> FUN_180cb1900): 1 every
+    /// part by its flags (dynamic for a physbox's one part), 3 every part keyframed. Unlike DisableMotion the velocities stay.
+    /// </summary>
+    public static void SetMotionType(GameWorld w, int index, int motion) => w.SetBodyType(index, motion == 3 ? 1 : 2);
 
     // The group's layers (FUN_180d07730: debris 5 is debris and not touchall; any group but 2 and 14 is touchall and
     // not debris), then the record as the physics gets it (FUN_180d11800: physics_prop while the move type is 5),

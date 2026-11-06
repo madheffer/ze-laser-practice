@@ -521,13 +521,15 @@ export class EntityEngine {
       try { this.dispatch(q); } catch (err) { this.warnOnce(`err:${String(q.input).toLowerCase()}`, `input ${q.input} on ${q.target?.name || q.target} failed: ${err?.message || err}`); }
       if (++guard > 20000) { this.warnOnce('loop', 'I/O loop: over 20000 events in one tick'); this.queue = []; break; }
     }
-    // CS2's physics (classes/physics-rubikon.js): keyframes and controllers in, one step, before the thinks read it
-    if (this.physics) { try { physicsStep(this); } catch (err) { this.warnOnce('physics', `physics step failed: ${err?.message || err}`); } }
     for (const e of this.ents) {
       if (!e.alive) continue;
       const th = C[e.cls]?.think;
       if (th) { try { th(e, dt); } catch (err) { this.warnOnce(`think:${e.cls}`, `${e.cls} think failed: ${err?.message || err}`); } }
     }
+    // CS2's physics (classes/physics-rubikon.js) after the thinks and the I/O, as CSource2Server::GameFrame (180dd4970)
+    // runs CPhysicsGameSystem's OnSimulate from the post-think event. (CS2 thinks before it services the I/O queue;
+    // this engine has always run the I/O first.)
+    if (this.physics) { try { physicsStep(this); } catch (err) { this.warnOnce('physics', `physics step failed: ${err?.message || err}`); } }
     tickBurn(this); // you, on fire (CS2Fixes IgniteLifetime)
     // drop dead entities now and then
     if (this.ents.length > 4000 && this.ents.some((e) => !e.alive)) this.ents = this.ents.filter((e) => e.alive);

@@ -400,6 +400,43 @@ export function boxTouchesHull(c, h, hull) {
   return true;
 }
 
+// Do two placed convex hulls overlap? Separating axis theorem over both hulls' face planes, then each pair of edge
+// directions (when both carry verts + edges); touching surfaces count. A trigger and a physbox (physics-touch.js).
+export function hullsOverlap(a, b) {
+  if (a.max[0] < b.min[0] || a.min[0] > b.max[0] || a.max[1] < b.min[1] || a.min[1] > b.max[1] || a.max[2] < b.min[2] || a.min[2] > b.max[2]) return false;
+  const span = (V, nx, ny, nz) => {
+    let lo = Infinity, hi = -Infinity;
+    for (let k = 0; k < V.length; k += 3) {
+      const p = nx * V[k] + ny * V[k + 1] + nz * V[k + 2];
+      if (p < lo) lo = p;
+      if (p > hi) hi = p;
+    }
+    return [lo, hi];
+  };
+  const faces = (h, other) => {
+    if (!other.verts) return true;
+    const P = h.planes;
+    for (let i = 0; i < P.length; i += 4) if (span(other.verts, P[i], P[i + 1], P[i + 2])[0] > P[i + 3]) return false;
+    return true;
+  };
+  if (!faces(a, b) || !faces(b, a)) return false;
+  const EA = a.edges, EB = b.edges;
+  if (!EA || !EB || !a.verts || !b.verts) return true;
+  for (let i = 0; i < EA.length; i += 3) {
+    for (let j = 0; j < EB.length; j += 3) {
+      let nx = EA[i + 1] * EB[j + 2] - EA[i + 2] * EB[j + 1];
+      let ny = EA[i + 2] * EB[j] - EA[i] * EB[j + 2];
+      let nz = EA[i] * EB[j + 1] - EA[i + 1] * EB[j];
+      const L = Math.hypot(nx, ny, nz);
+      if (L < 1e-6) continue;
+      nx /= L; ny /= L; nz /= L;
+      const [alo, ahi] = span(a.verts, nx, ny, nz), [blo, bhi] = span(b.verts, nx, ny, nz);
+      if (ahi < blo || bhi < alo) return false;
+    }
+  }
+  return true;
+}
+
 // Ray (origin o, unit direction d) against a placed convex hull's planes: the distance it enters at (0 if it
 // starts inside), or null for a miss. Up to 8192 u (CS2's bullet range). Bullets and the knife vs bosses.
 export function rayHullEntry(o, d, h) {

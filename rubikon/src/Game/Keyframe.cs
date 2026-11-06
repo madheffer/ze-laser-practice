@@ -39,8 +39,9 @@ public static class Keyframe
     /// wakes when the target is more than 1/32 unit away (squared 0.0009765625) or turned more than 0.0349 rad (2 deg).
     /// </summary>
     /// <remarks>
-    /// The turn is 2 atan2(|v|, w) of the conjugate of the body's orientation times the target's, wrapped to +-pi; its
-    /// operation order is not checked against the disassembly (it only decides the wake at that threshold).
+    /// Checked against the disassembly: the frame origin is Transforms.FrameOrigin's; the turn is 2 atan2(|v|, w) of
+    /// target x conj(body) (each lane ((a tw + .. tx) + .. ty) + .. tz on the sign-masked swizzles of 180449190..1c0),
+    /// |v|^2 summed (y^2 + x^2) + z^2, wrapped by +-2pi past +-pi.
     /// </remarks>
     public static void SetTarget(RnWorld w, RnBody body, Vec3 position, Quat orientation, float dt)
     {
@@ -51,21 +52,22 @@ public static class Keyframe
         t.Time = 0f <= dt ? dt : 0f;
         ref var s = ref body.State;
         if ((s.Flags249 & 4) == 0) return;
-        var o = BodyOps.FrameOrigin(s);
+        var o = Transforms.FrameOrigin(s);
         float dx = position.X - o.X, dy = position.Y - o.Y, dz = position.Z - o.Z;
         if ((dx * dx) + (dy * dy) + (dz * dz) <= 0.0009765625f)
         {
+            // a = conj(body) (xorps 180449190), t = the target
             var c = s.Orientation;
-            float cx = -c.X, cy = -c.Y, cz = -c.Z, cw = c.W;
+            float ax = -c.X, ay = -c.Y, az = -c.Z, aw = c.W;
             var q = orientation;
-            var rx = (cw * q.X) + (cx * q.W) + (cy * q.Z) - (cz * q.Y);
-            var ry = (cw * q.Y) - (cx * q.Z) + (cy * q.W) + (cz * q.X);
-            var rz = (cw * q.Z) + (cx * q.Y) - (cy * q.X) + (cz * q.W);
-            var rw = (cw * q.W) - (cx * q.X) - (cy * q.Y) - (cz * q.Z);
-            var angle = CrtMath.Atan2(MathF.Sqrt((ry * ry) + (rx * rx) + (rz * rz)), rw);
+            var rx = (((ax * q.W) + (aw * q.X)) + (az * q.Y)) + (-ay * q.Z);
+            var ry = (((ay * q.W) + (-az * q.X)) + (aw * q.Y)) + (ax * q.Z);
+            var rz = (((az * q.W) + (ay * q.X)) + (-ax * q.Y)) + (aw * q.Z);
+            var rw = (((aw * q.W) + (-ax * q.X)) + (-ay * q.Y)) + (-az * q.Z);
+            var angle = CrtMath.Atan2(MathF.Sqrt(((ry * ry) + (rx * rx)) + (rz * rz)), rw);
             angle += angle;
-            if (angle > 3.1415927f) angle -= 6.2831855f;
-            else if (angle < -3.1415927f) angle += 6.2831855f;
+            if (angle > 3.1415927f) angle += -6.2831855f;
+            else if (-3.1415927f > angle) angle += 6.2831855f;
             if (MathF.Abs(angle) <= 0.03490659f) return;
         }
         ContactLifecycle.Wake(w, body, false);

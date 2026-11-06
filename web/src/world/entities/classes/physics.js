@@ -11,7 +11,7 @@ import * as THREE from 'three';
 import { register } from '../registry.js';
 import { num } from '../math.js';
 import { traceSolids, boxTouchesHull } from '../../collision.js';
-import { thrusterInput, keepUprightInput, followBody } from './physics-rubikon.js';
+import { thrusterInput, thrusterThink, keepUprightInput } from './physics-rubikon.js';
 
 const GRAVITY = 800;
 const FLOOR_FRICTION = 0.8;
@@ -31,6 +31,7 @@ register('phys_thruster', {
       case 'scale': e.state.scale = num(p, 1); return true;
     }
   },
+  think(e) { if (e.engine.physics) thrusterThink(e); },
 });
 register('phys_keepupright', {
   input: (e, inp, p) => (e.engine.physics ? keepUprightInput(e, inp, p) : inp === 'turnon' || inp === 'turnoff'),
@@ -73,7 +74,8 @@ function thrust(box) {
 
 // func_clip_vphysics (CS2 CFuncVPhysicsClip): a brush physics objects collide with and players walk through.
 // ze_tyranny2 keeps its bosses in with them: a lid over the spider's arena, Gargantua's doorways, the box Diablo's mover
-// slides around in. UNSETTLED: CFuncVPhysicsClip's collision groups not decompiled; this is what the class is named for
+// slides around in. CFuncVPhysicsClip::CreateVPhysics (180ce6490): keyframed, group 3, interacts-with 0x200000 (the
+// physics_prop layer only, which physboxes are and players are not), its solid layer cleared (BrushPhysics.cs)
 register('func_clip_vphysics', { physSolid: (e) => e.enabled });
 
 // The map's solid brushes and movers this tick (a lift, a door, another cube) and its physics clips, built once per
@@ -89,7 +91,7 @@ function solidsNow(engine) {
 // Called from func_physbox's think (brushes.js). Needs engine.traceBox (the session wires the collision world in);
 // headless (tools/sim.mjs) there is none and physboxes stay put.
 export function physboxThink(e, dt) {
-  if (e.engine.physics && e.state.body != null) { followBody(e); return; }
+  if (e.engine.physics && e.state.body != null) return; // physics-rubikon.js moves it, in the step after the thinks
   const s = e.state;
   if (!s.awake || s.frozen || e.parent || !e.engine.traceBox) return;
   const b = e.engine.assets.bounds[e.model];
