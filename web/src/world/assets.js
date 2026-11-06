@@ -15,6 +15,7 @@ import { MapEffects } from '../fx/effects.js';
 import { chunkList } from './stream.js';
 import { soundDurations } from '../lib/sound-durations.js';
 
+import { loadPhysics } from './physics-world.js';
 // VRF exports glTF in metres, Y up: gltf = (src.y, src.z, src.x) * 0.0254. This puts it back in Source units.
 export const GLTF_TO_SOURCE = new THREE.Matrix4().set(
   0, 0, 1 / 0.0254, 0,
@@ -111,6 +112,12 @@ export async function loadMap(name, onProgress = () => {}, opts = {}) {
   // fetched alongside the rest rather than after it
   const fxFiles = Promise.all([fetchBufferProgress(url('collision_fx.bin'), bytes).catch(() => null), fetchBuffer(url('collision_fx_layers.bin')).catch(() => null)]);
   const [entities, hullsRaw, colBuf, particles, entwatch, overview, animations, stripper] = await Promise.all([
+  // optional: the map's physics for CS2's physics (lasers-bake --physics; world/physics-world.js), and its runtime
+  // (rubikon/, served from /rubikon/_framework by tools/build-rubikon.mjs), once per page
+  const physicsFile = Promise.all([
+    fetchBuffer(url('physics.bin')).catch(() => null),
+    loadPhysics(new URL(`${import.meta.env?.BASE_URL || '/'}rubikon/_framework/dotnet.js`, location.href).href),
+  ]).then(([bin, ok]) => (ok ? bin : null));
     fetchJson(url('entities.json')),
     fetchJson(url(manifestPath(manifest.hulls, 'hulls.json'))).catch(() => ({})),
     fetchBufferProgress(url(manifestPath(manifest.collision?.file, 'collision.bin')), bytes),
@@ -131,6 +138,7 @@ export async function loadMap(name, onProgress = () => {}, opts = {}) {
   applyStripper(entities, stripper, name);
   const [fxBuf, fxLayerBuf] = await fxFiles;
   const collisionFx = fxBuf && fxLayerBuf && fxBuf.byteLength === fxLayerBuf.byteLength * 9 ? { tris: new Float32Array(fxBuf), layers: new Uint32Array(fxLayerBuf) } : null;
+  const physics = await physicsFile;
   const collision = new Float32Array(colBuf);
 
   const { hulls, bounds } = normaliseHulls(hullsRaw);

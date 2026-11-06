@@ -1,0 +1,871 @@
+namespace Source2.Compiler.Simulation;
+
+/// <summary>
+/// Rubikon's island manager (RnWorld +0x118, functions 0x1802ca000..0x1802cf000):
+/// islands are persistent, grown when a contact starts touching (merge into
+/// the larger island, ties to B's), marked when one stops (a removed body
+/// leaves a hole) and split by flood fill every tenth step. Every list is a
+/// swap-remove array, so the order bodies and contacts end up in, which is
+/// the order the island solve runs them in, depends on all of it.
+/// </summary>
+/// <remarks>
+/// Joints are islands' edges like touching contacts (FUN_1802cb0a0 and
+/// FUN_1802cd5b0), handled first wherever an island's lists are walked; the
+/// type-1 constraint list is not ported (a settle has none). An island with 100 or more contacts in one group gets a graph colouring
+/// (<see cref="IslandColouring"/>) and is solved colour by colour.
+/// </remarks>
+public static class IslandManagerOps
+{
+    /// <summary>Removes item index <paramref name="index"/> by moving the last one there.</summary>
+    private static void SwapRemove<T>(List<T> list, int index, Action<T, int> setIndex)
+    {
+        var last = list[^1];
+        list[index] = last;
+        list.RemoveAt(list.Count - 1);
+        setIndex(last, index);
+    }
+
+    private static List<IslandNode> ListOf(IslandManager m, IslandNode n)
+        => n.Kind == 0 ? m.Free : ((RnIsland)n).Coloured ? m.Coloured : m.Serial;
+
+    /// <summary>Appends a node to its solve list if it is in none (FUN_1802ce1e0).</summary>
+    public static void RegisterNode(IslandManager m, IslandNode n)
+    {
+        if (n.ListIndex != -1)
+            return;
+        var list = ListOf(m, n);
+        n.ListIndex = list.Count;
+        list.Add(n);
+    }
+
+    /// <summary>Takes a node out of its solve list (FUN_1802ce6a0).</summary>
+    public static void Unlist(IslandManager m, IslandNode n)
+    {
+        if (n.ListIndex == -1)
+            return;
+        var index = n.ListIndex;
+        SwapRemove(ListOf(m, n), index, (x, i) => x.ListIndex = i);
+        n.ListIndex = -1;
+    }
+
+    /// <summary>Adds a node to the manager, and to its solve list when awake (FUN_1802ce480).</summary>
+    public static void AddNode(IslandManager m, IslandNode n)
+    {
+        n.ManagerIndex = m.All.Count;
+        m.All.Add(n);
+        if (n.Awake && n.ListIndex == -1)
+            RegisterNode(m, n);
+    }
+
+    /// <summary>Takes a node out of the manager entirely (FUN_1802cf0d0).</summary>
+    public static void RemoveNode(IslandManager m, IslandNode n)
+    {
+        Unlist(m, n);
+        var index = n.ManagerIndex;
+        SwapRemove(m.All, index, (x, i) => x.ManagerIndex = i);
+        n.ManagerIndex = -1;
+        if (n is RnIsland island && island.SplitIndex != -1)
+        {
+            SwapRemove(m.SplitPending, island.SplitIndex, (x, i) => x.SplitIndex = i);
+            island.SplitIndex = -1;
+        }
+    }
+
+    /// <summary>
+    /// Enters the body in an island's map (FUN_1802ce2d0), proposing the next
+    /// solver index. True when the body is new to the island; the index is
+    /// the body's solver index there either way.
+    /// </summary>
+    private static bool MapRegister(RnBody b, RnIsland island, int proposed, out int index)
+    {
+        if (b.MapState == 1 && b.MapIsland == island)
+        {
+            b.MapRefs++;
+            index = b.MapIndex;
+            return false;
+        }
+        if (b.MapState != 0)
+        {
+            if (b.MapState == 1)
+            {
+                b.MapHash ??= [];
+                b.MapHash[b.MapIsland!] = (b.MapIndex, b.MapRefs);
+                b.MapIsland = null;
+                b.MapIndex = -1;
+                b.MapRefs = 0;
+                b.MapState = 2;
+            }
+            var (i, refs) = b.MapHash!.TryGetValue(island, out var e) ? e : (0, 0);
+            refs++;
+            if (refs != 1)
+            {
+                b.MapHash[island] = (i, refs);
+                index = i;
+                return false;
+            }
+            b.MapHash[island] = (proposed, refs);
+            index = proposed;
+            return true;
+        }
+        b.MapIsland = island;
+        b.MapIndex = proposed;
+        b.MapRefs++;
+        b.MapState = 1;
+        index = proposed;
+        return true;
+    }
+
+    /// <summary>Drops one edge of the body in an island (FUN_1802ceef0); true when it left the island.</summary>
+    private static bool MapRelease(RnBody b, RnIsland island)
+    {
+        if (b.MapState == 1)
+        {
+            if (--b.MapRefs != 0)
+                return false;
+            ResetMap(b);
+            return true;
+        }
+        var (i, refs) = b.MapHash![island];
+        if (--refs != 0)
+        {
+            b.MapHash[island] = (i, refs);
+            return false;
+        }
+        b.MapHash.Remove(island);
+        if (b.MapHash.Count == 0)
+            ResetMap(b);
+        return true;
+    }
+
+    private static void ResetMap(RnBody b)
+    {
+        b.MapIsland = null;
+        b.MapIndex = -1;
+        b.MapRefs = 0;
+        b.MapState = 0;
+    }
+
+    /// <summary>
+    /// Registers a contact's bodies in its island (FUN_1802cb890): a body new to
+    /// the island is appended (its solver index is its position), the iteration
+    /// maxima grow, and an awake body counts. The indices go to contact +0x6c/+0x70.
+    /// </summary>
+    private static void RegisterBodies(RnContact c, RnIsland island)
+    {
+        c.SolverA = Register(c.A.Body, island);
+        c.SolverB = Register(c.B.Body, island);
+    }
+
+    private static int Register(RnBody b, RnIsland island)
+    {
+        if (MapRegister(b, island, island.Bodies.Count, out var index))
+        {
+            island.Bodies.Add(b);
+            island.VelocityIterations = Math.Max(b.State.MinVelocityIterations, island.VelocityIterations);
+            island.PositionIterations = Math.Max(b.State.MinPositionIterations, island.PositionIterations);
+            if (b.ActiveIndex >= 0)
+                island.AwakeCount++;
+        }
+        return index;
+    }
+
+    /// <summary>Appends a contact to an island (FUN_1802ca8e0).</summary>
+    public static void AppendContact(RnIsland island, RnContact c)
+    {
+        var group = island.Contacts[c.Group];
+        c.IslandIndex = group.Count;
+        group.Add(c);
+        c.Island = island;
+        island.Sizes[c.Group] += c.Size88;
+        RegisterBodies(c, island);
+        island.EdgeCount++;
+        if (island.Colouring is { } colouring)
+            AssignColour(colouring, c);
+    }
+
+    /// <summary>Colours per contact group (0x1803e2900) and their first bit in a body's mask (0x1803e2910).</summary>
+    private static ReadOnlySpan<int> ColourCount => [16, 3];
+    private static ReadOnlySpan<int> ColourShift => [13, 29];
+
+    /// <summary>
+    /// Gives a contact the lowest colour neither dynamic body holds in its
+    /// group (FUN_1802ca570); with none free it goes to the overflow bucket
+    /// and takes no bit. It is appended to its bucket.
+    /// </summary>
+    private static void AssignColour(IslandColouring colouring, RnContact c)
+    {
+        var g = c.Group;
+        uint used = 0;
+        if (c.A.Body.State.BodyType == 2)
+            used = c.A.Body.State.ColourMask;
+        if (c.B.Body.State.BodyType == 2)
+            used |= c.B.Body.State.ColourMask;
+        var free = ~((used >> ColourShift[g]) & ((1u << ColourCount[g]) - 1));
+        var colour = System.Numerics.BitOperations.TrailingZeroCount(free);
+        if (colour == ColourCount[g])
+            colour = IslandColouring.Overflow;
+        var bucket = colouring.Contacts[colour, g];
+        c.ColourIndex = bucket.Count;
+        bucket.Add(c);
+        colouring.Sizes[colour, g] += c.Size88;
+        c.Colour = (byte)colour;
+        if (colour == IslandColouring.Overflow)
+            return;
+        var bit = 1u << (colour + ColourShift[g]);
+        if (c.A.Body.State.BodyType == 2)
+            c.A.Body.State.ColourMask |= bit;
+        if (c.B.Body.State.BodyType == 2)
+            c.B.Body.State.ColourMask |= bit;
+    }
+
+    /// <summary>Takes a contact out of its bucket, the last one moving into its place (the tail of FUN_1802ccce0).</summary>
+    private static void RemoveColour(IslandColouring colouring, RnContact c)
+    {
+        var colour = c.Colour;
+        var g = c.Group;
+        SwapRemove(colouring.Contacts[colour, g], c.ColourIndex, (x, i) => x.ColourIndex = i);
+        c.ColourIndex = -1;
+        colouring.Sizes[colour, g] -= c.Size88;
+        c.Colour = 0xff;
+        if (colour == IslandColouring.Overflow)
+            return;
+        var bit = ~(1u << (colour + ColourShift[g]));
+        if (c.A.Body.State.BodyType == 2)
+            c.A.Body.State.ColourMask &= bit;
+        if (c.B.Body.State.BodyType == 2)
+            c.B.Body.State.ColourMask &= bit;
+    }
+
+    /// <summary>
+    /// Colours an island (FUN_180333110 with FUN_180332cd0): the dynamic
+    /// bodies' masks start empty, then the contacts are coloured group by
+    /// group in island order.
+    /// </summary>
+    internal static void CreateColouring(RnIsland island)
+    {
+        if (island.Colouring != null)
+            return;
+        var colouring = island.Colouring = new IslandColouring();
+        foreach (var b in island.Bodies)
+            if (b != null && b.State.BodyType == 2)
+                b.State.ColourMask = 0;
+        foreach (var j in island.Joints)
+            AssignColour(colouring, j);
+        for (var g = 0; g < 2; g++)
+            foreach (var c in island.Contacts[g])
+                AssignColour(colouring, c);
+    }
+
+    /// <summary>
+    /// Drops an island's colouring (FUN_1803331e0): the contacts lose their
+    /// colour (FUN_180332bb0), the dynamic bodies their masks.
+    /// </summary>
+    internal static void DestroyColouring(RnIsland island)
+    {
+        if (island.Colouring == null)
+            return;
+        foreach (var j in island.Joints)
+        {
+            j.Common.Colour = 0xff;
+            j.Common.BucketIndex = -1;
+        }
+        for (var g = 0; g < 2; g++)
+            foreach (var c in island.Contacts[g])
+            {
+                c.Colour = 0xff;
+                c.ColourIndex = -1;
+            }
+        foreach (var b in island.Bodies)
+            if (b != null && b.State.BodyType == 2)
+                b.State.ColourMask = 0;
+        island.Colouring = null;
+    }
+
+    /// <summary>Empties every bucket but keeps the colouring (FUN_180332b80).</summary>
+    private static void ClearBuckets(IslandColouring colouring)
+    {
+        for (var b = 0; b < 17; b++)
+        {
+            colouring.Joints[b].Clear();
+            colouring.JointSizes[b] = 0;
+            for (var g = 0; g < 2; g++)
+            {
+                colouring.Contacts[b, g].Clear();
+                colouring.Sizes[b, g] = 0;
+            }
+        }
+    }
+
+    /// <summary>
+    /// A contact's size estimate changed by <paramref name="delta"/> (the
+    /// resize loop of FUN_1801dceb0 and FUN_1801dc6a0): its island and its
+    /// colour bucket count it.
+    /// </summary>
+    public static void Resize(RnIsland island, RnContact c, int delta)
+    {
+        island.Sizes[c.Group] += delta;
+        if (island.Colouring is { } colouring)
+            colouring.Sizes[c.Colour, c.Group] += delta;
+    }
+
+    /// <summary>
+    /// Empties an island's body list (FUN_1802cca70), resetting each body's
+    /// map for this island, and returns the bodies in island order.
+    /// </summary>
+    private static List<RnBody> ResetBodies(RnIsland island)
+    {
+        var bodies = new List<RnBody>();
+        foreach (var b in island.Bodies)
+        {
+            if (b == null)
+                continue;
+            if (b.MapState == 1)
+                ResetMap(b);
+            else if (b.MapHash != null && b.MapHash.Remove(island) && b.MapHash.Count == 0)
+                ResetMap(b);
+            b.State.ColourMask = 0;
+            bodies.Add(b);
+        }
+        island.Bodies.Clear();
+        island.VelocityIterations = 0;
+        island.PositionIterations = 0;
+        island.AwakeCount = 0;
+        return bodies;
+    }
+
+    /// <summary>Moves every joint and then every contact of one island onto another, in order (FUN_1802cc790).</summary>
+    private static void MoveContacts(RnIsland from, RnIsland to)
+    {
+        foreach (var j in from.Joints)
+        {
+            Unassigned(j);
+            AppendJoint(to, j);
+        }
+        from.Joints.Clear();
+        from.JointSize = 0;
+        for (var g = 0; g < 2; g++)
+        {
+            foreach (var c in from.Contacts[g])
+            {
+                c.IslandIndex = -1;
+                c.ColourIndex = -1;
+                c.Island = null;
+                c.Colour = 0xff;
+                AppendContact(to, c);
+            }
+            from.Contacts[g].Clear();
+            from.Sizes[g] = 0;
+        }
+    }
+
+    /// <summary>
+    /// Brings a body into the target island (FUN_1802ce050): a body in no
+    /// island leaves the manager (its own node goes), a body in another heap
+    /// island brings that whole island along.
+    /// </summary>
+    private static void Absorb(IslandManager m, RnIsland target, RnBody b)
+    {
+        if (b.MapState == 0)
+        {
+            RemoveNode(m, b.Node);
+            return;
+        }
+        if (b.Static || b.MapState != 1 || b.MapIsland == target || b.MapIsland!.Kind != 1)
+            return;
+        var island = b.MapIsland;
+        ResetBodies(island);
+        MoveContacts(island, target);
+        island.EdgeCount = 0;
+        if (island.Colouring is { } colouring)
+            ClearBuckets(colouring);
+        RemoveNode(m, island);
+        island.Colouring = null;
+    }
+
+    /// <summary>
+    /// The colouring threshold on an island's lists (FUN_1802cad70 at
+    /// 0x1802cae0x, FUN_1802ce7b0): a quarter of either contact group reaches
+    /// 25 when the manager colours (+0x50, on from its constructor FUN_1802cdd40).
+    /// </summary>
+    private static bool NeedsColouring(IslandManager m, RnIsland island)
+    {
+        var limit = m.Colouring ? 25 : int.MaxValue;
+        return limit <= island.Contacts[1].Count / 4 || limit <= island.Contacts[0].Count / 4
+            || limit <= island.Joints.Count / 8;
+    }
+
+    /// <summary>
+    /// A contact became an island edge (FUN_1802cad70): the target is the
+    /// larger of the two bodies' heap islands (B's on a tie) or a new one;
+    /// both bodies are absorbed, the contact appended, and the island listed
+    /// if it is awake.
+    /// </summary>
+    public static void ActivateEdge(IslandManager m, RnContact c)
+    {
+        c.InIsland = true;
+        RnIsland? target = null;
+        foreach (var b in new[] { c.A.Body, c.B.Body })
+            if (!b.Static && b.MapState == 1 && (target == null || target.Bodies.Count <= b.MapIsland!.Bodies.Count))
+                target = b.MapIsland;
+        if (target == null)
+        {
+            target = new RnIsland();
+            AddNode(m, target);
+        }
+        Absorb(m, target, c.A.Body);
+        Absorb(m, target, c.B.Body);
+        AppendContact(target, c);
+        if (!target.Coloured && NeedsColouring(m, target))
+        {
+            Unlist(m, target);
+            CreateColouring(target);
+        }
+        if (target.Awake && target.ListIndex == -1)
+            RegisterNode(m, target);
+    }
+
+    /// <summary>
+    /// Takes a contact out of its island (FUN_1802ccce0). A body left with no
+    /// edge there becomes a hole in the body list, and if it is in no island
+    /// any more its own node is returned to be put back.
+    /// </summary>
+    private static void RemoveContact(RnIsland island, RnContact c, List<IslandNode> returned)
+    {
+        var group = island.Contacts[c.Group];
+        SwapRemove(group, c.IslandIndex, (x, i) => x.IslandIndex = i);
+        c.IslandIndex = -1;
+        c.Island = null;
+        island.Sizes[c.Group] -= c.Size88;
+        foreach (var (b, slot) in new[] { (c.A.Body, c.SolverA), (c.B.Body, c.SolverB) })
+        {
+            if (!MapRelease(b, island))
+                continue;
+            if (b.ActiveIndex >= 0)
+                island.AwakeCount--;
+            island.Bodies[slot] = null;
+            if (b.MapState == 0)
+                returned.Add(b.Node);
+        }
+        island.EdgeCount--;
+        if (island.Colouring is { } colouring)
+            RemoveColour(colouring, c);
+    }
+
+    /// <summary>
+    /// A contact stopped being an island edge (FUN_1802cd2b0). An island left
+    /// without edges is deleted; otherwise it waits for a split. Bodies that
+    /// dropped out of every island get their own node back.
+    /// </summary>
+    public static void DeactivateEdge(IslandManager m, RnContact c)
+    {
+        var returned = new List<IslandNode>();
+        if (c.Island is { } island)
+        {
+            RemoveContact(island, c, returned);
+            if (island.EdgeCount == 0)
+            {
+                RemoveNode(m, island);
+                island.Colouring = null;
+            }
+            else
+            {
+                if (island.AwakeCount == 0)
+                    Unlist(m, island);
+                if (island.SplitIndex == -1)
+                {
+                    island.SplitIndex = m.SplitPending.Count;
+                    m.SplitPending.Add(island);
+                }
+                island.Flags |= 1;
+            }
+        }
+        foreach (var n in returned)
+        {
+            n.ManagerIndex = m.All.Count;
+            m.All.Add(n);
+            if (n.Awake && n.ListIndex == -1)
+                RegisterNode(m, n);
+        }
+        c.InIsland = false;
+    }
+
+    /// <summary>
+    /// Splits the pending islands (FUN_1802cee50), on steps that are multiples
+    /// of 10, last pending first. True when it ran.
+    /// </summary>
+    public static bool SplitPending(IslandManager m, int step)
+    {
+        if (m.SplitPending.Count == 0 || !(step < 0 || step % 10 == 0))
+            return false;
+        while (m.SplitPending.Count > 0)
+        {
+            var island = m.SplitPending[^1];
+            m.SplitPending.RemoveAt(m.SplitPending.Count - 1);
+            island.SplitIndex = -1;
+            Split(m, island);
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// Rebuilds an island by flood fill (FUN_1802ce7b0). The old island is
+    /// emptied and reused for the first part; each part grows from the next
+    /// unassigned body in the old order, depth first through the bodies'
+    /// touching contacts in shape list order. The reused island keeps its
+    /// colouring with the buckets emptied, so its part is coloured as it
+    /// grows; then a big part gets a colouring and a small one loses its.
+    /// </summary>
+    private static void Split(IslandManager m, RnIsland island)
+    {
+        if ((island.Flags & 2) != 0)
+        {
+            if ((island.Flags & 1) == 0)
+            {
+                island.VelocityIterations = 0;
+                island.PositionIterations = 0;
+                foreach (var b in island.Bodies)
+                {
+                    if (b == null)
+                        continue;
+                    island.VelocityIterations = Math.Max(b.State.MinVelocityIterations, island.VelocityIterations);
+                    island.PositionIterations = Math.Max(b.State.MinPositionIterations, island.PositionIterations);
+                }
+            }
+            island.Flags &= ~2;
+        }
+        if ((island.Flags & 1) == 0)
+            return;
+
+        var bodies = ResetBodies(island);
+        foreach (var j in island.Joints)
+            Unassigned(j);
+        island.Joints.Clear();
+        island.JointSize = 0;
+        for (var g = 0; g < 2; g++)
+        {
+            foreach (var c in island.Contacts[g])
+            {
+                c.Island = null;
+                c.IslandIndex = -1;
+                c.ColourIndex = -1;
+                c.Colour = 0xff;
+            }
+            island.Contacts[g].Clear();
+            island.Sizes[g] = 0;
+        }
+        island.EdgeCount = 0;
+        if (island.Colouring is { } colouring)
+            ClearBuckets(colouring);
+        Unlist(m, island);
+        SwapRemove(m.All, island.ManagerIndex, (x, i) => x.ManagerIndex = i);
+        island.ManagerIndex = -1;
+
+        RnIsland? reuse = island;
+        var stack = new List<RnBody>();
+        foreach (var seed in bodies)
+        {
+            if (seed.MapState != 0 || seed.Static)
+                continue;
+            var current = reuse ?? new RnIsland();
+            reuse = null;
+            stack.Add(seed);
+            while (stack.Count > 0)
+            {
+                var body = stack[^1];
+                stack.RemoveAt(stack.Count - 1);
+                // FUN_1802cc290: the body's active joints with no island yet, in edge order.
+                foreach (var (j, _) in body.JointEdges)
+                {
+                    if (j.Common.Active == 0 || j.Island != null)
+                        continue;
+                    foreach (var other in new[] { j.Body1!, j.Body2! })
+                        if (other.MapState == 0 && !other.Static && other != seed)
+                            stack.Add(other);
+                    AppendJoint(current, j);
+                }
+                foreach (var shape in body.Shapes)
+                {
+                    for (var e = shape.Heads[0]; e is { } edge; e = edge.Contact.Next[edge.Half])
+                    {
+                        var c = edge.Contact;
+                        if (!c.InIsland || c.Island != null)
+                            continue;
+                        foreach (var other in new[] { c.A.Body, c.B.Body })
+                            if (other.MapState == 0 && !other.Static && other != seed)
+                                stack.Add(other);
+                        AppendContact(current, c);
+                    }
+                }
+            }
+            if (NeedsColouring(m, current))
+                CreateColouring(current);
+            else
+                DestroyColouring(current);
+            AddNode(m, current);
+        }
+        island.Flags &= ~1;
+    }
+
+    /// <summary>A joint taken off an island's lists (FUN_1802cc600, FUN_1802cc790): no island, no index, no colour.</summary>
+    private static void Unassigned(RnJoint j)
+    {
+        j.Island = null;
+        j.Common.BucketIndex = -1;
+        j.Common.IslandIndex = -1;
+        j.Common.Colour = 0xff;
+    }
+
+    /// <summary>
+    /// Appends a joint to an island (FUN_1802ca9c0): its index, the joints'
+    /// size estimate, its bodies registered (solver indices to joint +0x68 /
+    /// +0x6c), an edge, and with a colouring a colour.
+    /// </summary>
+    public static void AppendJoint(RnIsland island, RnJoint j)
+    {
+        ref var c = ref j.Common;
+        c.IslandIndex = island.Joints.Count;
+        island.Joints.Add(j);
+        j.Island = island;
+        island.JointSize += c.Size;
+        c.SolverA = Register(j.Body1!, island);
+        c.SolverB = Register(j.Body2!, island);
+        island.EdgeCount++;
+        if (island.Colouring is { } colouring)
+            AssignColour(colouring, j);
+    }
+
+    /// <summary>
+    /// Gives a joint the lowest of the ten joint colours neither dynamic body
+    /// holds (FUN_1802ca6c0; bits 0..9 of the bodies' masks), else the
+    /// overflow bucket, and appends it to its bucket.
+    /// </summary>
+    private static void AssignColour(IslandColouring colouring, RnJoint j)
+    {
+        var a = j.Body1!;
+        var b = j.Body2!;
+        uint used = 0;
+        if (a.State.BodyType == 2)
+            used = a.State.ColourMask;
+        if (b.State.BodyType == 2)
+            used |= b.State.ColourMask;
+        var colour = System.Numerics.BitOperations.TrailingZeroCount(~(used & 0x3ff));
+        if (colour == 10)
+            colour = IslandColouring.Overflow;
+        ref var c = ref j.Common;
+        var bucket = colouring.Joints[colour];
+        c.BucketIndex = bucket.Count;
+        bucket.Add(j);
+        colouring.JointSizes[colour] += c.Size;
+        c.Colour = (byte)colour;
+        if (colour == IslandColouring.Overflow)
+            return;
+        if (a.State.BodyType == 2)
+            a.State.ColourMask |= 1u << colour;
+        if (b.State.BodyType == 2)
+            b.State.ColourMask |= 1u << colour;
+    }
+
+    /// <summary>
+    /// Takes a joint out of its island (FUN_1802ccef0), as
+    /// <see cref="RemoveContact"/> does a contact: a body left with no edge
+    /// becomes a hole, and one in no island any more gets its node back.
+    /// </summary>
+    private static void RemoveJoint(RnIsland island, RnJoint j, List<IslandNode> returned)
+    {
+        ref var c = ref j.Common;
+        SwapRemove(island.Joints, c.IslandIndex, (x, i) => x.Common.IslandIndex = i);
+        c.IslandIndex = -1;
+        j.Island = null;
+        island.JointSize -= c.Size;
+        foreach (var (b, slot) in new[] { (j.Body1!, c.SolverA), (j.Body2!, c.SolverB) })
+        {
+            if (!MapRelease(b, island))
+                continue;
+            if (b.ActiveIndex >= 0)
+                island.AwakeCount--;
+            island.Bodies[slot] = null;
+            if (b.MapState == 0)
+                returned.Add(b.Node);
+        }
+        island.EdgeCount--;
+        if (island.Colouring is not { } colouring)
+            return;
+        var colour = c.Colour;
+        SwapRemove(colouring.Joints[colour], c.BucketIndex, (x, i) => x.Common.BucketIndex = i);
+        c.BucketIndex = -1;
+        colouring.JointSizes[colour] -= c.Size;
+        c.Colour = 0xff;
+        if (colour == IslandColouring.Overflow)
+            return;
+        var bit = ~(1u << colour);
+        if (j.Body1!.State.BodyType == 2)
+            j.Body1.State.ColourMask &= bit;
+        if (j.Body2!.State.BodyType == 2)
+            j.Body2.State.ColourMask &= bit;
+    }
+
+    /// <summary>
+    /// A joint became an island edge (FUN_1802cb0a0): as
+    /// <see cref="ActivateEdge"/>, the larger of its bodies' heap islands
+    /// (body 2's on a tie) or a new one takes both bodies and the joint.
+    /// </summary>
+    public static void ActivateJoint(IslandManager m, RnJoint j)
+    {
+        j.Common.Active = 1;
+        RnIsland? target = null;
+        foreach (var b in new[] { j.Body1!, j.Body2! })
+            if (!b.Static && b.MapState == 1 && (target == null || target.Bodies.Count <= b.MapIsland!.Bodies.Count))
+                target = b.MapIsland;
+        if (target == null)
+        {
+            target = new RnIsland();
+            AddNode(m, target);
+        }
+        Absorb(m, target, j.Body1!);
+        Absorb(m, target, j.Body2!);
+        AppendJoint(target, j);
+        if (!target.Coloured && NeedsColouring(m, target))
+        {
+            Unlist(m, target);
+            CreateColouring(target);
+        }
+        if (target.Awake && target.ListIndex == -1)
+            RegisterNode(m, target);
+    }
+
+    /// <summary>
+    /// A joint stopped being an island edge (FUN_1802cd5b0), as
+    /// <see cref="DeactivateEdge"/> does a contact.
+    /// </summary>
+    public static void DeactivateJoint(IslandManager m, RnJoint j)
+    {
+        var returned = new List<IslandNode>();
+        if (j.Island is { } island)
+        {
+            RemoveJoint(island, j, returned);
+            if (island.EdgeCount == 0)
+            {
+                RemoveNode(m, island);
+                island.Colouring = null;
+            }
+            else
+            {
+                if (island.AwakeCount == 0)
+                    Unlist(m, island);
+                if (island.SplitIndex == -1)
+                {
+                    island.SplitIndex = m.SplitPending.Count;
+                    m.SplitPending.Add(island);
+                }
+                island.Flags |= 1;
+            }
+        }
+        foreach (var n in returned)
+        {
+            n.ManagerIndex = m.All.Count;
+            m.All.Add(n);
+            if (n.Awake && n.ListIndex == -1)
+                RegisterNode(m, n);
+        }
+        j.Common.Active = 0;
+    }
+
+    /// <summary>
+    /// Whether a joint is an island edge (the tails of FUN_1802055f0 and
+    /// FUN_1802cc370): in the world, of a type other than 0, not disabled,
+    /// with both bodies, neither out of the manager, and one of them dynamic.
+    /// </summary>
+    public static bool ShouldBeActive(RnJoint j)
+    {
+        ref var c = ref j.Common;
+        if (c.WorldIndex == -1 || c.Type == 0 || (c.Flags & 1) != 0 || j.Body1 is not { } a || j.Body2 is not { } b)
+            return false;
+        if (a.MapState == 3 || b.MapState == 3)
+            return false;
+        return a.State.BodyType == 2 || b.State.BodyType == 2;
+    }
+
+    /// <summary>Activates or deactivates a joint whose state differs from <see cref="ShouldBeActive"/>.</summary>
+    public static void UpdateJoint(IslandManager m, RnJoint j)
+    {
+        var active = ShouldBeActive(j);
+        if (active == (j.Common.Active != 0))
+            return;
+        if (active)
+            ActivateJoint(m, j);
+        else
+            DeactivateJoint(m, j);
+    }
+
+    /// <summary>
+    /// SetType's leave (FUN_1802ccbb0): the body's active joints deactivated in edge order, then the edges of its body
+    /// +0x240 list (FUN_1802cd8b0; a kind this port does not create, so none here), then every in-island contact of its
+    /// shapes, shape by shape, touching list then not touching (FUN_1802cc020 -> FUN_1802cd2b0), which hands the body's
+    /// node back to the manager; then the node out of the manager, state 3.
+    /// </summary>
+    public static void Leave(IslandManager m, RnBody b)
+    {
+        foreach (var (j, _) in b.JointEdges)
+            if (j.Common.Active != 0)
+                DeactivateJoint(m, j);
+        foreach (var shape in b.Shapes)
+            for (var state = 0; state < 2; state++)
+                for (var e = shape.Heads[state]; e is { } edge; e = edge.Contact.Next[edge.Half])
+                    if (edge.Contact.InIsland)
+                        DeactivateEdge(m, edge.Contact);
+        RemoveNode(m, b.Node);
+        b.MapState = 3;
+    }
+
+    /// <summary>
+    /// SetType's return (FUN_1802ce270): state 0, the node back (FUN_1802ce480), each joint's state re-evaluated in edge
+    /// order (FUN_1802cc370), the +0x240 list's (FUN_1802cc520, none here), then each contact of its shapes in the same
+    /// order as the leave (FUN_1802cc140): an island edge when alive, solid and touching (+0x68 != -1, +0x78 bit 0,
+    /// +0x48 == 0).
+    /// </summary>
+    public static void Return(IslandManager m, RnBody b)
+    {
+        b.MapState = 0;
+        AddNode(m, b.Node);
+        foreach (var (j, _) in b.JointEdges)
+            UpdateJoint(m, j);
+        foreach (var shape in b.Shapes)
+            for (var state = 0; state < 2; state++)
+                for (var e = shape.Heads[state]; e is { } edge; e = edge.Contact.Next[edge.Half])
+                {
+                    var c = edge.Contact;
+                    var want = c.AllIndex != -1 && (c.Flags78 & 1) != 0 && c.TouchState == 0;
+                    if (want == c.InIsland) continue;
+                    if (want) ActivateEdge(m, c);
+                    else DeactivateEdge(m, c);
+                }
+    }
+
+    /// <summary>A body in islands woke (FUN_1801dc0a0): each of its islands counts it and is listed.</summary>
+    public static void BodyWoke(IslandManager m, RnBody b)
+    {
+        if (b.MapState == 1)
+        {
+            RegisterNode(m, b.MapIsland!);
+            b.MapIsland!.AwakeCount++;
+        }
+        else if (b.MapState == 2)
+        {
+            throw new NotSupportedException("waking a body in several islands (a static body cannot wake)");
+        }
+    }
+
+    /// <summary>A body in islands fell asleep (FUN_1801dc1e0): an island with no awake body leaves its list.</summary>
+    public static void BodySlept(IslandManager m, RnBody b)
+    {
+        if (b.MapState == 1)
+        {
+            if (--b.MapIsland!.AwakeCount == 0)
+                Unlist(m, b.MapIsland);
+        }
+        else if (b.MapState == 2)
+        {
+            throw new NotSupportedException("a body in several islands fell asleep (a static body cannot sleep)");
+        }
+    }
+}

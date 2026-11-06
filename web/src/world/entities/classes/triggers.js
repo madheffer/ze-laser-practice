@@ -2,8 +2,8 @@
 // hurt, push, teleport). The engine calls updateTriggers / untouch / passesFilter from here.
 import * as THREE from 'three';
 import { boxTouchesHull } from '../../collision.js';
-import { register } from '../registry.js';
-import { DEG, num, bool, parseVec, angleForward } from '../math.js';
+import { register, MAX_HUMANS } from '../registry.js';
+import { DEG, num, bool, parseVec, angleForward, touchesPlayers } from '../math.js';
 import { nameMatches } from '../../../lib/names.js';
 import { explosionSound } from '../sound.js';
 import { strandsHuman } from '../cages.js';
@@ -157,17 +157,22 @@ export function filterPasses(engine, fname, depth = 0) {
 // where the map keeps zombies, from its own wiring: world/entities/cages.js (tools/teleports.mjs imports it from here)
 export { zombieCages } from '../cages.js';
 
-// game_zone_player: CountPlayersInZone fires OnPlayerInZone / OnPlayerOutZone once per player (you), activator =
-// that player, then PlayersInCount / PlayersOutCount with the counts (ze_deadcore's Insane D tests who is outside)
+// game_zone_player: CountPlayersInZone fires OnPlayerInZone / OnPlayerOutZone once per player, activator = that
+// player, then PlayersInCount / PlayersOutCount with the counts (ze_deadcore's Insane D tests who is outside). You
+// stand in for engine.humans humans (as on an HP trigger's touch, engine.fireOutput), all where you are: so the
+// per-player output fires that many times. ze_tyranny2's boss HP is this: Map_HP_Zone's OnPlayerOutZone -> a CT
+// filter -> Map_Hp_Add_Boss_S<n>.Trigger -> bosshp2.Add(40), once per human
 register('game_zone_player', {
   input(e, inp) {
     if (inp !== 'countplayersinzone') return false;
-    const ph = e.engine.playerHull;
+    const engine = e.engine;
+    const ph = engine.playerHull;
     const inside = !!ph && (e.hulls() || []).some((hull) => boxTouchesHull(ph.c, ph.h, hull));
-    const P = e.engine.playerEnt;
-    e.fireOutput(inside ? 'OnPlayerInZone' : 'OnPlayerOutZone', P);
-    e.fireOutput('PlayersInCount', P, inside ? 1 : 0);
-    e.fireOutput('PlayersOutCount', P, inside ? 0 : 1);
+    const P = engine.playerEnt;
+    const n = Math.min(MAX_HUMANS, Math.max(1, engine.humans | 0));
+    for (let i = 0; i < n; i++) e.fireOutput(inside ? 'OnPlayerInZone' : 'OnPlayerOutZone', P);
+    e.fireOutput('PlayersInCount', P, inside ? n : 0);
+    e.fireOutput('PlayersOutCount', P, inside ? 0 : n);
     return true;
   },
 });
@@ -238,8 +243,7 @@ export function updateTriggers(engine, player) {
         if (e.state.thinkAt != null && engine.time + EPS >= e.state.thinkAt) { e.state.thinkAt = null; e.state.hurtThisCycle = false; }
         continue;
       }
-      const sf = num(e.kv.spawnflags);
-      if (!(sf & 1)) continue; // "clients" flag
+      if (!touchesPlayers(e.kv)) continue; // "Clients" or "Everything" (math.js)
       const hulls = e.hulls();
       if (!hulls) continue;
       let inside = false;

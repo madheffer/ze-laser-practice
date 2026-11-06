@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Rubikon (CS2's vphysics2) for the game: the simulation source2-compiler ported and verified against Valve's own
+    vphysics2 (copied from source2-compiler at a12333d, see README.md), built here for the browser and the co-op server.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>Source2.Compiler</RootNamespace>
+    <AssemblyName>Rubikon</AssemblyName>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <NoWarn>$(NoWarn);CS1591;CS8002</NoWarn>
+    <DefaultItemExcludes>$(DefaultItemExcludes);tests\**;wasm\**</DefaultItemExcludes>
+  </PropertyGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="src\Resources\estimate_zen4_*.bin" LogicalName="%(Filename)%(Extension)" />
+  </ItemGroup>
+</Project>

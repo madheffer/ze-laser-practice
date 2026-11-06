@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk.WebAssembly">
+  <!--
+    Rubikon as a WebAssembly module (browser-wasm) for the game and the co-op server (Node). The simulation is
+    ../src (source2-compiler's verified port); this project adds only the JS interop (Interop.cs).
+    Build: dotnet publish -c Release  ->  bin/Release/net10.0/publish/wwwroot/_framework
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RuntimeIdentifier>browser-wasm</RuntimeIdentifier>
+    <OutputType>Exe</OutputType>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <RootNamespace>Source2.Compiler</RootNamespace>
+    <AssemblyName>Rubikon.Wasm</AssemblyName>
+    <NoWarn>$(NoWarn);CS1591;CS8002</NoWarn>
+    <RunAOTCompilation>true</RunAOTCompilation>
+    <WasmEnableSIMD>true</WasmEnableSIMD>
+    <WasmFingerprintAssets>false</WasmFingerprintAssets>
+    <PublishTrimmed>true</PublishTrimmed>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Rubikon.csproj" />
+  </ItemGroup>
+</Project>

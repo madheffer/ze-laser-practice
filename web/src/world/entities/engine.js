@@ -5,7 +5,8 @@
 // Unknown classes still exist (they can be parents, be killed, have outputs fired by user inputs); they
 // just ignore inputs they don't implement, and the first time each one happens it is logged once.
 import * as THREE from 'three';
-import { C } from './registry.js';
+import { C, MAX_HUMANS } from './registry.js';
+import { physicsStep } from './classes/physics-rubikon.js';
 import { Entity, stripName } from './entity.js';
 import { ONE, parseVec, angleQuat, mulberry32, poseMatrix } from './math.js';
 import { addOutput, keyValue, playerInput } from './keyvalues.js';
@@ -31,7 +32,6 @@ import { breakSound, hitSound } from './sound.js';
 // Limits on what a map's data can make the engine do (a map is untrusted). Far above any real map:
 // ze_mist_p peaks at ~2000 live entities in a firestorm wave and ~20 simulated humans.
 const MAX_ENTITIES = 50000;
-const MAX_HUMANS = 256;
 
 // entities.json's lumps: { name: [{kv, io}] }; anything else in there is dropped, not trusted to have a shape.
 function validLumps(lumps) {
@@ -413,13 +413,14 @@ export class EntityEngine {
   // Called every tick with the player's hull. Fires touch outputs; returns hurt/heal/push/teleport events.
   updateTriggers(player) { return triggers.updateTriggers(this, player); }
 
-  // Solid brush entities, for the collision world.
-  solids() {
+  // Solid brush entities, for the collision world. physics: also the ones only physics objects collide with
+  // (func_clip_vphysics), for physboxes (classes/physics.js)
+  solids({ physics = false } = {}) {
     const out = [];
     for (const e of this.ents) {
       if (!e.alive) continue;
       const h = C[e.cls];
-      if (!h?.solid || !h.solid(e)) continue;
+      if (!(h?.solid && h.solid(e)) && !(physics && h?.physSolid && h.physSolid(e))) continue;
       const hulls = e.solidHulls(); // mesh shapes as their triangles (entity.js)
       if (!hulls) continue;
       const solid = hulls.filter((x) => x.solid !== false);
@@ -449,6 +450,8 @@ export class EntityEngine {
       try { this.dispatch(q); } catch (err) { this.warnOnce(`err:${String(q.input).toLowerCase()}`, `input ${q.input} on ${q.target?.name || q.target} failed: ${err?.message || err}`); }
       if (++guard > 20000) { this.warnOnce('loop', 'I/O loop: over 20000 events in one tick'); this.queue = []; break; }
     }
+    // CS2's physics (classes/physics-rubikon.js): keyframes and controllers in, one step, before the thinks read it
+    if (this.physics) { try { physicsStep(this); } catch (err) { this.warnOnce('physics', `physics step failed: ${err?.message || err}`); } }
     for (const e of this.ents) {
       if (!e.alive) continue;
       const th = C[e.cls]?.think;

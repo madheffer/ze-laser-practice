@@ -90,6 +90,7 @@ export function startScenario(i, mode = 'normal') {
   createRunEngine({
     entities: map.entities, hulls: map.hulls, bounds: map.bounds, animations: map.animations, soundDurations: map.soundDurations,
     traceBox: (s, e, h) => S.world.traceBox(s, e, h, undefined, true),
+    physics: map.physics, // the bake's physics.bin, for CS2's physics (world/physics-world.js)
     fits: (o, solids) => standsFree(S.world, o, solids), // never spawn inside the floor or a moving brush
     countdown: S.replay ? (S.replay.meta.countdown ?? legacyCountdown(scenario)) : COUNTDOWN,
     scenario, mapUpdated: S.mapUpdated, mode, seed: run.seed,
@@ -97,6 +98,7 @@ export function startScenario(i, mode = 'normal') {
     // kept on the run: a replay's seek mutes the map the same way (app/replay.js)
     hooks: run.hooks = {
       attach(engine) {
+        if (S.engine !== engine) S.engine?.physics?.destroy(); // the last run's physics world (world/physics-world.js)
         S.engine = engine;
         engine.on('spawn', (e) => G.renderer.addEntity(e, map));
         engine.on('kill', (e) => G.renderer.removeEntity(e));

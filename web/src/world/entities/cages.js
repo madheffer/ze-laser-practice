@@ -26,7 +26,7 @@
 import * as THREE from 'three';
 import { assetKey } from '../../lib/paths.js';
 import { nameKey, nameMatches } from '../../lib/names.js';
-import { parseVec, angleQuat, poseMatrix, num } from './math.js';
+import { parseVec, angleQuat, poseMatrix, num, touchesPlayers } from './math.js';
 import { filterPasses } from './classes/triggers.js';
 
 const SHARE_OF_SMALLER = 0.5; // split: the overlap is at least half of the smaller volume...
@@ -61,7 +61,7 @@ export function strandsHuman(engine, dest) {
   const o = dest.worldOrigin();
   const land = { mn: [o[0] - HULL.half, o[1] - HULL.half, o[2]], mx: [o[0] + HULL.half, o[1] + HULL.half, o[2] + HULL.height] };
   for (const t of engine.byClass.get('trigger_teleport') || []) {
-    if (!t.enabled || !(num(t.kv.spawnflags) & 1) || !t.kv.target || nameKey(t.kv.target) === dest.key || !engine.passesFilter(t)) continue;
+    if (!t.enabled || !touchesPlayers(t.kv) || !t.kv.target || nameKey(t.kv.target) === dest.key || !engine.passesFilter(t)) continue;
     if ((t.hulls() || []).some((h) => overlaps({ mn: h.min, mx: h.max }, land))) return false;
   }
   return true;

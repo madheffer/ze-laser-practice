@@ -4,12 +4,14 @@
 // CollisionWorld for the moving brushes). A few maps stay cached; the least recently used one is dropped.
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { isMapName } from '../src/lib/paths.js';
 import { applyStripper } from '../src/lib/stripper.js';
 import { normaliseHulls } from '../src/world/hulls.js';
 import { TriangleBVH } from '../src/world/collision.js';
 import { mapItems, usableHeals } from '../src/world/items.js';
 import { soundDurations } from '../src/lib/sound-durations.js';
+import { loadPhysics } from '../src/world/physics-world.js';
 
 const KEEP = 3;
 
@@ -24,7 +26,7 @@ export function mapStore(dir) {
     }
     const folder = path.join(dir, map); // [a-z0-9_-] only: never leaves dir
     const p = (async () => {
-      const [entities, hullsRaw, col, entwatch, animations, fxCol, fxLayers, stripper, soundevents] = await Promise.all([
+      const [entities, hullsRaw, col, entwatch, animations, fxCol, fxLayers, stripper, soundevents, physicsBin, physicsOk] = await Promise.all([
         readFile(path.join(folder, 'entities.json'), 'utf8').then(JSON.parse),
         readFile(path.join(folder, 'hulls.json'), 'utf8').then(JSON.parse).catch(() => ({})),
         readFile(path.join(folder, 'collision.bin')),
@@ -38,6 +40,10 @@ export function mapStore(dir) {
         readFile(path.join(folder, 'stripper.json'), 'utf8').then(JSON.parse).catch(() => null),
         // the sound events' lengths: point_soundevent's OnSoundFinished times by them, as on the clients (optional)
         readFile(path.join(folder, 'soundevents.json'), 'utf8').then(JSON.parse).catch(() => null),
+        // CS2's physics, as the clients run it (world/physics-world.js): the map's physics.bin (optional) and the
+        // runtime the browser gets from /rubikon/_framework, loaded from the same files once per process
+        readFile(path.join(folder, 'physics.bin')).catch(() => null),
+        loadPhysics(pathToFileURL(path.join(dir, '..', 'rubikon', '_framework', 'dotnet.js')).href),
       ]);
       // the same edits the client applies (world/assets.js): the anti-cheat's copy of the map must be the player's
       applyStripper(entities, stripper, map);
@@ -48,7 +54,8 @@ export function mapStore(dir) {
             layers: new Uint32Array(fxLayers.buffer.slice(fxLayers.byteOffset, fxLayers.byteOffset + fxLayers.byteLength)) }
         : null;
       // the map's EntWatch items, as the browser reads them (world/items.js): a round's heal holders get its heals
-      return { map, entities, hulls, bounds, animations, soundDurations: soundDurations(soundevents), bvh: new TriangleBVH(tris), fx, heals: usableHeals(mapItems(entities, entwatch)) };
+      const physics = physicsOk && physicsBin ? physicsBin.buffer.slice(physicsBin.byteOffset, physicsBin.byteOffset + physicsBin.byteLength) : null;
+      return { map, entities, hulls, bounds, animations, soundDurations: soundDurations(soundevents), bvh: new TriangleBVH(tris), fx, physics, heals: usableHeals(mapItems(entities, entwatch)) };
     })();
     p.catch(() => cache.delete(map));
     cache.set(map, p);

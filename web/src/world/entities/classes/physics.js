@@ -1,20 +1,17 @@
-// A little rigid-body motion, enough for physboxes the map pushes around: phys_thruster on a func_physbox (ze_deadcore's
-// mini-boss cubes chase you this way), gravity and floor friction, sliding along the static world and the map's solid
-// brushes and movers (deadcore's Stage B arena: 4 of its 12 cube spawns stand on the escape lift, b_escape_move_1).
+// Physboxes and the physics entities that push them. With a physics world (engine.physics: CS2's vphysics2 and the
+// server's physics entities, ported from the binaries into rubikon/ and run as WebAssembly, world/physics-world.js)
+// physics-rubikon.js does it all. Without one (the runtime didn't load, a map baked before physics.bin, tools/sim.mjs)
+// the old fallback below moves them: phys_thruster on a func_physbox (ze_deadcore's mini-boss cubes chase you this way),
+// gravity and floor friction, sliding along the static world and the map's solid brushes and movers.
 //
-// ze_deadcore's cube: four trigger_multiple bands 900 u out (left/right/up/down, parented to the physbox, filtered to
-// the player who woke it) Activate the thruster on that side, Deactivate 1 s later; trigger_multiple re-fires every
-// `wait` while you stay in a band, so the cube keeps accelerating towards you. phys_keepupright keeps it from
-// tipping, so the physbox never rotates here.
-//
-// Truth: phys_thruster spawnflags (Source SDK phys_controller / CS2 FGD): 1 start active, 2 apply force, 4 apply
-// torque, 8 orient locally, 16 ignore mass (force is then an acceleration, u/s²), 32 ignore position. Gravity is
-// sv_gravity 800. Friction is an approximation: VPhysics/Rubikon contact friction isn't in the entity data, so a
-// physbox on the floor loses FLOOR_FRICTION × g of horizontal speed per second (μ 0.8, Source's "default" surface).
+// FALLBACK, not CS2: no rotation, "ignore mass" honoured, force every tick, friction FLOOR_FRICTION x g (mu 0.8).
+// CS2's own (rubikon/CS2_RUNTIME.md): a thruster adds force x 1000 x invMass per second of velocity and turns the body by
+// its inertia; mass, inertia and damping come from the model's compiled physics.
 import * as THREE from 'three';
 import { register } from '../registry.js';
-import { num, parseVec, angleForward } from '../math.js';
+import { num } from '../math.js';
 import { traceSolids, boxTouchesHull } from '../../collision.js';
+import { thrusterInput, keepUprightInput, followBody } from './physics-rubikon.js';
 
 const GRAVITY = 800;
 const FLOOR_FRICTION = 0.8;
@@ -27,6 +24,7 @@ register('phys_thruster', {
     e.state.scale = 1;
   },
   input(e, inp, p) {
+    if (e.engine.physics) return thrusterInput(e, inp, p);
     switch (inp) {
       case 'activate': e.enabled = true; wake(e); return true;
       case 'deactivate': e.enabled = false; return true;
@@ -34,7 +32,9 @@ register('phys_thruster', {
     }
   },
 });
-register('phys_keepupright', { input: (e, inp) => inp === 'turnon' || inp === 'turnoff' });
+register('phys_keepupright', {
+  input: (e, inp, p) => (e.engine.physics ? keepUprightInput(e, inp, p) : inp === 'turnon' || inp === 'turnoff'),
+});
 
 // the physbox a thruster pushes (attach1), woken when the thruster fires
 function attached(e) {
@@ -48,6 +48,7 @@ function wake(thruster) {
 
 // World-space linear acceleration from the active thrusters on `box`.
 const tmpQ = new THREE.Quaternion();
+const FORWARD = new THREE.Vector3(1, 0, 0); // Source's +x, angleForward's axis
 function thrust(box) {
   const acc = new THREE.Vector3();
   const set = box.engine.byClass.get('phys_thruster');
@@ -57,9 +58,12 @@ function thrust(box) {
     const sf = num(t.kv.spawnflags);
     if (!(sf & 2)) continue; // torque-only thrusters don't move it
     const f = num(t.kv.force) * (t.state.scale ?? 1);
-    // the thruster's own facing; "orient locally" means it turns with the box (which stays upright here)
-    const dir = new THREE.Vector3(...angleForward(parseVec(t.kv.angles)));
-    if (t.parent) dir.applyQuaternion(tmpQ.setFromRotationMatrix(t.parent.getWorld()));
+    // the thruster's facing as the engine placed it: its template angles turned by the maker that spawned it
+    // (ze_tyranny2's spider aims each poison ball with its maker's KeyValues(angles -15 180 0) before ForceSpawn), any
+    // KeyValues(angles) since (its tornadoes re-aim their thrusters that way), and a parent. UNSETTLED: CS2's
+    // CPhysThruster (orient locally, torque, ignore position) is not decompiled yet (porter research Q10); the box
+    // never turns here
+    const dir = FORWARD.clone().applyQuaternion(tmpQ.setFromRotationMatrix(t.getWorld()));
     // without "ignore mass", force / mass; the cubes all ignore mass, and gamemass 0 means VPhysics' own (unknown)
     const mass = sf & 16 ? 1 : Math.max(1, num(box.kv.gamemass) || num(box.kv.massscale) || 1);
     acc.addScaledVector(dir, f / mass);
@@ -67,11 +71,17 @@ function thrust(box) {
   return acc;
 }
 
-// The map's solid brushes and movers this tick (a lift, a door, another cube), built once per tick for every physbox.
+// func_clip_vphysics (CS2 CFuncVPhysicsClip): a brush physics objects collide with and players walk through.
+// ze_tyranny2 keeps its bosses in with them: a lid over the spider's arena, Gargantua's doorways, the box Diablo's mover
+// slides around in. UNSETTLED: CFuncVPhysicsClip's collision groups not decompiled; this is what the class is named for
+register('func_clip_vphysics', { physSolid: (e) => e.enabled });
+
+// The map's solid brushes and movers this tick (a lift, a door, another cube) and its physics clips, built once per
+// tick for every physbox.
 function solidsNow(engine) {
   const c = engine._physSolids;
   if (c && c.t === engine.time) return c.list;
-  const list = engine.solids();
+  const list = engine.solids({ physics: true });
   engine._physSolids = { t: engine.time, list };
   return list;
 }
@@ -79,6 +89,7 @@ function solidsNow(engine) {
 // Called from func_physbox's think (brushes.js). Needs engine.traceBox (the session wires the collision world in);
 // headless (tools/sim.mjs) there is none and physboxes stay put.
 export function physboxThink(e, dt) {
+  if (e.engine.physics && e.state.body != null) { followBody(e); return; }
   const s = e.state;
   if (!s.awake || s.frozen || e.parent || !e.engine.traceBox) return;
   const b = e.engine.assets.bounds[e.model];

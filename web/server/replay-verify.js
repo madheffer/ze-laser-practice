@@ -69,6 +69,7 @@ export function replayVerifier({ loadMap, findStage, store, log = () => {} }) {
       }
       await new Promise((r) => setImmediate(r));
     }
+    pc.dispose(); // its physics world (world/physics-world.js)
     if (cheat) return { removed: `replay: ${cheat}` };
     const reportedDead = run.result !== 'win';
     if (pc.hits > (run.hits ?? Infinity)) return { removed: 'replay: more hits than reported' };

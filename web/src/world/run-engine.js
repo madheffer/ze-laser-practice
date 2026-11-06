@@ -2,7 +2,7 @@
 // the browser (app/session.js) and on the co-op server's checker (server/coop-check.js), so the server's copy of
 // a round can't drift from what players see. Pure: no DOM, no rendering, no audio, no player physics.
 //
-//   const run = createRunEngine({ entities, hulls, bounds, animations, traceBox, scenario, mode, seed, humans, bossHp, items, hooks })
+//   const run = createRunEngine({ entities, hulls, bounds, animations, traceBox, physics, scenario, mode, seed, humans, bossHp, items, hooks })
 //   hooks.attach(engine)    before the world spawns (renderer / sound / player hooks)
 //   hooks.silent(on)        a fast-forward replay starts / ends (the client mutes its sounds)
 //   hooks.win() / lose()    the scenario's win / lose input arrived (a disabled relay doesn't count); a win with
@@ -23,6 +23,7 @@ import { giveItems } from './items.js';
 import { installEndless } from '../app/endless.js';
 import { inputMatcher, nameKey, nameMatches, stripPrefix } from '../lib/names.js';
 import { own } from '../lib/storage.js';
+import { createPhysicsWorld } from './physics-world.js';
 
 export const TICK = 1 / 64;
 // s from the spawn to the stage's start, solo and in a round: time to look around, and for a round's guests to click
@@ -36,11 +37,14 @@ export const legacyCountdown = (scenario) => (scenario?.fastForward ? 0 : 1);
 const DAMAGE_PER_HIT = 30;
 const PERFECT_HITS_PER_HUMAN = 5;
 
-export function createRunEngine({ entities, hulls, bounds, animations, soundDurations = null, traceBox, fits = null, countdown = COUNTDOWN, scenario, mapUpdated = null, mode = 'normal', seed, humans = 20, bossHp = 100, items = [], hooks = {}, run: into = {} }) {
+export function createRunEngine({ entities, hulls, bounds, animations, soundDurations = null, traceBox, physics = null, fits = null, countdown = COUNTDOWN, scenario, mapUpdated = null, mode = 'normal', seed, humans = 20, bossHp = 100, items = [], hooks = {}, run: into = {} }) {
   const endless = mode === 'endless' && !!scenario?.endless;
   // soundDurations: event name -> seconds (lib/sound-durations.js), for point_soundevent's OnSoundFinished
   const engine = new EntityEngine(entities, { hulls, bounds, animations, soundDurations }, { seed });
-  // physboxes (world/entities/classes/physics.js) slide along the static world only
+  // physboxes (world/entities/classes/physics.js): CS2's physics from the map's physics.bin when the runtime is loaded
+  // (world/physics-world.js; the caller destroys the world with the run), else the fallback that slides along the static world
+  const world = createPhysicsWorld(physics);
+  if (world) engine.physics = world;
   if (traceBox) engine.traceBox = traceBox;
   // CS2Fixes' 2026-01-21 map migrations remap numbered rendermodes on maps updated before then (entities/render-mode.js);
   // mapUpdated: the scenario file's workshopUpdated

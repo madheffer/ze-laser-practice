@@ -322,6 +322,7 @@ export class Round {
 
   // the copies are done: free their engines
   free() {
+    for (const p of this.players.values()) p.check.dispose?.();
     for (const p of this.players.values()) p.check = { hits: p.check.hits, alive: false, stageTime: p.check.stageTime, behind: () => false, queueBossDamage() {}, feed() {}, checkHits: () => [] };
   }
 }

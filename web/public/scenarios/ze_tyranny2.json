@@ -1,0 +1,191 @@
+{
+  "map": "ze_tyranny2",
+  "title": "ze_tyranny2",
+  "workshop": "3415955166",
+  "workshopUpdated": "2026-05-06",
+  "description": "Five stages of fantasy bosses by Moray and nano (CS2 port by Tenshi): the Spider, the Troll, the Dragon and Rakiora, Gargantua and Diablo's lasers, then Diablo, Angra and Diablo's last lasers.",
+  "scenarios": [
+    {
+      "id": "s1_spider",
+      "group": "Stage 1",
+      "name": "Spider (boss)",
+      "summary": "Dodge the spider's poison balls and pools",
+      "description": "Stage 1 (leveltrigger_case 1). You cross s1boss_trigger into the arena: Map_HP_Zone counts the humans 1 s later and each one adds 40 hits to the segment (bosshp2 / bosshp1: 1 + 40 per human), 10 segments (bosshp3). At +22 s the spider rises (s1boss_move) and every 6-11 s (s1boss_atk_timer) lobs 4 poison balls 0.5 s apart from s1boss_atk_maker at one of 48 aims (4 pitches x 12 yaws): a physbox on a phys_thruster (5000) that hurts 100 in flight, then lands and pools for 120 at +5 s. At +52 s s1_spider_hurt_all_trig poisons the whole arena (16 a tick). GFL's BossHUD calls it Snake.",
+      "spawn": { "origin": [8029, 2560, -2085], "yaw": 90 },
+      "start": [{ "target": "[PR#]leveltrigger_case", "input": "InValue", "param": "1" }],
+      "arrive": ["[PR#]s1boss_trigger"],
+      "fastForward": 19,
+      "bosses": [
+        { "target": "[PR#]s1boss_hit", "name": "Snake", "counter": "[PR#]bosshp1", "counterMode": "hits", "backup": "[PR#]bosshp2", "iterator": "[PR#]bosshp3" }
+      ],
+      "win": { "target": "[PR#]s1boss_hpbar", "input": "Kill" },
+      "hazards": {
+        "s1boss_atk_hurt1": "a poison ball",
+        "s1boss_atk_hurt2": "a poison pool",
+        "s1_spider_hurt_all_trig": "the spider's poison"
+      }
+    },
+    {
+      "id": "s2_troll",
+      "group": "Stage 2",
+      "name": "Troll (boss)",
+      "summary": "A charging troll throwing rocks",
+      "description": "Stage 2. You drop through s2boss_trigger into the troll's pit: each human adds 30 hits a segment (Map_Hp_Add_Boss_S2), 10 segments. At +10 s the troll spawns on bossmovement_temp: a physbox on five thrusters that chases whoever its spinning bossmove_rotate_trigger tags (context bosstar, 5 s), hurting on touch (s2boss_hurt1). Every s2boss_atk_timer tick it throws 5 rocks (s2_boss_atk_temp) from the rotating s2boss_atk_rot1 / rot2 launcher.",
+      "spawn": { "origin": [8783, 2700, -13638], "yaw": 90 },
+      "start": [{ "target": "[PR#]leveltrigger_case", "input": "InValue", "param": "2" }],
+      "arrive": ["[PR#]s2boss_trigger"],
+      "fastForward": 8,
+      "bosses": [
+        { "target": "[PR#]s2boss_hit", "name": "Troll", "counter": "[PR#]bosshp1", "counterMode": "hits", "backup": "[PR#]bosshp2", "iterator": "[PR#]bosshp3" }
+      ],
+      "win": { "target": "[PR#]s2boss_hpbar", "input": "Kill" },
+      "hazards": {
+        "s2boss_hurt1": "the troll",
+        "s2boss_atk_hurt": "a rock",
+        "s2_sewer_attack_hurt": "the sewer"
+      }
+    },
+    {
+      "id": "s3_dragon",
+      "group": "Stage 3",
+      "name": "Dragon (boss)",
+      "summary": "Tornadoes, fire breath, wind and gravity",
+      "description": "Stage 3. Past s3boss_trigger each human adds 38 hits a segment (Map_Hp_Add_Boss_S3), 10 segments. The dragon appears at +15 s; from +25 s s3boss_atkcase picks an attack every 10-13 s: tornadoes (s3_boss_atk_tornado_temp, wandering physboxes that push you), fire breath (s3boss_atk_fire_trigger spawning fire trains), wind (s3boss_atk_wind_hurt) or gravity (s3boss_atk_grav_hurt).",
+      "spawn": { "origin": [-13405, 9500, -2404], "yaw": 90 },
+      "start": [{ "target": "[PR#]leveltrigger_case", "input": "InValue", "param": "3" }],
+      "arrive": ["[PR#]s3boss_trigger"],
+      "fastForward": 13,
+      "bosses": [
+        { "target": "[PR#]s3boss_hit", "name": "Dragon", "counter": "[PR#]bosshp1", "counterMode": "hits", "backup": "[PR#]bosshp2", "iterator": "[PR#]bosshp3" }
+      ],
+      "win": { "target": "[PR#]s3boss_hpbar", "input": "Kill" },
+      "hazards": {
+        "s3boss_atk_tornado_hurt": "a tornado",
+        "s3boss_atk_fire_hurt": "the dragon's fire",
+        "s3boss_atk_poison_hurt": "the dragon's poison",
+        "s3boss_atk_wind_hurt": "the wind",
+        "s3boss_atk_grav_hurt": "the gravity"
+      }
+    },
+    {
+      "id": "s3_rakiora",
+      "group": "Stage 3",
+      "name": "Rakiora (ending)",
+      "summary": "Shoot the charging sea serpent down",
+      "description": "The stage 3 ending. At s3door_10_3 the humans hold 20 s; s3_snake_template spawns Rakiora and every human in s3_snake_add gives each of its 10 segments 4 hits (Boss_HealthBackup_snake). At +22 s it rises from the river, and at +25 s it charges down s3_snake_path1 -> 3 at 1015 u/s with a 99999 hurt: kill it before it reaches you. Its death (s3_snake_hitbox OnBreak) opens the end: win when s3end_trigger2 takes you.",
+      "spawn": { "origin": [1750, 12997, -2285], "yaw": 180 },
+      "start": [{ "target": "[PR#]leveltrigger_case", "input": "InValue", "param": "3" }],
+      "arrive": ["[PR#]s3door_10_3"],
+      "fastForward": 18,
+      "bosses": [
+        { "target": "[PR#]s3_snake_hitbox", "name": "Rakiora", "counter": "[PR#]Boss_Health_snake", "counterMode": "hits", "backup": "[PR#]Boss_HealthBackup_snake", "iterator": "[PR#]Boss_HealthCount_snake" }
+      ],
+      "win": { "target": "[PR#]stage_wins", "input": "InValue" },
+      "hazards": {
+        "s3_snake_hurt": "Rakiora"
+      }
+    },
+    {
+      "id": "s4_gargantua",
+      "group": "Stage 4",
+      "name": "Gargantua (boss)",
+      "summary": "A charging giant with barrels and crystals",
+      "description": "Stage 4. Past s4boss_trigger each human adds 48 hits a segment (Map_Hp_Add_Boss_S4), 10 segments; the door behind closes at +10 s. Gargantua spawns at +15 s on the same thruster mover as the troll (bossmovement_temp) and chases its tagged human, burning on touch (s4boss_hurt1). From +27 s s4boss_atkcase1 picks attacks: barrels, crystals, a gravity cannon, fire and ice.",
+      "spawn": { "origin": [8300, 11803, -2257], "yaw": 180 },
+      "start": [{ "target": "[PR#]leveltrigger_case", "input": "InValue", "param": "4" }],
+      "arrive": ["[PR#]s4boss_trigger"],
+      "fastForward": 13,
+      "bosses": [
+        { "target": "[PR#]s4boss_hit", "name": "Gargantua", "counter": "[PR#]bosshp1", "counterMode": "hits", "backup": "[PR#]bosshp2", "iterator": "[PR#]bosshp3" }
+      ],
+      "win": { "target": "[PR#]s4boss_hpbar", "input": "Kill" },
+      "hazards": {
+        "s4boss_hurt1": "Gargantua",
+        "s4boss_atk_barrel_hurt": "a barrel",
+        "s4boss_atk_crystal_hurt1": "a crystal",
+        "s4boss_atk_crystal_hurt2": "a crystal",
+        "s4boss_atk_gravcannon_hurt": "the gravity cannon",
+        "s4boss_atk_fire_hurt": "the fire",
+        "s4boss_atk_freeze_hurt": "the ice",
+        "s4_garg_ult_hurt": "Gargantua's roar"
+      }
+    },
+    {
+      "id": "s4_diablo",
+      "group": "Stage 4",
+      "name": "Diablo's lasers (ending)",
+      "summary": "Jump or crouch ten fast lasers",
+      "description": "The stage 4 ending. At s4door_13_2 the humans hold; Diablo appears behind them at +10 s and from +11.5 s to +21.4 s fires 10 lasers (s4boss_diablo_case, random height: 24, 44 or 66 u off the floor) up the hall at 3050 u/s, 999999 damage: jump the low ones, crouch the high one. Win when s4end_trigger2 takes you at +26 s.",
+      "spawn": { "origin": [3360, 15800, -1445], "yaw": 270 },
+      "start": [{ "target": "[PR#]leveltrigger_case", "input": "InValue", "param": "4" }],
+      "arrive": ["[PR#]s4door_13_2"],
+      "fastForward": 8,
+      "win": { "target": "[PR#]stage_wins", "input": "InValue" },
+      "hazards": {
+        "s4boss_diablo_laser_hurt": "Diablo's laser"
+      }
+    },
+    {
+      "id": "s5_diablo",
+      "group": "Stage 5",
+      "name": "Diablo (boss)",
+      "summary": "Meteors, cannons, beams and tornadoes",
+      "description": "Stage 5. Past s5boss_trigger each human adds 54 hits a segment (Map_Hp_Add_Boss_S5), 10 segments; after the 16 s hold and the cutscene (cutscene_relay -> cutscene_beam_center) Diablo is summoned and chases the human Diablo_Target_Finder tags (Diablo_MovePhys, five thrusters), burning for 150 on touch. Every 7.5-13 s s5boss_atkcase picks: gravity ring, meteors, cannon fire, beams, crystals or tornadoes.",
+      "spawn": { "origin": [11800, -2085, 6956], "yaw": 0 },
+      "start": [{ "target": "[PR#]leveltrigger_case", "input": "InValue", "param": "5" }],
+      "arrive": ["[PR#]s5boss_trigger"],
+      "fastForward": 30,
+      "bosses": [
+        { "target": "[PR#]s5boss_hit", "name": "Diablo", "counter": "[PR#]bosshp1", "counterMode": "hits", "backup": "[PR#]bosshp2", "iterator": "[PR#]bosshp3" }
+      ],
+      "win": { "target": "[PR#]s5boss_hpbar", "input": "Kill" },
+      "hazards": {
+        "s5boss_hurt1": "Diablo",
+        "s5boss_atk_grav_hurt": "the gravity ring",
+        "s5boss_atk_meteor_hurt": "a meteor",
+        "s5boss_atk_cannon_hurt": "a cannon shot",
+        "s5boss_atk_beam_hurt": "a beam",
+        "s5boss_atk_crystal_hurt1": "a crystal",
+        "s5boss_atk_crystal_hurt2": "a crystal",
+        "s5boss_atk_tornado_hurt": "a tornado"
+      }
+    },
+    {
+      "id": "s5_angra",
+      "group": "Stage 5",
+      "name": "Angra (boss)",
+      "summary": "Dodge the lanes of venom balls",
+      "description": "After Diablo: the humans hold 40 s at s5door_13_2, then s5boss_angra_trigger brings Angra down (s5boss_angra_move1) and hp_fix gives its 10 segments 15 hits per human. From +6.5 s after it lands, every 1.8 s (s5boss_angra_atk_timer1) it sends two venom balls down two of six lanes (s5boss_angra_atk_case1) at 1280 u/s, 120 damage each.",
+      "spawn": { "origin": [3550, 9600, 8244], "yaw": 90 },
+      "start": [{ "target": "[PR#]leveltrigger_case", "input": "InValue", "param": "5" }],
+      "arrive": ["[PR#]s5door_13_2"],
+      "fastForward": 38,
+      "bosses": [
+        { "target": "[PR#]s5boss_angra_hit", "name": "Angra", "counter": "[PR#]bosshp1", "counterMode": "hits", "backup": "[PR#]bosshp2", "iterator": "[PR#]bosshp3" }
+      ],
+      "win": { "target": "[PR#]s5boss_angra_hpbar", "input": "Kill" },
+      "hazards": {
+        "s5boss_angra_atk_hurt1": "Angra's venom"
+      }
+    },
+    {
+      "id": "s5_diablo_lasers",
+      "group": "Stage 5",
+      "name": "Diablo's last lasers (ending)",
+      "summary": "Shoot Diablo while jumping his lasers",
+      "description": "The stage 5 ending. After Angra, s5boss_diablo_trigger gives the last Diablo 10 hits per human per segment and the humans hold at s5door_14_3; Diablo lands at +10 s and from +17 s fires a laser every 1.2 s (s5boss_diablo_case_false: random height 24, 44 or 66 u off the floor, 2400 u/s, 999999 damage) until his 10 segments are gone. Map_Laser_Limit kills everyone in the end zone 120 s after the lasers start. Win when s5end_trigger2 takes you, 6 s after he dies.",
+      "spawn": { "origin": [3775, 12869, 8244], "yaw": 270 },
+      "start": [{ "target": "[PR#]leveltrigger_case", "input": "InValue", "param": "5" }],
+      "arrive": ["[PR#]s5boss_diablo_trigger", "[PR#]s5door_14_3"],
+      "fastForward": 12,
+      "bosses": [
+        { "target": "[PR#]s5boss_diablo_hit", "name": "Diablo", "counter": "[PR#]bosshp1", "counterMode": "hits", "backup": "[PR#]bosshp2", "iterator": "[PR#]bosshp3" }
+      ],
+      "win": { "target": "[PR#]stage_wins", "input": "InValue" },
+      "hazards": {
+        "s5boss_diablo_laser_hurt": "Diablo's laser",
+        "Map_Laser_Limit_Hurt": "the time limit"
+      }
+    }
+  ]
+}

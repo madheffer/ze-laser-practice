@@ -3,6 +3,7 @@
 import { register } from '../registry.js';
 import { num } from '../math.js';
 import { physboxThink } from './physics.js';
+import { spawnBody, physboxInput } from './physics-rubikon.js';
 
 // Breakables and physboxes carry health. Bosses are usually one of these: players shoot it, and the map
 // reads OnHealthChanged (health as a 0..1 fraction of max) or OnDamaged to count segments/hits.
@@ -36,7 +37,7 @@ export const breakable = register('func_breakable', {
   },
 });
 // physboxes also move (classes/physics.js): asleep at spawn, woken by a thruster or Wake / EnableMotion
-// (Source physobj.h: SF_PHYSBOX_ASLEEP 4096, SF_PHYSBOX_MOTIONDISABLED 32768)
+// (CS2's CPhysBox, rubikon/CS2_RUNTIME.md: spawnflag 0x100000 skips the spawn's Wake, 0x8000 starts motion disabled)
 // Spawnflag 16384 "Debris - Don't collide with the player or other debris" (CS2 game/core/base.fgd): not solid to
 // you. ze_dreamin's DONT_shoot_from_here (a debris physbox across the Final Crystal room's doorway) stopped you short
 // of the trigger that starts the blades; on a server humans walk through it
@@ -46,8 +47,13 @@ const physbox = {
   spawn(e) {
     breakable.spawn(e);
     const sf = num(e.kv.spawnflags);
-    e.state.awake = !(sf & 4096);
+    e.state.awake = !(sf & 0x100000);
     e.state.frozen = !!(sf & 32768);
+    spawnBody(e); // its CS2 physics body when the run has a physics world (physics-rubikon.js)
+  },
+  input(e, inp, p, act) {
+    if (physboxInput(e, inp)) return true;
+    return breakable.input(e, inp, p, act);
   },
   think: physboxThink,
 };

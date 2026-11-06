@@ -15,4 +15,11 @@
     <PackageReference Include="ValveResourceFormat" Version="20.1.7467" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- physics.bin's format and shape types, shared with Rubikon (rubikon/), so the bake writes what the game reads -->
+    <Compile Include="../rubikon/src/Physics/PhysFile.cs" Link="Rubikon/PhysFile.cs" />
+    <Compile Include="../rubikon/src/Physics/RnShapes.cs" Link="Rubikon/RnShapes.cs" />
+    <Compile Include="../rubikon/src/Physics/RnHullBuilder.cs" Link="Rubikon/RnHullBuilder.cs" />
+  </ItemGroup>
+
 </Project>

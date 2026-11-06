@@ -25,14 +25,22 @@ static class SurfaceBake
     const int MaxModels = 4000;
     static readonly (string kv, string json)[] Sounds = [("bulletimpact", "bulletImpact"), ("break", "break"), ("impacthard", "impactHard"), ("impactsoft", "impactSoft")];
 
-    sealed record Surf(string Name, uint Hash, uint Base, Dictionary<string, string> Audio);
+    // Physics: the entry's "physics" block (density, friction, elasticity, thickness, ...), for RubikonBake
+    internal sealed record Surf(string Name, uint Hash, uint Base, Dictionary<string, string> Audio, KVObject? Physics);
+
+    // Every surface property by m_nameHash: the stock packs', then the map's own (which win)
+    internal static Dictionary<uint, Surf> Load(IEnumerable<Package> mapPackages, IEnumerable<string> stockPaks)
+    {
+        var byHash = new Dictionary<uint, Surf>();
+        foreach (var path in stockPaks) { var p = new Package(); p.Read(path); Read(p, byHash); }
+        foreach (var p in mapPackages.Distinct()) Read(p, byHash);
+        return byHash;
+    }
 
     public static SortedSet<string> Write(GameFileLoader loader, IEnumerable<Package> mapPackages, IEnumerable<string> stockPaks, string outDir)
     {
         var names = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
-        var byHash = new Dictionary<uint, Surf>();
-        foreach (var path in stockPaks) { var p = new Package(); p.Read(path); Read(p, byHash); }
-        foreach (var p in mapPackages.Distinct()) Read(p, byHash); // the map's own win
+        var byHash = Load(mapPackages, stockPaks);
         if (byHash.Count == 0) { Console.WriteLine("surfaces: no surfaceproperties found"); return names; }
         var byName = byHash.Values.GroupBy(s => s.Name, StringComparer.OrdinalIgnoreCase).ToDictionary(g => g.Key, g => g.First().Hash, StringComparer.OrdinalIgnoreCase);
 
@@ -107,7 +115,8 @@ static class SurfaceBake
                             if (k != null && v.ValueType == KVValueType.String) audio[k] = v.ToString(CultureInfo.InvariantCulture);
                     var hash = Convert.ToUInt32(h.ToInt64(CultureInfo.InvariantCulture) & 0xffffffff);
                     var bse = s.TryGetValue("m_baseNameHash", out var bh) ? Convert.ToUInt32(bh.ToInt64(CultureInfo.InvariantCulture) & 0xffffffff) : 0u;
-                    into[hash] = new Surf(n.ToString(CultureInfo.InvariantCulture), hash, bse, audio);
+                    var physics = s.TryGetValue("physics", out var ph) && ph.IsCollection ? ph : null;
+                    into[hash] = new Surf(n.ToString(CultureInfo.InvariantCulture), hash, bse, audio, physics);
                 }
             }
             catch (Exception ex) { Console.WriteLine($"surfaces: {e.GetFullPath()}: {ex.Message}"); }

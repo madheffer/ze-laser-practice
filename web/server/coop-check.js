@@ -49,6 +49,9 @@ export class PlayerCheck {
   // assets: map-store's; scenario: the stage's full entry (or null for free roam)
   // items: the map items this player holds from the start (a round's heal holders)
   // countdown: seconds from the spawn to the stage start (a solo replay passes the one it was recorded with)
+  // the copy is done: its physics world goes (world/physics-world.js holds it in the WebAssembly heap)
+  dispose() { this.run?.engine?.physics?.destroy(); }
+
   constructor({ assets, scenario, mode, seed, rules, items = [], countdown = COUNTDOWN, onDeath, onOutcome, onCheat, onPenned = null, log = () => {} }) {
     this.scenario = scenario;
     this.rules = rules;
@@ -78,6 +81,7 @@ export class PlayerCheck {
     this.run = createRunEngine({
       entities: assets.entities, hulls: assets.hulls, bounds: assets.bounds, animations: assets.animations, soundDurations: assets.soundDurations,
       traceBox: (s, e, h) => this.world.traceBox(s, e, h, undefined, true),
+      physics: assets.physics, // CS2's physics as the clients run it (map-store.js, world/physics-world.js)
       // the client's spawn test (app/session.js): the same spot, so the spawn check below agrees
       fits: (o, solids) => standsFree(this.world, o, solids), countdown,
       scenario, mode, seed, humans: rules.humans, bossHp: rules.bossHp, items,
