@@ -165,7 +165,7 @@ For a map that's already baked, each piece can be redone on its own (`lasers-bak
 | Mode | What |
 |---|---|
 | `--lighting` | the whole `lighting/` folder (lightmaps, probes, post, skies, cubemaps) |
-| `--sky` | only skies + reflection cubemaps, merged into the existing `lighting.json` |
+| `--sky` | only skies + reflection cubemaps + csgo_moondome cubes (fake-skybox walls), merged into the existing `lighting.json`; rerun `--tiers` after |
 | `--tiers` | `q/medium` + `q/low` (after `--lighting`) |
 | `--alpha` | cut-out alpha back into the glb PNGs (tree leaves, fences). The `map` step already does it |
 | `--water` | the water shaders' textures (`water/`: waves, foam, debris, animated normal frames). The `map` step already does it; `bake-map.mjs <map> --steps water` for a map baked before |

@@ -105,8 +105,61 @@ static class SkyBake
                 catch (Exception e) { log($"  sky: {SafePath.Describe(key)}: {e.Message}"); }
             }
         }
+        // csgo_moondome materials: a surface that shows a cube texture along the view direction (ze_dreamin's sky_fix
+        // fake-skybox walls show sky56_cube2 through them). Their g_tCubeMap goes in with the skies, keyed by its vtex path
+        foreach (var cube in MoondomeCubes(mapDir).Take(MaxSkies))
+        {
+            if (skies.ContainsKey(cube)) continue;
+            try
+            {
+                using var texRes = load(cube + "_c");
+                if (texRes?.DataBlock is not Texture tex || !tex.Flags.HasFlag(VTexFlags.CUBE_TEXTURE)) { log($"  sky: moondome cube {SafePath.Describe(cube)} missing or not a cube"); continue; }
+                // as RGBM faces at full size: these cubes are often uncompressed RGBA8888 (ze_dreamin's: 33 MB raw),
+                // which the browser can't take as a compressed upload anyway
+                var hash = Fnv(cube);
+                TierBake.WriteRgbmFaces(tex, Math.Min((int)tex.Width, 1024), outDir, hash, null, null);
+                skies[cube] = new JsonObject { ["file"] = $"sky/{hash}.json" };
+                log($"  sky: moondome {cube} {tex.Format} {tex.Width}x{tex.Height} -> RGBM faces");
+            }
+            catch (Exception e) { log($"  sky: {SafePath.Describe(cube)}: {e.Message}"); }
+        }
         result["skies"] = skies;
         return result;
+    }
+
+    // the g_tCubeMap of every csgo_moondome material in the baked world / entity glbs (VRF keeps the vmat in extras)
+    static IEnumerable<string> MoondomeCubes(string mapDir)
+    {
+        var found = new SortedSet<string>(StringComparer.Ordinal);
+        foreach (var sub in new[] { "world", "models" })
+        {
+            var dir = Path.Combine(mapDir, sub);
+            if (!Directory.Exists(dir)) continue;
+            foreach (var file in Directory.EnumerateFiles(dir, "*.glb", SearchOption.AllDirectories))
+            {
+                try
+                {
+                    using var fs = File.OpenRead(file);
+                    using var br = new BinaryReader(fs);
+                    if (fs.Length < 20 || br.ReadUInt32() != 0x46546C67) continue; // "glTF"
+                    br.ReadUInt32(); br.ReadUInt32();
+                    var len = br.ReadUInt32();
+                    if (br.ReadUInt32() != 0x4E4F534A || len > fs.Length - 20) continue; // "JSON"
+                    var mats = JsonNode.Parse(br.ReadBytes((int)len))?["materials"]?.AsArray();
+                    foreach (var m in mats ?? [])
+                    {
+                        var vmat = m?["extras"]?["vmat"];
+                        if (!string.Equals(vmat?["ShaderName"]?.ToString(), "csgo_moondome.vfx", StringComparison.OrdinalIgnoreCase)) continue;
+                        var cube = vmat?["TextureParams"]?["g_tCubeMap"]?.ToString();
+                        if (string.IsNullOrEmpty(cube)) continue;
+                        cube = cube.Replace('\\', '/').ToLowerInvariant();
+                        found.Add(cube.EndsWith("_c") ? cube[..^2] : cube);
+                    }
+                }
+                catch (Exception) { /* not a glb we can read: no domes from it */ }
+            }
+        }
+        return found;
     }
 
     static string Fnv(string s)

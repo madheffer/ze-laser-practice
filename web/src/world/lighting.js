@@ -32,6 +32,7 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { parseVec, angleForward } from './entities/index.js';
 import { chainBeforeCompile } from '../lib/shader.js';
 import { MapLights, MAP_LIGHTS_PARS, MAP_LIGHTS_GATHER } from './maplights.js';
+import { skyCubeTexture } from './sky-cube.js';
 
 // the fallback (no baked lighting, or a GPU without the formats): what the renderer always had
 const FALLBACK = { hemiSky: 0xdde8ff, hemiGround: 0x3a3328, hemi: 1.1, sun: 0xfff1d6, sunIntensity: 1.6, sunDir: [0.4, 0.3, 1] };
@@ -320,31 +321,9 @@ export class MapLighting {
     const key = kv && String(kv.skyname || kv.skybox_material_day || '').replace(/\\/g, '/').toLowerCase().replace(/_c$/, '');
     const sky = key && skies?.[key];
     if (!sky) return;
-    const su0 = this.skyUniforms;
-    su0.cs2SkyRgbm.value = 0;
-    if (sky.rgbmFaces) return this.setSkyMesh(kv, sky, (() => {
-      const t = new THREE.CubeTexture(sky.rgbmFaces);
-      t.colorSpace = THREE.NoColorSpace; t.flipY = false; t.generateMipmaps = false; t.premultiplyAlpha = false;
-      t.minFilter = t.magFilter = THREE.LinearFilter; t.needsUpdate = true;
-      su0.cs2SkyRgbm.value = sky.range; su0.cs2SkyDecodeSrgb.value = 0;
-      return t;
-    })());
-    const faces = [];
-    for (let f = 0; f < 6; f++) {
-      faces.push({ width: sky.width, height: sky.height, mipmaps: sky.mips.map((m) => {
-        const face = m.bytes / 6;
-        return { data: sky.data.subarray(m.offset + f * face, m.offset + (f + 1) * face), width: m.width, height: m.height };
-      }) });
-    }
-    const tex = new THREE.CompressedCubeTexture(faces, sky.format);
-    tex.minFilter = sky.mips.length > 1 ? THREE.LinearMipmapLinearFilter : THREE.LinearFilter;
-    tex.magFilter = THREE.LinearFilter;
-    tex.generateMipmaps = false;
-    // an 8-bit sky is sRGB (sky.vfx reads it SrgbRead): decoded by the GPU when it can, else in the shader
-    const ldr = sky.kind !== 'bc6h';
-    tex.colorSpace = ldr && sky.srgbOk ? THREE.SRGBColorSpace : THREE.NoColorSpace;
-    tex.needsUpdate = true;
-    this.skyUniforms.cs2SkyDecodeSrgb.value = ldr && !sky.srgbOk ? 1 : 0;
+    const { tex, rgbm, decodeSrgb } = skyCubeTexture(sky); // world/sky-cube.js
+    this.skyUniforms.cs2SkyRgbm.value = rgbm;
+    this.skyUniforms.cs2SkyDecodeSrgb.value = decodeSrgb;
     this.setSkyMesh(kv, sky, tex);
   }
 

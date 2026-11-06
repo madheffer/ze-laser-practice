@@ -159,23 +159,14 @@ static class TierBake
             foreach (var (key, v) in hiSkies)
             {
                 var hiSky = JsonNode.Parse(File.ReadAllText(Path.Combine(mapDir, "lighting", v!["file"]!.GetValue<string>())))!.AsObject();
-                using var matRes = load(key + "_c");
-                if (matRes?.DataBlock is not Material mat || !mat.TextureParams.TryGetValue("g_tSkyTexture", out var texPath)) continue;
-                using var texRes = load(texPath.EndsWith("_c") ? texPath : texPath + "_c");
-                if (texRes?.DataBlock is not Texture tex || !tex.Flags.HasFlag(VTexFlags.CUBE_TEXTURE)) continue;
+                // a sky material's g_tSkyTexture, or a moondome cube keyed by its own vtex path (SkyBake.cs)
+                using var keyRes = load(key + "_c");
+                Resource? texRes = keyRes?.DataBlock is Texture ? null : keyRes?.DataBlock is Material mat && mat.TextureParams.TryGetValue("g_tSkyTexture", out var texPath)
+                    ? load(texPath.EndsWith("_c") ? texPath : texPath + "_c") : null;
+                using var ownedTex = texRes;
+                if ((texRes ?? keyRes)?.DataBlock is not Texture tex || !tex.Flags.HasFlag(VTexFlags.CUBE_TEXTURE)) continue;
                 var hash = Path.GetFileNameWithoutExtension(v["file"]!.GetValue<string>());
-                Directory.CreateDirectory(Path.Combine(outDir, "sky"));
-                var faces = new JsonArray();
-                for (var f = 0; f < 6; f++)
-                {
-                    using var face = tex.GenerateBitmap(depth: 0, face: (Texture.CubemapFace)f, mipLevel: 0);
-                    using var small = Downsample(face, tier.Sky, true, srgb: !tex.IsHighDynamicRange);
-                    var file = "sky/" + SaveSmallestLossless(small, Path.Combine(outDir, "sky"), $"{hash}_{f}");
-                    faces.Add(file);
-                }
-                var d = new JsonObject { ["format"] = "rgbm-faces", ["range"] = RgbmRange, ["faces"] = faces, ["size"] = Math.Min(tier.Sky, tex.Width), ["cube"] = true,
-                    ["ints"] = hiSky["ints"]?.DeepClone(), ["floats"] = hiSky["floats"]?.DeepClone() };
-                File.WriteAllText(Path.Combine(outDir, $"sky/{hash}.json"), d.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
+                WriteRgbmFaces(tex, tier.Sky, outDir, hash, hiSky["ints"], hiSky["floats"]);
                 skies[key] = new JsonObject { ["file"] = $"sky/{hash}.json" };
             }
         json["skies"] = skies;
@@ -183,6 +174,23 @@ static class TierBake
     }
 
     // box-filter a decoded bitmap to <= max on its longer side; hdr: float -> RGBM (linear); srgb: decode first
+    // a cube as six RGBM faces (decoded, linear, box-filtered to <= size) + sky/<hash>.json: what world/lightmaps.js
+    // loads as "rgbm-faces" on any GPU. outDir is the lighting folder the sky/ files go in
+    internal static void WriteRgbmFaces(Texture tex, int size, string outDir, string hash, JsonNode? ints, JsonNode? floats)
+    {
+        Directory.CreateDirectory(Path.Combine(outDir, "sky"));
+        var faces = new JsonArray();
+        for (var f = 0; f < 6; f++)
+        {
+            using var face = tex.GenerateBitmap(depth: 0, face: (Texture.CubemapFace)f, mipLevel: 0);
+            using var small = Downsample(face, size, true, srgb: !tex.IsHighDynamicRange);
+            faces.Add("sky/" + SaveSmallestLossless(small, Path.Combine(outDir, "sky"), $"{hash}_{f}"));
+        }
+        var d = new JsonObject { ["format"] = "rgbm-faces", ["range"] = RgbmRange, ["faces"] = faces, ["size"] = Math.Min(size, tex.Width), ["cube"] = true,
+            ["ints"] = ints?.DeepClone(), ["floats"] = floats?.DeepClone() };
+        File.WriteAllText(SafePath.OutFile(outDir, $"sky/{hash}.json"), d.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
+    }
+
     static SKBitmap Downsample(SKBitmap src, int max, bool rgbm, bool srgb = false)
     {
         var step = Math.Max(1, (int)Math.Ceiling(Math.Max(src.Width, src.Height) / (double)max));

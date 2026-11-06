@@ -238,6 +238,7 @@ standing still. Fields we added (cybo's site ignores them):
 | `fastForward` | seconds of the map's own sequence to replay silently before placing you. This is how later stages start mid-ending |
 | `fastForwardBosses` | `[{target, after}]` bosses the simulated team shoots down during that replay (from `after` s in) |
 | `spawn.at` | spawn on a named entity (an `info_teleport_destination`) instead of a fixed origin |
+| `arrive` | triggers you arrive through (names, or `{ "hammerid": "1901" }` for an unnamed one): their OnStartTouch fires with you as the toucher when the stage starts, per-human HP adds included. Spawn on the teleport's destination with this instead of on the teleport (ze_dreamin's boss arenas) |
 | `player` | `{health, gravity}` at spawn. ze_mist_p's boss door sets 180 HP; the escape trigger sets gravity 0.1 |
 | `bosses` | `[{target, name, counter, counterMode, iterator, reverseIterator, backup}]` breakables/physboxes the team shoots, with a HUD bar; `iterator` / `backup` / `reverseIterator` are GFL BossHUD's segment counter, refill counter and direction (westersand: the HUD shows all segments' HP, not one refilling segment) |
 | `shooters` | how many of the simulated humans fire at the bosses (a trainer choice, not map data): ze_deadcore's cubes have a flat 1500–2400 HP that 20 humans would erase in a blink, so their drills use 2 |

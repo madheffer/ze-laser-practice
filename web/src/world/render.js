@@ -15,6 +15,7 @@ import { Bloom, BLOOM_POST_GLSL } from './bloom.js';
 import { PropAnimator, cloneModel } from './anim.js';
 import { Water } from './water.js';
 import { applyUnlit } from './unlit.js';
+import { Moondome } from './moondome.js';
 import { spawnsHidden } from './entities/render-mode.js';
 import { applySelfIllum, tintSelfIllum } from './selfillum.js';
 
@@ -48,6 +49,7 @@ export class Renderer {
     this.lighting = new MapLighting(this.scene, this.renderer);
     this.post = new PostProcess();
     this.water = new Water(this.lighting); // CS2 water surfaces (world/water.js)
+    this.moondome = new Moondome(this.lighting); // csgo_moondome: fake-skybox surfaces that show a sky cube (world/moondome.js)
 
     this.worldRoot = new THREE.Group();
     this.worldRoot.matrixAutoUpdate = false;
@@ -134,7 +136,7 @@ export class Renderer {
         // CS2 water gets its own shader in place of the flat glTF material (world/water.js)
         const w = !Array.isArray(o.material) && this.water.material(o.material, { lit: !!o.geometry?.attributes?.uv1 });
         if (w) { o.material = w; this.water.track(o); }
-        else { applyUnlit(o, this.unlitMaterials); applySelfIllum(o, this.selfIllum); } // CS2's unlit / self-illum shaders (world/unlit.js, selfillum.js)
+        else { applyUnlit(o, this.unlitMaterials); applySelfIllum(o, this.selfIllum); this.moondome.apply(o); } // CS2's unlit / self-illum / moondome shaders (world/unlit.js, selfillum.js, moondome.js)
         // VRF names tool-texture meshes after their material; hide the editor-only ones
         const mats = Array.isArray(o.material) ? o.material : [o.material];
         if (mats.some((m) => /tools?(trigger|clip|nodraw|skip|invisible|playerclip|blocklight|areaportal|sky)/i.test(m?.name || ''))) o.visible = false;
@@ -271,7 +273,7 @@ export class Renderer {
             holder.matrixAutoUpdate = false;
             holder.matrix.copy(GLTF_TO_SOURCE);
             holder.add(inst);
-            inst.traverse((o) => { if (o.isMesh) { applyUnlit(o, this.unlitEntity); applySelfIllum(o, this.selfIllum); } }); // before the tint: it clones
+            inst.traverse((o) => { if (o.isMesh) { applyUnlit(o, this.unlitEntity); applySelfIllum(o, this.selfIllum); this.moondome.apply(o); } }); // before the tint: it clones
             const rc = kv.rendercolor ? parseVec(kv.rendercolor) : null;
             if (rc && (rc[0] !== 255 || rc[1] !== 255 || rc[2] !== 255)) {
               inst.traverse((o) => {

@@ -11,25 +11,13 @@
       "full": true,
       "name": "Level 1 ending (full): Crystal → blade room → elevator",
       "summary": "Crystal boss, blade room, then the elevator",
-      "description": "From the Crystal's teleport (boss_teleport, +50 hits per human) through its 8 segments, back to the teleport place, the blade room (Final Crystal, +70 hits per human) and the rising floor out. Win when a human reaches clear_trigger (score).",
+      "description": "From the Crystal's arena (boss_des: you arrive through boss_teleport, +50 hits per human) through its 8 segments, back to the teleport place, the blade room (Final Crystal, +70 hits per human) and the rising floor out. Win when a human reaches clear_trigger (score).",
       "spawn": {
-        "origin": [
-          -13548,
-          7510,
-          4374
-        ],
-        "yaw": 0
+        "at": "[PR#]boss_des",
+        "yaw": 90
       },
-      "start": [
-        {
-          "target": "[PR#]boss_teleport",
-          "input": "Enable"
-        },
-        {
-          "target": "[PR#]boss_teleport",
-          "input": "Disable",
-          "delay": 0.5
-        }
+      "arrive": [
+        "[PR#]boss_teleport"
       ],
       "bosses": [
         {
@@ -71,25 +59,13 @@
       "name": "Crystal (boss)",
       "summary": "A chasing crystal casting gravity, wind, ice",
       "childrenTitle": "Single casts",
-      "description": "boss_teleport adds 50 hits per human to HPCounter2; boss_relay starts the fight 7 s later. The crystal chases the nearest human on thrusters (80 damage on touch) and every 10–15 s casts Gravity, Thruster, Wind or Ice. 8 segments; at +140 s st1_fail breaks the floor.",
+      "description": "You arrive in the arena through boss_teleport, which adds 50 hits per human to HPCounter2; boss_relay starts the fight 7 s later. The crystal chases the nearest human on thrusters (80 damage on touch) and every 10–15 s casts Gravity, Thruster, Wind or Ice. 8 segments; at +140 s st1_fail breaks the floor.",
       "spawn": {
-        "origin": [
-          -13548,
-          7510,
-          4374
-        ],
-        "yaw": 0
+        "at": "[PR#]boss_des",
+        "yaw": 90
       },
-      "start": [
-        {
-          "target": "[PR#]boss_teleport",
-          "input": "Enable"
-        },
-        {
-          "target": "[PR#]boss_teleport",
-          "input": "Disable",
-          "delay": 0.5
-        }
+      "arrive": [
+        "[PR#]boss_teleport"
       ],
       "bosses": [
         {
@@ -386,20 +362,13 @@
       "featured": true,
       "name": "Level 1 finale",
       "summary": "Final Crystal's blades, the rising floor, then the blades from below",
-      "description": "boss_to_blade2 adds 70 hits per human to blade_hp (start 50) and teleports you into the blade room, facing the Final Crystal. Walking in, the first human through the trigger 1100 u in starts blade_start_timer: a blade flies out of the crystal every 2 s at 1700 u/s, low (jump), mid (jump) or high (crouch), 999999 damage; each human one kills takes 60 off the crystal. When it breaks, first_win: final_floor rises 3200 u (500 u/s) 9 s after a human steps on it; at the top, blades fly up from blade_rotate below (look down) for 8.5 s, clear_trigger opens at +9.5 s, NUKE at +12 s. Win at score.",
+      "description": "You start in the blade room, arrived through boss_to_blade2 (+70 hits per human to blade_hp, start 50), facing the Final Crystal. Walking in, the first human through the trigger 1100 u in starts blade_start_timer: a blade flies out of the crystal every 2 s at 1700 u/s, low (jump), mid (jump) or high (crouch), 999999 damage; each human one kills takes 60 off the crystal. When it breaks, first_win: final_floor rises 3200 u (500 u/s) 9 s after a human steps on it; at the top, blades fly up from blade_rotate below (look down) for 8.5 s, clear_trigger opens at +9.5 s, NUKE at +12 s. Win at score.",
       "spawn": {
-        "origin": [
-          -10070,
-          6958,
-          4068
-        ],
+        "at": "[PR#]blade_room",
         "yaw": 180
       },
-      "start": [
-        {
-          "target": "[PR#]boss_to_blade2",
-          "input": "Enable"
-        }
+      "arrive": [
+        "[PR#]boss_to_blade2"
       ],
       "bosses": [
         {
@@ -448,13 +417,14 @@
       "summary": "Puny Light boss, then the final climb",
       "description": "From the snow elevator's teleport into the arena (+5000 HP per human on st2_hitbox, 1500 base) through the 118 s fight, then st2_final_relay's 128 s climb: stone walk at +90 s, the final lasers at +108 s, the teleport up at +120 s. Win at score_trigger.",
       "spawn": {
-        "origin": [
-          -15424,
-          2144,
-          9184
-        ],
-        "yaw": 270
+        "at": "[PR#]st2_boss_des",
+        "yaw": 0
       },
+      "arrive": [
+        {
+          "hammerid": "1901"
+        }
+      ],
       "start": [
         {
           "target": "[PR#]st2_trigger",
@@ -520,13 +490,14 @@
       "childrenTitle": "Single phases",
       "description": "st2_start: a phase every 14 s (shuffled: Spread out, Zombie way, Danger Field, For Upper, Laser, Spikes) and 118 s to break st2_hitbox (1500 + 5000 per human; grenades 100 each), else fail_nuke. 200 damage touching it.",
       "spawn": {
-        "origin": [
-          -15424,
-          2144,
-          9184
-        ],
-        "yaw": 270
+        "at": "[PR#]st2_boss_des",
+        "yaw": 0
       },
+      "arrive": [
+        {
+          "hammerid": "1901"
+        }
+      ],
       "start": [
         {
           "target": "[PR#]st2_trigger",
@@ -975,12 +946,15 @@
       "description": "From st3_goto (+600 hits per human on st3_hp) through the Giant Light's 250 s (phases, totems, the defense hold at +115 s, phase 2 at +180 s), the floor out, the final run (final_relay) and the Final Light at +110 s. Win at st3_clear (+143 s).",
       "spawn": {
         "origin": [
-          -7744,
-          -8720,
-          -9167
+          -640,
+          640,
+          -2752
         ],
         "yaw": 0
       },
+      "arrive": [
+        "[PR#]st3_goto"
+      ],
       "start": [
         {
           "target": "[PR#]st3_trigger",
@@ -1046,12 +1020,15 @@
       "description": "st3_goto drops each human into a corner of the arena and adds 600 hits per human; st3_boss_start (+5 s). A phase every 13 s (shuffled: two Ice, Crouch, Wind, Upline, Explosions, Line lasers), a Reflection one time in eight every 15 s (shooting it then costs you 10 per hit), totems every 10–14 s. 250 s, else st3_fail.",
       "spawn": {
         "origin": [
-          -7744,
-          -8720,
-          -9167
+          -640,
+          640,
+          -2752
         ],
         "yaw": 0
       },
+      "arrive": [
+        "[PR#]st3_goto"
+      ],
       "start": [
         {
           "target": "[PR#]st3_trigger",

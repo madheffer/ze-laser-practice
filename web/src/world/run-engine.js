@@ -68,6 +68,10 @@ export function createRunEngine({ entities, hulls, bounds, animations, soundDura
       run.musicFired = true;
       for (const s of scenario?.music || []) engine.fire(s.target, s.input, s.param || '', s.delay || 0, engine.playerEnt, null);
     }
+    // `arrive`: the triggers whose teleport put you here (you spawn on its destination instead of walking in): their
+    // OnStartTouch fires with you as the toucher, so per-human boss HP adds repeat as on a touch (engine.fireOutput).
+    // A name, or { hammerid } for an unnamed trigger (ze_dreamin's Puny Light teleport)
+    for (const a of scenario?.arrive || []) for (const e of arriveTriggers(engine, a)) engine.fireOutput(e, 'OnStartTouch', engine.playerEnt);
     for (const s of scenario?.start || []) engine.fire(s.target, s.input, s.param || '', s.delay || 0, engine.playerEnt, null);
   };
 
@@ -190,6 +194,13 @@ export function freeSpawn(origin, fits) {
     }
   }
   return origin;
+}
+
+// a scenario `arrive` entry's triggers: by name, or { hammerid } (the map's hammeruniqueid keyvalue)
+function arriveTriggers(engine, a) {
+  if (typeof a === 'string') return engine.find(a);
+  const id = a && typeof a === 'object' ? String(a.hammerid ?? '') : '';
+  return id ? engine.ents.filter((e) => e.alive && String(e.kv?.hammeruniqueid ?? '') === id) : [];
 }
 
 // Each tick before the stage has started (client loop.js, server coop-check.js): its start once the run's clock t
