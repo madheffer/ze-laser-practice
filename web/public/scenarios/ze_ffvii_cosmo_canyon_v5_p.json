@@ -98,7 +98,7 @@
       "group": "Endings",
       "name": "Extreme – Ifrit's lasers",
       "summary": "Jump or duck Ifrit's lasers until he falls",
-      "description": "Extreme's end (Extreme_End). Ifrit appears in front of the airship (Hojo_Temp, 2.95 s) and from 4 s lvl3_boss_lasers_time (1.2-2.5 s) sends a laser at you from one of three heights (the map's script, SpawnIfritLaser: z 216 / 204 / 191): Hojo_Laser_Hurt kills, 1600 u/s for 4500 units, and every human it hits takes 45 off Ifrit. 70 hits per human (lvl2_Gi_Nattak_Counter). The clip in front of the airship (Gi_Nattak_Clip) only goes when Ifrit dies, so kill him before the airship leaves at 20 s; at 38 s it checks for zombies on board and the win trigger opens; at 41 s Map_All_Hurt kills everyone left in the canyon.",
+      "description": "Extreme's end (Extreme_End). Ifrit appears in front of the airship (Hojo_Temp, 2.95 s) and from 4 s lvl3_boss_lasers_time (1.2-2.5 s) sends a laser at you from one of three heights (the map's script, SpawnIfritLaser: z 216 / 204 / 191); with our \"Ifrit's lasers per wave\" map edit on (the default, Settings > Map edits; not a GFL config) each tick sends 4, each at its own random height: Hojo_Laser_Hurt kills, 1600 u/s for 4500 units, and every human it hits takes 45 off Ifrit. 70 hits per human (lvl2_Gi_Nattak_Counter). The clip in front of the airship (Gi_Nattak_Clip) only goes when Ifrit dies, so kill him before the airship leaves at 20 s; at 38 s it checks for zombies on board and the win trigger opens; at 41 s Map_All_Hurt kills everyone left in the canyon.",
       "spawn": {
         "origin": [9128, 7920, 152],
         "yaw": 90
