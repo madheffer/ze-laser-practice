@@ -11,6 +11,7 @@
 import { register } from '../registry.js';
 import { nameKey } from '../../../lib/names.js';
 import { own } from '../../../lib/storage.js';
+import { cosmo } from './scripts-cosmo.js';
 
 const num = (v, d = 0) => (Number.isFinite(Number(v)) ? Number(v) : d);
 
@@ -100,7 +101,7 @@ const minigames = {
     return true;
   },
 };
-const PORTS = { bosshud, minigames };
+const PORTS = { bosshud, minigames, cosmo };
 
 // the stage's `scripts` (keyed by the point_script's targetname) onto the engine, before the world spawns. The adds
 // are what fireOutput repeats once per simulated human, like an AddHealth (engine.js)
@@ -122,8 +123,8 @@ register('point_script', {
     e.portCfg = cfg;
     e.port?.reset(e.state);
   },
-  input(e, inp, p, act) {
+  input(e, inp, p, act, caller) {
     if (inp !== 'runscriptinput' || !e.port) return false;
-    return e.port.run(e, e.portCfg, String(p ?? ''), act);
+    return e.port.run(e, e.portCfg, String(p ?? ''), act, caller);
   },
 });

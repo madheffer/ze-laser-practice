@@ -57,7 +57,18 @@ static class ProbeBake
             using var bmp = tex.GenerateBitmap(depth: (uint)z, face: Texture.CubemapFace.PositiveX, mipLevel: 0);
             var px = new float[W * H * 4];
             if (bmp.ColorType == SkiaSharp.SKColorType.RgbaF32) System.Runtime.InteropServices.MemoryMarshal.Cast<byte, float>(bmp.GetPixelSpan()).CopyTo(px);
-            else { var b = bmp.GetPixelSpan(); for (var i = 0; i < W * H * 4; i++) px[i] = b[i] / 255f; } // 8-bit (the shadow masks)
+            else
+            {
+                // 8-bit (the shadow masks), in the bitmap's own channel order: SkiaSharp hands BC7 back as BGRA on
+                // Windows, so channel 0 read raw was the mask's B, not the sun's R (bakedshadowindex 0)
+                var b = bmp.GetPixelSpan();
+                var bgra = bmp.ColorType == SkiaSharp.SKColorType.Bgra8888;
+                for (var i = 0; i < W * H * 4; i += 4)
+                {
+                    px[i] = b[i + (bgra ? 2 : 0)] / 255f; px[i + 1] = b[i + 1] / 255f;
+                    px[i + 2] = b[i + (bgra ? 0 : 2)] / 255f; px[i + 3] = b[i + 3] / 255f;
+                }
+            }
             cache[(shadow, z)] = px;
             return px;
         }

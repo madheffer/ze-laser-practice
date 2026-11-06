@@ -3,8 +3,9 @@
 //   - the static world: the baked lightmaps (world/lightmaps.js). Its indirect light is the irradiance shaped by the
 //     directional lightmap in tangent space (ComputeLightmapShading: clamped dominant direction, "flatness boost"
 //     from curvature, the non-directional share in the direction texture's z), and nothing else: no ambient, no
-//     sky light on top. Lights with directlight 1 ("fully baked") are inside it, the sun included.
-//   - the sun (light_environment with directlight 2 / 3): added per pixel, colour (sRGB -> linear) x brightness x
+//     sky light on top. Lights with directlight 1 ("fully baked") are inside it, the sun included,
+//     unless it has a bakedshadowindex (then it is stationary, VRF SceneLight.GetCost: drawn as below).
+//   - the sun (light_environment with directlight 2 / 3, or 1 with a bakedshadowindex): added per pixel, colour (sRGB -> linear) x brightness x
 //     N.L, masked by its channel of the baked shadow mask (bakedshadowindex: 0 R .. 3 A; 1 = fully shadowed).
 //   - the map's light_omni2 with directlight 3: the same, per pixel on the world, each by its own channel (maplights.js)
 //   - CS2's diffuse has no 1/pi (DiffuseColor x (direct + indirect)); three's Lambert divides by pi, so the
@@ -216,10 +217,13 @@ export class MapLighting {
     const brightness = kvNum(env.brightness, 1) * kvNum(env.brightnessscale, 1);
     this.sun.color.copy(kvColor(env.color));
     this.sun.intensity = brightness * Math.PI;
-    // directlight 1 = fully baked into the lightmap: no runtime sun (it would count twice)
+    // The runtime sun, by the light's cost as VRF resolves it (SceneLight.GetCost): directlight 2 (dynamic) and 3
+    // (stationary) draw it; directlight 1 is fully baked (no runtime sun, it would count twice) UNLESS it has a baked
+    // shadow index: then the lightmap holds its shadow mask and only the bounce, and the sun is stationary (Alyx-era
+    // entities: directlight 1 + baked_light_indexing; ze_ffvii_cosmo_canyon_v5_p, ze_deadcore, ze_offliner, ze__hell_p)
     const direct = parseInt(env.directlight ?? '2', 10);
-    this.sun.visible = direct === 2 || direct === 3;
     const idx = parseInt(env.bakedshadowindex ?? env.bakelightindex ?? '-1', 10);
+    this.sun.visible = direct === 2 || direct === 3 || (direct === 1 && idx >= 0);
     this.uniforms.cs2SunMask.value.set(idx === 0 ? 1 : 0, idx === 1 ? 1 : 0, idx === 2 ? 1 : 0, idx === 3 ? 1 : 0);
     // the sky's ambient: what non-lightmapped things (models, particles) get until light probes are done
     this.ambient.copy(kvColor(env.skycolor)).multiplyScalar(kvNum(env.skyintensity, 1));

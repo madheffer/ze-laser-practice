@@ -1,0 +1,279 @@
+{
+  "map": "ze_ffvii_cosmo_canyon_v5_p",
+  "title": "FFVII Cosmo Canyon",
+  "workshop": "3714323840",
+  "workshopUpdated": "2026-06-13",
+  "description": "Headshooter.SC & HaRyDe's Final Fantasy VII escape through Cosmo Canyon. The ends of three levels: Hard's Bomb and its fireballs, Extreme's Ifrit and his lasers, both in front of the airship, and Rage's Genesis at the Shinra base, then Bahamut's lasers as the airship takes off.",
+  "scenarios": [
+    {
+      "id": "hard_bomb",
+      "group": "Endings",
+      "featured": true,
+      "name": "Hard – the Bomb and its fireballs",
+      "summary": "Shoot the Bomb through its fireballs, board the airship",
+      "description": "Hard's end (Hard_End). Genesis summons the Bomb (Gi_Nattak_lvl2_Temp, 3 s) in front of the airship; it can be shot from 3.02 s (lvl2_Boss_Hitbox's filter goes to Humans_Filter), 70 hits per human (lvl2_Gi_Nattak_HP_Add on the way in, counted on lvl2_Gi_Nattak_Counter), and its body burns (lvl2_Boss_Clip, 20 + 8 s of fire). From 3 s lvl2_Fireball_Timer (1-1.2 s) sends a fireball down the canyon from one of three spots (the map's script, SpawnFireball): Firedicks_Hurt, 100 damage and 4 s of fire, 950 u/s for 2800 units. The airship leaves at 20 s (or as soon as a human steps on its back, End_Airship_Hard_Start); at 38 s it checks for zombies on board and the win trigger opens; at 41 s Map_All_Hurt kills everyone left in the canyon. Killing the Bomb ends the fireballs.",
+      "spawn": {
+        "origin": [9128, 7920, 152],
+        "yaw": 90
+      },
+      "view": {
+        "min": [7900, 6900, -900],
+        "max": [10400, 14600, 2200]
+      },
+      "setup": [
+        {
+          "target": "[PR#]Hard_End",
+          "input": "Enable"
+        },
+        {
+          "target": "[PR#]lvl2_Gi_Nattak_Push",
+          "input": "Enable"
+        },
+        {
+          "target": "[PR#]lvl2_Gi_Nattak_HP_Add",
+          "input": "Enable"
+        },
+        {
+          "target": "[PR#]hard_extreme_nuke_relay",
+          "input": "Enable"
+        }
+      ],
+      "arrive": ["[PR#]lvl2_Gi_Nattak_Push", "[PR#]lvl2_Gi_Nattak_HP_Add", "[PR#]Hard_End"],
+      "music": [
+        {
+          "target": "[PR#]Music_Conflict",
+          "input": "StartSound"
+        }
+      ],
+      "bosses": [
+        {
+          "target": "[PR#]lvl2_Boss_Hitbox",
+          "name": "Bomb",
+          "counter": "[PR#]lvl2_Gi_Nattak_Counter",
+          "counterMode": "hits"
+        }
+      ],
+      "win": {
+        "target": "[PR#]Map_Win_Sound",
+        "input": "StartSound",
+        "survive": 3
+      },
+      "scripts": {
+        "[PR#]script_cosmo": {
+          "port": "cosmo",
+          "spawnAt": {
+            "SpawnFireball": [
+              [8996, 9167, 223],
+              [9142, 9166, 223],
+              [9282, 9168, 223]
+            ],
+            "SpawnIfritLaser": [
+              [9136, 10184, 216],
+              [9136, 10184, 204],
+              [9136, 10184, 191]
+            ]
+          },
+          "hurtImmunity": 0.4,
+          "heal": 200
+        }
+      },
+      "hazards": {
+        "Firedicks_Hurt": "a fireball",
+        "lvl2_Boss_Clip": "the Bomb",
+        "Hojo_Laser_Hurt": "Ifrit's laser",
+        "Genesis_Laser_Hurt": "Genesis' laser",
+        "2Genesis_Laser_Hurt": "Genesis' laser",
+        "3Genesis_Laser_Hurt": "Genesis' laser",
+        "5Genesis_Laser_Hurt": "Genesis' laser",
+        "6Genesis_Laser_Hurt": "Genesis' laser",
+        "1Bahamut_Laser_Hurt": "Bahamut's laser",
+        "2Bahamut_Laser_Hurt": "Bahamut's laser",
+        "Genesis_Campers_Hurt": "Genesis",
+        "Map_All_Hurt": "left behind (the airship left)",
+        "hard_extreme_nuke": "left behind (the airship left)"
+      }
+    },
+    {
+      "id": "extreme_ifrit",
+      "group": "Endings",
+      "name": "Extreme – Ifrit's lasers",
+      "summary": "Jump or duck Ifrit's lasers until he falls",
+      "description": "Extreme's end (Extreme_End). Ifrit appears in front of the airship (Hojo_Temp, 2.95 s) and from 4 s lvl3_boss_lasers_time (1.2-2.5 s) sends a laser at you from one of three heights (the map's script, SpawnIfritLaser: z 216 / 204 / 191): Hojo_Laser_Hurt kills, 1600 u/s for 4500 units, and every human it hits takes 45 off Ifrit. 70 hits per human (lvl2_Gi_Nattak_Counter). The clip in front of the airship (Gi_Nattak_Clip) only goes when Ifrit dies, so kill him before the airship leaves at 20 s; at 38 s it checks for zombies on board and the win trigger opens; at 41 s Map_All_Hurt kills everyone left in the canyon.",
+      "spawn": {
+        "origin": [9128, 7920, 152],
+        "yaw": 90
+      },
+      "view": {
+        "min": [7900, 6900, -900],
+        "max": [10400, 14600, 2200]
+      },
+      "setup": [
+        {
+          "target": "[PR#]Extreme_End",
+          "input": "Enable"
+        },
+        {
+          "target": "[PR#]lvl2_Gi_Nattak_Push",
+          "input": "Enable"
+        },
+        {
+          "target": "[PR#]lvl2_Gi_Nattak_HP_Add",
+          "input": "Enable"
+        },
+        {
+          "target": "[PR#]hard_extreme_nuke_relay",
+          "input": "Enable"
+        }
+      ],
+      "arrive": ["[PR#]lvl2_Gi_Nattak_Push", "[PR#]lvl2_Gi_Nattak_HP_Add", "[PR#]Extreme_End"],
+      "music": [
+        {
+          "target": "[PR#]Music_Advent_Children",
+          "input": "StartSound"
+        }
+      ],
+      "bosses": [
+        {
+          "target": "[PR#]lvl3_end_boss",
+          "name": "Ifrit",
+          "counter": "[PR#]lvl2_Gi_Nattak_Counter",
+          "counterMode": "hits"
+        }
+      ],
+      "win": {
+        "target": "[PR#]Map_Win_Sound",
+        "input": "StartSound",
+        "survive": 3
+      },
+      "scripts": {
+        "[PR#]script_cosmo": {
+          "port": "cosmo",
+          "spawnAt": {
+            "SpawnFireball": [
+              [8996, 9167, 223],
+              [9142, 9166, 223],
+              [9282, 9168, 223]
+            ],
+            "SpawnIfritLaser": [
+              [9136, 10184, 216],
+              [9136, 10184, 204],
+              [9136, 10184, 191]
+            ]
+          },
+          "hurtImmunity": 0.4,
+          "heal": 200
+        }
+      },
+      "hazards": {
+        "Firedicks_Hurt": "a fireball",
+        "lvl2_Boss_Clip": "the Bomb",
+        "Hojo_Laser_Hurt": "Ifrit's laser",
+        "Genesis_Laser_Hurt": "Genesis' laser",
+        "2Genesis_Laser_Hurt": "Genesis' laser",
+        "3Genesis_Laser_Hurt": "Genesis' laser",
+        "5Genesis_Laser_Hurt": "Genesis' laser",
+        "6Genesis_Laser_Hurt": "Genesis' laser",
+        "1Bahamut_Laser_Hurt": "Bahamut's laser",
+        "2Bahamut_Laser_Hurt": "Bahamut's laser",
+        "Genesis_Campers_Hurt": "Genesis",
+        "Map_All_Hurt": "left behind (the airship left)",
+        "hard_extreme_nuke": "left behind (the airship left)"
+      }
+    },
+    {
+      "id": "rage_genesis",
+      "group": "Endings",
+      "name": "Rage – Genesis, then Bahamut on the airship",
+      "summary": "Kill Genesis through his lasers, dodge Bahamut's in flight",
+      "description": "Rage's end at the Shinra base (Rage_End_Trigger). Genesis (Genesis_Temp, 1.95 s) stands between you and the airship behind a wall (Genesis_Clip) that only breaks when he dies: 75 hits per human (Genesis_HP_Add on the way in, Genesis_Counter). From 2 s lvl4_boss_lasers_time (1.2-1.4 s) sends one of five lasers (Genesis_Laser_Temp ...) at 1500 u/s for 4500 units: they kill, and every human one hits takes 40-45 off Genesis. His death spawns Bahamut (2 s); 10 s later seph_laser_timer fires four of Bahamut's lasers 0.9 s apart (1/2Bahamut_Laser, 2100 u/s for 7500 units) down the airship's way. The airship leaves at 20 s (or when a human boards it, End_Airship_Rage_Start), at 42 s it checks for zombies on board and the win trigger opens; at 44 s Map_All_Hurt kills everyone left at the base.",
+      "spawn": {
+        "origin": [-12544, 7600, 2710],
+        "yaw": 270
+      },
+      "view": {
+        "min": [-14600, -400, 1000],
+        "max": [-10400, 9200, 3800]
+      },
+      "setup": [
+        {
+          "target": "[PR#]LocShinra_Temp",
+          "input": "ForceSpawn"
+        },
+        {
+          "target": "[PR#]Shinra_Props",
+          "input": "Enable"
+        },
+        {
+          "target": "[PR#]Genesis_Model",
+          "input": "Enable",
+          "delay": 0.05
+        },
+        {
+          "target": "[PR#]Genesis_HP_Push",
+          "input": "Enable"
+        },
+        {
+          "target": "[PR#]Genesis_HP_Add",
+          "input": "Enable"
+        }
+      ],
+      "arrive": ["[PR#]Genesis_HP_Push", "[PR#]Genesis_HP_Add", "[PR#]Rage_End_Trigger"],
+      "music": [
+        {
+          "target": "[PR#]Music_Propane_Nightmares",
+          "input": "StartSound"
+        }
+      ],
+      "bosses": [
+        {
+          "target": "[PR#]lvl4_end_boss",
+          "name": "Genesis",
+          "counter": "[PR#]Genesis_Counter",
+          "counterMode": "hits"
+        }
+      ],
+      "win": {
+        "target": "[PR#]Map_Win_Sound",
+        "input": "StartSound",
+        "survive": 3
+      },
+      "scripts": {
+        "[PR#]script_cosmo": {
+          "port": "cosmo",
+          "spawnAt": {
+            "SpawnFireball": [
+              [8996, 9167, 223],
+              [9142, 9166, 223],
+              [9282, 9168, 223]
+            ],
+            "SpawnIfritLaser": [
+              [9136, 10184, 216],
+              [9136, 10184, 204],
+              [9136, 10184, 191]
+            ]
+          },
+          "hurtImmunity": 0.4,
+          "heal": 200
+        }
+      },
+      "hazards": {
+        "Firedicks_Hurt": "a fireball",
+        "lvl2_Boss_Clip": "the Bomb",
+        "Hojo_Laser_Hurt": "Ifrit's laser",
+        "Genesis_Laser_Hurt": "Genesis' laser",
+        "2Genesis_Laser_Hurt": "Genesis' laser",
+        "3Genesis_Laser_Hurt": "Genesis' laser",
+        "5Genesis_Laser_Hurt": "Genesis' laser",
+        "6Genesis_Laser_Hurt": "Genesis' laser",
+        "1Bahamut_Laser_Hurt": "Bahamut's laser",
+        "2Bahamut_Laser_Hurt": "Bahamut's laser",
+        "Genesis_Campers_Hurt": "Genesis",
+        "Map_All_Hurt": "left behind (the airship left)",
+        "hard_extreme_nuke": "left behind (the airship left)"
+      },
+      "hide": [
+        "[PR#]Ifrit_Model"
+      ]
+    }
+  ]
+}

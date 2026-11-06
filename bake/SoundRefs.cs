@@ -9,6 +9,7 @@
 //   - func_breakable / func_physbox: the material's break (Die) and hit (DamageSound) events, server.dll's tables
 //   - env_explosion without spawnflag 64 and no custom sound: its explosion type's m_SoundName from CS2's
 //     scripts/explosion_types.vdata (read from the stock packs)
+//   - env_spark without spawnflag 256 (Silent): "DoSpark"
 //   - particle systems already baked into fx/systems: C_OP_RenderSound m_pszSoundName
 using System.Globalization;
 using System.Text.Json;
@@ -87,6 +88,8 @@ static partial class SoundRefs
             if (mat == 6) add("Breakable.MatMetal");
         }
         var spawnflags = int.TryParse(Kv("spawnflags"), NumberStyles.Integer, CultureInfo.InvariantCulture, out var sf) ? sf : 0;
+        // env_spark: "DoSpark" with every burst unless spawnflag 256 (Silent); web/src/world/entities/classes/sparks.js
+        if (cls == "env_spark" && (spawnflags & 256) == 0) add("DoSpark");
         if (cls == "env_explosion" && Kv("explosion_custom_sound").Length == 0 && (spawnflags & 64) == 0)
         {
             var t = Kv("explosion_type");

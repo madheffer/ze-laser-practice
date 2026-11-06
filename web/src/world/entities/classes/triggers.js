@@ -21,6 +21,11 @@ const triggerBase = {
       // a new damage also becomes damage model 1's base (m_flOriginalDamage)
       case 'sethurtdamage': case 'setdamage': e.kv.damage = p; e.state.curDamage = undefined; return true;
       case 'setpushspeed': e.kv.speed = p; return true;
+      // CBaseTrigger::TouchTest: OnTouching while anything that passes the filter is touching it, else OnNotTouching
+      // (only filter-passing entities get StartTouch, so the touch list is the test). Here that is you: a zombie-only
+      // trigger is never touched, so it answers OnNotTouching (ze_ffvii_cosmo_canyon_v5_p's win check: no zombies on
+      // the airship opens the human win trigger)
+      case 'touchtest': e.fireOutput(e.engine.touching.has(e) ? 'OnTouching' : 'OnNotTouching', act || e.engine.playerEnt); return true;
     }
   },
 };
@@ -64,14 +69,15 @@ export function playerTakesDamage(engine, damageType) {
 }
 
 // HurtEntity: one hurt (or heal) to the player. Always counts as a hurt, like the binary's return value; damage your
-// damage filter turns away does nothing (healing is never filtered).
+// damage filter turns away does nothing (healing is never filtered), nor does any while a map script holds off trigger_hurt
+// damage from you (triggerHurtImmuneUntil: ze_ffvii_cosmo_canyon_v5_p's TriggerHurtImmunity, classes/scripts-cosmo.js).
 function hurtPlayer(engine, e, dmg, events) {
   const s = e.state;
   const first = !s.hurtOnce;
   s.hurtOnce = true;
   s.hurtThisCycle = true;
   if (dmg < 0) events.push({ type: 'heal', ent: e, amount: -dmg });
-  else if (dmg > 0 && playerTakesDamage(engine, e.kv.damagetype)) events.push({ type: 'hurt', ent: e, damage: dmg, first });
+  else if (dmg > 0 && playerTakesDamage(engine, e.kv.damagetype) && !(engine.time < (engine.playerEnt.triggerHurtImmuneUntil ?? -Infinity))) events.push({ type: 'hurt', ent: e, damage: dmg, first });
   e.fireOutput('OnHurtPlayer', engine.playerEnt);
   e.fireOutput('OnHurt', engine.playerEnt);
 }

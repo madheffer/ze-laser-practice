@@ -5,7 +5,7 @@
 //   node tools/sim.mjs web/public/maps/ze_deadcore --scenario a_boss --for 60 --watch "boss|hurt"
 //   node tools/sim.mjs web/public/maps/ze_deadcore --fire "stage_a_relay.Trigger" --fire "a_temp.ForceSpawn@0.5" --for 30
 //
-//   --scenario <id>   fire that scenario's `arrive` and `start` (web/public/scenarios/<map>.json)
+//   --scenario <id>   fire that scenario's `setup`, `arrive` and `start` (web/public/scenarios/<map>.json)
 //   --fire t.Input[(param)][@delay]   fire an input (repeatable)
 //   --for <s>         seconds to run (default 30)
 //   --watch <regex>   print spawns, kills and inputs of entities whose name or class matches
@@ -77,6 +77,9 @@ for (const f of fires) {
   if (!m) { console.error(`bad --fire ${f}`); process.exit(2); }
   start.push({ target: m[1], input: m[2], param: m[3] || '', delay: Number(m[4] || 0) });
 }
+// `setup`: fired as you are placed, before the start inputs (run-engine.js), so a trigger it enables is on by then
+for (const s of sc?.setup || []) engine.fire(s.target, s.input, s.param || '', s.delay || 0, engine.playerEnt, null);
+if (sc?.setup?.length) engine.tick(1 / 64);
 // `arrive`: the triggers whose touch put you there fire OnStartTouch with you as the toucher, as run-engine.js does
 for (const a of sc?.arrive || []) for (const e of arriveTriggers(engine, a)) engine.fireOutput(e, 'OnStartTouch', engine.playerEnt);
 for (const s of start) engine.fire(s.target, s.input, s.param || '', s.delay || 0, engine.playerEnt, null);

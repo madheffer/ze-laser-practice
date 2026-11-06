@@ -18,7 +18,7 @@ import { cloneModel } from './anim.js';
 import { applySelfIllum } from './selfillum.js';
 import { parseVec, isParticleSystem } from './entities/index.js';
 import { spawnsHidden } from './entities/render-mode.js';
-import { nameKey } from '../lib/names.js';
+import { nameKey, nameMatches } from '../lib/names.js';
 import { texturesOf } from './gpu-upload.js';
 
 const MAX_MODELS = 80;
@@ -79,8 +79,10 @@ const SELF_FIRING = /^(trigger_|logic_auto$|logic_timer$|func_(rot_)?button$|mom
 
 // [{ kind: 'model' | 'hull', name, origin }] for every entity in a template lump that render.js draws, placed at its
 // template (origin only: it picks the nearest first and the probe volume); only the templates this stage can spawn
-// (stageTemplates; view: its view box, world/view-box.js, or null)
-export function templateAssets(engine, scenario = null, view = null) {
+// (stageTemplates; view: its view box, world/view-box.js, or null). hidden: the names render.js draws nothing for this
+// stage (its setHidden list, the scenario's `hide`): never fetched for them (ze_ffvii_cosmo_canyon_v5_p's Rage end
+// skips the Shinra arena's 7.6 MB Genesis its spawn template carries)
+export function templateAssets(engine, scenario = null, view = null, hidden = []) {
   const spawnable = stageTemplates(engine, scenario, view);
   const tplOrigin = new Map();
   for (const ds of Object.values(engine.lumps)) for (const d of ds) {
@@ -96,6 +98,7 @@ export function templateAssets(engine, scenario = null, view = null) {
     for (const d of engine.lumps[lump] || []) {
       const kv = d.kv, cls = String(kv.classname || '').toLowerCase();
       if (!kv.model) continue;
+      if (hidden.length && kv.targetname && hidden.some((n) => nameMatches(n, kv.targetname))) continue;
       let kind;
       if (cls === 'trigger_hurt') kind = 'hull';
       else if (cls.startsWith('trigger_') || isParticleSystem(cls)) continue;
@@ -116,7 +119,7 @@ export function templateAssets(engine, scenario = null, view = null) {
 export async function warmTemplates({ renderer, map, engine, scenario, view, origin, isCurrent }) {
   const gl = renderer.renderer;
   const d2 = (o) => (o[0] - origin[0]) ** 2 + (o[1] - origin[1]) ** 2 + (o[2] - origin[2]) ** 2;
-  const items = templateAssets(engine, scenario, view).sort((a, b) => d2(a.origin) - d2(b.origin));
+  const items = templateAssets(engine, scenario, view, renderer.hidden || []).sort((a, b) => d2(a.origin) - d2(b.origin));
   // what this map has warmed: each stage warms its own nearest, skipping what an earlier stage did
   const done = map.warmDone || (map.warmDone = new Set());
   const uploaded = new Set();
