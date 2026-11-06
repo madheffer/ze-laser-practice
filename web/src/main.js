@@ -37,6 +37,7 @@ import { Radar } from './ui/radar.js';
 import { ItemHud } from './ui/itemhud.js';
 import { Killfeed } from './ui/killfeed.js';
 import { installChat } from './app/chat.js';
+import { installVoice, talk } from './app/voice.js';
 import { Lobby } from './ui/lobby.js';
 import { Home } from './ui/home.js';
 import { Rankings } from './ui/rankings.js';
@@ -84,6 +85,7 @@ function leaveLoading() {
 }
 G.killfeed = new Killfeed($('#killfeed'));
 installChat($('#chat'), { net }); // Y / U to talk (app/chat.js)
+installVoice(); // V to talk out loud (app/voice.js)
 G.peers = new Peers(G.renderer.scene, { log, onModel: litByParticles }); // the other players in a co-op / versus round
 G.simulate = simulate;
 
@@ -158,6 +160,7 @@ function applySettings() {
   G.renderer.delay = simulatedPing() / 1000; // a round's is locked at its start (app/coop-load.js)
   if (S.engine) S.engine.humans = rule('humans');
   G.audio.setVolumes({ sfx: settings.sfx, music: settings.music });
+  G.voice?.setVolume(settings.voice);
   applyGamma(settings.gamma); // r_fullscreen_gamma (ui/gamma.js)
   G.renderer.setQuality({ renderScale: settings.renderScale, msaa: settings.msaa, pixelCap: settings.pixelCap, bloom: settings.bloom, reflections: settings.reflections });
   G.renderer.lighting.setOptions({ fog: settings.fog, reflections: settings.reflections, particleLights: settings.particleLights });
@@ -196,7 +199,7 @@ G.maps = new MapPicker($('#maps'), { onPick: (name) => openMap(name) });
 function showMaps() { G.maps.build(S.mapIndex, S.map?.name); G.menu.show('maps'); G.maps.focusCurrent(); }
 
 installInput(canvas, {
-  pause: G.pause, unpause: G.unpause, resume: G.resume, applySettings,
+  pause: G.pause, unpause: G.unpause, resume: G.resume, applySettings, talk,
   weapon,
   lastWeapon: () => { const before = G.vm.weapon; G.vm.swapLast(); if (G.vm.weapon !== before) { G.hud.showWeapons(G.vm.weapon, G.vm.gunName); drawSounds(); } },
   reload: () => G.vm.reload(),

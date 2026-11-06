@@ -59,5 +59,7 @@ export default defineConfig({
   // a stable copy for playing while code is being edited: `npm run play` (build + preview, no hot reload)
   // `npm run host` = the same on every network interface, so a friend on your LAN can join a co-op room
   preview: { port: 5805, strictPort: true },
-  build: { target: 'es2022' },
+  // a script asset (the voice AudioWorklet, audio/voice-worklet.js) is never inlined as a data: URL: the CSP's
+  // script-src 'self' would refuse it
+  build: { target: 'es2022', assetsInlineLimit: (file) => (file.endsWith('.js') ? false : undefined) },
 });

@@ -76,6 +76,16 @@ static class PanoramaBake
         "panorama/images/hud/deathnotice/icon_suicide.vsvg_c",
         "panorama/images/hud/deathnotice/icon_headshot.vsvg_c",
         "panorama/images/hud/deathnotice/penetrate.vsvg_c",
+        // who is talking (ui/voice-hud.js): CS2's voice status popups and their CT / T speaker icons
+        "panorama/layout/hud/hudvoicestatus.vxml_c",
+        "panorama/styles/hud/hudvoicestatus.vcss_c",
+        "panorama/images/hud/voicestatus/iconct42_png.vtex_c",
+        "panorama/images/hud/voicestatus/icont42_png.vtex_c",
+        "panorama/images/icons/ui/sound_off.vsvg_c",
+        "panorama/images/icons/ui/sound_1.vsvg_c",
+        "panorama/images/icons/ui/sound_2.vsvg_c",
+        "panorama/images/icons/ui/sound_3.vsvg_c",
+        "panorama/images/icons/ui/kill.vsvg_c",
     ];
     // every buyable gun's equipment icon (weapon select + ammo panel): icons/equipment/<vdata name without weapon_>
     static readonly string[] Files = [.. BaseFiles, .. WeaponBake.Guns.Select(g => $"panorama/images/icons/equipment/{g.Vdata["weapon_".Length..]}.vsvg_c")];

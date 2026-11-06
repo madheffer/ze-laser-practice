@@ -21,6 +21,7 @@ export const DEFAULTS = {
   humans: 20, fixedHumans: false, bossHp: 100, autoFire: false, fallDamage: false, fullscreen: true,
   healItem: false, // hold the map's heal item (EntWatch / map data: mist's Cleansing Aura, westersand's Heal Magick), E to use it
   sfx: 0.5, music: 0.5,
+  voice: 0.8, // teammates' voice in a room (app/voice.js), 0-1 like the other two
   perfectTeam: false, // true = the other humans never stop shooting (the old fast kill)
   ping: 0, // simulated round trip in ms (0-500): the map's entities are drawn this late (see render.js record())
   thirdPerson: false, tpDist: 65,
@@ -42,7 +43,7 @@ export const DEFAULTS = {
 // Allowed range per numeric setting; a saved value outside it is clamped (the menu can't produce one).
 const RANGES = {
   sens: [0.001, 100], timescale: [0.01, 4], humans: [1, 64], bossHp: [1, 100], ping: [0, 500],
-  sfx: [0, 1], music: [0, 1], tpDist: [15, 150], gamma: [1, 2.5], renderScale: [0.25, 1], pixelCap: [0.5, 3], quality: [0, 3], streamDistance: [0, 2], touchSens: [0.2, 3],
+  sfx: [0, 1], music: [0, 1], voice: [0, 1], tpDist: [15, 150], gamma: [1, 2.5], renderScale: [0.25, 1], pixelCap: [0.5, 3], quality: [0, 3], streamDistance: [0, 2], touchSens: [0.2, 3],
 };
 const DROPPED = new Set(['myaw', 'fov', 'stamina', 'volume']);
 // string settings: one of these values
@@ -88,7 +89,7 @@ export const settings = { ...DEFAULTS, ...sanitizeSettings(migrate(loadJson(KEY)
 
 export function saveSettings() { saveJson(KEY, settings); }
 
-const PERCENT = new Set(['sfx', 'music']);
+const PERCENT = new Set(['sfx', 'music', 'voice']);
 
 // Wire every settings control in the menu to `settings`; onChange runs after each edit.
 export function bindSettings(onChange) {
@@ -128,6 +129,7 @@ export function bindSettings(onChange) {
   // 0-1 like CS2's console values: game sound (the menu's #volume pair, labelled SFX) and `snd_musicvolume`
   bindPair('#volume', '#volume-num', 'sfx', 0, 1, onChange, 0.01);
   bindPair('#musicvol', '#musicvol-num', 'music', 0, 1, onChange, 0.01);
+  bindPair('#voicevol', '#voicevol-num', 'voice', 0, 1, onChange, 0.01);
 }
 
 // A slider with an editable number beside it: drag for coarse, type for exact (e.g. 194, or 0.35).

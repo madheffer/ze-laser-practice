@@ -25,6 +25,7 @@ import { serverAuth } from './auth/index.js';
 import { replayVerifier } from './replay-verify.js';
 import { roomChat } from './coop-chat.js';
 import { coopLog, who } from './coop-log.js';
+import { relayVoice } from './coop-voice.js';
 
 export const PATH = '/coop';
 const MAX_ROOMS = 300;
@@ -311,7 +312,8 @@ export function attachCoopRelay(httpServer, { log = () => {}, store = openStore(
     ws.isAlive = true;
     ws.on('pong', () => { ws.isAlive = true; });
     send(c, { t: 'welcome', you: c.id, max: ROOM_MAX });
-    ws.on('message', (raw) => onMessage(c, raw));
+    // binary frames are voice (coop-voice.js), with their own budget; text frames are JSON messages
+    ws.on('message', (raw, isBinary) => { if (isBinary) relayVoice(c, raw, Date.now()); else onMessage(c, raw); });
     // why a socket closed: the client's close code (1000/1001 a normal close or a closed tab, 1006 the line dropped),
     // our heartbeat dropping it, or an error (1009: a frame over MAX_FRAME)
     ws.on('error', (e) => { ws.dropWhy ||= e?.message || 'error'; });

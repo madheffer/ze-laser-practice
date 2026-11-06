@@ -166,6 +166,20 @@ export class RoomScreen {
     if (show) this.render();
   }
 
+  // mute a player's voice (app/voice.js), for you only
+  muteBtn(m) {
+    const b = btn('', 'rm-mute', () => { G.voice.mute(m.id, !G.voice.muted(m.id)); show(); });
+    const show = () => {
+      const on = G.voice.muted(m.id);
+      b.textContent = on ? 'Muted' : 'Mute';
+      b.classList.toggle('on', on);
+      b.title = `${on ? 'Unmute' : 'Mute'} ${m.name}'s voice`;
+      b.setAttribute('aria-label', b.title);
+    };
+    show();
+    return b;
+  }
+
   // back from the full menu (its "Room" button, ui/lobby.js)
   comeBack() { this.away = false; this.sync(); }
 
@@ -195,6 +209,7 @@ export class RoomScreen {
         li.append(el('span', `rm-ms${m.ping ? '' : ' zero'}`, `${m.ping || 0} ms`));
         if (m.id === room.owner) li.append(el('span', 'rm-tag owner', 'Host'));
         if (m.id === net.you) li.append(el('span', 'rm-tag', 'You'));
+        if (m.id !== net.you && G.voice) li.append(this.muteBtn(m));
         if (host && m.id !== net.you) li.append(btn('✕', 'rm-kick', () => { if (confirm(`Remove ${m.name} from the room?`)) net.kick(m.id); }, `Remove ${m.name}`));
         return li;
       });

@@ -1,0 +1,49 @@
+/* CS2's hudvoicestatus.vcss at 1080p reference px x --u (ui/hud.css). CSGOHudVoiceStatus sits in #HudLowerLeft
+   (hud.vxml, bottom left): a 300 px StatusPanel + 2 px margin, with the VoicePanel at y 182 in it and its notices
+   flowing down, so the first row's top is 120 px above the screen's bottom. .VoiceNotice 22 tall, 2 px in, flow right;
+   .SpeakerIcon 24 (6 px in), .SoundIcon1-3 6 x 22 at -10 / -4 / -4 px, the 0.4 s SoundIcon1-3Anim loops; .AvatarBG 22
+   (iconct42), .Skull 16 x 15 (kill.vsvg); .VoiceText Stratum2 medium 18 white, 4 px in. img-shadow 1 1 1 #00000040. */
+.voice-status {
+  --u: calc(100vh / 1080);
+  position: fixed; left: 0; top: calc(100vh - 120 * var(--u)); z-index: 6;
+  display: flex; flex-direction: column; pointer-events: none;
+}
+.voice-status .VoiceNotice {
+  height: calc(22 * var(--u)); margin-left: calc(2 * var(--u));
+  display: flex; align-items: center; opacity: 1; transition: opacity 0.2s linear;
+}
+.voice-status .VoiceNotice.Hidden { opacity: 0; transition-duration: 0.3s; }
+.voice-status .SoundAnim { display: flex; align-items: center; }
+.voice-status .SoundAnim > div, .voice-status .AvatarBG, .voice-status .Skull {
+  /* longhands: a `background` shorthand here would out-rank each icon's own background-image */
+  background-repeat: no-repeat; background-position: 50% 50%; background-size: 100% 100%;
+  filter: drop-shadow(1px 1px 1px #00000040); flex: none;
+}
+.voice-status .SpeakerIcon { width: calc(24 * var(--u)); height: calc(24 * var(--u)); margin-left: calc(6 * var(--u)); background-image: url('/panorama/icons/ui/sound_off.svg'); }
+.voice-status .SoundIcon1, .voice-status .SoundIcon2, .voice-status .SoundIcon3 { width: calc(6 * var(--u)); height: calc(22 * var(--u)); }
+.voice-status .SoundIcon1 { margin-left: calc(-10 * var(--u)); background-image: url('/panorama/icons/ui/sound_1.svg'); }
+.voice-status .SoundIcon2 { margin-left: calc(-4 * var(--u)); background-image: url('/panorama/icons/ui/sound_2.svg'); }
+.voice-status .SoundIcon3 { margin-left: calc(-4 * var(--u)); background-image: url('/panorama/icons/ui/sound_3.svg'); }
+.voice-status .Looping .SoundIcon1 { animation: vs-bar1 0.4s linear infinite; }
+.voice-status .Looping .SoundIcon2 { animation: vs-bar2 0.4s linear infinite; }
+.voice-status .Looping .SoundIcon3 { animation: vs-bar3 0.4s linear infinite; }
+/* the loudness caps the bars (CS2: .SoundOff / .SoundLow hide 2 and 3, .SoundHigh hides 3; its SoundOff rule for
+   bar 1 is written as a descendant selector and never matches, so bar 1 always shows) */
+.voice-status .SoundOff .SoundIcon2, .voice-status .SoundLow .SoundIcon2,
+.voice-status .SoundOff .SoundIcon3, .voice-status .SoundLow .SoundIcon3, .voice-status .SoundHigh .SoundIcon3 { visibility: hidden; }
+@keyframes vs-bar1 { 0% { opacity: 0; } 40%, 100% { opacity: 1; } }
+@keyframes vs-bar2 { 0%, 40% { opacity: 0; } 70%, 100% { opacity: 1; } }
+@keyframes vs-bar3 { 0%, 70% { opacity: 0; } 100% { opacity: 1; } }
+.voice-status .AvatarPanel { position: relative; width: calc(22 * var(--u)); height: calc(22 * var(--u)); flex: none; }
+.voice-status .AvatarBG { position: absolute; inset: 0; }
+.voice-status .DefaultAvatarCT .AvatarBG { background-image: url('/panorama/hud/voicestatus/iconct42.png'); }
+.voice-status .DefaultAvatarT .AvatarBG { background-image: url('/panorama/hud/voicestatus/icont42.png'); }
+.voice-status .Skull {
+  position: absolute; left: 50%; top: 50%; width: calc(16 * var(--u)); height: calc(15 * var(--u));
+  transform: translate(-50%, -50%); background-image: url('/panorama/icons/ui/kill.svg'); background-size: 90% 90%; opacity: 0;
+}
+.voice-status .ShowSkull .Skull { opacity: 1; }
+.voice-status .VoiceText {
+  margin-left: calc(4 * var(--u)); white-space: nowrap; color: #fff;
+  font: 500 calc(18 * var(--u)) / 1 'Stratum2', 'Arial Unicode MS', sans-serif; letter-spacing: 0;
+}

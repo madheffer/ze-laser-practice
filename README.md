@@ -423,6 +423,15 @@ and each player's ping shows next to their name (the client sends `ping`, the se
 owner edits them, everyone else sees them read-only). On the room screen it opens in a sheet that closes with ✕, Esc
 or a click outside; in the menu it is the Settings tab. Sliders, dropdowns and fields share one style (`ui/controls.css`).
 
+**Voice chat**: hold **V** in a round to talk; everyone in the room hears it (alltalk, like the room chat). The mic
+opens on your first press (the browser asks once) and closes when you leave the room; Settings → Audio → Voice sets the
+volume and the room screen has **Mute** per player. Opus at 40 kbit/s, 48 kHz mono in 20 ms packets, encoded and
+decoded by the browser (WebCodecs; `audio/voice-capture.js`, `voice-worklet.js`, `voice-opus.js`), sent as binary
+frames on the co-op socket and relayed by the server (`server/coop-voice.js`), so players still never connect to each
+other. Each listener's jitter buffer (`audio/voice-playback.js`) starts 60 ms ahead, grows on a gap and settles to
+40 ms: the delay is the server trip plus ~40 ms. Who is talking shows in CS2's voice popups (`ui/voice-hud.js`:
+hudvoicestatus.vxml / .vcss from `--panorama`, the classes client.dll's CCSGO_HudVoiceStatus sets).
+
 **The pause screen** (`ui/pause.js`, Esc during a run): Resume, Restart, Change stage (solo) / End round (room
 owner), Settings, Leave room / Home, the stage, clock, hits and HP, and in a room the room code with Copy code /
 Invite link and who is alive (with each player's ping). Change stage and Settings open the full menu.

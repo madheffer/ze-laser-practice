@@ -7,12 +7,15 @@
 //   net.rtt                              // the measured round trip to the server (ms) while in a room, 0 before one
 //   net.on('left', why) / net.on('error', msg) / net.on('status', status)
 //   net.on('chat', ({ id, name, text, team, dead } | { flood })) // room chat; net.chat(text, team) sends
+//   net.on('voice', (id, first, opus))   // a teammate's voice packet (server/coop-voice.js); net.voice(first, opus) sends
 import { cleanSettings, cleanText } from '../lib/room-rules.js';
 import { cleanChat, cleanChatName } from '../lib/chat-colors.js';
 import { isMapName } from '../lib/paths.js';
 
 export const ROOM_CODE = /^[A-Z]{4}$/;
 const RTT_MS = 2000;
+const VOICE_MAX = 600; // bytes per packet (server/coop-voice.js)
+const VOICE_BACKLOG = 16 * 1024; // bytes still queued on the socket past which a packet is dropped, not sent late
 const GAME = new Set(['start', 's', 'dead', 'bd', 'clock', 'leader', 'end', 'use', 'wait', 'go']);
 
 export class CoopClient {
@@ -58,7 +61,8 @@ export class CoopClient {
       for (const m of this.pending || []) ws.send(JSON.stringify(m));
       this.pending = null;
     };
-    ws.onmessage = (ev) => this.onFrame(ev.data);
+    ws.binaryType = 'arraybuffer';
+    ws.onmessage = (ev) => (typeof ev.data === 'string' ? this.onFrame(ev.data) : this.onVoice(ev.data));
     ws.onclose = () => {
       if (this.ws !== ws) return;
       this.ws = null;
@@ -100,6 +104,22 @@ export class CoopClient {
   }
   // a note for the server's log (app/coop-diag.js; server/coop-relay.js 'diag'): kind a-z, msg plain text
   diag(kind, msg, r) { if (this.ws?.readyState === 1) this.ws.send(JSON.stringify({ t: 'diag', kind, msg: String(msg).slice(0, 400), r })); }
+  // a 20 ms Opus packet of your voice (app/voice.js): sent now or never, a late one only adds delay
+  voice(first, opus) {
+    const ws = this.ws;
+    if (!this.room || ws?.readyState !== 1 || ws.bufferedAmount > VOICE_BACKLOG || !opus.length || opus.length > VOICE_MAX) return;
+    const out = new Uint8Array(1 + opus.length);
+    out[0] = first ? 1 : 0;
+    out.set(opus, 1);
+    ws.send(out);
+  }
+  // [sender u32 LE][flags u8][opus]: only from someone in your room
+  onVoice(buf) {
+    if (!this.room || !(buf instanceof ArrayBuffer) || buf.byteLength < 6 || buf.byteLength > VOICE_MAX + 5) return;
+    const id = new DataView(buf).getUint32(0, true);
+    if (id === this.you || !this.member(id)) return;
+    this.emit('voice', id, (new Uint8Array(buf, 4, 1)[0] & 1) === 1, new Uint8Array(buf, 5));
+  }
   // round traffic (only while connected: nothing is queued for a round)
   game(m) { if (this.room && this.ws?.readyState === 1) this.ws.send(JSON.stringify(m)); }
 

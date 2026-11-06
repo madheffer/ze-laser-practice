@@ -1,5 +1,6 @@
 // Keyboard, mouse, touch, pointer lock, fullscreen. CS2 bindings: WASD, Space / wheel down jump, Ctrl crouch,
-// Shift walk, Mouse 1/2 attack, 1 / 3 / Q weapons, R reload, F inspect, Esc menu (a tap, like CS2 and cybo's site).
+// Shift walk, Mouse 1/2 attack, 1 / 3 / Q weapons, R reload, F inspect, V push to talk in a room (app/voice.js),
+// Esc menu (a tap, like CS2 and cybo's site).
 //
 // "In game" = S.locked: player input is live. On desktop that is the pointer lock; on touch (ui/touch.js) there is
 // no lock, so it is "a stage is running and not paused". loop.js reads input only while S.locked.
@@ -263,6 +264,7 @@ export function installInput(canvas, actions) {
       case 'KeyR': actions.reload(); break;
       case 'KeyF': G.vm.inspect(); break;
       case 'KeyE': useItems(); break; // CS2 +use: the held map item's button (app/items.js)
+      case 'KeyV': actions.talk?.(true); break; // +voicerecord, held
       case 'Backspace': actions.restart(); break;
       // a co-op / versus round plays by the room's rules (app/rules.js): these are solo-only
       case 'KeyH': if (!S.mp) { setToggle('hitboxes', '#hitboxes', !settings.hitboxes); actions.applySettings(); } break;
@@ -270,6 +272,6 @@ export function installInput(canvas, actions) {
       case 'KeyT': if (!S.mp) settings.timescale = settings.timescale === 1 ? 0.25 : 1; break;
     }
   });
-  document.addEventListener('keyup', (ev) => keys.delete(ev.code));
-  window.addEventListener('blur', () => keys.clear());
+  document.addEventListener('keyup', (ev) => { keys.delete(ev.code); if (ev.code === 'KeyV') actions.talk?.(false); });
+  window.addEventListener('blur', () => { keys.clear(); actions.talk?.(false); });
 }
