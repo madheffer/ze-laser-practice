@@ -25,6 +25,9 @@
       "start": [
         { "target": "relay10", "input": "Trigger" }
       ],
+      "music": [
+        { "target": "music6", "input": "PlaySound" }
+      ],
       "win": { "target": "ele6", "input": "StartForward" },
       "endless": {
         "cancel": [
@@ -56,6 +59,9 @@
       "start": [
         { "target": "relay10", "input": "Trigger" }
       ],
+      "music": [
+        { "target": "music6", "input": "PlaySound" }
+      ],
       "win": { "target": "ele6", "input": "StartForward" },
       "endless": {
         "cancel": [
@@ -86,6 +92,9 @@
       ],
       "start": [
         { "target": "relay9", "input": "Trigger" }
+      ],
+      "music": [
+        { "target": "music5", "input": "PlaySound" }
       ],
       "win": { "target": "door8", "input": "Open" },
       "endless": {
