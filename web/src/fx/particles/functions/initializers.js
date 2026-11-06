@@ -125,7 +125,11 @@ export const initializers = {
         const l0 = evalVec(fn.m_LocalCoordinateSystemSpeedMin, c, i, 'init'), l1 = evalVec(fn.m_LocalCoordinateSystemSpeedMax, c, i, 'init');
         const lsp = [0, 1, 2].map((k) => l0[k] + (l1[k] - l0[k]) * drawVarying(c));
         const off = mul(dir, dist);
-        const p = add(cp.position, fn.m_bLocalCoords ? toWorld(cp, off) : off);
+        // At the CP where it was when this particle was created inside the frame (Source's GetControlPointAtTime, as
+        // C_INIT_CreateWithinBox does): C_OP_PositionLock then carries it only for its own age. Spawning at the end-of-frame
+        // CP put it a frame ahead of a moving CP; neochrome's dodge lasers (CP on a door at ~1600 u/s, spun by
+        // C_OP_MovementRotateParticleAroundAxis) fanned into fat spiky tubes.
+        const p = add(cpPositionAt(c, cp, c.attr[A.CREATION][i]), fn.m_bLocalCoords ? toWorld(cp, off) : off);
         setV(c, out, i, p);
         const vel = add(mul(fn.m_bLocalCoords ? toWorld(cp, dir) : dir, speed), toWorld(cp, lsp));
         // Velocity lives in Position Previous (prev = pos - v*dt).
