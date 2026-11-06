@@ -7,13 +7,13 @@ import './hud.css';
 import { esc, replayClass } from '../lib/dom.js';
 import { clamp, clamp01 } from '../lib/math.js';
 import { thousands } from '../lib/format.js';
-import { GUNS, DEFAULT_GUN } from '../lib/weapons.js';
+import { GUNS, PISTOLS, DEFAULT_GUN, DEFAULT_PISTOL, firearm } from '../lib/weapons.js';
 
 // absolute: these go into CSS custom properties (--src: url(...)), and a relative url() there resolves against the
 // built stylesheet's folder (/assets/), not the page: every HUD icon 404'd on the hosted build, fine in dev
 const P = `${import.meta.env?.BASE_URL ?? '/'}panorama/`;
 const ICONS = {
-  gun: (name) => `${P}icons/equipment/${GUNS[name].icon}.svg`, // a gun's (lasers-bake --panorama, one per buyable gun)
+  gun: (name) => `${P}icons/equipment/${firearm(name).icon}.svg`, // a gun's (lasers-bake --panorama, one per buyable gun + the pistol)
   knife: `${P}icons/equipment/knife.svg`,
   armor: `${P}hud/armor.svg`,
   helmet: `${P}hud/armor_helmet.svg`,
@@ -26,6 +26,7 @@ const ICONS = {
 // CS2's inventory slots for what a ZE human carries (the primary's row follows the gun held: showWeapons)
 const WEAPONS = [
   { slot: 1, id: 'gun', name: GUNS[DEFAULT_GUN].label, icon: ICONS.gun(DEFAULT_GUN) },
+  { slot: 2, id: 'pistol', name: PISTOLS[DEFAULT_PISTOL].label, icon: ICONS.gun(DEFAULT_PISTOL) },
   { slot: 3, id: 'knife', name: 'Knife', icon: ICONS.knife },
 ];
 
@@ -124,12 +125,12 @@ export class Hud {
     const armor = v.armor || 0;
     e.armor.classList.toggle('has-armor', armor > 0);
     set('armor', e.armorLabel, String(armor));
-    const gun = v.weapon === 'gun';
-    e.wpn.classList.toggle('no-ammo', !gun);
-    if (gun) {
+    // the held gun's ammo (v.held: its vdata name, primary or pistol); none on the knife
+    const g = firearm(v.held);
+    e.wpn.classList.toggle('no-ammo', !g);
+    if (g) {
       set('clip', e.clip, String(v.clip));
       set('reserve', e.reserve, String(v.reserve));
-      const g = GUNS[v.gun] || GUNS[DEFAULT_GUN];
       const cf = clamp01(v.clip / g.clip);
       // the fire-mode mark shows only on a gun that can switch modes (hudhealthammocenter.css can-change-fire-mode: the FAMAS)
       e.modeIcon.style.visibility = g.burstMode ? '' : 'hidden';

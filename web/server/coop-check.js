@@ -17,7 +17,7 @@ import { useItems } from '../src/world/items.js';
 import { CollisionWorld, makeTrace } from '../src/world/collision.js';
 import { bulletWorld, BULLET_MASK } from '../src/world/bullets.js';
 import { CS, standsFree } from '../src/world/movement.js';
-import { GUNS, KNIFE, DEFAULT_GUN } from '../src/lib/weapons.js';
+import { GUNS, PISTOLS, KNIFE, DEFAULT_GUN, DEFAULT_PISTOL } from '../src/lib/weapons.js';
 
 const MAX_AXIS_SPEED = 3500 * 1.05; // CS2 clamps each velocity axis to sv_maxvelocity 3500
 const BOOST_TICKS = 32; // after a push / map velocity: half a second of extra speed allowance, no fly check
@@ -28,6 +28,7 @@ const AHEAD_LIMIT = 32; // ticks a run may lead it (jitter)
 const SPAWN_SLACK = 96; // units: the first tick has to be this close to the spawn
 const TELEPORT_SLACK = 96; // units: the tick after a map teleport, this close to its destination
 const KNIFE_REACH = 32; // units added to a knife's range (hull / latency)
+const KNIFE_DAMAGE = [KNIFE.slash.first, KNIFE.slash.follow, KNIFE.stab.damage];
 const BURST = 6; // rounds that may arrive at once (network jitter bunches a few 100 ms batches)
 const SWAP_GRACE = 1500; // ms the gun held before a buy still counts (its last rounds' hits trail the message)
 const RELOAD_SLACK = 0.3; // s off a reported reload (the report travels; the last rounds' hits may trail it)
@@ -69,7 +70,8 @@ export class PlayerCheck {
     this.bd = []; // [{ tick, hits }] boss damage to apply when this run reaches that tick
     this.ping = 0; this.lagTicks = 0; this.past = []; // past: [{ tick, hulls: Map boss id -> hulls }], lagTicks + 1 long
     this.gun = GUNS[DEFAULT_GUN]; this.prevGun = null; this.prevUntil = 0;
-    this.shots = { tokens: BURST, rounds: this.gun.clip, reloadUntil: 0, knife: 2, at: Date.now() };
+    this.pistol = PISTOLS[DEFAULT_PISTOL]; // every human's slot 2 (the USP-S): its own magazine, the same fire budget
+    this.shots = { tokens: BURST, rounds: this.gun.clip, reloadUntil: 0, pistolRounds: this.pistol.clip, pistolReloadUntil: 0, knife: 2, at: Date.now() };
     const me = this;
     this.stub = { centre: () => [me.pos[0], me.pos[1], me.pos[2] + me.height / 2], half: () => [CS.halfWidth, CS.halfWidth, me.height / 2] };
     this.run = createRunEngine({
@@ -302,42 +304,60 @@ export class PlayerCheck {
     s.tokens = Math.min(BURST, s.tokens + dt / g.cycle);
     s.knife = Math.min(BURST / 2, s.knife + dt / KNIFE.slash.cycle);
     const gunDamage = (d) => d === g.damage || (now < this.prevUntil && d === this.prevGun?.damage);
+    const P = this.pistol;
+    // what can deal this damage: the primary, the pistol, the knife (the UMP-45 and the USP-S both hit for 35)
+    const kindsOf = (d) => [gunDamage(d) && 'gun', d === P.damage && 'pistol', KNIFE_DAMAGE.includes(d) && 'knife'].filter(Boolean);
+    const rangeOf = (k, d) => (k === 'gun' ? Math.max(g.range, now < this.prevUntil ? this.prevGun?.range || 0 : 0)
+      : k === 'pistol' ? P.range : (d === KNIFE.stab.damage ? KNIFE.stab.range : KNIFE.slash.range) + KNIFE_REACH);
+    // one shot from that weapon, if its magazine and the fire budget allow it
+    const spend = (k, d) => {
+      if (k === 'gun') {
+        // the gun held before a buy: its last rounds were fired before the new gun's draw lock
+        const old = d !== g.damage;
+        if ((now < s.reloadUntil && !old) || s.tokens < 1) return false;
+        s.tokens--; s.rounds--;
+        if (s.rounds <= 0) { s.rounds = g.clip; s.reloadUntil = now + g.reload * 1000; }
+      } else if (k === 'pistol') {
+        // the budget is in the primary's cycles: a pistol shot costs its own cycle's worth
+        const cost = P.cycle / g.cycle;
+        if (now < s.pistolReloadUntil || s.tokens < cost) return false;
+        s.tokens -= cost; s.pistolRounds--;
+        if (s.pistolRounds <= 0) { s.pistolRounds = P.clip; s.pistolReloadUntil = now + P.reload * 1000; }
+      } else {
+        if (s.knife < 1) return false;
+        s.knife--;
+      }
+      return true;
+    };
     const bosses = this.bosses();
     const then = this.lagTicks ? this.past[0] : null; // the oldest kept: what a client lagTicks behind saw
     const out = [];
     for (const [id, dmg, n] of hits) {
       const e = bosses.find((x) => x.id === id);
-      const kind = gunDamage(dmg) ? 'gun' : [KNIFE.slash.first, KNIFE.slash.follow, KNIFE.stab.damage].includes(dmg) ? 'knife' : null;
-      if (!e || !kind) { this.strike('shot', `damage ${dmg} on ${id}`); continue; }
-      const range = kind === 'gun' ? Math.max(g.range, now < this.prevUntil ? this.prevGun?.range || 0 : 0)
-        : (dmg === KNIFE.stab.damage ? KNIFE.stab.range : KNIFE.slash.range) + KNIFE_REACH;
+      const kinds = kindsOf(dmg);
+      if (!e || !kinds.length) { this.strike('shot', `damage ${dmg} on ${id}`); continue; }
+      const range = Math.max(...kinds.map((k) => rangeOf(k, dmg)));
       // out of sight / reach, now and where the player's ping showed it: dropped (real lag can do this honestly)
       const past = then?.hulls.get(e.id);
       if (!this.canHit(e.hulls(), range) && !(past && this.canHit(past, range))) continue;
       let shotsWanted = Math.ceil(n / mult), ok = 0;
-      while (shotsWanted-- > 0) {
-        if (kind === 'gun') {
-          // the gun held before a buy: its last rounds were fired before the new gun's draw lock
-          const old = dmg !== g.damage;
-          if ((now < s.reloadUntil && !old) || s.tokens < 1) break;
-          s.tokens--; s.rounds--;
-          if (s.rounds <= 0) { s.rounds = g.clip; s.reloadUntil = now + g.reload * 1000; }
-        } else {
-          if (s.knife < 1) break;
-          s.knife--;
-        }
-        ok++;
-      }
+      while (shotsWanted-- > 0 && kinds.some((k) => spend(k, dmg))) ok++;
       if (ok * mult < n - mult) this.strike('firerate', `${n} hits, ${ok} shots allowed`); // one shot of slack
       if (ok) out.push([id, dmg, Math.min(n, ok * mult)]);
     }
     return out;
   }
 
-  // the client started a reload: no rounds until it's done, then a full magazine (an early reload is legal; faking
-  // one only costs the shooter time)
-  reload() {
+  // the client started a reload of its primary or its pistol (w: the slot): no rounds until it's done, then a full
+  // magazine (an early reload is legal; faking one only costs the shooter time)
+  reload(w) {
     const now = Date.now(), s = this.shots;
+    if (w === 'pistol') {
+      if (now < s.pistolReloadUntil) return;
+      s.pistolReloadUntil = now + (this.pistol.reload - RELOAD_SLACK) * 1000;
+      s.pistolRounds = this.pistol.clip;
+      return;
+    }
     if (now < s.reloadUntil) return;
     s.reloadUntil = now + (this.gun.reload - RELOAD_SLACK) * 1000;
     s.rounds = this.gun.clip;

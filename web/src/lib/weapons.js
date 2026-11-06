@@ -6,7 +6,7 @@
 // Reserve stays full: ZE servers run CS2Fixes cs2f_infinite_reserve_ammo 1.
 // Knife (CSKnife::SwingOrStab): slash refires 0.4 s after a miss, 40 damage on the first swing and 25 on a
 // follow-up (a swing within 0.4 s of the refire time); stab 65, refires 1.0 s. Range 48 slash, 32 stab.
-import { CS2_GUNS } from './weapons-cs2.js';
+import { CS2_GUNS, CS2_PISTOLS } from './weapons-cs2.js';
 
 // CS2Fixes' names and buy aliases (src/utils/weapon.cpp s_WeaponMap), plus the short ones people type
 // (m4, m4a1_s, ...). An alias wins over a bare class name: `m4a1` is the M4A1-S (CS2Fixes), `weapon_m4a1` the M4A4.
@@ -47,6 +47,16 @@ export const GUN_IDS = Object.freeze(['weapon_ak47', 'weapon_bizon', ...Object.k
 export const DEFAULT_GUN = 'weapon_bizon';
 export const LEGACY_GUN = 'weapon_ak47';
 
+// The pistol every human spawns with (slot 2): CS2's CT default, the USP-S. Not buyable, so not in GUNS / GUN_IDS.
+const PISTOL_LABELS = { weapon_usp_silencer: 'USP-S' };
+export const PISTOLS = freezeDeep(Object.fromEntries(Object.entries(CS2_PISTOLS).map(([name, g]) => (
+  [name, { ...g, name, label: PISTOL_LABELS[name] || name.replace(/^weapon_/, ''), aliases: [], icon: name.replace(/^weapon_/, '') }]
+))));
+export const DEFAULT_PISTOL = 'weapon_usp_silencer';
+
+// a gun's numbers by vdata name, primary or pistol (a shot names the gun it left), or undefined
+export const firearm = (name) => (Object.hasOwn(GUNS, name) ? GUNS[name] : Object.hasOwn(PISTOLS, name) ? PISTOLS[name] : undefined);
+
 export const KNIFE = freezeDeep({
   chassis: 'knife_default_ct', deploy: 1.0,
   slash: { cycle: 0.4, cycle2: 0.4, first: 40, follow: 25, range: 48 },
@@ -70,8 +80,8 @@ export function gunCommandNames(name) {
   return g ? [...new Set([...g.aliases, name.slice(7), name])] : [];
 }
 
-// every sound event a gun plays (its shot, draw and reload), to fetch before it is heard
+// every sound event a gun or pistol plays (its shot, draw and reload), to fetch before it is heard
 export function gunSounds(name) {
-  const g = GUNS[name];
+  const g = firearm(name);
   return g ? [g.fireSound, ...g.drawSounds.map((s) => s[1]), ...g.reloadSounds.map((s) => s[1])] : [];
 }

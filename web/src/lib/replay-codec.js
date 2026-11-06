@@ -8,7 +8,8 @@
 //
 // Layout: varint(VERSION) varint(n) then n ticks, then varint(events) and the events.
 //   tick:  zigzag deltas of x, y, z (1/32 unit), yaw, pitch (1/10 degree; yaw wraps), then one flags byte:
-//          bits 0-3 duckAmount (0..15), bit 4 on the ground, bit 5 ducked, bit 6 the primary is out
+//          bits 0-3 duckAmount (0..15), bit 4 on the ground, bit 5 ducked, bit 6 the primary is out,
+//          bit 7 the pistol is out (neither: the knife)
 //   event: varint(tick delta from the last event), varint(type), then its fields (EVENT_FIELDS)
 // The bytes are gzipped on the wire and in the database (CompressionStream / zlib).
 import { GUN_IDS, LEGACY_GUN } from './weapons.js';

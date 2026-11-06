@@ -715,3 +715,40 @@ export const CS2_GUNS = {
     ]
   }
 };
+export const CS2_PISTOLS = {
+  "weapon_usp_silencer": {
+    "chassis": "pistol_usp",
+    "damage": 35,
+    "cycle": 0.17,
+    "clip": 12,
+    "reserve": 24,
+    "deploy": 1,
+    "fullAuto": false,
+    "burstMode": false,
+    "range": 4096,
+    "bullets": 1,
+    "maxSpeed": 240,
+    "reload": 2.2,
+    "price": 200,
+    "recoil": {
+      "angle": 0,
+      "angleVariance": 0,
+      "magnitude": 29,
+      "magnitudeVariance": 0,
+      "seed": 5426
+    },
+    "fireSound": "Weapon_USP.SilencedShot",
+    "drawSounds": [
+      [0.1, "Weapon_USP.Draw"],
+      [0.3, "Weapon_USP.Slideback_Q"],
+      [0.4667, "Weapon_USP.Sliderelease_Q"]
+    ],
+    "reloadSounds": [
+      [0.4333, "Weapon_USP.Clipout"],
+      [0.7, "Weapon_USP.Clipin"],
+      [0.9, "Weapon_USP.AddAmmo"],
+      [1.3667, "Weapon_USP.Slideback"],
+      [1.5334, "Weapon_USP.Sliderelease"]
+    ]
+  }
+};

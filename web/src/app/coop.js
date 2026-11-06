@@ -98,7 +98,7 @@ class Round {
   used(k) { if (!this.ended && !S.run?.spectating) { this.sendTicks(); net.game({ t: 'use', r: this.r, k }); } }
 
   // your gun's reload started: the server's shot check holds your next rounds until it's done
-  reloaded() { if (!this.ended && !S.run?.spectating) net.game({ t: 'reload', r: this.r }); }
+  reloaded(w) { if (!this.ended && !S.run?.spectating) net.game({ t: 'reload', r: this.r, w }); } // w: the slot reloaded
 
   // you bought a gun (app/buy.js): the server's shot check holds you to its numbers from now on
   bought(gun) { if (!this.ended && !S.run?.spectating) net.game({ t: 'weapon', r: this.r, gun }); }

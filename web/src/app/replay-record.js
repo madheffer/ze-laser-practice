@@ -20,7 +20,8 @@ export class ReplayRecorder {
   }
 
   // tick k (1, 2, 3...: run.ticks) after the player has moved
-  pose(k, player, gun) {
+  // weapon: the held slot ('gun' | 'pistol' | 'knife')
+  pose(k, player, weapon) {
     if (this.full) return;
     if (k !== this.n + 1 || this.n >= MAX_TICKS) { this.full = true; return; } // a gap: stop (never a wrong replay)
     if (this.n >= this.cap) {
@@ -31,7 +32,7 @@ export class ReplayRecorder {
     const i = this.n++, o = player.origin, t = this.t;
     t.x[i] = q(o[0], POS_SCALE); t.y[i] = q(o[1], POS_SCALE); t.z[i] = q(o[2], POS_SCALE);
     t.yaw[i] = q((((player.yaw % 360) + 540) % 360) - 180, ANG_SCALE); t.pitch[i] = q(Math.max(-89, Math.min(89, player.pitch)), ANG_SCALE);
-    t.flags[i] = Math.round(Math.max(0, Math.min(1, player.duckAmount)) * 15) | (player.onGround ? 16 : 0) | (player.ducked ? 32 : 0) | (gun ? 64 : 0);
+    t.flags[i] = Math.round(Math.max(0, Math.min(1, player.duckAmount)) * 15) | (player.onGround ? 16 : 0) | (player.ducked ? 32 : 0) | (weapon === 'gun' ? 64 : weapon === 'pistol' ? 128 : 0);
   }
 
   event(tick, type, fields = {}) {

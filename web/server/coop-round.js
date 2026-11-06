@@ -244,7 +244,7 @@ export class Round {
     this.broadcast({ t: 'use', r: this.r, id: c.id }, c);
   }
 
-  onReload(c) { const p = this.players.get(c.id); if (p?.alive && !this.ended && this.started) p.check.reload(); }
+  onReload(c, w) { const p = this.players.get(c.id); if (p?.alive && !this.ended && this.started) p.check.reload(w === 'pistol' ? 'pistol' : 'gun'); }
   // a bought gun (app/buy.js): any of lib/weapons.js GUNS, held to its numbers (PlayerCheck.setGun drops the rest)
   onWeapon(c, gun) { const p = this.players.get(c.id); if (p?.alive && !this.ended) p.check.setGun?.(gun); }
 

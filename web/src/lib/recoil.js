@@ -18,7 +18,7 @@
 // UNSETTLED (CS:GO defaults; their cvars are gone from CS2, the values not yet found in its binaries): the table's
 // variance 0.55 and first-4-shot suppression 0.75 (full auto only), the view punch per shot (magnitude x 0.055), and
 // the recoil index decaying x exp(-2 ln 10 t) once 1.1 cycles pass without a shot.
-import { GUNS } from './weapons.js';
+import { firearm } from './weapons.js';
 
 export const STEP = 1 / 128;
 const EXP_STEP = Math.exp(-0.0625);
@@ -78,7 +78,7 @@ const lerp = (t, a, b) => a + (b - a) * t;
 const tables = new Map();
 export function recoilTable(name) {
   if (tables.has(name)) return tables.get(name);
-  const g = GUNS[name];
+  const g = firearm(name);
   const r = g?.recoil;
   const out = [];
   if (r) {

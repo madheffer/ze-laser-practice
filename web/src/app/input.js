@@ -1,5 +1,5 @@
 // Keyboard, mouse, touch, pointer lock, fullscreen. CS2 bindings: WASD, Space / wheel down jump, Ctrl crouch,
-// Shift walk, Mouse 1/2 attack, 1 / 3 / Q weapons, R reload, F inspect, V push to talk in a room (app/voice.js),
+// Shift walk, Mouse 1/2 attack, 1 / 2 / 3 / Q weapons, R reload, F inspect, V push to talk in a room (app/voice.js),
 // Esc menu (a tap, like CS2 and cybo's site).
 //
 // "In game" = S.locked: player input is live. On desktop that is the pointer lock; on touch (ui/touch.js) there is
@@ -259,6 +259,7 @@ export function installInput(canvas, actions) {
     if (ev.code === 'Space') spaceDown = true;
     switch (ev.code) {
       case 'Digit1': actions.weapon('gun'); break;
+      case 'Digit2': actions.weapon('pistol'); break;
       case 'Digit3': actions.weapon('knife'); break;
       case 'KeyQ': actions.lastWeapon(); break;
       case 'KeyR': actions.reload(); break;

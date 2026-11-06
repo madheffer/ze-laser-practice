@@ -161,7 +161,7 @@ export function frame(now) {
   const look = takeLookDelta();
   G.vm.visible = !tp && !S.run?.spectating;
   if (rv && S.replay.gunName && S.replay.gunName !== G.vm.gunName) { G.vm.setGun(S.replay.gunName); G.hud.showWeapons(G.vm.weapon, G.vm.gunName); } // a buy
-  if (rv && S.replay.gun !== (G.vm.weapon === 'gun')) { G.vm.setWeapon(S.replay.gun ? 'gun' : 'knife'); G.hud.showWeapons(G.vm.weapon, G.vm.gunName); }
+  if (rv && S.replay.weapon !== G.vm.weapon) { G.vm.setWeapon(S.replay.weapon); G.hud.showWeapons(G.vm.weapon, G.vm.gunName); }
   if (S.run) {
     // the viewmodel keeps animating behind the menu (triggers are released on pause, shots are ignored)
     G.vm.update(Math.max(1e-3, realDt) * timescale(), {
@@ -215,7 +215,7 @@ export function step() {
   if (!S.replay) {
     // window.__lasersInput drives the player in tests: solo only (no bots in a round)
     inp = (!S.mp && window.__lasersInput?.(run.t)) || (S.locked ? readInput() : IDLE);
-    player.maxSpeed = G.vm.weapon === 'knife' ? 250 : G.vm.gun.maxSpeed; // CS2's m_flMaxSpeed: knife 250, PP-Bizon 240, AK-47 215
+    player.maxSpeed = G.vm.held ? G.vm.held.maxSpeed : 250; // CS2's m_flMaxSpeed: knife 250, PP-Bizon / USP-S 240, AK-47 215
     player.tick(inp, moveSettings());
   }
   const ground = player.groundEntity && player.groundEntity.alive ? player.groundEntity : null;
@@ -232,7 +232,7 @@ export function step() {
   } else {
     // the tick's final pose (moved, then carried): what the round's server checks against this tick's solids
     S.mp?.record(run.ticks, player); // a round's server replays your run from these (the anti-cheat)
-    run.rec?.pose(run.ticks, player, G.vm.weapon === 'gun'); // your solo run's replay (app/replay-record.js)
+    run.rec?.pose(run.ticks, player, G.vm.weapon); // your solo run's replay (app/replay-record.js)
     footsteps(inp, before);
   }
 
@@ -326,7 +326,7 @@ export function updateHud() {
     sub: sub.join(' · '),
     hp: run.spectating ? (S.mp?.spectateView()?.hp ?? 0) : run.hp, god: godMode(), armor: run.armor, money: run.money,
     spectate: run.spectating ? S.mp?.spectateLabel() : '',
-    weapon: G.vm.weapon, gun: G.vm.gunName, clip: G.vm.clip, reserve: G.vm.reserve, reloading: G.vm.reloading,
+    weapon: G.vm.weapon, gun: G.vm.gunName, held: G.vm.held?.name, clip: G.vm.clip, reserve: G.vm.reserve, reloading: G.vm.reloading,
     bossHtml: bossHudHtml(bosses),
   });
 }

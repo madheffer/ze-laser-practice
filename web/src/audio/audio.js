@@ -37,7 +37,7 @@ import { RoomDsp } from './dsp.js';
 import { followCurve, fadeOut, randomAround } from './shape.js';
 import { SurfaceSounds } from './surfaces.js';
 import { ALIASES, readTable, fileUrl } from './tables.js';
-import { DEFAULT_GUN, gunSounds } from '../lib/weapons.js';
+import { DEFAULT_GUN, DEFAULT_PISTOL, gunSounds } from '../lib/weapons.js';
 
 
 const MAX_VOICES = 64;
@@ -305,7 +305,7 @@ export class GameAudio {
 
   _preloadStock() {
     this.preload(Object.values(ALIASES).map((a) => (typeof a === 'string' ? a : a.name)));
-    this.preload(gunSounds(DEFAULT_GUN));
+    this.preload([...gunSounds(DEFAULT_GUN), ...gunSounds(DEFAULT_PISTOL)]);
   }
 
   // stock events to have fetched and decoded before they play (the aliases at boot, a gun when it is bought)

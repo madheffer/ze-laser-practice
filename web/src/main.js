@@ -167,8 +167,8 @@ function applySettings() {
   G.stream?.setMode(streamMode());
 }
 
-// ---- weapons (CS2: 1 primary, 3 knife, Q last weapon, R reload; !<gun> in chat buys one: app/buy.js)
-const drawSounds = () => (G.vm.weapon === 'gun' ? playGunDraw() : playKnifeDraw());
+// ---- weapons (CS2: 1 primary, 2 pistol, 3 knife, Q last weapon, R reload; !<gun> in chat buys one: app/buy.js)
+const drawSounds = () => (G.vm.held ? playGunDraw() : playKnifeDraw());
 function weapon(w) {
   if (G.vm.weapon === w) return;
   G.vm.setWeapon(w);
@@ -177,7 +177,7 @@ function weapon(w) {
 }
 G.vm.onShot = onShot;
 G.vm.onReload = () => {
-  S.mp?.reloaded(); // a round's server checks your rounds against the reload
+  S.mp?.reloaded(G.vm.weapon); // a round's server checks your rounds against the reload
   playGunReload(); // the gun's own reload sounds, on its clip's timing
 };
 

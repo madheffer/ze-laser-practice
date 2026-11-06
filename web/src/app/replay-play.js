@@ -7,7 +7,7 @@
 import { S } from './state.js';
 import { POS_SCALE, ANG_SCALE, SHOT_KINDS } from '../lib/replay-codec.js';
 import { CS } from '../world/movement.js';
-import { GUNS, GUN_IDS, KNIFE } from '../lib/weapons.js';
+import { GUNS, GUN_IDS, KNIFE, PISTOLS, DEFAULT_PISTOL } from '../lib/weapons.js';
 
 export const replaying = () => !!S.replay;
 
@@ -39,7 +39,7 @@ export function applyPose(k, player) {
   player.onGround = !!(f & 16);
   player.ducked = !!(f & 32); // the hull the map's triggers touch (player.height follows it)
   player.groundEntity = null; // no riding: the recorded positions already moved with the platform
-  S.replay.gun = !!(f & 64);
+  S.replay.weapon = f & 64 ? 'gun' : f & 128 ? 'pistol' : 'knife';
   return true;
 }
 
@@ -56,7 +56,7 @@ export function eventsAfter(k, { shoot, use }) {
     else if (ev.type === 'buy') S.replay.gunName = GUN_IDS[ev.gun] || S.replay.gunName;
     // a replay is someone else's data: a shot is held to CS2's own numbers (lib/weapons.js), whatever it claims
     else if (ev.type === 'shot') {
-      const gun = GUNS[S.replay.gunName];
+      const gun = S.replay.weapon === 'pistol' ? PISTOLS[DEFAULT_PISTOL] : GUNS[S.replay.gunName];
       const w = ev.kind === 0 ? gun : ev.kind === 2 ? KNIFE.stab : KNIFE.slash;
       const damage = Math.min(ev.damage, ev.kind === 0 ? gun.damage : ev.kind === 2 ? KNIFE.stab.damage : KNIFE.slash.first);
       shoot({ kind: SHOT_KINDS[ev.kind], damage, range: Math.min(ev.range, w.range), gun: ev.kind === 0 ? gun.name : undefined }, ev.yaw / ANG_SCALE, Math.max(-89, Math.min(89, ev.pitch / ANG_SCALE)));

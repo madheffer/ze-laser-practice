@@ -50,7 +50,7 @@ export async function playReplay({ meta, bytes, info = {} }) {
   const index = S.scenarios.findIndex((s) => s.id === meta.stage);
   if (index < 0) throw new Error('replay: that stage is not in this map any more');
   if (meta.mapVersion && S.map.version && meta.mapVersion !== S.map.version) log('replay: the map was re-baked since this run; it may play out differently');
-  S.replay = { meta, data, byTick: indexEvents(data.events), info, index, cam: 'first', speed: 1, paused: false, fast: false, gun: meta.weapon === 'gun', stageName: S.scenarios[index].name || '' };
+  S.replay = { meta, data, byTick: indexEvents(data.events), info, index, cam: 'first', speed: 1, paused: false, fast: false, weapon: meta.weapon, stageName: S.scenarios[index].name || '' };
   G.overlay.hide();
   G.home?.hide();
   begin();

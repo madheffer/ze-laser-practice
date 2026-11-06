@@ -87,8 +87,8 @@ static class PanoramaBake
         "panorama/images/icons/ui/sound_3.vsvg_c",
         "panorama/images/icons/ui/kill.vsvg_c",
     ];
-    // every buyable gun's equipment icon (weapon select + ammo panel): icons/equipment/<vdata name without weapon_>
-    static readonly string[] Files = [.. BaseFiles, .. WeaponBake.Guns.Select(g => $"panorama/images/icons/equipment/{g.Vdata["weapon_".Length..]}.vsvg_c")];
+    // every buyable gun's and the spawn pistol's equipment icon (weapon select + ammo panel): icons/equipment/<vdata name without weapon_>
+    static readonly string[] Files = [.. BaseFiles, .. WeaponBake.All.Select(g => $"panorama/images/icons/equipment/{g.Vdata["weapon_".Length..]}.vsvg_c")];
 
     public static void Run(string cs2, string outDir)
     {

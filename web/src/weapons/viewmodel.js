@@ -1,10 +1,13 @@
-// First-person weapon (CS2 viewmodel arms + knife / gun). CONTRACT (main.js calls exactly these):
+// First-person weapon (CS2 viewmodel arms + knife / pistol / gun). CONTRACT (main.js calls exactly these):
 //
 //   const vm = new Viewmodel(threeRenderer)   // THREE.WebGLRenderer shared with the world
 //   await vm.load()
-//   vm.setWeapon('knife' | 'gun')             // keys 3 / 1, plays the draw
+//   vm.setWeapon('gun' | 'pistol' | 'knife')  // keys 1 / 2 / 3, plays the draw
 //   vm.setGun(name)                           // a bought primary (lib/weapons.js GUNS name): replaces it, draws it
 //   vm.gun                                    // the primary's numbers (GUNS entry); vm.gunName its vdata name
+//   vm.pistol                                 // the spawn pistol's (PISTOLS entry, the USP-S); vm.pistolName
+//   vm.held                                   // the held gun's numbers (primary or pistol), null on the knife
+//   vm.clip / vm.reserve / vm.reloading       // the held gun's magazine (the primary's while on the knife)
 //   vm.update(dt, { speed, onGround, ducked, yawDelta, pitchDelta })   // every frame (sway/bob/landing)
 //   vm.trigger(down)                          // Mouse 1 held/released
 //   vm.trigger2(down)                         // Mouse 2 (knife stab)
@@ -17,8 +20,8 @@
 //
 // The animation is CS2's own: vpkstuff's previewer engine (src/fp/, see fp.js) evaluates the game's compiled
 // AnimGraph2 for each weapon, so draw, idle, slash/stab, shoot, inspect and their gating are the graph's.
-// Assets: public/weapons/fp/ (the CT default agent's arms, the guns, the CT default knife, their clips and graphs).
-// The knife and the primary load up front; a bought gun loads when bought (its numbers apply at once).
+// Assets: public/weapons/fp/ (the CT default agent's arms, the guns, the USP-S, the CT default knife, their clips and
+// graphs). The knife, the pistol and the primary load up front; a bought gun loads when bought (its numbers apply at once).
 //
 // The FIRE GATE lives here, not in the graph, and runs whether or not the visuals have loaded: shots go out on
 // CS2's cadence from the first frame. When a shot is accepted the graph is told to play it.
@@ -30,7 +33,7 @@ import { tickCs2Materials } from './fp/util.js';
 import { barnUniforms, patchBarns } from '../world/lighting.js';
 import { METRES_PER_INCH as IN } from './fp/three-kit.js';
 import { DEG } from '../world/entities/math.js';
-import { GUNS, KNIFE, DEFAULT_GUN } from '../lib/weapons.js';
+import { GUNS, PISTOLS, KNIFE, DEFAULT_GUN, DEFAULT_PISTOL } from '../lib/weapons.js';
 import { Recoil } from '../lib/recoil.js';
 
 const FP_BASE = `${import.meta.env?.BASE_URL ?? '/'}weapons/fp/`;
@@ -63,13 +66,13 @@ export class Viewmodel {
     this._press = false; this._press2 = false;   // latched so a click shorter than a frame still fires
     this._next = 0; this._next2 = 0;              // next allowed primary / secondary time (s)
     this._deployed = false;
-    this._sources = {};                          // 'gun' | 'knife' -> the FpSource on screen for that slot
+    this._sources = {};                          // 'gun' | 'pistol' | 'knife' -> the FpSource on screen for that slot
     this._chassis = new Map();                   // chassis -> Promise<FpSource> (each loads once)
     this._loaded = new Set();                    // the FpSources in the scene
     this.gunName = DEFAULT_GUN;                  // the primary (lib/weapons.js GUNS)
-    this.clip = this.gun.clip;                   // its magazine (the HUD reads clip / reserve / reloading)
-    this.reserve = this.gun.reserve;
-    this.reloading = false;
+    this.pistolName = DEFAULT_PISTOL;            // the secondary (lib/weapons.js PISTOLS)
+    this._clips = { gun: this.gun.clip, pistol: this.pistol.clip }; // each gun keeps its own magazine
+    this.reloading = false;                      // the held gun's (switching away cancels it)
     this._reloadDone = 0;
     this.lastWeapon = 'gun';                     // what Q (lastinv) swaps back to
     this.recoil = new Recoil();                  // CS2's aim / view punch (lib/recoil.js): shots carry it, the camera shows it
@@ -106,8 +109,9 @@ export class Viewmodel {
     }
     try {
       const gunName = this.gunName;
-      const [gun, knife] = await Promise.all([this._load(this.gun.chassis), this._load(KNIFE.chassis)]);
+      const [gun, pistol, knife] = await Promise.all([this._load(this.gun.chassis), this._load(this.pistol.chassis), this._load(KNIFE.chassis)]);
       this._sources.knife = knife;
+      this._sources.pistol = pistol;
       if (this.gunName === gunName) this._sources.gun = gun; // else a buy during the load brings its own
       this.ready = true;
       this._show(this.weapon, true);
@@ -126,6 +130,13 @@ export class Viewmodel {
   }
 
   get gun() { return GUNS[this.gunName]; }
+  get pistol() { return PISTOLS[this.pistolName]; }
+  // a slot's gun numbers ('gun' | 'pistol'), null for the knife
+  _arm(w) { return w === 'gun' ? this.gun : w === 'pistol' ? this.pistol : null; }
+  get held() { return this._arm(this.weapon); }
+  // the HUD's ammo: the held gun's magazine (on the knife, the primary's; the HUD hides it there)
+  get clip() { return this._clips[this.held ? this.weapon : 'gun']; }
+  get reserve() { return (this.held || this.gun).reserve; }
 
   // one chassis's viewmodel (CS2's arms + the weapon + its graph), loaded once and kept
   _load(chassis) {
@@ -162,8 +173,7 @@ export class Viewmodel {
   setGun(name) {
     if (!Object.hasOwn(GUNS, name)) return false;
     this.gunName = name;
-    this.clip = this.gun.clip;
-    this.reserve = this.gun.reserve;
+    this._clips.gun = this.gun.clip;
     this.reloading = false;
     if (this.weapon !== 'gun') this.lastWeapon = this.weapon;
     this.weapon = 'gun';
@@ -176,7 +186,7 @@ export class Viewmodel {
   }
 
   setWeapon(w) {
-    if (w !== 'gun' && w !== 'knife') return;
+    if (w !== 'gun' && w !== 'pistol' && w !== 'knife') return;
     if (w === this.weapon && this._deployed) return;      // CS2: re-selecting the held slot does nothing
     const first = !this._deployed;
     if (this._deployed && w !== this.weapon) this.lastWeapon = this.weapon;
@@ -186,7 +196,7 @@ export class Viewmodel {
     this.recoil.index = 0;
     this._held = this._held2 = this._press = this._press2 = false;
     // m_flDeployDuration: no attack until the draw is done (not on the very first equip at spawn).
-    const lock = first ? 0 : (w === 'gun' ? this.gun : KNIFE).deploy;
+    const lock = first ? 0 : (this._arm(w) || KNIFE).deploy;
     this._next = this._next2 = this._t + lock;
     if (this.ready) this._show(w, true);
   }
@@ -202,23 +212,24 @@ export class Viewmodel {
   // Q: CS2's lastinv, back to the previously held weapon
   swapLast() { this.setWeapon(this.lastWeapon === this.weapon ? (this.weapon === 'gun' ? 'knife' : 'gun') : this.lastWeapon); }
 
-  // R / empty magazine: the gun's reload (no-op on the knife, at a full magazine, or mid-reload)
+  // R / empty magazine: the held gun's reload (no-op on the knife, at a full magazine, or mid-reload)
   reload() {
-    if (this.weapon !== 'gun' || this.reloading || this.clip >= this.gun.clip) return false;
+    const g = this.held;
+    if (!g || this.reloading || this.clip >= g.clip) return false;
     this.reloading = true;
-    this._reloadDone = this._t + this.gun.reload;
+    this._reloadDone = this._t + g.reload;
     const s = this.ready ? this._sources.gun : null;
     if (s?.wc) { s.wc.ammo = this.clip; s.wc.reload(); }
     this.onReload?.();
     return true;
   }
 
-  // Fresh spawn: the stage's primary (the PP-Bizon; a replay's own), full magazine, knife out (ZE humans spawn
-  // holding the knife) or the stage's weapon, no draw lock.
+  // Fresh spawn: the stage's primary (the PP-Bizon; a replay's own) and the USP-S, full magazines, knife out (ZE
+  // humans spawn holding the knife) or the stage's weapon, no draw lock.
   reset(weapon = 'knife', gun = DEFAULT_GUN) {
     if (gun !== this.gunName && Object.hasOwn(GUNS, gun)) { this.gunName = gun; this._mountGun(gun, false); }
-    this.reserve = this.gun.reserve;
-    this.clip = this.gun.clip;
+    this._clips.gun = this.gun.clip;
+    this._clips.pistol = this.pistol.clip;
     this.reloading = false;
     this._deployed = false;
     this.recoil.reset();
@@ -255,28 +266,29 @@ export class Viewmodel {
     const press1 = this._press;
     const want1 = this._held || this._press, want2 = this._held2 || this._press2;
     this._press = this._press2 = false;
-    if (this.weapon === 'gun') {
-      const g = this.gun;
+    const g = this.held;
+    if (g) {
+      const slot = this.weapon;
       if (this.reloading) {
         if (this._t < this._reloadDone) return;
         this.reloading = false;
-        this.clip = g.clip;                              // reserve stays full (infinite reserve)
+        this._clips[slot] = g.clip;                      // reserve stays full (infinite reserve)
         this._next = Math.max(this._next, this._t);
       }
       // Full auto (m_bIsFullAuto): keep the cadence on the cycle's grid while held (next += cycle), so frame jitter
       // cannot slow it down; a fresh pull after a pause starts a new grid. Semi-auto (AWP, SSG 08): a shot per click,
-      // and a click inside the cycle is dropped, as CS2's.
+      // and a click inside the cycle is dropped, as CS2's (the USP-S too).
       const want = g.fullAuto ? want1 : press1;
-      for (let n = 0; want && this._t >= this._next && this.clip > 0 && n < (g.fullAuto ? 4 : 1); n++) {
+      for (let n = 0; want && this._t >= this._next && this._clips[slot] > 0 && n < (g.fullAuto ? 4 : 1); n++) {
         const late = this._t - this._next;
         this._next = late < Math.max(dt, 1 / 30) + 1e-4 ? this._next + g.cycle : this._t + g.cycle;
-        this.clip--;
+        this._clips[slot]--;
         this._shot({ kind: 'bullet', damage: g.damage, range: g.range, gun: g.name });
         this._play(undefined);
         this.recoil.kick(g.name);
       }
       // CS2 reloads by itself once the magazine runs dry
-      if (this.clip === 0 && this._t >= this._next) this.reload();
+      if (this._clips[slot] === 0 && this._t >= this._next) this.reload();
       return;
     }
     const K = KNIFE;
@@ -297,7 +309,7 @@ export class Viewmodel {
 
   // A replay's recorded shot (app/loop.js): the animation only; the replay traces the shot itself.
   playShot(kind) {
-    if (kind === 'bullet') { if (this.weapon !== 'gun') return; this._play(undefined); this.recoil.kick(this.gunName); }
+    if (kind === 'bullet') { if (!this.held) return; this._play(undefined); this.recoil.kick(this.held.name); }
     else if (this.weapon === 'knife') this._play(kind === 'stab' ? KNIFE_HEAVY : KNIFE_LIGHT);
   }
 
@@ -314,7 +326,7 @@ export class Viewmodel {
     if (!s?.graph) return;
     s.wc.sinceFire = 99;
     // the graph decrements its own count on fire, so hand it ours + 1 (the knife's stays topped up)
-    s.wc.ammo = this.weapon === 'gun' ? this.clip + 1 : s.wc.ammoMax;
+    s.wc.ammo = this.held ? this.clip + 1 : s.wc.ammoMax;
     s.wc.fire(attackType, false);
   }
 
