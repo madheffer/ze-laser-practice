@@ -45,6 +45,9 @@ const KICK_ADDR_MS = 10 * 60_000;
 // a room's rounds start at most this often: each start builds the server's copy of the map's logic for every player
 // (coop-check.js), so a flood of 'start' would be a flood of that work (MAX_ROUNDS only counts the other rooms)
 const START_MS = 3000;
+// a socket that misses one pong is dropped: a vanished owner (a closed laptop, a lost Wi-Fi) hands the room on within
+// 10-20 s instead of holding it where nobody can start a round
+const HEARTBEAT_MS = 10_000;
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ'; // no I / O (they read as 1 / 0)
 const CODE = /^[A-Z]{4}$/;
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -112,8 +115,13 @@ export function attachCoopRelay(httpServer, { log = () => {}, store = openStore(
     c.room = null;
     room.members = room.members.filter((m) => m !== c);
     room.round?.onLeave(c);
-    if (!room.members.length) { rooms.delete(room.code); return; }
-    if (room.owner === c.id) room.owner = room.members[0].id; // the next oldest runs the room
+    if (!room.members.length) { clearTimeout(room.pingT); rooms.delete(room.code); return; }
+    if (room.owner === c.id) {
+      room.owner = room.members[0].id; // the next oldest runs the room
+      room.startAt = 0; // a new owner can start at once (START_MS was the last owner's)
+    }
+    // the heal holder they were (rules.heal = their id) is nobody now: a random player carries it instead
+    if (room.settings.rules.heal === c.id) room.settings = { ...room.settings, rules: { ...room.settings.rules, heal: 'random' } };
     room.round?.updateLeader();
     announce(room);
     if (why === 'kicked') send(c, { t: 'kicked' });
@@ -154,6 +162,7 @@ export function attachCoopRelay(httpServer, { log = () => {}, store = openStore(
     let assets;
     try { assets = await loadMap(m.map); } catch { return send(c, { t: 'error', msg: 'That map is not on this server' }); }
     if (c.room !== room || room.owner !== c.id) return;
+    room.round?.close(); // a round still on (a restart) is replaced: its server copies are freed, not left running
     room.round = new Round(room, { map: m.map, stage, mode, kind: room.settings.kind, rules: room.settings.rules, assets }, io);
     room.map = m.map;
     room.round.broadcast(room.round.startMessage());
@@ -244,7 +253,9 @@ export function attachCoopRelay(httpServer, { log = () => {}, store = openStore(
         room.startAt = now;
         startRound(c, m);
         break;
-      case 'abort': if (owner && round && !round.ended) round.end('lose'); break;
+      // r: the round the owner means. An abort sent for a round that has since been replaced (a new owner's start)
+      // must not end the new one
+      case 'abort': if (owner && round && !round.ended && m.r === round.r) round.end('lose'); break;
       // a round's traffic, for the round the client is in
       case 's': if (round && m.r === round.r) round.onState(c, m); break;
       case 'dead': if (round && m.r === round.r) round.onDead(c, m); break;
@@ -298,7 +309,7 @@ export function attachCoopRelay(httpServer, { log = () => {}, store = openStore(
       ws.isAlive = false;
       ws.ping();
     }
-  }, 20000);
+  }, HEARTBEAT_MS);
   wss.on('close', () => { clearInterval(tick); clearInterval(ping); });
 
   httpServer.on('upgrade', (req, socket, head) => {

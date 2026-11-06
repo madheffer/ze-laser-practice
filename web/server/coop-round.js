@@ -299,7 +299,20 @@ export class Round {
     this.result = { t: 'end', r: this.r, result, reason, at: t, winners: winners.map((p) => p.id), best: all.length > 1 ? best.map((p) => p.id) : [],
       stats: all.map((p) => ({ id: p.id, alive: p.alive, at: p.deadAt == null ? null : Math.min(p.deadAt, t), hits: hits(p), cheat: p.cheat || undefined })) };
     this.broadcast(this.result);
-    // the copies are done: free their engines
-    for (const p of all) p.check = { hits: p.check.hits, alive: false, stageTime: p.check.stageTime, behind: () => false, queueBossDamage() {}, feed() {}, checkHits: () => [] };
+    this.free();
+  }
+
+  // replaced by a new round (the owner restarted, or a new owner started one): over without a verdict. Its players
+  // are already loading the new one, so nothing is sent (an 'end' would put up an end card and drop their mouse lock)
+  close() {
+    if (this.ended) return;
+    this.ended = true;
+    this.fed = true; // no verdict, so nothing for the home page's feed
+    this.free();
+  }
+
+  // the copies are done: free their engines
+  free() {
+    for (const p of this.players.values()) p.check = { hits: p.check.hits, alive: false, stageTime: p.check.stageTime, behind: () => false, queueBossDamage() {}, feed() {}, checkHits: () => [] };
   }
 }

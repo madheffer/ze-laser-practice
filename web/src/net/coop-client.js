@@ -91,7 +91,7 @@ export class CoopClient {
   pick(map, stage, mode) { if (this.isHost && isMapName(map)) this.send({ t: 'pick', map, stage, mode }); }
   // your simulated ping (ms), for the room to show next to your name (each player sets their own)
   setPing(ms) { if (this.room && Number.isFinite(ms)) this.send({ t: 'ping', ms: Math.round(ms) }); }
-  abort() { if (this.isHost) this.send({ t: 'abort' }); }
+  abort(r) { if (this.isHost && Number.isInteger(r)) this.send({ t: 'abort', r }); } // r: the round to end
   leave() {
     if (!this.room) return;
     this.send({ t: 'leave' });

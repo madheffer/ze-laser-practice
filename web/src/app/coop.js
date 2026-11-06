@@ -20,6 +20,7 @@ import { isMapName } from '../lib/paths.js';
 import { TICK } from '../world/run-engine.js';
 import { lastFrameAt } from './loop.js';
 import { systemLine } from './chat.js';
+import { ownerLine } from '../ui/room-chat.js';
 import { itemState, spendUse, usableHeals } from '../world/items.js';
 import { beginRoster, applyWait, markOut, rosterGo, clearRoster, waitLine, startReports, simulatedPing, lockPing, unlockPing } from './coop-load.js';
 
@@ -185,6 +186,7 @@ class Round {
     if (S.run) S.run.done = true;
     G.pause();
     document.exitPointerLock?.();
+    this.endData = d; this.cardHost = net.isHost; // the card is drawn again if the room changes hands (onRoom)
     showRoundEnd(this, d);
   }
 }
@@ -316,8 +318,13 @@ function cleanEnd(d) {
   };
 }
 
-function onRoom(room) {
+function onRoom(room, prev) {
   lobby.busy = !!room.round && !room.round.ids.includes(net.you);
+  // the owner left and the room is someone else's now: say so in the game's chat (the room screen's has it too)
+  if (prev?.code === room.code && prev.owner !== room.owner) systemLine([[` ${ownerLine(room, net.you)}`, NOTE_COLOR]]);
+  // the end card still up was drawn for the old owner: the new one gets Play again, the rest stop waiting on someone gone
+  const mp = S.mp;
+  if (mp?.ended && mp.endData && G.overlay.open && mp.cardHost !== net.isHost) { mp.cardHost = net.isHost; showRoundEnd(mp, mp.endData); }
   G.lobby.render();
 }
 
@@ -339,7 +346,7 @@ function onLeft(why) {
 
 // The owner walked away from a live round (changed map): the server ends it for everyone.
 export function abortRound() {
-  if (S.mp && !S.mp.ended && net.isHost) net.abort();
+  if (S.mp && !S.mp.ended && net.isHost) net.abort(S.mp.r);
 }
 
 export function installCoop() {

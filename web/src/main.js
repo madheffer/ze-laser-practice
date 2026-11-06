@@ -215,7 +215,9 @@ async function openMap(name, fromRound = false) {
   try {
     G.maps.loading(name, 'stages');
     if (!fromRound) G.loading.close(false); // a stage of the last map still loading is dropped (a round's is this map's)
-    abortRound(); // the host leaving a live round for another map ends it for everyone
+    // the host leaving a live round for another map ends it for everyone; a round's own start bringing its map
+    // never does (the server has already replaced the old round with that one)
+    if (!fromRound) abortRound();
     endRun();
     unloadWorld();
     const info = S.mapIndex.find((m) => m.name === name) || {};

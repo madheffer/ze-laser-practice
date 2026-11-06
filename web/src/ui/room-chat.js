@@ -7,6 +7,12 @@ import { cleanChat, cleanChatName } from '../lib/chat-colors.js';
 const MAX_LINES = 100;
 const MAX_LEN = 127; // server/coop-chat.js cleanChat's cap
 
+// "You are the host now" / "Bob is the host now": the room changed hands (its owner left)
+export function ownerLine(room, you) {
+  return room.owner === you ? 'You are the host now: you pick and start the rounds'
+    : `${room.members.find((m) => m.id === room.owner)?.name || 'Someone'} is the host now`;
+}
+
 function el(tag, cls, t) { const e = document.createElement(tag); if (cls) e.className = cls; if (t != null) e.textContent = t; return e; }
 
 export class RoomChat {
@@ -30,7 +36,19 @@ export class RoomChat {
     this.input.addEventListener('keydown', (ev) => ev.stopPropagation());
     this.root.append(this.log, form);
     net.on('chat', (m) => this.onChat(m));
-    net.on('room', (room) => { if (room?.code !== this.code) { this.code = room?.code ?? null; this.log.replaceChildren(); } });
+    net.on('room', (room, prev) => {
+      if (room?.code !== this.code) { this.code = room?.code ?? null; this.log.replaceChildren(); return; }
+      if (room && prev) this.changes(room, prev);
+    });
+  }
+
+  // who came, who went and who runs the room now, as notes in the log
+  changes(room, prev) {
+    const had = new Map(prev.members.map((m) => [m.id, m.name]));
+    const has = new Set(room.members.map((m) => m.id));
+    for (const m of room.members) if (!had.has(m.id)) this.line(null, `${m.name} joined`, 'note');
+    for (const [id, name] of had) if (!has.has(id)) this.line(null, `${name} left`, 'note');
+    if (room.owner !== prev.owner) this.line(null, ownerLine(room, this.net.you), 'note');
   }
 
   send() {
