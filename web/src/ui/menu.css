@@ -162,6 +162,7 @@ body.touch :is(#menu, .sheet) .kb { display: none; }
 .se-note { margin: 0 0 2px; font-size: 12px; color: var(--dim); }
 .se-row { display: flex; align-items: center; gap: 8px; }
 .se-row .chk { flex: 1; min-width: 0; }
+.se-row .se-count { flex: none; width: auto; min-height: calc(var(--tap) - 8px); }
 
 /* third-person distance only while third person is on */
 .card:has(#thirdperson:not(:checked)) .tp-dist { display: none; }

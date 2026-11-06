@@ -11,7 +11,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { mapName, safeRelPath, assetKey, versioned } from '../lib/paths.js';
 import { fetchJson, fetchBuffer, fetchBufferProgress, FRESH } from '../lib/fetch.js';
-import { applyStripper, stripperEdits, cleanEditsOff } from '../lib/stripper.js';
+import { applyStripper, stripperEdits, resolveChoice } from '../lib/stripper.js';
 import { normaliseHulls } from './hulls.js';
 import { mapItems } from './items.js';
 import { MapEffects } from '../fx/effects.js';
@@ -195,17 +195,15 @@ export async function loadMap(name, onProgress = () => {}, opts = {}) {
   return { name, version, url, skins, manifest, entities, collision, collisionFx, physics, hulls, bounds, animations, soundDurations: sounds, world, chunks, loadChunk, getModel, particles: fx, items, radar, effects, water, sky2d, sprites, edits };
 }
 
-// Put a loaded map (S.map) on the entities a run plays with GFL's edits `off` left out (lib/stripper.js cleanEditsOff):
-// its entities and items swap to that variant, built once (the same steps as above: the edits, then the skybox) and
-// kept for the next run. Off ids the map doesn't have are dropped. -> the off list actually used (a replay records it)
-export function mapEdits(map, off) {
+// Put a loaded map (S.map) on the entities a run plays: the map's edits with `choice`'s left out and its counts
+// picked (lib/stripper.js resolveChoice): its entities and items swap to that variant, built once (the same steps as
+// above: the edits, then the skybox) and kept for the next run. -> { off, counts } as applied (a replay records them)
+export function mapEdits(map, choice) {
   const e = map?.edits;
-  if (!e) return [];
-  const known = new Set(e.list.map((x) => x.id));
-  const list = cleanEditsOff(off).filter((id) => known.has(id));
-  const key = list.join(',');
+  if (!e) return { off: [], counts: {} };
+  const { off, counts, key } = resolveChoice(e.list, choice);
   if (!e.variants.has(key)) {
-    const entities = applyStripper(structuredClone(e.raw), e.stripper, map.name, list);
+    const entities = applyStripper(structuredClone(e.raw), e.stripper, map.name, { off, counts });
     mergeSkybox(entities, e.skybox);
     e.variants.set(key, { entities, items: mapItems(entities, e.entwatch) });
   }
@@ -213,7 +211,7 @@ export function mapEdits(map, off) {
   map.entities = v.entities;
   map.items = v.items;
   e.off = key;
-  return list;
+  return { off, counts };
 }
 
 // water.json -> { textures: { <vtex path>: url }, frames: { <vtex path>: slices }, cubes } (null without one). File names only

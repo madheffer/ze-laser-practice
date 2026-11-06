@@ -56,13 +56,19 @@ for (const name of fs.readdirSync(mapsDir).sort()) {
   // loads only its stage list, the rest waits for a stage (web/src/main.js)
   const read = (f) => { const q = path.join(mapsDir, name, f); return fs.existsSync(q) ? JSON.parse(fs.readFileSync(q, 'utf8')) : null; };
   const items = mapItems(readMapEntities(path.join(mapsDir, name)), read('entwatch.json'));
-  // GFL's edits to the map (stripper.json, lib/stripper.js), for the settings' on / off list: each with the scenario
-  // file's words for it ("stripper": { <edit id>: { name, summary, detail } }), else GFL's own comment
+  // the map's edits (stripper.json, lib/stripper.js: GFL's and ours), for the settings' on / off list: each with the
+  // scenario file's words for it ("stripper": { <edit id>: { name, summary, detail } }), else our config's own
+  // ("x-lasers"), else the comment; `count`: the number an edit of ours takes (cosmo's lasers per wave)
   const words = file.stripper && typeof file.stripper === 'object' ? file.stripper : {};
   const edits = stripperEdits(read('stripper.json'), name).map((e) => {
     const w = Object.hasOwn(words, e.id) && words[e.id] && typeof words[e.id] === 'object' ? words[e.id] : {};
+    const m = e.meta || {};
     const text = (v, n) => (typeof v === 'string' ? v.slice(0, n) : '');
-    return { id: e.id, name: text(w.name, 60) || e.note.slice(0, 60) || e.id, summary: text(w.summary, 120) || e.note, detail: text(w.detail, 1200), gfl: e.note };
+    return {
+      id: e.id, source: e.source,
+      name: text(w.name, 60) || m.name || e.note.slice(0, 60) || e.id, summary: text(w.summary, 120) || m.summary || e.note, detail: text(w.detail, 1200) || m.detail || '',
+      ...(e.source === 'gfl' ? { gfl: e.note } : {}), ...(m.count ? { count: m.count } : {}),
+    };
   });
   for (const id of Object.keys(words)) if (!edits.some((e) => e.id === id)) console.warn(`${name}: scenario "stripper" names ${id}, not one of the map's GFL edits`);
   maps.push({

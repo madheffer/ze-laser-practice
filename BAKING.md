@@ -95,11 +95,23 @@ skipped: the bake has the main world only. Re-run the step to pick up GFL's chan
 
 Each config is kept as its **named edits**: GFL comments every fix at the top level, and a comment plus the actions
 under it is one edit (id: the comment's first four words, e.g. `fix-broken-respawn-toggle`; the same id in several
-files is one edit). Players can turn each one off per map in Settings > GFL map edits (solo only; a co-op round plays
-them all, and a solo replay records which were off so the server's check loads the same map). The words shown there
-come from the scenario file: `"stripper": { "<edit id>": { "name", "summary" (one line), "detail" } }`, collected into
-`maps/index.json` by `tools/index-maps.mjs` (GFL's own comment stands in when a map has none). `tools/stripper.mjs`
-prints every edit's id.
+files is one edit). Players can turn each one off per map in Settings > Map edits (solo only; a co-op round plays
+them all at their defaults, and a solo replay records which were off and any counts picked, so the server's check
+loads the same map). The words shown there come from the scenario file: `"stripper": { "<edit id>": { "name",
+"summary" (one line), "detail" } }`, collected into `maps/index.json` by `tools/index-maps.mjs` (an own config's
+`x-lasers` words, then the comment, stand in when the scenario has none). `tools/stripper.mjs` prints every edit's id.
+
+**Our own edits** live in this repo as `stripper/<map>/[<world>/]<lump>.jsonc`, GFL's format and layout (one could be
+sent upstream as is), for changes players ask for that no server ships. `tools/stripper.mjs` merges them with GFL's.
+Two extension keys (StripperCS2 would ignore the first and insert the output once):
+
+- `"x-lasers": { "name", "summary", "detail", "count": { "default", "min", "max", "label" } }` after the edit's
+  comment: its words, and a number the player picks (1-16) in the settings
+- `"repeat": "count"` on an io entry the edit inserts: that output goes in `count` times
+
+Today: `ze_ffvii_cosmo_canyon_v5_p` `ifrit-fires-4-lasers` (Extreme's final ship: `lvl3_boss_lasers_time`'s one
+`Hojo_Laser_Temp.FireUser1` per tick becomes 4, so each wave is 4 lasers at the script's random heights; 1-8). Keep a
+comment on one line: each `//` line starts a new edit.
 
 Applied today: ze_deadcore's B ending (`b_escape_speedup1`: `KeyValue runspeed 2`, then `runspeed 1` 36 s later,
 instead of the map's `speed`) and ze_ffxii_westersand_v8 (the `Staff_*_Epicker` item blockers killed 15 s in, a warmup

@@ -1,0 +1,39 @@
+{
+	// Ifrit fires 4 lasers at a time on the final ship
+	"x-lasers": {
+		"name": "Ifrit fires 4 lasers",
+		"summary": "Each of Ifrit's laser waves on the final ship is 4 lasers at once",
+		"detail": "On Extreme's final ship, Ifrit's timer (lvl3_boss_lasers_time, every 1.2-2.5 s) fires one laser per wave in the map as released: its Hojo_Laser_Temp.FireUser1 makes the map script spawn one laser at one of three heights. This edit fires it several times per wave, each picking its own height, so the waves are as dense as they are played. Ours, not GFL's: the count is yours to pick. Off: one laser per wave, as the map ships.",
+		"count": { "default": 4, "min": 1, "max": 8, "label": "Lasers per wave" }
+	},
+	"modify":
+	{
+		"match":
+		{
+			"targetname": "[PR#]lvl3_boss_lasers_time"
+		},
+		"delete":
+		{
+			"io":
+			[
+				{
+					"outputname": "OnTimer",
+					"targetname": "[PR#]Hojo_Laser_Temp",
+					"inputname": "FireUser1"
+				}
+			]
+		},
+		"insert":
+		{
+			"io":
+			[
+				{
+					"outputname": "OnTimer",
+					"targetname": "[PR#]Hojo_Laser_Temp",
+					"inputname": "FireUser1",
+					"repeat": "count"
+				}
+			]
+		}
+	}
+}

@@ -12,7 +12,7 @@ import { warmTemplates } from '../world/warm.js';
 import { DEFAULT_GUN } from '../lib/weapons.js';
 import { S, G, log } from './state.js';
 import { settings } from './settings.js';
-import { rule, godMode, stripperOff } from './rules.js';
+import { rule, godMode, stripperChoice } from './rules.js';
 import { mapEdits } from '../world/assets.js';
 import { submitRun, getRecord } from './records.js';
 import { reportSolo } from './activity.js';
@@ -88,8 +88,9 @@ export function startScenario(i, mode = 'normal') {
   // map sounds arrive with the entities they belong to: as late as the simulated ping draws them
   // During a silent fast-forward, remember what is still sounding, so it can join at the right point after.
   const sounding = new Map(); // `${ent.id}:${slot}` -> { ev, at }
-  // the map's entities with the GFL edits this run leaves out (app/rules.js stripperOff; world/assets.js mapEdits)
-  const runEdits = { off: mapEdits(map, stripperOff(map.name)) };
+  // the map's entities with the edits this run leaves out and the counts it picked (app/rules.js stripperChoice;
+  // world/assets.js mapEdits)
+  const runEdits = mapEdits(map, stripperChoice(map.name));
   createRunEngine({
     entities: map.entities, hulls: map.hulls, bounds: map.bounds, animations: map.animations, soundDurations: map.soundDurations,
     traceBox: (s, e, h) => S.world.traceBox(s, e, h, undefined, true),
@@ -195,7 +196,7 @@ export function startScenario(i, mode = 'normal') {
     run.rec = new ReplayRecorder({
       seed: run.seed, map: map.name, mapVersion: map.version || '', stage: scenario.id, mode: run.mode, countdown: run.startAt,
       weapon: scenario.weapon || 'knife', gun: DEFAULT_GUN,
-      rules: { humans: rule('humans'), bossHp: rule('bossHp'), autoFire: rule('autoFire'), perfectTeam: rule('perfectTeam'), fallDamage: rule('fallDamage'), healItem: !!settings.healItem, ultimaItem: settings.ultimaItem, ultimaAt: settings.ultimaAt, stripperOff: runEdits.off },
+      rules: { humans: rule('humans'), bossHp: rule('bossHp'), autoFire: rule('autoFire'), perfectTeam: rule('perfectTeam'), fallDamage: rule('fallDamage'), healItem: !!settings.healItem, ultimaItem: settings.ultimaItem, ultimaAt: settings.ultimaAt, stripperOff: runEdits.off, stripperCount: runEdits.counts },
     });
   }
   // every stage starts with the PP-Bizon (a replay: the gun its run started with, then its buys: app/replay-play.js)

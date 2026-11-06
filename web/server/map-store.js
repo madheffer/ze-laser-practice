@@ -6,7 +6,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { isMapName } from '../src/lib/paths.js';
-import { applyStripper, cleanEditsOff } from '../src/lib/stripper.js';
+import { applyStripper, stripperEdits, resolveChoice } from '../src/lib/stripper.js';
 import { normaliseHulls } from '../src/world/hulls.js';
 import { TriangleBVH } from '../src/world/collision.js';
 import { mapItems } from '../src/world/items.js';
@@ -17,11 +17,11 @@ const KEEP = 3;
 
 export function mapStore(dir) {
   const cache = new Map(); // map -> Promise<assets>
-  // off: the GFL edits a solo run turned off (lib/stripper.js cleanEditsOff); none, or a map GFL doesn't strip: the map as GFL runs it
-  return function load(map, off = []) {
-    const list = cleanEditsOff(off);
+  // choice: the map edits a solo run left out and the counts it picked ({ off, counts }, lib/stripper.js cleanChoice);
+  // none (every round), or a map without edits: the map as GFL's server runs it, our edits at their defaults
+  return function load(map, choice = null) {
     const p = loadBase(map);
-    return list.length ? p.then((a) => (a.variant ? a.variant(list.join(','), list) : a)) : p;
+    return choice ? p.then((a) => (a.variant ? a.variant(choice) : a)) : p;
   };
 
   function loadBase(map) {
@@ -65,11 +65,15 @@ export function mapStore(dir) {
       // the map's EntWatch items, as the browser reads them (world/items.js): a round's holders get theirs
       const physics = physicsOk && physicsBin ? physicsBin.buffer.slice(physicsBin.byteOffset, physicsBin.byteOffset + physicsBin.byteLength) : null;
       const assets = { map, entities, hulls, bounds, animations, soundDurations: soundDurations(soundevents), bvh: new TriangleBVH(tris), fx, physics, items: mapItems(entities, entwatch) };
-      // the map with some of GFL's edits off (a solo run's rules.stripperOff): its own entities and items, the rest shared
+      // the map with a solo run's choice of edits (rules.stripperOff / stripperCount, resolved as the client resolves
+      // it: world/assets.js mapEdits): its own entities and items, the rest shared
       const variants = new Map();
-      if (raw) assets.variant = (key, list) => {
+      const edits = stripperEdits(stripper, map);
+      if (raw) assets.variant = (choice) => {
+        const { off, counts, key } = resolveChoice(edits, choice);
+        if (!key) return assets;
         if (!variants.has(key)) {
-          const ents = applyStripper(structuredClone(raw), stripper, map, list);
+          const ents = applyStripper(structuredClone(raw), stripper, map, { off, counts });
           variants.set(key, { ...assets, entities: ents, items: mapItems(ents, entwatch) });
           while (variants.size > KEEP) variants.delete(variants.keys().next().value);
         }

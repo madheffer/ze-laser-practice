@@ -159,9 +159,13 @@ exact map-folder format so he can lift our maps straight into his site. See [REA
       only, a replay records `rules.stripperOff` and the server's check loads that variant (map-store). Checked on
       :5807: offliner's respawn fix off -> the map's `trigger`, on -> GFL's `Disable`
     - [ ] GFL edits in rooms: a room rule for which edits play (rounds play them all now)
-    - [ ] ze_ffvii_cosmo_canyon_v5_p: GFL has no CS2 stripper for it (only CS:GO v5k_fix / v6test5). A player asked
-      for "the stripper where the boss shoots 4 lasers at the end"; the baked map already fires 4 of Bahamut's lasers
-      (seph_laser_counter max 4), so nothing was added
+    - [x] ze_ffvii_cosmo_canyon_v5_p: Ifrit fires 4 lasers per wave on the final ship (2026-11-07). Requested by players
+      (as their servers play it); GFL has no CS2 stripper for the map, so it is ours: `stripper/<map>/463#entityLumpName.jsonc`
+      (BAKING.md "Our own edits"), on by default, lasers per wave 1-8 in the settings, recorded in replays
+      (`rules.stripperCount`). Checked: headless 4 lasers per tick (unique names, flying together); on :5807 the
+      default 4 and a pick of 6 (6 in flight at once, recorded)
+    - [ ] UNSETTLED: the 4 lasers of a wave each pick a height from the script's 3 (repeats allowed, as one laser picks),
+      all at the same moment; the servers' own stripper wasn't found to confirm either
     - [ ] runspeed: how CS2's own movement applies m_flVelocityModifier (assumed Source's: a max-speed multiplier that
       recovers only below 1) isn't confirmed from the binary
     - [ ] boss bar over all 16 segments: GFL's bosshud gives Blue Particle `iterator: boss_healthcount` (CS2Fixes

@@ -13,7 +13,7 @@ import { $ } from '../lib/dom.js';
 import { clamp } from '../lib/math.js';
 import { loadJson, saveJson } from '../lib/storage.js';
 import { isMapName } from '../lib/paths.js';
-import { cleanEditsOff } from '../lib/stripper.js';
+import { cleanEditsOff, cleanCounts } from '../lib/stripper.js';
 
 export const M_YAW = 0.022; // CS2's m_yaw (and m_pitch) default
 export const FOV = 90; // CS2's horizontal FOV at 4:3, fixed
@@ -45,6 +45,8 @@ export const DEFAULTS = {
   touchSens: 1, touchCrouch: false, // phone / tablet: look speed multiplier, crouch as a toggle instead of hold
   // GFL's map edits turned off, per map: { <map>: [edit ids] } (lib/stripper.js; ui/stripper-settings.js). Solo only
   stripperOff: {},
+  // and the numbers picked for edits that take one, per map: { <map>: { <edit id>: n } } (cosmo's Ifrit lasers per wave)
+  stripperCount: {},
 };
 
 // Allowed range per numeric setting; a saved value outside it is clamped (the menu can't produce one).
@@ -71,7 +73,8 @@ export function sanitizeSettings(saved) {
       if (typeof d === 'boolean' && typeof v === 'boolean') out[k] = v;
       else if (typeof d === 'number' && typeof v === 'number' && Number.isFinite(v)) out[k] = RANGES[k] ? clamp(v, ...RANGES[k]) : v;
       else if (typeof d === 'string' && CHOICES[k]?.includes(v)) out[k] = v;
-      else if (k === 'stripperOff') out[k] = cleanStripperOff(v);
+      else if (k === 'stripperOff') out[k] = perMap(v, cleanEditsOff, (l) => l.length);
+      else if (k === 'stripperCount') out[k] = perMap(v, cleanCounts, (c) => Object.keys(c).length);
     } else if (typeof v === 'boolean' || (typeof v === 'number' && Number.isFinite(v)) || (typeof v === 'string' && v.length <= 200)) {
       out[k] = v;
     }
@@ -79,13 +82,13 @@ export function sanitizeSettings(saved) {
   return out;
 }
 
-// { map: [edit ids] } from storage: map names checked, ids cleaned (lib/stripper.js), empty lists dropped, 64 maps at most
-function cleanStripperOff(v) {
+// { map: value } from storage: map names checked, each value cleaned (lib/stripper.js), empty ones dropped, 64 maps at most
+function perMap(v, clean, keep) {
   const out = Object.create(null);
   if (!v || typeof v !== 'object' || Array.isArray(v)) return {};
-  for (const [map, ids] of Object.entries(v).slice(0, 64)) {
-    const list = isMapName(map) ? cleanEditsOff(ids) : [];
-    if (list.length) out[map] = list;
+  for (const [map, x] of Object.entries(v).slice(0, 64)) {
+    const c = isMapName(map) ? clean(x) : null;
+    if (c && keep(c)) out[map] = c;
   }
   return { ...out };
 }

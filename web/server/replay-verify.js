@@ -46,7 +46,7 @@ export function replayVerifier({ loadMap, findStage, store, log = () => {} }) {
     const stage = await findStage(run.map, run.stageId);
     if (!stage?.full) return { reason: 'no stage' };
     if (Array.isArray(stage.full.bosses) && stage.full.bosses.length) return { reason: 'boss stage' };
-    const assets = await loadMap(run.map, meta.rules.stripperOff); // with the GFL edits the run turned off left out
+    const assets = await loadMap(run.map, { off: meta.rules.stripperOff, counts: meta.rules.stripperCount }); // the map edits as the run played them
     let cheat = '', death = null, outcome = null;
     const pc = new PlayerCheck({
       assets, scenario: stage.full, mode: run.mode, seed: meta.seed,

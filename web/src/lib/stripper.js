@@ -75,6 +75,26 @@ function valueEnd(s, i) {
   return i;
 }
 
+// ---- our own configs (stripper/<map>/ in this repo, GFL's format plus two extension keys, tools/stripper.mjs):
+//   "x-lasers": { name, summary, detail, count: { default, min, max, label } }  after an edit's comment: the
+//                settings' words for it, and a number the player picks (1-16)
+//   "repeat": "count"  on an io entry an edit inserts: that output goes in `count` times (the player's number)
+// StripperCS2 would ignore the key and insert the output once.
+const META_KEY = 'x-lasers';
+const COUNT_CAP = [1, 16];
+const str = (v, n) => (typeof v === 'string' ? v.slice(0, n) : '');
+const int = (v, lo, hi, d) => (Number.isFinite(Number(v)) ? Math.min(hi, Math.max(lo, Math.round(Number(v)))) : d);
+function cleanEditMeta(v) {
+  if (!v || typeof v !== 'object') return undefined;
+  const out = { name: str(v.name, 60), summary: str(v.summary, 120), detail: str(v.detail, 1200) };
+  const c = v.count;
+  if (c && typeof c === 'object') {
+    const min = int(c.min, ...COUNT_CAP, COUNT_CAP[0]), max = int(c.max, min, COUNT_CAP[1], COUNT_CAP[1]);
+    out.count = { min, max, default: int(c.default, min, max, min), label: str(c.label, 40) || 'Count' };
+  }
+  return out;
+}
+
 // -> { filter: [...], add: [...], modify: [...], edits: [{ id, note, actions: { filter, add, modify } }] }: every
 // top-level occurrence kept, in order; edits: the same actions split by the comment above them (Named edits, top)
 export function parseStripperJsonc(text) {
@@ -101,6 +121,7 @@ export function parseStripperJsonc(text) {
     const value = JSON.parse(s.slice(i, vEnd));
     i = vEnd;
     if (key === NOTE) { startEdit(String(value)); continue; }
+    if (key === META_KEY) { if (!edit) startEdit(''); edit.meta = cleanEditMeta(value); continue; }
     if (key !== 'filter' && key !== 'add' && key !== 'modify') continue;
     if (!edit) startEdit('');
     for (const v of Array.isArray(value) ? value : [value]) if (v && typeof v === 'object') { out[key].push(v); edit.actions[key].push(v); }
@@ -202,16 +223,21 @@ function applyToLump(list, actions) {
 
 // a file's edits: its named ones, or the whole file as one ('gfl') in a stripper.json from before edits were named
 function fileEdits(f) {
-  if (Array.isArray(f?.edits)) return f.edits.filter((e) => e && isEditId(e.id) && e.actions && typeof e.actions === 'object');
+  if (Array.isArray(f?.edits)) return f.edits.filter((e) => e && isEditId(e.id) && e.actions && typeof e.actions === 'object' && !Array.isArray(e.actions));
   return f?.actions ? [{ id: 'gfl', note: '', actions: f.actions }] : [];
 }
 
-// The map's named edits, once each, in file order: [{ id, note }] (note: GFL's own comment)
+// The map's named edits, once each, in file order: [{ id, note, source, meta? }] (note: the config's comment; source:
+// 'gfl' or 'ours', from tools/stripper.mjs; meta: an own config's words and count, cleanEditMeta)
 export function stripperEdits(stripper, map) {
   const seen = new Map();
   for (const f of Array.isArray(stripper?.files) ? stripper.files : []) {
     if (map && String(f?.world || '').toLowerCase() !== String(map).toLowerCase()) continue;
-    for (const e of fileEdits(f)) if (!seen.has(e.id)) seen.set(e.id, { id: e.id, note: String(e.note || '').slice(0, 200) });
+    for (const e of fileEdits(f)) {
+      if (seen.has(e.id)) continue;
+      const meta = cleanEditMeta(e.meta);
+      seen.set(e.id, { id: e.id, note: String(e.note || '').slice(0, 200), source: f.source === 'ours' ? 'ours' : 'gfl', ...(meta ? { meta } : {}) });
+    }
   }
   return [...seen.values()];
 }
@@ -221,11 +247,62 @@ export function cleanEditsOff(v) {
   return Array.isArray(v) ? [...new Set(v.filter(isEditId))].sort().slice(0, 32) : [];
 }
 
+// Counts picked for edits that take one ({ id: n }), clean: ids checked, whole numbers in the hard cap, 32 at most.
+// Each edit's own range clamps it again when applied
+export function cleanCounts(v) {
+  const out = {};
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return out;
+  for (const id of Object.keys(v).filter(isEditId).sort().slice(0, 32)) out[id] = int(v[id], ...COUNT_CAP, COUNT_CAP[0]);
+  return out;
+}
+
+// What a run plays: { off: [ids], counts: { id: n } } from either form (a plain array is the off list)
+export function cleanChoice(v) {
+  if (Array.isArray(v)) return { off: cleanEditsOff(v), counts: {} };
+  return { off: cleanEditsOff(v?.off), counts: cleanCounts(v?.counts) };
+}
+// A choice against the map's own edits (stripperEdits): unknown ids dropped, counts clamped to their edit's range and
+// left out at its default, so the same play has one form. -> { off, counts, key } (key: '' = every edit, defaults;
+// the variant caches on the client and the server use it, and a replay records off / counts)
+export function resolveChoice(edits, choice) {
+  const c = cleanChoice(choice);
+  const byId = new Map((edits || []).map((e) => [e.id, e]));
+  const off = c.off.filter((id) => byId.has(id));
+  const counts = {};
+  for (const [id, n] of Object.entries(c.counts)) {
+    const r = byId.get(id)?.meta?.count;
+    if (!r || off.includes(id)) continue;
+    const v = int(n, r.min, r.max, r.default);
+    if (v !== r.default) counts[id] = v;
+  }
+  const key = [off.join(','), Object.entries(counts).map(([id, n]) => `${id}=${n}`).join(',')].join(';');
+  return { off, counts, key: key === ';' ? '' : key };
+}
+
+// an edit's actions with its "repeat": "count" outputs put in n times (a copy; the edit's own data is never changed)
+function withCount(actions, n) {
+  const expand = (io) => (Array.isArray(io) ? io : [io]).flatMap((o) => {
+    if (!o || typeof o !== 'object' || o.repeat !== 'count') return [o];
+    const { repeat, ...rest } = o;
+    return Array.from({ length: n }, () => ({ ...rest }));
+  });
+  const walk = (v) => {
+    if (Array.isArray(v)) return v.map(walk);
+    if (!v || typeof v !== 'object') return v;
+    const out = {};
+    for (const [k, x] of Object.entries(v)) out[k] = k === 'io' ? expand(x).map(walk) : walk(x);
+    return out;
+  };
+  return walk(actions);
+}
+
 // Apply a map's stripper.json ({ files: [{ world, lump, edits: [{ id, note, actions: {filter, add, modify} }] }] },
 // tools/stripper.mjs) to its entities.json ({ lumps: { name: [{kv, io}] } }), in place; returns the entities.
-// off: edit ids to leave out (cleanEditsOff); the others apply as GFL's server applies the whole file.
-export function applyStripper(entities, stripper, map, off = []) {
-  const skip = new Set(cleanEditsOff(off));
+// choice: the edits to leave out and the counts picked (cleanChoice; a plain array = the off list); the others
+// apply as GFL's server applies the whole file, an edit with a count at its default unless one was picked.
+export function applyStripper(entities, stripper, map, choice = []) {
+  const { off, counts } = cleanChoice(choice);
+  const skip = new Set(off);
   const files = Array.isArray(stripper?.files) ? stripper.files : [];
   const lumps = entities?.lumps;
   if (!files.length || !lumps || typeof lumps !== 'object') return entities;
@@ -235,7 +312,12 @@ export function applyStripper(entities, stripper, map, off = []) {
     const key = byName.get(String(f?.lump || '').toLowerCase());
     if (!key || !Array.isArray(lumps[key])) continue;
     const actions = { filter: [], add: [], modify: [] };
-    for (const e of fileEdits(f)) if (!skip.has(e.id)) for (const k of Object.keys(actions)) if (Array.isArray(e.actions[k])) actions[k].push(...e.actions[k]);
+    for (const e of fileEdits(f)) {
+      if (skip.has(e.id)) continue;
+      const c = cleanEditMeta(e.meta)?.count;
+      const acts = c ? withCount(e.actions, int(counts[e.id], c.min, c.max, c.default)) : e.actions;
+      for (const k of Object.keys(actions)) if (Array.isArray(acts[k])) actions[k].push(...acts[k]);
+    }
     applyToLump(lumps[key], actions);
   }
   return entities;
