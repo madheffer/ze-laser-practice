@@ -20,6 +20,8 @@ import { account, SIGN_IN_URL } from './account.js';
 import { formatTime, plural } from '../lib/format.js';
 import { consoleSay } from './chat.js';
 import { simulatedPing } from './coop-load.js';
+import { waterQuery } from '../world/water-volumes.js';
+import { waterSound } from './water-sounds.js';
 
 export function endRun() {
   G.audio.stopAll();
@@ -155,6 +157,10 @@ export function startScenario(i, mode = 'normal') {
   player.cvars = {};
   for (const [n, v] of Object.entries(run.cvars || {})) setMoveCvar(player, n, v);
   S.engine.on('cvar', (n, v) => setMoveCvar(player, n, v));
+  // the map's water (world/water-volumes.js: func_water, water-layer shapes, the world's water) and its sounds
+  player.water = waterQuery(S.engine, map.collisionFx);
+  player.waterFrac = 0; player.waterLevel = 0; player.swimSoundMs = 0; player.waterJumpMs = 0;
+  player.onWaterSound = waterSound;
   // a round runs on the wall clock from here (loop.js simulate), so every client's map stays in step
   run.wall0 = performance.now();
   // nothing moves until the stage is loaded and drawn; a round then tells the server and waits for its go
@@ -164,7 +170,7 @@ export function startScenario(i, mode = 'normal') {
     run.loading = '';
     if (S.mp) S.mp.sendReady();
     // what the map spawns mid-stage, made ready in idle time so its first spawn doesn't stall a frame (world/warm.js)
-    if (!S.replay?.fast) warmTemplates({ renderer: G.renderer, map, engine: S.engine, origin: [...player.origin], isCurrent: () => S.run === run && !run.done }).catch((e) => console.warn('warm-up:', e));
+    if (!S.replay?.fast) warmTemplates({ renderer: G.renderer, map, engine: S.engine, scenario, view, origin: [...player.origin], isCurrent: () => S.run === run && !run.done }).catch((e) => console.warn('warm-up:', e));
   });
   // the loading screen (ui/loading.js) covers it until the clock starts; a restart on a loaded map is usually
   // ready within a few frames, so it shows only if it isn't by then

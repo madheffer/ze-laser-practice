@@ -181,6 +181,17 @@ static class LightingBake
                         o["tonemap"] = tm;
                     }
                     if (d.GetBooleanProperty("m_bHasBloomParams") && d.GetSubCollection("m_bloomParams") is { } b) o["bloom"] = BloomJson(b);
+                    // m_vignetteParams (world/tonemap.js draws it as CS2's post_process shader does, D_VIGNETTE)
+                    if (d.GetBooleanProperty("m_bHasVignetteParams") && d.GetSubCollection("m_vignetteParams") is { } vg)
+                    {
+                        static JsonArray Vec(KVObject? v, int n) => new([.. (v?.IsArray == true ? v.Children.Take(n).Select(c => (JsonNode)JsonValue.Create(Convert.ToDouble(c.Value.ToString(System.Globalization.CultureInfo.InvariantCulture), System.Globalization.CultureInfo.InvariantCulture))!) : [])]);
+                        o["vignette"] = new JsonObject
+                        {
+                            ["strength"] = vg.GetFloatProperty("m_flVignetteStrength"), ["center"] = Vec(vg.GetValueOrDefault("m_vCenter"), 2),
+                            ["radius"] = vg.GetFloatProperty("m_flRadius"), ["roundness"] = vg.GetFloatProperty("m_flRoundness"),
+                            ["feather"] = vg.GetFloatProperty("m_flFeather"), ["tint"] = Vec(vg.GetValueOrDefault("m_vColorTint"), 3),
+                        };
+                    }
                     var dim = d.ContainsKey("m_nColorCorrectionVolumeDim") ? d.GetInt32Property("m_nColorCorrectionVolumeDim") : 0;
                     byte[]? lut = null;
                     foreach (var (k, v) in d.Children) if (k == "m_colorCorrectionVolumeData" && v.ValueType == KVValueType.BinaryBlob) lut = v.AsBlob().ToArray();

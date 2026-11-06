@@ -79,7 +79,10 @@ export class MapLighting {
     // reflections: the cube array (as a 2D array of faces) + one row of volume data per cubemap
     this.cubeUniforms = { cs2Cubes: { value: null }, cs2CubeVolumes: { value: null }, cs2CubeCount: { value: 0 }, cs2CubeMips: { value: new THREE.Vector2(0, 0) },
       // the volumes the camera can see this frame (cullCubes), as rows of cs2CubeVolumes in priority order
-      cs2CubeOrder: { value: null }, cs2CubeVisible: { value: 0 } };
+      cs2CubeOrder: { value: null }, cs2CubeVisible: { value: 0 },
+      // the low tier's RGBM faces: their range (0 = plain HDR blocks); cs2CubeWorld: 1 while the Reflections setting is
+      // on. The world's materials reflect only then; water always does (its reflection is most of what it looks like)
+      cs2CubeRgbm: { value: 0 }, cs2CubeWorld: { value: 1 } };
     this.cubeBoxes = []; // each volume's world box (its edge-fade padding included), row order
     this._frustum = new THREE.Frustum(); this._viewProj = new THREE.Matrix4();
     this.cubeCount = 0; // the map's; the uniform is 0 while reflections are off (the loop then costs nothing)
@@ -95,7 +98,7 @@ export class MapLighting {
   setOptions({ fog = true, reflections = true, particleLights = true } = {}) {
     this.options = { fog, reflections, particleLights };
     this.cubeUniforms.cs2CubeCount.value = reflections ? this.cubeCount : 0;
-    if (!reflections) this.cubeUniforms.cs2CubeVisible.value = 0;
+    this.cubeUniforms.cs2CubeWorld.value = reflections ? 1 : 0;
     this._cubeKey = null; // re-cull on the next frame
   }
 
@@ -133,7 +136,7 @@ export class MapLighting {
   // picture is the same as looping over every volume; westersand has 73, and that loop was most of a frame.
   cullCubes(camera) {
     const cu = this.cubeUniforms, order = cu.cs2CubeOrder.value;
-    if (!order || !this.options.reflections) { cu.cs2CubeVisible.value = 0; return; }
+    if (!order) { cu.cs2CubeVisible.value = 0; return; } // culled with reflections off too: water still reflects
     camera.updateMatrixWorld();
     this._viewProj.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
     this._frustum.setFromProjectionMatrix(this._viewProj);
@@ -246,8 +249,11 @@ export class MapLighting {
     cu.cs2CubeOrder.value = null; cu.cs2CubeVisible.value = 0; this.cubeBoxes = []; this._cubeKey = null;
     if (!cm) return;
     const layers = cm.faces; // depth x 6
-    const tex = new THREE.CompressedArrayTexture(cm.mips.map((m) => ({ data: cm.data.subarray(m.offset, m.offset + m.bytes), width: m.width, height: m.height })),
-      cm.width, cm.height, layers, cm.format);
+    const tex = cm.kind === 'rgbm8'
+      ? new THREE.DataArrayTexture(cm.data.subarray(0, cm.total), cm.width, cm.height, layers)
+      : new THREE.CompressedArrayTexture(cm.mips.map((m) => ({ data: cm.data.subarray(m.offset, m.offset + m.bytes), width: m.width, height: m.height })),
+        cm.width, cm.height, layers, cm.format);
+    cu.cs2CubeRgbm.value = cm.kind === 'rgbm8' ? cm.rgbm : 0;
     tex.minFilter = cm.mips.length > 1 ? THREE.LinearMipmapLinearFilter : THREE.LinearFilter;
     tex.magFilter = THREE.LinearFilter;
     tex.generateMipmaps = false;
@@ -670,7 +676,7 @@ const LIGHTS_MAPS_CS2 = `
   irradiance = cs2Diffuse * PI; // three's BRDF_Lambert divides by pi; CS2's diffuse doesn't
 #endif
 #if defined( CS2_CUBEMAPS ) && defined( RE_IndirectSpecular )
-  radiance += cs2EnvSpecular( vCs2World, normal, geometryViewDir, material.roughness, cs2Luma( cs2Diffuse ) );
+  if ( cs2CubeWorld > 0 ) radiance += cs2EnvSpecular( vCs2World, normal, geometryViewDir, material.roughness, cs2Luma( cs2Diffuse ) );
 #elif defined( USE_ENVMAP ) && defined( RE_IndirectSpecular )
   {
     vec3 cs2Env = radiance + getIBLRadiance( geometryViewDir, geometryNormal, material.roughness );
@@ -713,7 +719,7 @@ const LIGHTS_MAPS_PROBES = `
   irradiance = cs2ProbeIrradiance( cs2PC, cs2WorldN ) * PI; // three's Lambert divides by pi; CS2's doesn't
 #endif
 #if defined( CS2_CUBEMAPS ) && defined( RE_IndirectSpecular )
-  radiance += cs2EnvSpecular( vCs2World, normal, geometryViewDir, material.roughness, dot( irradiance / PI, vec3( 0.2126, 0.7152, 0.0722 ) ) );
+  if ( cs2CubeWorld > 0 ) radiance += cs2EnvSpecular( vCs2World, normal, geometryViewDir, material.roughness, dot( irradiance / PI, vec3( 0.2126, 0.7152, 0.0722 ) ) );
 #elif defined( USE_ENVMAP ) && defined( RE_IndirectSpecular )
   radiance += getIBLRadiance( geometryViewDir, geometryNormal, material.roughness )
     * min( 1.0, dot( irradiance, vec3( 0.2126, 0.7152, 0.0722 ) ) / max( dot( getIBLIrradiance( geometryNormal ), vec3( 0.2126, 0.7152, 0.0722 ) ), 1e-4 ) );
@@ -793,6 +799,22 @@ void main() {
   gl_FragColor = vec4( mix( c, cs2SkyFogColor, cs2SkyFog ), 1.0 );
 }`;
 
+// a cube direction (as GL picks the face) -> the face's layer offset and uv, for a cube kept as a 2D array of its six
+// faces (+X -X +Y -Y +Z -Z, the layout of CS2's cube textures as the bake writes them). Guarded: two snippets include it
+export const CUBE_FACE = `
+#ifndef CS2_CUBE_FACE
+#define CS2_CUBE_FACE
+vec3 cs2CubeFace( vec3 d ) {
+  vec3 a = abs( d );
+  float face; vec2 st; float ma;
+  if ( a.x >= a.y && a.x >= a.z ) { ma = a.x; face = d.x > 0.0 ? 0.0 : 1.0; st = d.x > 0.0 ? vec2( -d.z, -d.y ) : vec2( d.z, -d.y ); }
+  else if ( a.y >= a.z ) { ma = a.y; face = d.y > 0.0 ? 2.0 : 3.0; st = d.y > 0.0 ? vec2( d.x, d.z ) : vec2( d.x, -d.z ); }
+  else { ma = a.z; face = d.z > 0.0 ? 4.0 : 5.0; st = d.z > 0.0 ? vec2( d.x, -d.y ) : vec2( -d.x, -d.y ); }
+  return vec3( st / ma * 0.5 + 0.5, face );
+}
+#endif
+`;
+
 // ---- reflections (VRF common/envmap.slang, CS2 = lightmap version 2)
 const CUBE_PARS = (on) => !on ? '' : `
 #define CS2_CUBEMAPS
@@ -802,15 +824,9 @@ uniform int cs2CubeCount;
 uniform highp sampler2D cs2CubeOrder;       // the volumes in view this frame (rows of cs2CubeVolumes, by priority)
 uniform int cs2CubeVisible;
 uniform vec2 cs2CubeMips;                   // CS2's mip count, mips the bake skipped
-// a cube direction (as GL picks the face) -> the face's layer offset and uv
-vec3 cs2CubeFace( vec3 d ) {
-  vec3 a = abs( d );
-  float face; vec2 st; float ma;
-  if ( a.x >= a.y && a.x >= a.z ) { ma = a.x; face = d.x > 0.0 ? 0.0 : 1.0; st = d.x > 0.0 ? vec2( -d.z, -d.y ) : vec2( d.z, -d.y ); }
-  else if ( a.y >= a.z ) { ma = a.y; face = d.y > 0.0 ? 2.0 : 3.0; st = d.y > 0.0 ? vec2( d.x, d.z ) : vec2( d.x, -d.z ); }
-  else { ma = a.z; face = d.z > 0.0 ? 4.0 : 5.0; st = d.z > 0.0 ? vec2( d.x, -d.y ) : vec2( -d.x, -d.y ); }
-  return vec3( st / ma * 0.5 + 0.5, face );
-}
+uniform float cs2CubeRgbm;                  // the low tier's RGBM faces: rgb x a x range (0: HDR blocks as they are)
+uniform int cs2CubeWorld;                   // the Reflections setting (the world's materials; water ignores it)
+${CUBE_FACE}
 vec4 cs2Vol( int i, int t ) { return texelFetch( cs2CubeVolumes, ivec2( t, i ), 0 ); }
 // every volume around the pixel, by priority, until covered: .rgb the reflection along R (world space; box parallax
 // mixed back to the plain direction by parallaxRough), .a the cubemaps' own baked luma along N
@@ -834,7 +850,8 @@ vec4 cs2EnvGather( vec3 posWS, vec3 N, vec3 R, float parallaxRough, float lod ) 
     float dist = abs( min( far3.x, min( far3.y, far3.z ) ) );
     vec3 dir = mix( lp + lr * dist, lr, parallaxRough );
     vec3 uvf = cs2CubeFace( dir );
-    env += textureLod( cs2Cubes, vec3( uvf.xy, mn.w * 6.0 + uvf.z ), lod ).rgb * weight;
+    vec4 ct = textureLod( cs2Cubes, vec3( uvf.xy, mn.w * 6.0 + uvf.z ), lod );
+    env += ( cs2CubeRgbm > 0.0 ? ct.rgb * ct.a * cs2CubeRgbm : ct.rgb ) * weight;
     vec4 sh = cs2Vol( i, 6 );
     envLuma += dot( vec4( N, 1.0 ), sh ) * weight;
     total += weight;

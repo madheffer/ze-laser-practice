@@ -2,7 +2,9 @@
 // setting; Auto picks low on a GPU without BC6H/BC7, e.g. phones). High is the map folder as baked.
 //   tier     textures  lightmaps (decoded, RGBM WebP) reflections            sky (RGBM WebP faces)
 //   medium   512 px    2048 px                       cubemaps <= 64 px      512 px
-//   low      256 px    1024 px                       none                   256 px
+//   low      256 px    1024 px                       cubemaps 32 px, RGBM  256 px
+// The low tier is for GPUs without BC6H, so its cubemaps are decoded (RGBM faces, any GPU): water is drawn with them
+// whatever the Reflections setting (world/water.js), and with none its grazing reflection fell to black.
 // -> <map>/q/<tier>/tex/<world|models/...>.webp (the glbs' textures, same names as .webp; the loader redirects them)
 //    <map>/q/<tier>/tex.json ({ format: "webp", version }: what the loader redirects to, and its cache version)
 //    <map>/q/<tier>/lighting/ (lighting.json + WebPs; post / probes copied; medium: the cubemaps' small mips)
@@ -24,8 +26,8 @@ namespace Lasers.Bake;
 
 static class TierBake
 {
-    record Tier(string Name, int Texture, int Lightmap, int Cube, int Sky);
-    static readonly Tier[] Tiers = [new("medium", 512, 2048, 64, 512), new("low", 256, 1024, 0, 256)];
+    record Tier(string Name, int Texture, int Lightmap, int Cube, int Sky, int RgbmCube = 0);
+    static readonly Tier[] Tiers = [new("medium", 512, 2048, 64, 512), new("low", 256, 1024, 0, 256, 32)];
     const float RgbmRange = 16f; // irradiance / sky values above this clip (CS2 lightmaps sit well under it)
     const int TextureQuality = 80; // lossy WebP for the tier textures
     const int LightmapQuality = 90; // lossy WebP for the directional / shadow lightmaps (block-compressed at the source)
@@ -149,6 +151,33 @@ static class TierBake
                 c["mips"] = outMips;
                 c["width"] = keep[0]["width"]!.DeepClone(); c["height"] = keep[0]["height"]!.DeepClone();
                 c["skippedMips"] = (c["skippedMips"]?.GetValue<int>() ?? 0) + (mips.Count - keep.Count);
+                json["cubemaps"] = c;
+            }
+        }
+
+        // the low tier: the cubemaps decoded, linear, box-filtered to RgbmCube, RGBM (layer = array index x 6 + face)
+        if (tier.RgbmCube > 0 && hi["cubemaps"] is JsonObject hcm)
+        {
+            using var res = load($"maps/{mapName}/cubemaps/env_cubemap_array.vtex_c");
+            if (res?.DataBlock is Texture ct && ct.Flags.HasFlag(VTexFlags.CUBE_TEXTURE))
+            {
+                using var ms = new MemoryStream();
+                int w = 0, h = 0;
+                var depth = Math.Max(1, (int)ct.Depth);
+                for (var d = 0; d < depth; d++)
+                    for (var f = 0; f < 6; f++)
+                    {
+                        using var face = ct.GenerateBitmap(depth: (uint)d, face: (Texture.CubemapFace)f, mipLevel: 0);
+                        using var small = Downsample(face, tier.RgbmCube, true, srgb: !ct.IsHighDynamicRange);
+                        (w, h) = (small.Width, small.Height);
+                        ms.Write(small.GetPixelSpan());
+                    }
+                File.WriteAllBytes(Path.Combine(outDir, "cubemaps.bin"), ms.ToArray());
+                var c = hcm.DeepClone().AsObject();
+                c["format"] = "rgbm8"; c["range"] = RgbmRange; c["width"] = w; c["height"] = h;
+                c["mips"] = new JsonArray(new JsonObject { ["offset"] = 0, ["bytes"] = ms.Length, ["width"] = w, ["height"] = h });
+                // CS2's mips above this one (the shader's roughness lod counts from the source's top mip)
+                c["skippedMips"] = (int)Math.Round(Math.Log2(Math.Max(1, ct.Width / (double)Math.Max(1, w))));
                 json["cubemaps"] = c;
             }
         }

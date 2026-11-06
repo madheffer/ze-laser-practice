@@ -73,3 +73,7 @@ register('func_wall_toggle', {
     if (num(e.kv.spawnflags) & 1) { e.enabled = false; e.visible = false; }
   },
 });
+
+// func_water: CS2's water volume. Not solid to anything; the player swims in it (world/water-volumes.js finds its
+// shapes, world/water-move.js is the movement). Kill / SetParent and the rest are the engine's generic inputs.
+register('func_water', { solid: () => false });

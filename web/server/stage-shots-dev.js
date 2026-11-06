@@ -2,7 +2,8 @@
 // stage here, and this writes it to web/public/maps/<map>/stages/<id>.webp. `vite` (serve) only, never a build or
 // preview, and only from this machine: a loopback socket, a localhost Host (no DNS rebinding) and, when the browser
 // sends one, a localhost Origin. The map must be a map name with a scenario file, the id one of that file's stages,
-// the body a real webp under MAX_BYTES. Nothing else is ever written.
+// the body a real webp under MAX_BYTES. kind=card (captureCard: the map picker card's picture, from that stage) writes
+// maps/<map>/card.webp instead, up to CARD_MAX_BYTES. Nothing else is ever written.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -10,6 +11,7 @@ import { isMapName, isStageId } from '../src/lib/paths.js';
 
 const ROUTE = '/__dev/stage-shot';
 const MAX_BYTES = 64 * 1024;
+const CARD_MAX_BYTES = 128 * 1024;
 const PUBLIC = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../public');
 const LOCAL_HOST = /^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/i;
 const LOCAL_ORIGIN = /^http:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/i;
@@ -28,13 +30,13 @@ function stageIds(map) {
   return new Set((Array.isArray(list) ? list : []).map((s) => s?.id).filter(isStageId));
 }
 
-function readBody(req) {
+function readBody(req, max) {
   return new Promise((resolve, reject) => {
     const parts = [];
     let size = 0;
     req.on('data', (c) => {
       size += c.length;
-      if (size > MAX_BYTES) { reject(new Error('too large')); req.destroy(); return; }
+      if (size > max) { reject(new Error('too large')); req.destroy(); return; }
       parts.push(c);
     });
     req.on('end', () => resolve(Buffer.concat(parts)));
@@ -49,8 +51,10 @@ async function handle(req, res) {
   if (!LOOPBACK.has(req.socket.remoteAddress) || !LOCAL_HOST.test(req.headers.host || '')) return fail(res, 403, 'localhost only');
   if (req.headers.origin && !LOCAL_ORIGIN.test(req.headers.origin)) return fail(res, 403, 'localhost only');
   if ((req.headers['content-type'] || '').split(';')[0].trim() !== 'image/webp') return fail(res, 415, 'image/webp only');
-  if (Number(req.headers['content-length'] || 0) > MAX_BYTES) return fail(res, 413, 'too large');
   const q = new URL(req.url, 'http://localhost').searchParams;
+  const card = q.get('kind') === 'card';
+  const max = card ? CARD_MAX_BYTES : MAX_BYTES;
+  if (Number(req.headers['content-length'] || 0) > max) return fail(res, 413, 'too large');
   const map = q.get('map');
   const id = q.get('id');
   if (!isMapName(map) || !isStageId(id)) return fail(res, 400, 'bad map or stage id');
@@ -59,10 +63,10 @@ async function handle(req, res) {
   const mapDir = path.join(PUBLIC, 'maps', map);
   if (!fs.existsSync(path.join(mapDir, 'manifest.json'))) return fail(res, 404, 'map not baked');
   let body;
-  try { body = await readBody(req); } catch { return fail(res, 413, 'too large'); }
+  try { body = await readBody(req, max); } catch { return fail(res, 413, 'too large'); }
   if (!isWebp(body)) return fail(res, 415, 'not a webp');
-  const dir = path.join(mapDir, 'stages');
-  const file = path.resolve(dir, `${id}.webp`);
+  const dir = card ? mapDir : path.join(mapDir, 'stages');
+  const file = path.resolve(dir, card ? 'card.webp' : `${id}.webp`);
   if (path.dirname(file) !== path.resolve(dir)) return fail(res, 400, 'bad path');
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(file, body);

@@ -30,7 +30,8 @@ function check(name, t) {
   return { file: t.file, format: f[0], ext: f[2], width: w, height: h, bytes };
 }
 
-// opts.reflections false: the reflection cubemaps aren't downloaded
+// opts.reflections false: the reflection cubemaps aren't downloaded, unless the map has CS2 water (water/water.json):
+// water always reflects them (world/lighting.js), a grazing water surface with none went black
 export async function loadLightmaps(mapBase, renderer, log = () => {}, opts = {}) {
   // a quality tier lives in q/<tier>/lighting/ (PNG lightmaps any GPU can take), else the high bake's raw blocks
   const base = opts.tier === 'medium' || opts.tier === 'low' ? `${mapBase}q/${opts.tier}/` : mapBase;
@@ -112,7 +113,8 @@ export async function loadLightmaps(mapBase, renderer, log = () => {}, opts = {}
   }));
   // the reflection cubemaps (env_cubemap_array): a cube array, depth x 6 faces per mip
   let cubemaps = null;
-  const cm = opts.reflections !== false && json.cubemaps && rawTexture(json.cubemaps, 'cubemaps.bin', renderer);
+  const wantCubes = opts.reflections !== false || await fetch(`${mapBase}water/water.json`, { method: 'HEAD' }).then((r) => r.ok, () => false);
+  const cm = wantCubes && json.cubemaps && (rawTexture(json.cubemaps, 'cubemaps.bin', renderer) || rgbmCubes(json.cubemaps));
   if (cm && json.cubemaps.cube) {
     const buf = await fetchBuffer(versioned(`${base}lighting/cubemaps.bin`, version)).catch(() => null);
     const int = (v, lo, hi) => (Number.isInteger(v) && v >= lo && v <= hi ? v : 0);
@@ -150,6 +152,15 @@ function rawTexture(d, file, renderer) {
     total += bytes;
   }
   return { file, format, kind: d.format, srgbOk: d.format === 'dxt1' && renderer.extensions.has('WEBGL_compressed_texture_s3tc_srgb'), width: mips[0].width, height: mips[0].height, faces, mips, total };
+}
+// the low tier's cubemaps (lasers-bake --tiers): one level of RGBA8 RGBM faces, any GPU takes them
+function rgbmCubes(d) {
+  if (!d || d.format !== 'rgbm8' || d.file !== 'cubemaps.bin' || !d.cube || !Array.isArray(d.mips) || d.mips.length !== 1) return null;
+  const faces = 6 * (Number.isInteger(d.depth) && d.depth >= 1 && d.depth <= 1024 ? d.depth : 1);
+  const m = d.mips[0], w = m?.width, h = m?.height;
+  if (!Number.isInteger(w) || !Number.isInteger(h) || w < 1 || h < 1 || w > 256 || h > 256 || m.offset !== 0 || m.bytes !== w * h * 4 * faces) return null;
+  const range = typeof d.range === 'number' && d.range > 0 && d.range <= 1024 ? d.range : 16;
+  return { file: 'cubemaps.bin', format: null, kind: 'rgbm8', rgbm: range, width: w, height: h, faces, mips: [{ offset: 0, bytes: m.bytes, width: w, height: h }], total: m.bytes };
 }
 // CUBEMAP_RADIANCE_SH: 27 floats per cubemap (9 per colour channel)
 function shList(sh) {

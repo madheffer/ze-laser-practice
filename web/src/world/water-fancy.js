@@ -1,11 +1,12 @@
 // csgo_water_fancy.vfx (dreamin, mist, neochrome, offliner, visualizer): the material for water-fancy-glsl.js.
 // Every parameter from the vmat, VRF's defaults (water_csgo.frag.slang) for one it leaves out.
 //
-// Quality: high = the vmat as authored; medium = SSR at half the vmat's steps (48 at most) and one refraction sample
-// instead of the blurred five; low = no SSR, no caustics, one refraction sample, 2 wave octaves at most.
+// Quality: every level draws the vmat as authored. CS2's own low shader quality (S_SHADER_QUALITY 0, the combo the port
+// was checked against) keeps SSR, caustics and every wave octave, and water is too much of what a player sees to cut.
 import * as THREE from 'three';
 import { WATER_VS, WATER_FS } from './water-fancy-glsl.js';
-import { LIGHTMAP_PARS, CUBE_PARS, FOG_PARS } from './lighting.js';
+import { LIGHTMAP_PARS, CUBE_PARS, FOG_PARS, CUBE_FACE } from './lighting.js';
+import { MAP_LIGHTS_PARS } from './maplights.js';
 import { sceneCopyUniforms } from './scenecopy.js';
 import { num, paramUniforms, waterMaterialOptions } from './water-common.js';
 
@@ -25,6 +26,7 @@ const FLOATS = {
   g_flCausticSharpness: 0.5, g_flCausticDepthFallOffDistance: 100, g_flCausticShadowCutOff: 0.2, g_flReflectance: 0.2,
   g_flReflectionDistanceEffect: 0.5, g_flEnvironmentMapBrightness: 1, g_flGlossiness: 0.75, g_flSSRStepSize: 0.1,
   g_flSSRSampleJitter: 0.02, g_flSSRBoostThreshold: 1, g_flSSRBoost: 0, g_flSSRBrightness: 1, g_flSSRMaxThickness: 4,
+  g_flLowEndCubeMapIntensity: 1,
 };
 const INTS = { g_nWaveIterations: 3, g_nSSRMaxForwardSteps: 20, g_bUseTriplanarCaustics: 0 };
 const VECTORS = {
@@ -41,11 +43,14 @@ export const FANCY_TEXTURES = {
 // ctx: { lighting, shared, texture(slot, vtex, spec) }; lit: the mesh has lightmap UVs (else the sky ambient)
 export function fancyMaterial(ctx, vmat, src, key, lit) {
   const L = ctx.lighting, T = vmat.TextureParams || {};
-  const uniforms = { ...ctx.shared, ...sceneCopyUniforms, ...L.uniforms, ...L.fogUniforms, ...L.cubeUniforms, ...paramUniforms(vmat, { floats: FLOATS, ints: INTS, vectors: VECTORS }) };
+  const uniforms = { ...ctx.shared, ...sceneCopyUniforms, ...L.uniforms, ...L.fogUniforms, ...L.cubeUniforms, ...L.mapLights.uniforms, ...paramUniforms(vmat, { floats: FLOATS, ints: INTS, vectors: VECTORS }) };
   for (const [k, spec] of Object.entries(FANCY_TEXTURES)) uniforms[k] = { value: ctx.texture(k, T[k], spec) };
+  const lowEnd = ctx.cube(T.g_tLowEndCubeMap); // world/water.js: the baked cube as six layers, or null
+  uniforms.g_tLowEndCubeMap = { value: lowEnd || ctx.cube(null) };
+  uniforms.uLowEndCube = { value: lowEnd ? 1 : 0 };
   // the map's cubemaps, not the uniform: that is 0 while reflections are off, and the shader checks cs2CubeVisible
   const hasShadow = lit && !!L.uniforms.cs2Shadows.value, cubes = L.cubeCount > 0;
-  const pars = `${lit ? '' : '#define CS2_NO_LIGHTMAP'}\n${LIGHTMAP_PARS(false, hasShadow)}\n${FOG_PARS}\n${CUBE_PARS(cubes)}`;
+  const pars = `${lit ? '' : '#define CS2_NO_LIGHTMAP'}\n${LIGHTMAP_PARS(false, hasShadow)}\n${FOG_PARS}\n${CUBE_PARS(cubes)}\n${CUBE_FACE}\n${MAP_LIGHTS_PARS}`;
   const m = new THREE.ShaderMaterial({ name: `water:${key}`, uniforms, vertexShader: WATER_VS, fragmentShader: WATER_FS(pars), ...waterMaterialOptions(src) });
   const I = vmat.IntParams || {};
   m.userData.features = {
@@ -53,21 +58,16 @@ export function fancyMaterial(ctx, vmat, src, key, lit) {
     F_CAUSTICS: Math.round(num(I.F_CAUSTICS, 0)), F_BLUR_REFRACTION: Math.round(num(I.F_BLUR_REFRACTION, 0)),
     waves: Math.max(1, Math.min(16, uniforms.g_nWaveIterations.value)), ssrSteps: Math.max(0, Math.min(400, uniforms.g_nSSRMaxForwardSteps.value)),
   };
-  m.userData.applyLevel = (level) => fancyLevel(m, level);
+  m.userData.applyLevel = () => fancyLevel(m);
   m.defines = {};
   return m;
 }
 
-// the vmat's features, capped by the quality level (a define change recompiles the material once)
-function fancyLevel(m, level) {
-  const f = m.userData.features, low = level === 'low', medium = level === 'medium';
-  const d = {
-    F_REFLECTION_TYPE: low ? Math.min(1, f.F_REFLECTION_TYPE) : f.F_REFLECTION_TYPE,
-    F_REFRACTION: f.F_REFRACTION,
-    F_CAUSTICS: low ? 0 : f.F_CAUSTICS,
-    F_BLUR_REFRACTION: low || medium ? 0 : f.F_BLUR_REFRACTION,
-  };
-  m.uniforms.g_nWaveIterations.value = low ? Math.min(2, f.waves) : f.waves;
-  m.uniforms.g_nSSRMaxForwardSteps.value = medium ? Math.min(48, Math.ceil(f.ssrSteps / 2)) : f.ssrSteps;
+// the vmat's features (a define change recompiles the material once)
+function fancyLevel(m) {
+  const f = m.userData.features;
+  const d = { F_REFLECTION_TYPE: f.F_REFLECTION_TYPE, F_REFRACTION: f.F_REFRACTION, F_CAUSTICS: f.F_CAUSTICS, F_BLUR_REFRACTION: f.F_BLUR_REFRACTION };
+  m.uniforms.g_nWaveIterations.value = f.waves;
+  m.uniforms.g_nSSRMaxForwardSteps.value = f.ssrSteps;
   if (Object.keys(d).some((k) => m.defines[k] !== d[k])) { Object.assign(m.defines, d); m.needsUpdate = true; }
 }

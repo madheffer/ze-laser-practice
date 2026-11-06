@@ -36,7 +36,8 @@ export class Water {
       uCamDir: { value: new THREE.Vector3() }, uCamUp: { value: new THREE.Vector3() }, uProjection: { value: new THREE.Matrix4() },
       uLightmap: { value: null }, uLightmapUvTransform: { value: new THREE.Matrix3() },
     };
-    this.ctx = { lighting, shared: this.shared, texture: (slot, vtex, spec) => this.texture(slot, vtex, spec) };
+    this.ctx = { lighting, shared: this.shared, texture: (slot, vtex, spec) => this.texture(slot, vtex, spec), cube: (vtex) => this.cube(vtex) };
+    this.cubes = {}; this.cubeTextures = new Map();
     this._frustum = new THREE.Frustum(); this._vp = new THREE.Matrix4(); this._sphere = new THREE.Sphere();
   }
 
@@ -46,6 +47,9 @@ export class Water {
     for (const t of this.textures.values()) t.dispose();
     this.materials.clear(); this.textures.clear(); this.meshes.clear();
     this.urls = water?.textures || {};
+    for (const t of this.cubeTextures.values()) t.dispose();
+    this.cubeTextures.clear();
+    this.cubes = water?.cubes || {};
     this.frames = water?.frames || {};
   }
 
@@ -54,6 +58,22 @@ export class Water {
     if (l === this.level) return;
     this.level = l;
     for (const m of this.materials.values()) m.userData.applyLevel(l);
+  }
+
+  // a cube texture slot (g_tLowEndCubeMap) as a 2D array of its six faces (float RGBA, CS2's face order), sampled with
+  // lighting.js cs2CubeFace; null when the bake has none. With vtex null: a black stand-in for the sampler
+  cube(vtex) {
+    const key = vtex ? String(vtex) : '';
+    const c = vtex ? this.cubes[key] : { size: 1, data: new Float32Array(24) };
+    if (!c) return null;
+    let t = this.cubeTextures.get(key);
+    if (!t) {
+      t = new THREE.DataArrayTexture(c.data, c.size, c.size, 6);
+      t.type = THREE.FloatType; t.format = THREE.RGBAFormat; t.colorSpace = THREE.NoColorSpace;
+      t.minFilter = t.magFilter = THREE.LinearFilter; t.generateMipmaps = false; t.needsUpdate = true;
+      this.cubeTextures.set(key, t);
+    }
+    return t;
   }
 
   // the baked texture for a slot (a texture array when the bake says it has frames), else a neutral texel

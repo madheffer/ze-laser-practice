@@ -134,6 +134,9 @@ export class GameAudio {
           pos: ev.pos, ent: ev.ent, local: !!ev.local, entId: id, offset: ev.offset || 0, slot: ev.slot ?? null,
           volume, pitch: Number.isFinite(ev.pitch) && ev.pitch > 0 ? ev.pitch : 1, follow: typeof ev.follow === 'function' ? ev.follow : null,
           repeat: !!ev.repeat, guid: Number.isFinite(ev.guid) ? ev.guid : 0,
+          // the emitter's volume, replacing the event's own (client.dll starts Player.AmbientUnderWater, volume 0 in its
+          // event, with 1: app/water-sounds.js)
+          paramVolume: Number.isFinite(ev.paramVolume) ? ev.paramVolume : undefined,
         });
         return;
       }
@@ -387,7 +390,7 @@ export class GameAudio {
         spatial: !isMusic && (!!randomPos || (!!o.pos && !o.local && !def.local)), music: isMusic, rate,
         // the event's volume (+ its random variance; a snd_event_param "volume" replaces it) x the request's; the mix
         // group's level (layers included) is applied in _update
-        eventVolume: eventVolume(def), paramVolume: null, requestVolume: hit.volume * (o.volume ?? 1), group: eventGroup(def),
+        eventVolume: eventVolume(def), paramVolume: Number.isFinite(o.paramVolume) ? Math.abs(o.paramVolume) : null, requestVolume: hit.volume * (o.volume ?? 1), group: eventGroup(def),
         userVolume: 1, userPitch: 1, stopped: false,
       };
       this._track(v);

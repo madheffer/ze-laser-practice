@@ -5,6 +5,7 @@
 // Everything on a card comes from index.json, which is built from map / scenario files: text goes in through
 // textContent only.
 import { mapRecordCounts } from '../app/records.js';
+import { isMapName, versioned } from '../lib/paths.js';
 
 function el(tag, cls, text) {
   const e = document.createElement(tag);
@@ -52,6 +53,16 @@ export class MapPicker {
     btn.setAttribute('aria-label', `${m.title || m.name}: ${m.scenarios || 'no'} stages`);
 
     const art = el('span', 'map-art');
+    // a picture from the map (index.json `card`: its version; maps/<name>/card.webp), else the colour block
+    if (isMapName(m.name) && typeof m.card === 'string' && /^[a-z0-9]{1,16}$/.test(m.card)) {
+      const img = el('img', 'map-pic');
+      img.alt = '';
+      img.decoding = 'async';
+      img.loading = 'lazy';
+      img.src = versioned(`maps/${m.name}/card.webp`, [m.version, m.card].filter(Boolean).join('.'));
+      art.classList.add('has-pic');
+      art.append(img);
+    }
     art.append(el('span', 'map-big', displayName(m.title || m.name)));
     if (current) art.append(el('span', 'map-badge', 'loaded'));
 
@@ -71,7 +82,7 @@ export class MapPicker {
 
     const foot = el('span', 'map-foot');
     const bosses = (m.parts || []).reduce((n, p) => n + (p.bosses || 0), 0);
-    foot.append(el('span', null, [m.scenarios ? `${m.scenarios} stages` : '', bosses ? `${bosses} boss fights` : ''].filter(Boolean).join(' · ')));
+    foot.append(el('span', null, [m.scenarios ? `${m.scenarios} stage${m.scenarios === 1 ? '' : 's'}` : '', bosses ? `${bosses} boss fights` : ''].filter(Boolean).join(' · ')));
     const rec = mapRecordCounts(m.name);
     if (rec.cleared || rec.endless) foot.append(el('span', 'map-pb', [rec.cleared && `${rec.cleared} cleared`, rec.endless && `${rec.endless} endless`].filter(Boolean).join(' · ')));
     body.append(foot);

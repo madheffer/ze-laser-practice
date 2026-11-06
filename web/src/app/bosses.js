@@ -11,6 +11,7 @@ import { stripPrefix } from '../lib/names.js';
 import { clamp } from '../lib/math.js';
 import { bossHittable, replayBossFire } from '../world/run-engine.js';
 import { bulletWorld, BULLET_MASK } from '../world/bullets.js';
+import { waterSplash } from './water-sounds.js';
 
 // the static world as bullets see it: the map's particle collision set with layer bits, else the player-solid one
 const shotWorld = () => bulletWorld(S.map?.collisionFx, S.world);
@@ -158,6 +159,7 @@ export function shootAs(shot, yaw, pitch) {
   // CS2's bullet trace (world/bullets.js): player clips don't stop it (knife too: the same static world here)
   const wallTr = shotWorld().traceRay(eye, eye.map((v, i) => v + dir[i] * range), undefined, true, BULLET_MASK);
   const wallDist = wallTr.fraction * range;
+  waterSplash(shotWorld(), eye, dir, range, shot.kind); // a shot or swing into water splashes (app/water-sounds.js)
   for (const { e } of bossTargets()) {
     for (const h of e.hulls() || []) {
       const t = rayHullEntry(eye, dir, h);

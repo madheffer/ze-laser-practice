@@ -48,13 +48,16 @@ for (const name of fs.readdirSync(mapsDir).sort()) {
   const shotFiles = fs.existsSync(stagesDir) ? fs.readdirSync(stagesDir).filter((f) => f.endsWith('.webp') && ids.has(f.slice(0, -5))) : [];
   const stageShots = shotFiles.map((f) => f.slice(0, -5)).sort();
   const stageShotsVersion = shotFiles.reduce((t, f) => Math.max(t, Math.floor(fs.statSync(path.join(stagesDir, f)).mtimeMs / 1000)), 0).toString(36);
+  // the map picker card's picture (captureCard writes maps/<name>/card.webp): its file time, for the URL, or none
+  const cardFile = path.join(mapsDir, name, 'card.webp');
+  const card = fs.existsSync(cardFile) ? Math.floor(fs.statSync(cardFile).mtimeMs / 1000).toString(36) : undefined;
   // the map's EntWatch items (world/items.js), so the stage list's heal option needs no entity data: picking a map
   // loads only its stage list, the rest waits for a stage (web/src/main.js)
   const read = (f) => { const q = path.join(mapsDir, name, f); return fs.existsSync(q) ? JSON.parse(fs.readFileSync(q, 'utf8')) : null; };
   const items = mapItems(readMapEntities(path.join(mapsDir, name)), read('entwatch.json'));
   maps.push({
     name, title: file.title || m.title || name, description: file.description || '', workshop: file.workshop || '',
-    scenarios: list.length, parts, version: m.version, shots, items, stageShots, stageShotsVersion,
+    scenarios: list.length, parts, version: m.version, shots, items, stageShots, stageShotsVersion, card,
   });
 }
 fs.writeFileSync(path.join(mapsDir, 'index.json'), JSON.stringify({ maps }, null, 1));

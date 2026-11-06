@@ -1,0 +1,54 @@
+{
+  "map": "ze_the_shifting_pool",
+  "title": "ze_the_shifting_pool",
+  "workshop": "3554883009",
+  "workshopUpdated": "2026-05-14",
+  "description": "The ride-the-wave minigame: swim through the gaps in the walls coming down a flooded tunnel.",
+  "scenarios": [
+    {
+      "id": "wave_minigame",
+      "group": "Ending",
+      "name": "Ride the wave (minigame)",
+      "summary": "Swim through the gaps in the oncoming walls",
+      "description": "Where trigger_teleport_to_minigame1 puts the humans (dest_mg_wall), as its touch starts relay_mg_wall_begin: you float in the flooded tube (water_mg_wave; moveseg2 is the passing wave you see). Easy walls at +5, 10 and 15 s (mg_chunk_t1-t3), then a random one of 20 every 5 s from timer_mg_wall_clock until counter_mg_wall_chunk_count reaches 10. Each wall is an mg_chunk_* train coming down track_mg_* at 700 u/s from the tube's far end; swim (Space or the wheel up, look up to rise faster, sink by letting go) into its opening. A wall that hits you pushes you back into the human-only trigger_teleport to dest_killroom. Win when relay_mg_wall_end_sequence enables trigger_teleport_mg_wall_complete (9 s after the 10th wall), the tick before it sends you to the island: only the tube is drawn (view), the island and the platform stage are never loaded. Endless: the counter never fills, so walls keep coming.",
+      "spawn": {
+        "at": "[PR#]dest_mg_wall",
+        "yaw": 90
+      },
+      "start": [
+        {
+          "target": "[PR#]relay_mg_wall_begin",
+          "input": "Trigger"
+        }
+      ],
+      "music": [
+        {
+          "target": "[PR#]music_minigame",
+          "input": "StartSound"
+        }
+      ],
+      "player": {
+        "health": 100
+      },
+      "win": {
+        "target": "[PR#]trigger_teleport_mg_wall_complete",
+        "input": "Enable"
+      },
+      "view": {
+        "min": [-14720, -3840, -256],
+        "max": [-13952, 2048, 768]
+      },
+      "loseTo": [
+        "[PR#]dest_killroom"
+      ],
+      "endless": {
+        "cancel": [
+          {
+            "target": "[PR#]counter_mg_wall_chunk_count",
+            "input": "Add"
+          }
+        ]
+      }
+    }
+  ]
+}

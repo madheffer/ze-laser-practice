@@ -52,6 +52,8 @@ uniform float g_flWaterDecayStrength, g_flWaterMaxDepth, g_flWaterFogShadowStren
 uniform float g_flSpecularPower, g_flSpecularNormalMultiple, g_flSpecularBloomBoostStrength, g_flSpecularBloomBoostThreshold;
 uniform float g_flCausticUVScaleMultiple, g_flCausticDistortion, g_flCausticsStrength, g_flCausticSharpness;
 uniform float g_flCausticDepthFallOffDistance, g_flCausticShadowCutOff, g_flReflectance, g_flReflectionDistanceEffect;
+uniform highp sampler2DArray g_tLowEndCubeMap; // the vmat's TextureLowEndCubeMap, six faces (world/water.js)
+uniform float g_flLowEndCubeMapIntensity, uLowEndCube; // uLowEndCube: 1 when the bake has the material's cube
 uniform float g_flEnvironmentMapBrightness, g_flGlossiness, g_flSSRStepSize, g_flSSRSampleJitter, g_flSSRBoostThreshold;
 uniform float g_flSSRBoost, g_flSSRBrightness, g_flSSRMaxThickness;
 uniform int g_nWaveIterations, g_nSSRMaxForwardSteps, g_bUseTriplanarCaustics;
@@ -381,6 +383,26 @@ void main() {
   float sunVis = 1.0;
 #endif
   vec3 DiffuseDirect = uSunDiffuse * saturate( dot( Normal, sunDir ) ) * sunVis;
+  // CS2 starts from a per-view term (PerViewLighting c18: scenesystem fills it from an int view attribute, so 0 here)
+  // CS2 adds every light of the view's clusters here (g_BarnLights: N.L x colour x falloff x 1 - its baked shadow channel):
+  // the map's light_omni2s, as the world draws them (world/maplights.js), each masked by its channel of the shadow lightmap
+#ifndef CS2_NO_LIGHTMAP
+#ifdef CS2_SHADOWS
+  vec4 mapShadow = texture( cs2Shadows, lmUv );
+#else
+  vec4 mapShadow = vec4( 0.0 );
+#endif
+  for ( int mi = 0; mi < 16; mi++ ) {
+    if ( mi >= cs2MapCount ) break;
+    vec3 mv = cs2MapPos[ mi ] - finalSurfacePos;
+    float md = length( mv );
+    vec2 mf = cs2MapFade[ mi ];
+    if ( md >= mf.x ) continue;
+    float mt = clamp( ( mf.x - md ) / max( mf.x - mf.y, 1e-3 ), 0.0, 1.0 );
+    float mvis = clamp( 1.0 - dot( mapShadow, cs2MapMask[ mi ] ), 0.0, 1.0 );
+    DiffuseDirect += cs2MapColor[ mi ] * ( mt * mt * ( 3.0 - 2.0 * mt ) / max( md * md, 1.0 ) * mvis ) * max( 0.0, dot( Normal, mv / max( md, 1e-6 ) ) );
+  }
+#endif
   vec3 returnColor = mix( ( DiffuseDirect + DiffuseIndirect ) * Albedo, combinedRefractedColor * waterDecayColorFactor, vec3( waterOpacity ) );
   returnColor = mix( returnColor, baseFogColor * 4.0 * DiffuseIndirect, vec3( waterFogAlpha * saturate( 1.0 - surfaceCoverageAlpha + noClue ) * ( 1.0 - g_flWaterFogShadowStrength ) ) );
 
@@ -393,15 +415,15 @@ void main() {
   tempSurfNormal = mat3( viewMatrix ) * normalize( tempSurfNormal );
   tempSurfNormal.yz *= 2.0;
   tempSurfNormal = transpose( mat3( viewMatrix ) ) * normalize( tempSurfNormal );
-  // without cubemaps (reflections off): the lightmap light here, what CS2 normalises a cubemap toward
+  // CS2's base reflection (the decompiled ps): the material's own low-end cube along the reflected view, x the lightmap's
+  // luma x g_flLowEndCubeMapIntensity x g_flEnvironmentMapBrightness (not the map's cubemaps). Its lod (one mip in the
+  // cubes seen so far) is sqrt(roughness) x 6. Without the cube baked: the lightmap light, as before
   vec3 finalReflectionColor = DiffuseIndirect;
-#if F_REFLECTION_TYPE > 0 && defined( CS2_CUBEMAPS )
-  if ( cs2CubeVisible > 0 ) {
-    vec3 nVS = normalize( ( viewMatrix * vec4( normalize( tempSurfNormal ), 0.0 ) ).xyz );
-    vec3 vVS = normalize( ( viewMatrix * vec4( viewDirInv, 0.0 ) ).xyz );
-    finalReflectionColor = cs2EnvSpecular( finalSurfacePos, nVS, vVS, matRoughness, GetLuma( DiffuseIndirect ) ) * g_flEnvironmentMapBrightness;
+  if ( uLowEndCube > 0.5 ) {
+    vec3 lowEndDir = -reflect( finalDirToCam, Normal );
+    vec3 lf = cs2CubeFace( lowEndDir );
+    finalReflectionColor = textureLod( g_tLowEndCubeMap, lf, matRoughness * 6.0 ).rgb * ( GetLuma( DiffuseIndirect ) * g_flLowEndCubeMapIntensity ) * g_flEnvironmentMapBrightness;
   }
-#endif
 #if F_REFLECTION_TYPE == 2
   {
     // CS2: x (0.5 + 0.5 * !g_bIsSkybox): the full count for world water; none looking straight down
@@ -438,8 +460,8 @@ void main() {
         + textureLod( uSceneColor, clamp( hitUV + vec2( o, 0.001953125 ), 0.0, 1.0 ), 0.0 ).rgb * 0.222222
         + textureLod( uSceneColor, clamp( hitUV + vec2( 0.001953125 ), 0.0, 1.0 ), 0.0 ).rgb * 0.111111;
       vec3 SsrReflectionResult = ( ssr + normalize( ssr + vec3( 0.001 ) ) * ClampToPositive( GetLuma( ssr ) - g_flSSRBoostThreshold ) * g_flSSRBoost ) * g_flSSRBrightness;
-      // CS2's screen v runs downward: its (1 - v) fade is the top of the screen, three's v = 1
-      finalReflectionColor = mix( finalReflectionColor, SsrReflectionResult, vec3( saturate( 1.0 - pow( fracOfTotalSteps, 4.0 ) ) * saturate( hitUV.y * 8.0 ) * saturate( ( 1.0 - hitUV.y ) * 8.0 ) * saturate( hitUV.x * 8.0 ) * saturate( ( 1.0 - hitUV.x ) * 8.0 ) ) );
+      // CS2: (1 - f^4) x saturate(v x 8) x saturate(stepMul x 2); its screen v runs downward, three's up (1 - v)
+      finalReflectionColor = mix( finalReflectionColor, SsrReflectionResult, vec3( saturate( 1.0 - pow( fracOfTotalSteps, 4.0 ) ) * saturate( ( 1.0 - hitUV.y ) * 8.0 ) * saturate( stepMul * 2.0 ) ) );
     }
   }
 #endif

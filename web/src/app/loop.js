@@ -16,6 +16,7 @@ import { formatTime, plural } from '../lib/format.js';
 import { getRecord } from './records.js';
 import { cameraPosition } from './camera.js';
 import { perfFrame } from './perf.js';
+import { pushPlayer, solidMatrices } from '../world/push.js';
 
 let acc = 0;
 let last = performance.now();
@@ -222,10 +223,12 @@ export function step() {
   }
   const ground = player.groundEntity && player.groundEntity.alive ? player.groundEntity : null;
   const groundBefore = ground ? ground.getWorld().clone() : null;
+  const solidsBefore = S.replay ? null : solidMatrices(world.dynamic); // a mover that runs into you pushes you (world/push.js)
   if (mapRuns(run)) engine.tick(CS.tick); // a mid-map stage holds still through its countdown
   G.renderer.record(engine.time);
   if (ground && !S.replay) player.ride(ground, groundBefore, ground.getWorld());
   world.dynamic = engine.solids();
+  if (solidsBefore) pushPlayer(player, solidsBefore, world.dynamic);
   if (S.replay) {
     // where the recorded player stood on this tick (app/replay-play.js); the recording's end is the replay's
     if (!applyPose(run.ticks, player)) { finish('end'); return; }
@@ -295,7 +298,9 @@ function footsteps(inp, before) {
   const hs = Math.hypot(player.velocity[0], player.velocity[1]);
   if (!player.onGround || hs <= 135 || inp.walk || player.ducked) return;
   run.stepDist = (run.stepDist || 0) + Math.hypot(player.origin[0] - before[0], player.origin[1] - before[1]);
-  if (run.stepDist >= 80) { run.stepDist = 0; G.audio.footstep?.(player.origin); }
+  // in water (any level) CS2's server steps with CT_Water.StepLeft (FUN_180c79490; its "wade" surface step besides,
+  // whose event the surface data doesn't name)
+  if (run.stepDist >= 80) { run.stepDist = 0; if (player.waterLevel > 0) G.audio.play('CT_Water.StepLeft', { pos: player.origin }); else G.audio.footstep?.(player.origin); }
 }
 
 export function updateHud() {

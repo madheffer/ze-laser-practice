@@ -29,7 +29,7 @@ static partial class WaterBake
     // shader -> the texture slots it reads that the glb doesn't carry as they are
     static readonly Dictionary<string, string[]> Slots = new(StringComparer.OrdinalIgnoreCase)
     {
-        ["csgo_water_fancy.vfx"] = ["g_tWavesNormalHeight", "g_tFoam", "g_tDebris", "g_tDebrisNormal"],
+        ["csgo_water_fancy.vfx"] = ["g_tWavesNormalHeight", "g_tFoam", "g_tDebris", "g_tDebrisNormal", "g_tLowEndCubeMap"],
         ["csgo_water.vfx"] = ["g_tNormal"],
     };
     // slots CS2 reads as .wy (a two-channel normal in alpha + green): written as (R, G) = (A, G), A = 1, so the
@@ -86,6 +86,7 @@ static partial class WaterBake
         Directory.CreateDirectory(waterDir);
         var map = new JsonObject();
         var frames = new JsonObject();
+        var cubes = new JsonObject();
         var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var vtex in wanted)
         {
@@ -94,6 +95,38 @@ static partial class WaterBake
                 var path = vtex.EndsWith("_c", StringComparison.OrdinalIgnoreCase) ? vtex : vtex + "_c";
                 using var res = loader.LoadFile(path);
                 if (res?.DataBlock is not Texture tex || tex.Width > MaxSide || tex.Height > MaxSide) { log($"  water: {SafePath.Describe(vtex)} missing"); continue; }
+                // a cube (csgo_water_fancy's TextureLowEndCubeMap: 4x4 HDR in the maps seen): its texels as floats, every face
+                // in CS2's order (+X -X +Y -Y +Z -Z), for world/water.js to sample as six layers
+                if (tex.Flags.HasFlag(VTexFlags.CUBE_TEXTURE))
+                {
+                    if (tex.Height != tex.Width) { log($"  water: {SafePath.Describe(vtex)}: a {tex.Width}x{tex.Height} cube, not exported"); continue; }
+                    var faces = new JsonArray();
+                    // VRF decodes the shifting pool's 4x4 BC6H cubes to 1x1 faces (one colour each): export what it decodes, a bigger
+                    // cube (mist's default_cube, 256) box-filtered to CubeMax a side (the shader reads its single lod anyway)
+                    var side = 0; var step = 1;
+                    for (var f = 0; f < 6; f++)
+                    {
+                        using var fb = tex.GenerateBitmap(depth: 0, face: (Texture.CubemapFace)f, mipLevel: 0);
+                        if (f == 0) { step = Math.Max(1, (fb.Width + CubeMax - 1) / CubeMax); side = fb.Width / step; }
+                        if (fb.Height != fb.Width || fb.Width / step != side || side < 1) throw new InvalidDataException($"cube face {fb.Width}x{fb.Height}");
+                        for (var y = 0; y < side; y++)
+                            for (var x = 0; x < side; x++)
+                            {
+                                double r = 0, g = 0, b = 0;
+                                for (var sy = 0; sy < step; sy++)
+                                    for (var sx = 0; sx < step; sx++)
+                                    {
+                                        var t = Texel(fb, x * step + sx, y * step + sy, tex.IsHighDynamicRange);
+                                        r += t.r; g += t.g; b += t.b;
+                                    }
+                                var n = (double)step * step;
+                                faces.Add(Math.Round(r / n, 6)); faces.Add(Math.Round(g / n, 6)); faces.Add(Math.Round(b / n, 6));
+                            }
+                    }
+                    cubes[vtex] = new JsonObject { ["size"] = side, ["faces"] = faces };
+                    log($"  water: {vtex} ({tex.Format} {tex.Width}x{tex.Width} cube, {side}x{side} faces) -> water.json cubes");
+                    continue;
+                }
                 var stem = Unsafe().Replace(Path.GetFileNameWithoutExtension(vtex).ToLowerInvariant(), "_");
                 if (stem.Length == 0 || stem.Length > 100) stem = "tex";
                 var name = stem + ".png";
@@ -110,8 +143,24 @@ static partial class WaterBake
             }
             catch (Exception e) { log($"  water: {SafePath.Describe(vtex)}: {e.Message}"); }
         }
-        File.WriteAllText(Path.Combine(waterDir, "water.json"), new JsonObject { ["textures"] = map, ["frames"] = frames }.ToJsonString());
+        File.WriteAllText(Path.Combine(waterDir, "water.json"), new JsonObject { ["textures"] = map, ["frames"] = frames, ["cubes"] = cubes }.ToJsonString());
         log($"water: {map.Count} textures");
+    }
+
+    const int CubeMax = 16;
+
+    // one texel, linear: an HDR texture's floats as they are, an 8-bit one's sRGB decoded
+    static (double r, double g, double b) Texel(SKBitmap bmp, int x, int y, bool hdr)
+    {
+        if (bmp.ColorType == SKColorType.RgbaF32)
+        {
+            var px = System.Runtime.InteropServices.MemoryMarshal.Cast<byte, float>(bmp.GetPixelSpan());
+            var k = (y * bmp.Width + x) * 4;
+            return (Math.Max(0, px[k]), Math.Max(0, px[k + 1]), Math.Max(0, px[k + 2]));
+        }
+        var c = bmp.GetPixel(x, y);
+        static double Lin(byte v) { var s = v / 255.0; return s <= 0.04045 ? s / 12.92 : Math.Pow((s + 0.055) / 1.055, 2.4); }
+        return hdr ? (c.Red / 255.0, c.Green / 255.0, c.Blue / 255.0) : (Lin(c.Red), Lin(c.Green), Lin(c.Blue));
     }
 
     // a texture array's slices, each at most FrameSide px, stacked top to bottom (slice 0 on top)

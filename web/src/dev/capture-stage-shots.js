@@ -6,16 +6,23 @@
 // the HUD is HTML and the viewmodel is its own pass), scale it into a 320x180 webp (quality 0.6, a few KB) and POST it
 // to the dev server (server/stage-shots-dev.js writes maps/<map>/stages/<id>.webp). Audio stays silent throughout,
 // and nothing is written to the saved settings. Then `node tools/index-maps.mjs` lists the new thumbnails.
+// A stage whose spawn view says little (the shifting pool's tube before any wall) passes `prepare`: an async (L) => {}
+// run after the stage is ready, which may advance the paused simulation to the moment worth showing.
+// captureCard(i, opts): the same, as the map picker card's picture (maps/<map>/card.webp, CARD_W x CARD_H).
 export const W = 320;
 export const H = 180;
 export const QUALITY = 0.6;
+export const CARD_W = 640;
+export const CARD_H = 240;
+export const CARD_QUALITY = 0.7;
 const READY_MS = 25000;
 const DARK = 4; // mean channel value (0-255) under which a frame counts as black
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // one frame of the world, cover-cropped to W x H, as a webp Blob
-export function grab(L = window.__lasers) {
+export function grab(L = window.__lasers, { w = W, h = H, quality = QUALITY } = {}) {
+  const W = w, H = h, QUALITY = quality;
   const r = L.renderer;
   r.render(); // right before reading the canvas: the drawing buffer is still intact within this task
   const src = r.renderer.domElement;
@@ -36,8 +43,8 @@ export function grab(L = window.__lasers) {
   return new Promise((resolve, reject) => c.toBlob((b) => (b ? resolve(b) : reject(new Error('toBlob failed'))), 'image/webp', QUALITY));
 }
 
-export async function upload(map, id, blob) {
-  const res = await fetch(`/__dev/stage-shot?map=${encodeURIComponent(map)}&id=${encodeURIComponent(id)}`, {
+export async function upload(map, id, blob, kind = 'stage') {
+  const res = await fetch(`/__dev/stage-shot?map=${encodeURIComponent(map)}&id=${encodeURIComponent(id)}&kind=${kind}`, {
     method: 'POST', headers: { 'Content-Type': 'image/webp' }, body: blob,
   });
   if (!res.ok) throw new Error(`${id}: ${res.status} ${await res.text()}`);
@@ -45,7 +52,7 @@ export async function upload(map, id, blob) {
 }
 
 // Capture one stage (index into __lasers.scenarios()). Returns { id, bytes }.
-export async function captureStage(i, { settle = 300, maxPitch = 12 } = {}) {
+export async function captureStage(i, { settle = 300, maxPitch = 12, prepare = null, card = false } = {}) {
   const L = window.__lasers;
   const s = L.scenarios()[i];
   if (!s) throw new Error(`no stage ${i}`);
@@ -64,15 +71,19 @@ export async function captureStage(i, { settle = 300, maxPitch = 12 } = {}) {
     // the sky (mist's throne: -40) still shows where you are
     const p = L.player;
     if (p && Number.isFinite(p.pitch)) p.pitch = Math.max(-maxPitch, Math.min(maxPitch, p.pitch));
+    if (prepare) { if (!L.paused) L.pause(); await prepare(L); }
     await sleep(settle); // a couple of frames at the spawn: the camera is the player's view
-    const blob = await grab(L);
-    const out = await upload(L.map.name, s.id, blob);
+    const blob = await grab(L, card ? { w: CARD_W, h: CARD_H, quality: CARD_QUALITY } : {});
+    const out = await upload(L.map.name, s.id, blob, card ? 'card' : 'stage');
     return { id: s.id, bytes: out.bytes };
   } finally {
     if (L.run) L.run.done = true; // end it: no clock, no prompt on leaving
     audio.resume = resume;
   }
 }
+
+// The map picker card's picture, from stage i (posed as captureStage does)
+export function captureCard(i, opts = {}) { return captureStage(i, { ...opts, card: true }); }
 
 // Capture several stages (default: every top-level stage of the open map, the cards that show a thumbnail).
 export async function captureStages(list) {

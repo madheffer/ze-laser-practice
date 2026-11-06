@@ -16,6 +16,7 @@ import { createRunEngine, hazardName, TICK, COUNTDOWN, startIfDue, mapRuns, winD
 import { useItems } from '../src/world/items.js';
 import { CollisionWorld, makeTrace } from '../src/world/collision.js';
 import { bulletWorld, BULLET_MASK } from '../src/world/bullets.js';
+import { waterQuery } from '../src/world/water-volumes.js';
 import { CS, standsFree } from '../src/world/movement.js';
 import { GUNS, PISTOLS, KNIFE, DEFAULT_GUN, DEFAULT_PISTOL } from '../src/lib/weapons.js';
 
@@ -102,6 +103,15 @@ export class PlayerCheck {
       },
     });
     this.engine = this.run.engine;
+    // the map's water (world/water-volumes.js): swimming has no gravity, so the fly check leaves a swimmer alone
+    this.water = waterQuery(this.engine, assets.fx);
+  }
+
+  // CS2's water mode (world/water-move.js): m_flWaterLevel >= 0.5, eyes down to the feet
+  swimming(o, ducked) {
+    const eye = ducked ? CS.viewDuck : CS.viewStand;
+    const r = this.water.trace([o[0], o[1], o[2] + eye], o);
+    return r.fraction < 1 && 1 - r.fraction >= 0.5;
   }
 
   // a push or a map-set velocity: that much extra speed is allowed (and gravity may be fought) for a while
@@ -254,7 +264,8 @@ export class PlayerCheck {
     // a player wedged motionless against geometry in the air is stuck (CS movement can lock a falling hull in a
     // crease), not flying; a motionless hull touching nothing is hovering
     const wedged = !onGround && Math.abs(d[0]) + Math.abs(d[1]) + Math.abs(d[2]) < 0.01 && this.touching(to, h);
-    if (!onGround && !boosted && !teleported && !wedged && this.wasAir) {
+    const swim = this.swimming(from, this.ducked) || this.swimming(to, ducked);
+    if (!onGround && !boosted && !teleported && !wedged && !swim && this.wasAir) {
       this.air.push(vz - this.vz);
       if (this.air.length >= AIR_WINDOW) {
         const mean = this.air.reduce((x, y) => x + y, 0) / this.air.length;

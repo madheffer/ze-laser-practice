@@ -3,6 +3,7 @@
 //
 // Units are Source units (inches), Z up. origin = the bottom centre of the player's hull.
 import { makeTrace } from './collision.js';
+import { WATER, checkWater, swimJump, waterMove, checkWaterJump, waterJumpTick, waterLevelSounds } from './water-move.js';
 
 export const CS = {
   tick: 1 / 64,
@@ -98,7 +99,21 @@ export class Player {
     this.ticks = 0;
     this.landTick = -Infinity;
     this.landVz = 0;
+    // water (world/water-move.js): the map's water query (world/water-volumes.js; null = no water), m_flWaterLevel and
+    // its level, slime or water, the swim stroke's sound timer and the water jump; onWaterSound(name) for its sounds
+    this.water = null;
+    this.waterFrac = 0;
+    this.waterLevel = 0;
+    this.waterSlime = false;
+    this.swimSoundMs = 0;
+    this.waterJumpMs = 0;
+    this.waterJumpVel = [0, 0];
+    this.onWaterSound = null;
   }
+
+  // the view offset CheckWater traces from: CS2's view vectors (64, ducked 46), not the duck blend
+  viewZ() { return this.ducked ? CS.viewDuck : CS.viewStand; }
+  stepSize() { return this.cvars.stepSize ?? CS.stepSize; }
 
   // The modern jump's strength right after a landing (cs2_server FUN_180ab23e0): clamp(1 + 0.0005 x the landing's
   // vertical speed, 0.2, 1), plus 0.6 per second spent on the ground after the landing tick, capped at 1. Landing
@@ -126,6 +141,7 @@ export class Player {
     this.duckFlag = false;
     this.lastDuckTime = -Infinity;
     this.onGround = false;
+    this.waterJumpMs = 0;
     this.categorize();
   }
 
@@ -164,10 +180,29 @@ export class Player {
     const wantJump = input.jump && (settings.autoBhop || !this.jumpHeld || !!input.jumpPress);
     this.jumpHeld = input.jump;
 
+    if (this.stamina > 0) this.stamina = Math.max(0, this.stamina - CS.staminaRecovery * dt);
+
+    // water (world/water-move.js): the swim stroke's timer, where the water is now, then the water jump or the water mode
+    if (this.swimSoundMs > 0) this.swimSoundMs = Math.max(0, this.swimSoundMs - dt * 1000);
+    const oldLevel = this.waterLevel, oldFrac = this.waterFrac;
+    if (this.water) checkWater(this, this.viewZ());
+    if (this.water && (waterJumpTick(this, dt) || this.waterLevel > 2)) {
+      if (this.waterJumpMs > 0) this.flyMove(dt);
+      else this.swimTick(input, wantJump, dt);
+      this.baseVelocity = v3();
+      // CategorizePosition only flags the ground (Source / CS2 never move you in it): snapping onto the floor here kept a
+      // swim stroke (100 u/s, 1.6 u a tick) from ever leaving the bottom, so a scroll-wheel jump did nothing there
+      this.categorize(false);
+      if (this.onGround) this.velocity[2] = 0;
+      this.afterWater(oldLevel, oldFrac, wasOnGround, fallSpeed);
+      return;
+    }
+    // wading (level 2+) on the ground: the acceleration x sv_water_slow_amount, standing and not walking (FUN_180ab0310)
+    const wade = this.waterLevel >= 2 && !this.ducked && !input.walk ? WATER.slowAmount : 1;
+
     // gravity (half)
     if (!this.onGround) this.velocity[2] -= gravity * 0.5 * dt;
 
-    if (this.stamina > 0) this.stamina = Math.max(0, this.stamina - CS.staminaRecovery * dt);
 
     if (this.onGround && wantJump) {
       // CS2's jump velocity (cs2_server modern FUN_180adfa70 / legacy FUN_180ab5a30, the same formula): the impulse
@@ -193,7 +228,7 @@ export class Player {
     if (this.onGround) {
       this.velocity[2] = 0;
       this.friction(dt);
-      this.accelerate(wish, wishSpeed, this.cvars.accelerate ?? CS.accelerate, dt);
+      this.accelerate(wish, wishSpeed, (this.cvars.accelerate ?? CS.accelerate) * wade, dt);
       const sp = Math.hypot(this.velocity[0], this.velocity[1]);
       if (sp > this.maxSpeed * this.runSpeed && wishSpeed > 0) {
         // Source clamps ground speed to the current max
@@ -216,16 +251,47 @@ export class Player {
     this.baseVelocity = v3();
 
     this.categorize();
-    if (!wasOnGround && this.onGround) {
-      if (CS.legacyJump) this.stamina = Math.min(CS.staminaMax, this.stamina + CS.staminaLandCost * Math.max(0, fallSpeed));
-      this.landTick = this.ticks;
-      this.landVz = -fallSpeed;
-      this.onLand?.(fallSpeed);
-    }
+    this.landed(wasOnGround, fallSpeed);
     if (!this.onGround) this.velocity[2] -= gravity * 0.5 * dt;
     else if (this.velocity[2] < 0) this.velocity[2] = 0;
 
+    if (this.water) { checkWater(this, this.viewZ()); waterLevelSounds(this, oldLevel, oldFrac); }
+    this.clampVelocity();
+  }
+
+  clampVelocity() {
     for (let i = 0; i < 3; i++) this.velocity[i] = Math.max(-CS.maxVelocity, Math.min(CS.maxVelocity, this.velocity[i]));
+  }
+
+  // touching down this tick: stamina, the modern jump's landing, the landing callback (fall damage, its sound). In
+  // water a landing hurts nothing (Source's CheckFalling: "They landed in water"; UNSETTLED for CS2) and client.dll
+  // plays Land_WaterVol.StepLeft for one at 260 u/s or more (FUN_1808c1df0)
+  landed(wasOnGround, fallSpeed) {
+    if (wasOnGround || !this.onGround) return;
+    if (CS.legacyJump) this.stamina = Math.min(CS.staminaMax, this.stamina + CS.staminaLandCost * Math.max(0, fallSpeed));
+    this.landTick = this.ticks;
+    this.landVz = -fallSpeed;
+    if (this.waterLevel > 0) { if (fallSpeed >= 260) this.onWaterSound?.('Land_WaterVol.StepLeft'); return; }
+    this.onLand?.(fallSpeed);
+  }
+
+  // The water mode's move (water-move.js): CheckWaterJump at level 3, the jump button (swim up), WaterMove
+  swimTick(input, wantJump, dt) {
+    if (this.waterLevel === 3) checkWaterJump(this);
+    if (this.velocity[2] < 0 && this.waterJumpMs) this.waterJumpMs = 0;
+    if (wantJump) swimJump(this);
+    // CheckParameters' max speed: the weapon's x runspeed, x 0.52 walking, x (1 - stamina / 100)^2
+    let max = this.maxSpeed * this.runSpeed;
+    if (input.walk && !input.duck) max *= CS.walkFactor;
+    if (this.stamina > 0) max *= Math.min(1, Math.max(0, 1 - this.stamina / 100)) ** 2;
+    waterMove(this, input, max, dt, this.cvars.accelerate ?? CS.accelerate, this.cvars.friction ?? CS.friction);
+  }
+
+  afterWater(oldLevel, oldFrac, wasOnGround, fallSpeed) {
+    this.landed(wasOnGround, fallSpeed);
+    checkWater(this, this.viewZ());
+    waterLevelSounds(this, oldLevel, oldFrac);
+    this.clampVelocity();
   }
 
   handleDuck(input, dt) {
@@ -414,12 +480,13 @@ export class Player {
     this.yaw += ((ya - yb) * 180) / Math.PI;
   }
 
-  categorize() {
+  // snap: settle onto the floor found when landing (the walk / air move); the water mode only takes the flag
+  categorize(snap = true) {
     if (this.velocity[2] > 140) { this.onGround = false; this.groundEntity = null; return; }
     const down = [this.origin[0], this.origin[1], this.origin[2] - 2];
     const tr = this.trace(this.origin, down);
     if (tr.fraction < 1 && tr.normal[2] >= CS.groundNormalZ && !tr.allSolid) {
-      if (!this.onGround) this.origin = [tr.endPos[0], tr.endPos[1], tr.endPos[2] - this.height / 2];
+      if (!this.onGround && snap) this.origin = [tr.endPos[0], tr.endPos[1], tr.endPos[2] - this.height / 2];
       this.onGround = true;
       this.groundEntity = tr.hit;
     } else {

@@ -12,8 +12,15 @@
 // settings over its fadetime (the tone-curve numbers, the exposure and the lookup table each blended linearly).
 // Without an engine (no run yet) the map-wide pick stands: the enabled master, else the first enabled volume.
 // A volume whose .vpost the bake did not export (a stock CS2 one) is skipped: the map-wide pick shows instead.
+// Vignette (m_vignetteParams, after the lookup): CS2's post_process shader D_VIGNETTE (csgo/shaders_vulkan_dir.vpk,
+// post_process_vulkan_50_ps.vcs, VRF 20.1 SPIR-V reflection), exactly: d = |uv x 2 - 1 - centre| (uv 0..1 down the
+// screen), inner k = c5, outer K = c5 + c4, v = 1 - smoothstep(k^2 (sum (k d)^c6)^c7, K^2 (sum (K d)^c6)^c7, 1),
+// out = mix(tint x c, c, v) x mix(c1, 1, v) + c2 (1 - v). UNSETTLED: the shader's constants are unnamed and the code that
+// fills them from the vpost wasn't found (not in materialsystem2, which only parses them); read here as c5 = radius,
+// c4 = feather, c6 = 2 / roundness, c7 = -1 / c6 (then v ramps from the radius out over the feather, a round fit to
+// the screen at roundness 1), c1 = 1 + min(strength, 0) (darkens to black at -1), c2 = max(strength, 0) (lightens).
 // Not yet: auto exposure (CS2 meters the frame and clamps to the volume's min / max exposure; here the exposure is 1
-// clamped into that range, which is what every baked map so far asks for at rest), vignette. Bloom: the volume's
+// clamped into that range, which is what every baked map so far asks for at rest). Bloom: the volume's
 // m_bloomParams ride along here (cleanBloom, blended in a fade) and world/bloom.js draws them.
 // UNSETTLED: CS2's client blend between two volumes (parameter lerp vs a blend of the two results) is not
 // decompiled; the lerp here matches both at the ends of a fade.
@@ -37,6 +44,19 @@ vec3 cs2Curve(vec3 x) {
        / (x * (cs2ToneA.x * x + cs2ToneA.y) + cs2ToneB.y * cs2ToneA.w) - cs2ToneB.x / cs2ToneB.y;
 }
 vec3 cs2Tonemap(vec3 hdr) { return cs2Curve(min(max(hdr, vec3(0.0)) * cs2Exposure * 2.8, vec3(cs2ToneB.w))) * cs2ToneB.z; }
+uniform float cs2VigOn;
+uniform vec4 cs2VigA; // c1 (edge scale), c2 (edge add), c4 (feather), c5 (inner)
+uniform vec4 cs2VigB; // centre xy, c6, c7
+uniform vec3 cs2VigTint;
+vec3 cs2Vignette(vec3 c, vec2 uv) {
+  if (cs2VigOn <= 0.0) return c;
+  float k = cs2VigA.w, K = cs2VigA.w + cs2VigA.z;
+  vec2 d = abs(vec2(2.0) * uv - vec2(1.0) - cs2VigB.xy);
+  vec2 a = pow(vec2(k) * d, vec2(cs2VigB.z)), b = pow(vec2(K) * d, vec2(cs2VigB.z));
+  // at the centre the sums are 0 and the negative power infinite (no vignette there): kept finite for WebGL
+  float v = 1.0 - smoothstep(k * k * pow(max(a.x + a.y, 1e-30), cs2VigB.w), K * K * pow(max(b.x + b.y, 1e-30), cs2VigB.w), 1.0);
+  return mix(cs2VigTint * c, c, v) * mix(cs2VigA.x, 1.0, v) + vec3(cs2VigA.y - cs2VigA.y * v);
+}
 vec3 cs2ColorCorrect(vec3 srgb) {
   if (cs2LutWeight <= 0.0) return srgb;
   vec3 uvw = clamp(srgb, 0.0, 1.0) * (1.0 - 1.0 / cs2LutDim) + 0.5 / cs2LutDim;
@@ -67,6 +87,21 @@ const cleanBloom = (b) => (b && typeof b === 'object' ? {
   tints: Array.from({ length: 5 }, (_, k) => [0, 1, 2].map((q) => finite(b.tints?.[k]?.[q], 1))),
 } : null);
 const NO_BLOOM = cleanBloom({});
+// a .vpost's vignette (lasers-bake --post) as the shader's constants; null without one. NO_VIGNETTE leaves the frame as
+// it is (strength 0, white tint): what a fade from or to a volume without one blends with
+const vignetteOf = (g) => {
+  if (!g || typeof g !== 'object') return null;
+  const s = finite(g.strength, 0), p = 2 / Math.max(1e-3, finite(g.roundness, 1));
+  return { a: [1 + Math.min(s, 0), Math.max(s, 0), Math.max(0, finite(g.feather, 0.5)), Math.max(0, finite(g.radius, 0.5))],
+    b: [finite(g.center?.[0], 0), finite(g.center?.[1], 0), p, -1 / p], tint: [0, 1, 2].map((k) => finite(g.tint?.[k], 1)) };
+};
+const NO_VIGNETTE = { a: [1, 0, 0.5, 0.5], b: [0, 0, 2, -0.5], tint: [1, 1, 1] };
+const mixVignette = (x, y, w) => {
+  if (!x && !y) return null;
+  x ||= NO_VIGNETTE; y ||= NO_VIGNETTE;
+  const m = (p, q) => p.map((v, k) => lerp(v, q[k], w));
+  return { a: m(x.a, y.a), b: m(x.b, y.b), tint: m(x.tint, y.tint) };
+};
 const lerp = (a, b, w) => a + (b - a) * w;
 // a fade between two volumes blends the bloom numbers like the rest (no bloom = zero strengths)
 const mixBloom = (a, b, w) => {
@@ -119,6 +154,7 @@ export class PostProcess {
     this.uniforms = {
       cs2Exposure: { value: 1 }, cs2ToneA: { value: new THREE.Vector4() }, cs2ToneB: { value: new THREE.Vector4() },
       cs2Lut: { value: empty }, cs2LutWeight: { value: 0 }, cs2LutDim: { value: 1 },
+      cs2VigOn: { value: 0 }, cs2VigA: { value: new THREE.Vector4() }, cs2VigB: { value: new THREE.Vector4() }, cs2VigTint: { value: new THREE.Vector3(1, 1, 1) },
     };
     this.profiles = new Map(); // .vpost path -> { params, lut: Uint8Array | null, dim }
     this.dim = 0; // the shared lookup size (0: no volume has one)
@@ -151,7 +187,7 @@ export class PostProcess {
       if (!hash) return;
       try {
         const post = await fetchJson(versioned(`${base}lighting/post/${hash}.json`, lightmaps.version));
-        const prof = { params: cleanParams(post?.tonemap), bloom: cleanBloom(post?.bloom), lut: null, dim: 0 };
+        const prof = { params: cleanParams(post?.tonemap), bloom: cleanBloom(post?.bloom), vignette: vignetteOf(post?.vignette), lut: null, dim: 0 };
         const dim = post?.lutDim;
         if (Number.isInteger(dim) && dim >= 2 && dim <= MAX_LUT) {
           const buf = await fetchBuffer(versioned(`${base}lighting/post/${hash}.lut`, lightmaps.version));
@@ -184,7 +220,7 @@ export class PostProcess {
     const prof = vol ? this.profiles.get(vpostKey(vol)) : null;
     const params = prof?.params || cleanParams(DEFAULTS);
     const lut = this.dim && prof?.lut ? (prof.dim === this.dim ? Float32Array.from(prof.lut) : lutAt(prof.lut, prof.dim, this.dim)) : null;
-    return { params, exposure: volumeExposure(vol) * 2 ** params.m_flExposureBias, lut, bloom: prof?.bloom || null };
+    return { params, exposure: volumeExposure(vol) * 2 ** params.m_flExposureBias, lut, bloom: prof?.bloom || null, vignette: prof?.vignette || null };
   }
 
   target(e) {
@@ -205,6 +241,9 @@ export class PostProcess {
     this.uniforms.cs2Exposure.value = s.exposure;
     this.bloom = s.bloom || null; // world/bloom.js reads it each frame
     this.shown = s;
+    const g = s.vignette, u = this.uniforms;
+    u.cs2VigOn.value = g ? 1 : 0;
+    if (g) { u.cs2VigA.value.fromArray(g.a); u.cs2VigB.value.fromArray(g.b); u.cs2VigTint.value.fromArray(g.tint); }
     if (!this.lutTex) { this.uniforms.cs2LutWeight.value = 0; return; }
     if (!s.lut) { this.uniforms.cs2LutWeight.value = 0; return; }
     const data = this.lutTex.image.data;
@@ -240,6 +279,6 @@ export class PostProcess {
       lut = new Float32Array(la.length); // its own array: the next fade may start from this
       for (let i = 0; i < la.length; i++) lut[i] = la[i] + (lb[i] - la[i]) * w;
     }
-    return { params, exposure: a.exposure + (b.exposure - a.exposure) * w, lut, bloom: mixBloom(a.bloom, b.bloom, w) };
+    return { params, exposure: a.exposure + (b.exposure - a.exposure) * w, lut, bloom: mixBloom(a.bloom, b.bloom, w), vignette: mixVignette(a.vignette, b.vignette, w) };
   }
 }

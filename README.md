@@ -39,6 +39,7 @@ CS2 and its workshop folder are found from Steam's library list (`node tools/ste
 | ze__hell_p | 3351648056 (the spike boss room) |
 | ze_alien_shooter | 3425735986 (the Laser Alien) |
 | ze_minecraft_sakura | 3195096311 (L-U-C-I-D-D-R-E-A-M and the ending) |
+| ze_the_shifting_pool | 3554883009 (the ride-the-wave tunnel minigame) |
 
 ## Database (runs and leaderboards)
 
@@ -210,7 +211,7 @@ All coordinates are Source units (inches, Z up), except the glbs, which are VRF'
 | `particles.json` | *(ours)* a summary per effect an `info_particle_system` plays: colour, emit box, radius, rate, children |
 | `world/<map>.glb` | the world node, textures beside it as PNGs capped at 1024 px |
 | `models/<path>.glb` | each entity model, placed and moved at runtime |
-| `water/water.json` + `water/*.png` | *(ours)* the CS2 water shaders' textures the glTF exporter drops or flattens (`csgo_water_fancy`: waves normal + height, foam, debris, debris normal; `csgo_water`: its animated normal, every frame stacked top to bottom, (A, G) written as (R, G)): `{ textures: { <vtex path>: <file>.png }, frames: { <vtex path>: n } }`, raw channels. Only maps with CS2 water. Only this: `lasers-bake --water <workshop.vpk> <map folder>` |
+| `water/water.json` + `water/*.png` | *(ours)* the CS2 water shaders' textures the glTF exporter drops or flattens (`csgo_water_fancy`: waves normal + height, foam, debris, debris normal; `csgo_water`: its animated normal, every frame stacked top to bottom, (A, G) written as (R, G); `csgo_water_fancy`'s low-end cube as float texels): `{ textures: { <vtex path>: <file>.png }, frames: { <vtex path>: n }, cubes: { <vtex path>: { size, faces: [6 x size x size x RGB] } } }`, raw channels (cubes: faces +X -X +Y -Y +Z -Z, linear, at most 16 a side). Only maps with CS2 water. Only this: `lasers-bake --water <workshop.vpk> <map folder>` |
 
 ## Scenarios
 
@@ -245,7 +246,7 @@ standing still. Fields we added (cybo's site ignores them):
 | `setup` | inputs fired the moment you are placed (after any fast-forward): puts the map where its own sequence would be for a stage that starts past the relays that do it. ze_deadcore's drills move `des2` (its catch-all fall destination) to where the map keeps it for that part, so a fall puts you back where a human would land |
 | `music` | the map's own inputs that start the track a stage begins in the middle of (a level template, a boss track), fired with `start`, once (endless re-fires start but not this). westersand's level music lives in its level templates (`Easy_Temp`, `Tomb_Temp_Init`, `Epic_Temp`) |
 | `player.name` | the targetname the map gives a human before this point (westersand's spawn room names everyone `None`); name filters test it |
-| `view` | `{min, max}` (Source units): the only part of the map the stage draws. World chunks outside it aren't streamed, and world meshes and entity models outside it are hidden (collision and entities stay whole). Westersand's Chaos draws its deck, the plate and Chaos instead of ~860k triangles of map |
+| `view` | `{min, max}` (Source units): the only part of the map the stage draws. World chunks outside it aren't streamed, world meshes and entity models outside it are hidden, and an entity's model or particle effect isn't even downloaded until the entity reaches into it (its collision hulls, padded 512, stand in for the model); only templates the stage's own inputs or the triggers / timers inside it can reach are warmed (collision and entities stay whole). Westersand's Chaos draws its deck, the plate and Chaos instead of ~860k triangles of map; the shifting pool's tube downloads 9 MB instead of ~30 |
 | `hide` | names (a trailing `*` matches a prefix) of entities the stage doesn't draw, a trainer choice. Also allowed at the file's top level, for every stage of the map. Westersand hides its floating "BOSS" HP bars (`*_Hpbar`), since the HUD has its own |
 | `scripts` | `{ "<point_script>": { "port": "bosshud", ... } }`: runs a map's CS2 JavaScript (`cs_script`) as a hand port with the map's own numbers copied from its script (`world/entities/classes/scripts.js`; a map's code is never run). `bosshud` is GFL's BossHud port: `bosses` (init input -> `start`, `max`, `perHuman`, `relay`), `adds` (repeated per simulated human like an AddHealth), `damage` (input -> HP off). Point the stage's boss `counter` at the point_script with `counterMode: "hits"`. ze_alien_shooter's Laser Alien |
 | `loseTo` | destinations (`[PR#]name`) a map teleport to which takes you out of the stage: a holding pen the map keeps the humans it took out in (ze_minecraft_sakura's `mciddreams_huamn_dst`, where every laser hit sends you). Solo that is the end of the run; in a round you play on from it, and the round is lost once every player still alive is in it (`world/run-engine.js` sentOut, `server/coop-round.js` checkEnd) |
@@ -550,7 +551,10 @@ Invite link and who is alive (with each player's ping). Change stage and Setting
   - not yet: bloom, auto exposure, per-area post volumes
 - **World streaming** (`tools/chunk-world.mjs`, `world/stream.js`, BAKING.md): the world loads in 4096-unit chunks around
   you (a solo stage waits for its area), joined / instanced to cut draw calls; collision and entities are whole, so the
-  game plays the same. Video → World loading (Auto / Area only / Whole map); `?nochunks` loads the whole world glb
+  game plays the same. Video → World loading (Auto / Area only / Whole map); `?nochunks` loads the whole world glb.
+  Mid-stage spawns are warmed in the background (`world/warm.js`): the point_templates the stage can reach through the
+  map's I/O (from its own inputs, and from every entity with outputs, or on a stage with a `view` only the triggers,
+  timers and buttons inside it), nearest first
 - **Performance** (Settings → Video): render resolution, MSAA, fog, reflections (instant: uniforms, nothing recompiles),
   CS2 baked lighting off (skips the download) and Quality (Auto / High / Medium / Low, next map load).
 - **Cut-out alpha** (`AlphaBake.cs`, also `lasers-bake --alpha`): VRF 20.1's glTF exporter writes alpha-tested materials
@@ -558,13 +562,34 @@ Invite link and who is alive (with each player's ping). Change stage and Setting
   alpha back from the vmat's `g_tColor` (VRF's RGB kept).
 - **Water** (`world/water.js` picks the shader, `WaterBake.cs` bakes the textures): both CS2 water shaders run as CS2
   has them, every number from the vmat. `csgo_water_fancy` (`water-fancy*.js`, VRF's translation of the decompiled
-  shader): waves, refraction with depth fog and decay colour, caustics, foam and debris, cubemap + screen-space
-  reflections, the sun's glint. `csgo_water` (`water-basic*.js`, decompiled from CS2's own vcs with VRF's SPIR-V
+  shader, checked against CS2's own `csgo_water_fancy_vulkan_50_ps`, combo 92, lightmap mode): waves, refraction with
+  depth fog and decay colour, caustics, foam and debris, the sun's glint. Reflection as CS2 draws it: the vmat's own
+  low-end cube (`TextureLowEndCubeMap`, not the map's cubemaps) along the reflected view x the lightmap's luma x
+  `g_flLowEndCubeMapIntensity`, then SSR over it faded by (1 - f^4) x the screen's top edge x the step count. Direct
+  light is the sun plus the map's light_omni2s (`world/maplights.js`), each masked by its baked shadow channel; CS2's
+  per-view term in front of them (PerViewLighting c18) comes from an int view attribute in scenesystem (0x8310aef1), so
+  it's taken as 0. The tunnel water on ze_the_shifting_pool is baked by CS2 as unlit (irradiance exactly 0, every
+  shadow channel 1), so from above it shows only what SSR finds and the refraction through its fog, as in the game. `csgo_water` (`water-basic*.js`, decompiled from CS2's own vcs with VRF's SPIR-V
   reflection, defaults and parameter expressions from the same files): animated normal frames, refraction tinted and
   fogged by the water's depth, cubemap reflection with Fresnel, a directional highlight. Water on an entity's model, or
   with baked lighting off, takes the sky's ambient. A water shader not ported is logged and drawn flat. Not ported:
-  the player / bullet ripple buffer (`g_tWaterEffectsMap`), cubemap fog. Quality follows the preset (fancy only):
-  High as authored, Medium halves SSR and drops the blurred refraction, Low has no SSR or caustics and 2 wave octaves.
+  the player / bullet ripple buffer (`g_tWaterEffectsMap`), cubemap fog. Every quality level draws the vmat as
+  authored: CS2's own low shader quality keeps SSR, caustics and every wave octave.
+- **Swimming** (`world/water-volumes.js`, `world/water-move.js`, from cs2_server's movement services): water is what CS2's
+  traces see on the water / slime layers (mask 0x18000): `func_water` volumes, other shapes on those layers (the shifting
+  pool's tidal-wave trains) and the world's water triangles. CheckWater traces from your eyes (64, ducked 46) to your feet;
+  m_flWaterLevel = the part under water, level int(x 4 + 1). At level 3+ (half under) you swim: Source 2013's WaterMove
+  (wish speed x 0.8, sv_friction / sv_accelerate, sink at 60 with no input, looking up rises faster, jump held adds the
+  max speed), no gravity, a jump press (Space or each wheel notch) sets vertical speed 100 (slime 80) with `Player.Swim`
+  at most once a second; wading at level 2 on the ground accelerates x sv_water_slow_amount 0.9 (not when crouched or
+  walking: crouched is the plain duck slowdown). Crouching changes nothing else in water (no duck factor in WaterMove).
+  Sounds: Water.PlayerEnter / Exit + Player.Wade on entering / leaving, CT_Water.StepLeft steps, Land_WaterVol.StepLeft
+  landings, Player.AmbientUnderWater while your eyes are under, Physics.WaterSplash where a knife swing (its reach x 1.2)
+  or a bullet meets water (`app/water-sounds.js`). The co-op fly check leaves swimmers alone.
+- **Movers push you** (`world/push.js`): a solid entity that moves into you carries you with its motion (Source's pusher),
+  against the world and other solids; the one you stand on still carries you (player.ride).
+- **Vignette** (`world/tonemap.js`): a post volume's m_vignetteParams, drawn after the colour lookup with CS2's post_process
+  shader maths (D_VIGNETTE); how the vpost fields fill the shader's constants is inferred (UNSETTLED, see the file).
 - **Simulated ping** (0–500 ms, slider + exact number): your movement stays predicted, the map's entities (and their
   sounds) are drawn from a history that many ms behind the simulation, so you react as late as on a server at that ping.
 

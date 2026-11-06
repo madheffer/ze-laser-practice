@@ -26,6 +26,7 @@ make that from your own CS2 install. You need:
 | ze__hell_p | [3351648056](https://steamcommunity.com/sharedfiles/filedetails/?id=3351648056) |
 | ze_alien_shooter | [3425735986](https://steamcommunity.com/sharedfiles/filedetails/?id=3425735986) |
 | ze_minecraft_sakura | [3195096311](https://steamcommunity.com/sharedfiles/filedetails/?id=3195096311) |
+| ze_the_shifting_pool | [3554883009](https://steamcommunity.com/sharedfiles/filedetails/?id=3554883009) |
 
 (Each `web/public/scenarios/<map>.json` names its workshop id; that list is where `--scenarios` reads them.)
 
@@ -144,7 +145,7 @@ The Video settings' **Quality** picks the tier a map loads at (next map load). A
 |---|---|---|---|---|---|
 | high | as baked (1024 px) | full size, BC6H/BC7 blocks | cubemaps, all mips | BC6H cube | lighting 50 MB |
 | medium | 512 px, WebP q80 | 2048 px: RGBM exact, the rest WebP q90 | cubemaps <= 64 px | 512 px RGBM faces, exact | +18 MB (PNG: +54) |
-| low | 256 px, WebP q80 | 1024 px: RGBM exact, the rest WebP q90 | none | 256 px RGBM faces, exact | +7.3 MB (PNG: +19) |
+| low | 256 px, WebP q80 | 1024 px: RGBM exact, the rest WebP q90 | 32 px RGBM faces (any GPU; water always reflects them) | 256 px RGBM faces, exact | +7.3 MB (PNG: +19) |
 
 RGBM: `rgb x a x 16`, linear (the lightmaps and skies sit well under 16). Geometry (`world/`, `models/` glbs) is
 the same for every tier; the loader swaps their PNGs for `q/<tier>/tex/` ones (`assets.js` `glbLoader`), as
@@ -170,7 +171,7 @@ For a map that's already baked, each piece can be redone on its own (`lasers-bak
 | `--sky` | only skies + reflection cubemaps + csgo_moondome cubes (fake-skybox walls), merged into the existing `lighting.json`; rerun `--tiers` after |
 | `--tiers` | `q/medium` + `q/low` (after `--lighting`) |
 | `--alpha` | cut-out alpha back into the glb PNGs (tree leaves, fences). The `map` step already does it |
-| `--water` | the water shaders' textures (`water/`: waves, foam, debris, animated normal frames). The `map` step already does it; `bake-map.mjs <map> --steps water` for a map baked before |
+| `--water` | the water shaders' textures (`water/`: waves, foam, debris, animated normal frames, and `csgo_water_fancy`'s low-end cube as floats in water.json). The `map` step already does it; `bake-map.mjs <map> --steps water` for a map baked before |
 | `--fx` | particle effects (`fx/`) |
 | `--collision` | `collision_fx.bin` + layers only (the particle trace set); takes `web/public/maps`, not the map dir |
 | `--overview` | the CS2 radar (`overview/`) |

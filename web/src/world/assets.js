@@ -170,7 +170,7 @@ export async function loadMap(name, onProgress = () => {}, opts = {}) {
   return { name, version, manifest, entities, collision, collisionFx, hulls, bounds, animations, soundDurations: sounds, world, chunks, loadChunk, getModel, particles: fx, items, radar, effects, water };
 }
 
-// water.json -> { textures: { <vtex path>: url }, frames: { <vtex path>: slices } } (null without one). File names only
+// water.json -> { textures: { <vtex path>: url }, frames: { <vtex path>: slices }, cubes } (null without one). File names only
 // as the bake writes them; frame counts 1..64 (a texture array's animation frames, stacked in its PNG)
 function waterTextures(j, url) {
   const t = j?.textures;
@@ -182,7 +182,17 @@ function waterTextures(j, url) {
   for (const [vtex, n] of Object.entries(j.frames && typeof j.frames === 'object' ? j.frames : {})) {
     if (textures[vtex] && Number.isInteger(n) && n >= 1 && n <= 64) frames[vtex] = n;
   }
-  return { textures, frames };
+  // cubes: { <vtex path>: { size, faces: [6 x size x size x RGB floats] } } (WaterBake.cs: a vmat's small HDR cube) -> RGBA floats
+  const cubes = Object.create(null);
+  for (const [vtex, c] of Object.entries(j.cubes && typeof j.cubes === 'object' ? j.cubes : {})) {
+    const n = c?.size;
+    if (!Number.isInteger(n) || n < 1 || n > 16 || !Array.isArray(c.faces) || c.faces.length !== 6 * n * n * 3) continue;
+    if (!c.faces.every((v) => typeof v === 'number' && Number.isFinite(v) && v >= 0 && v < 65504)) continue;
+    const data = new Float32Array(6 * n * n * 4);
+    for (let i = 0; i < 6 * n * n; i++) { data[i * 4] = c.faces[i * 3]; data[i * 4 + 1] = c.faces[i * 3 + 1]; data[i * 4 + 2] = c.faces[i * 3 + 2]; data[i * 4 + 3] = 1; }
+    cubes[vtex] = { size: n, data };
+  }
+  return { textures, frames, cubes };
 }
 
 // (the loader adds ?v=)

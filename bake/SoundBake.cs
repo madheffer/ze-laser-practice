@@ -44,6 +44,7 @@ static class SoundBake
         "soundevents/game_sounds_player.vsndevts_c",
         "soundevents/game_sounds_footsteps.vsndevts_c",
         "soundevents/game_sounds_ui.vsndevts_c",
+        "soundevents/game_sounds_physics.vsndevts_c",
     ];
     static readonly string[] StockEvents =
     [
@@ -53,6 +54,10 @@ static class SoundBake
         "Player.DamageBody.Victim", "Player.DamageFall", "Player.BurnDamage", "Player.Death",
         // the stage countdown's 3, 2, 1: Premier map pick/ban's last-seconds tick (panorama/scripts/popups/popup_premier_pick_ban)
         "UI.Premier.CounterTimer",
+        // water (web/src/world/water-move.js): server.dll's jump-in-water swim stroke, enter / exit, the steps in water;
+        // client.dll's loop with your eyes under (m_flWaterLevel 1) and the splash a knife or bullet makes on water
+        "Player.Swim", "Player.Wade", "Water.PlayerEnter", "Water.PlayerExit", "CT_Water.StepLeft", "Land_WaterVol.StepLeft",
+        "Player.AmbientUnderWater", "Physics.WaterSplash",
     ];
 
     /// The map's events (every vsndevts_c in its packages) + the stock events its entities name (outDir's

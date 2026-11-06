@@ -22,6 +22,8 @@ import { applySelfIllum, tintSelfIllum } from './selfillum.js';
 import { uploadNow, uploadSpread, FRAME_BUDGET_MS } from './gpu-upload.js';
 import { ChunkOcclusion } from './occlusion.js';
 
+const _estP = new THREE.Vector3(), _estS = new THREE.Vector3(); // modelEstimate scratch
+
 // an entity's world transform as a particle control point: position and its forward / left / up axes
 function cpFrom(ent) {
   const m = ent.getWorld().elements;
@@ -186,6 +188,7 @@ export class Renderer {
   // not drawn. World meshes are placed once, so they are sorted here; entities move, so updateEntities checks them.
   setViewBox(box) {
     this.viewBox = box;
+    if (!box) for (const g of this.visuals.values()) this.loadPending(g, true);
     this.worldRoot.updateMatrixWorld(true);
     this.worldRoot.traverse((o) => this.fitView(o));
   }
@@ -197,6 +200,29 @@ export class Renderer {
     if (o.isInstancedMesh) { if (!o.boundingBox) o.computeBoundingBox(); local = o.boundingBox; }
     else if (!local) { o.geometry.computeBoundingBox(); local = o.geometry.boundingBox; }
     o.visible = o.userData.drawn && boxInView(this.viewBox, local, o.matrixWorld);
+  }
+
+  // An entity model's bounds in its own space (Source units) before the model is loaded: its collision hulls
+  // (hulls.json), else (no model, or no hulls: an effect, a prop) a box around its origin; padded so a mover's model is fetched a little before it comes in
+  modelEstimate(model, map) {
+    const cache = (this._estBoxes ||= new Map());
+    if (cache.has(model)) return cache.get(model);
+    const box = new THREE.Box3();
+    for (const h of (model && map.hulls?.[model]) || []) {
+      for (let i = 0; i + 2 < h.verts.length; i += 3) box.expandByPoint(_estP.set(h.verts[i], h.verts[i + 1], h.verts[i + 2]));
+    }
+    if (box.isEmpty()) box.setFromCenterAndSize(_estP.set(0, 0, 0), _estS.set(128, 128, 128));
+    box.expandByScalar(512);
+    cache.set(model, box);
+    return box;
+  }
+
+  // fetch a model or effect left out by the view box once its entity reaches into it (or at once: force)
+  loadPending(g, force = false) {
+    const f = g.userData.pendingLoad;
+    if (!f || (!force && !boxInView(this.viewBox, g.userData.estBox, g.matrix))) return;
+    g.userData.pendingLoad = null;
+    f();
   }
 
   // an entity's visual reaches into the view box: its meshes' bounds in its own space, measured again whenever a
@@ -259,7 +285,7 @@ export class Renderer {
       any = true;
       // its shaders are compiled before it is shown (off the main thread where the browser can): a first draw that
       // compiled them held the frame (deadcore: 138 ms when a stage's first effect started mid-stage)
-      this.track(map.effects.spawn(kv.effect_name, { seed: e.id }).then(async (inst) => {
+      const spawn = () => this.track(map.effects.spawn(kv.effect_name, { seed: e.id }).then(async (inst) => {
         if (!inst || !e.alive || this.visuals.get(e) !== group) return inst?.dispose();
         // a zero-length step with the state its first frame will have: its renderers and their materials exist
         inst.update(0, { cps: this.controlPoints(e, group), active: !!e.state.active, prepare: true });
@@ -272,6 +298,11 @@ export class Renderer {
         group.userData.fx = inst;
         this.fxRoot.add(inst.group);
       }));
+      // outside the stage's view box it isn't fetched until its entity comes in (loadPending): the shifting pool's
+      // waterfalls on the island
+      group.userData.estBox = this.modelEstimate(null, map);
+      if (boxInView(this.viewBox, group.userData.estBox, e.getWorld())) spawn();
+      else group.userData.pendingLoad = spawn;
     } else if (isParticleSystem(e.cls)) {
       // an older bake without fx/: the summary sprites
       const fx = map.particles?.[assetKey(kv.effect_name || '')];
@@ -319,10 +350,14 @@ export class Renderer {
       }
     } else if (!e.cls.startsWith('trigger_') && e.model) {
       if (!spawnsHidden(kv, e.engine?.renderMigrated)) { // kRenderNone as GFL runs the map (entities/render-mode.js)
-        const p = map.getModel(e.model);
-        if (p) {
+        // outside the stage's view box (world/view-box.js) the model isn't fetched until the entity moves into it
+        // (updateEntities): ze_the_shifting_pool's tube never downloads the platform stage's 250 grid pieces
+        group.userData.estBox = this.modelEstimate(e.model, map);
+        const pending = !boxInView(this.viewBox, group.userData.estBox, e.getWorld());
+        const p = pending ? null : map.getModel(e.model);
+        if (p || pending) {
           any = true;
-          this.track(p).then((scene) => {
+          const build = (p) => this.track(p).then((scene) => {
             if (!scene || !e.alive) return;
             const inst = cloneModel(scene);
             this.anims.attach(e, inst);
@@ -356,6 +391,8 @@ export class Renderer {
               this.lighting?.applyProbes(o); meshes.push(o);
             });
           });
+          if (p) build(p);
+          else group.userData.pendingLoad = () => { const q = map.getModel(e.model); if (q) build(q); };
         }
       }
     }
@@ -571,6 +608,7 @@ export class Renderer {
         g.visible = !!s && s.vis;
         if (!s) continue;
         g.matrix.copy(s.m);
+        this.loadPending(g);
         if (g.visible) g.visible = !this.fadedOut(g) && this.entityInView(g) && !this.entityOccluded(g);
         g.matrixWorldNeedsUpdate = true;
         for (const c of g.children) {
@@ -583,6 +621,7 @@ export class Renderer {
       }
       g.matrix.copy(e.getWorld());
       g.matrixWorldNeedsUpdate = true;
+      this.loadPending(g);
       const on = e.alive && e.visible;
       g.visible = on && !this.fadedOut(g) && this.entityInView(g) && !this.entityOccluded(g);
       for (const c of g.children) {
@@ -694,13 +733,13 @@ export class Renderer {
         uniforms: { tHdr: { value: this.hdr.texture }, ...this.post.uniforms, ...this.bloom.uniforms },
         vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
         fragmentShader: `// three prepends its tone-mapping functions (toneMapped material, drawn to the screen)
-// CS2's curve, then sRGB, then the map's colour lookup on the sRGB values (world/tonemap.js)
+// CS2's curve, then sRGB, then the map's colour lookup on the sRGB values, then its vignette (world/tonemap.js)
 uniform sampler2D tHdr; varying vec2 vUv;
 ${CS2_POST_GLSL}
 ${BLOOM_POST_GLSL}
 void main() {
   vec3 c = cs2Tonemap(cs2BloomPre(texture2D(tHdr, vUv).rgb, vUv, cs2Exposure)); vec4 s = sRGBTransferOETF(vec4(clamp(c, 0.0, 1.0), 1.0));
-  s.rgb = cs2ColorCorrect(cs2BloomScreen(s.rgb, vUv, cs2Exposure)); gl_FragColor = s;
+  s.rgb = cs2Vignette(cs2ColorCorrect(cs2BloomScreen(s.rgb, vUv, cs2Exposure)), vec2(vUv.x, 1.0 - vUv.y)); gl_FragColor = s;
 }`,
         depthTest: false, depthWrite: false, // (toneMapped stays true: three then feeds toneMappingExposure)
       });
