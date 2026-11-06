@@ -16,6 +16,7 @@ import { PropAnimator, cloneModel } from './anim.js';
 import { Water } from './water.js';
 import { applyUnlit } from './unlit.js';
 import { Moondome } from './moondome.js';
+import { Effects } from './effects.js';
 import { spawnsHidden } from './entities/render-mode.js';
 import { applySelfIllum, tintSelfIllum } from './selfillum.js';
 
@@ -50,6 +51,7 @@ export class Renderer {
     this.post = new PostProcess();
     this.water = new Water(this.lighting); // CS2 water surfaces (world/water.js)
     this.moondome = new Moondome(this.lighting); // csgo_moondome: fake-skybox surfaces that show a sky cube (world/moondome.js)
+    this.effects = new Effects(); // csgo_effects: unlit see-through / additive surfaces with fresnel and distance fade (world/effects.js)
 
     this.worldRoot = new THREE.Group();
     this.worldRoot.matrixAutoUpdate = false;
@@ -136,7 +138,7 @@ export class Renderer {
         // CS2 water gets its own shader in place of the flat glTF material (world/water.js)
         const w = !Array.isArray(o.material) && this.water.material(o.material, { lit: !!o.geometry?.attributes?.uv1 });
         if (w) { o.material = w; this.water.track(o); }
-        else { applyUnlit(o, this.unlitMaterials); applySelfIllum(o, this.selfIllum); this.moondome.apply(o); } // CS2's unlit / self-illum / moondome shaders (world/unlit.js, selfillum.js, moondome.js)
+        else { applyUnlit(o, this.unlitMaterials); applySelfIllum(o, this.selfIllum); this.moondome.apply(o); this.effects.apply(o); } // CS2's unlit / self-illum / moondome / effects shaders (world/unlit.js, selfillum.js, moondome.js, effects.js)
         // VRF names tool-texture meshes after their material; hide the editor-only ones
         const mats = Array.isArray(o.material) ? o.material : [o.material];
         if (mats.some((m) => /tools?(trigger|clip|nodraw|skip|invisible|playerclip|blocklight|areaportal|sky)/i.test(m?.name || ''))) o.visible = false;
@@ -273,7 +275,7 @@ export class Renderer {
             holder.matrixAutoUpdate = false;
             holder.matrix.copy(GLTF_TO_SOURCE);
             holder.add(inst);
-            inst.traverse((o) => { if (o.isMesh) { applyUnlit(o, this.unlitEntity); applySelfIllum(o, this.selfIllum); this.moondome.apply(o); } }); // before the tint: it clones
+            inst.traverse((o) => { if (o.isMesh) { applyUnlit(o, this.unlitEntity); applySelfIllum(o, this.selfIllum); this.moondome.apply(o); this.effects.apply(o); } }); // before the tint: it clones
             const rc = kv.rendercolor ? parseVec(kv.rendercolor) : null;
             if (rc && (rc[0] !== 255 || rc[1] !== 255 || rc[2] !== 255)) {
               inst.traverse((o) => {
@@ -599,6 +601,7 @@ void main() {
     if (this.hdr.width !== size.x || this.hdr.height !== size.y) this.hdr.setSize(size.x, size.y);
     // depth feathering / refraction read the frame after the opaques (scenecopy.js)
     this.water.frame(this.camera, performance.now() / 1000);
+    this.effects.frame(performance.now() / 1000);
     (this.sceneCopy ||= new SceneCopy(this.scene, () => this.water.wantsCopy || sceneCopyWanted())).frame(r, this.hdr, this.camera);
     r.setRenderTarget(this.hdr);
     r.render(this.scene, this.camera);
