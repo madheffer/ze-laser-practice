@@ -5,7 +5,7 @@ import { register } from '../registry.js';
 import { DEG, num, parseVec, angleForward } from '../math.js';
 import { approach, clamp01 } from '../../../lib/math.js';
 import './trains.js'; // registers path_track, func_tracktrain, func_tanktrain, func_train
-import { doorMoveSound, doorArriveSound, moveLinearStartSound, moveLinearStopSound } from '../sound.js';
+import { doorMoveSound, doorArriveSound, moveLinearStartSound, moveLinearStopSound, buttonSound } from '../sound.js';
 
 // Linear movers share this: position 0 = pos1, 1 = pos2, in the parent's space.
 function linearMover(e, dir, dist, startPos = 0) {
@@ -128,13 +128,14 @@ register('func_door_rotating', {
 
 // func_button: the map's item buttons (mist's Cleansing Aura is a func_button on the item's weapon). Press / Use
 // (app/items.js presses it for you on E) fires OnPressed unless locked; Lock / Unlock / PressOut as Source has them.
-// No movement or sounds: item buttons are invisible.
+// No movement: item buttons are invisible. Its sounds are sound.js buttonSound.
 register('func_button', {
   input(e, inp, p, act) {
     const s = e.state;
     switch (inp) {
       case 'press': case 'use': case 'pressin':
-        if (s.locked) { e.fireOutput('OnUseLocked', act); return true; }
+        if (s.locked) { e.fireOutput('OnUseLocked', act); buttonSound(e, true); return true; }
+        buttonSound(e, false);
         e.fireOutput('OnPressed', act); e.fireOutput('OnIn', act); return true;
       case 'pressout': e.fireOutput('OnOut', act); return true;
       case 'lock': s.locked = true; return true;

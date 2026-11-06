@@ -172,6 +172,21 @@ export function doorArriveSound(e, open) {
   startSound(e, !open && e.kv.closesound ? e.kv.closesound : e.kv.noise2, { slot: 'arrive' });
 }
 
+// ---- func_button (CS2's CBaseButton keeps m_sUseSound "use_sound" +0x900, m_sLockedSound "locked_sound" +0x908,
+// m_sUnlockedSound "unlocked_sound" +0x910: its datamap, cs2_server FUN_180cd1490). As Source's ButtonActivate
+// (buttons.cpp): a press plays use_sound, locked or not, then the lock sound for its state (PlayLockSounds: at most
+// one per BUTTON_SOUNDWAIT 0.5 s). Source-era values a port left (locked_sound "11", a sound table index) name no
+// sound event and stay silent, as in CS2. UNSETTLED: CS2's ButtonActivate itself is not decompiled.
+const BUTTON_SOUNDWAIT = 0.5;
+export function buttonSound(e, locked) {
+  startSound(e, e.kv.use_sound, { center: true, slot: 'use' });
+  const lock = locked ? e.kv.locked_sound : e.kv.unlocked_sound;
+  const now = e.engine.time;
+  if (!lock || now <= (e.state.lockSoundWait ?? -Infinity)) return;
+  e.state.lockSoundWait = now + BUTTON_SOUNDWAIT;
+  startSound(e, lock, { center: true, slot: 'lock' });
+}
+
 // ---- func_movelinear (Source CFuncMoveLinear::MoveTo / StopMoveSound, func_movelinear.cpp; CS2 keeps
 // "StartSound" / "StopSound" and CFuncMoveLinearStopMoveSound): a move plays StartSound (once: a move while it is still
 // the current sound plays nothing new), arriving stops it and plays StopSound.
