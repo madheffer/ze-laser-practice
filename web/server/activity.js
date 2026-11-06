@@ -18,7 +18,7 @@ import { isMapName } from '../src/lib/paths.js';
 
 const KEEP = 40; // rows kept and sent to a page that starts watching
 const STATS_MS = 3000; // numbers pushed at most this often, only when they changed
-const SOLO_RESULTS = new Set(['win', 'dead', 'lose']);
+const SOLO_RESULTS = new Set(['win', 'dead', 'lose', 'quit']); // quit: an endless run ended from the pause screen
 
 const round1 = (v) => Math.round(v * 10) / 10;
 
@@ -98,7 +98,7 @@ export function activityFeed({ send, findStage, stats, store, verify = null, log
           hits: Number.isInteger(m.hits) && m.hits >= 0 ? Math.min(m.hits, 9999) : null, survived: round1(time), removed: rp ? '' : 'no replay' }],
         replay: rp ? { data: rp.data, meta: rp.meta, public: share, owner: user?.steamId || null } : undefined,
       });
-      if (rp && id != null) verify?.queue(id, { map: m.map, stageId: stage.id, mode, result: endless ? 'over' : won ? 'win' : 'lose', time: round1(time), hits: Number.isInteger(m.hits) ? m.hits : null, cause: cleanText(m.cause, 40) }, rp.meta, rp.decoded);
+      if (rp && id != null) verify?.queue(id, { map: m.map, stageId: stage.id, mode, result: endless ? 'over' : won ? 'win' : 'lose', quit: m.result === 'quit', time: round1(time), hits: Number.isInteger(m.hits) ? m.hits : null, cause: cleanText(m.cause, 40) }, rp.meta, rp.decoded);
       return { id, replay: rp && id != null ? id : null };
     },
 

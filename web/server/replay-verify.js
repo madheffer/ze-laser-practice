@@ -3,8 +3,8 @@
 // replay's seed and rules. What it can prove depends on the stage:
 //   - no boss on the stage: the server's copy is the client's simulation, tick for tick (team fire and your shots
 //     only ever hit bosses). A run is VERIFIED when the copy reaches the same end (win / lose / death) at the same
-//     time with the same hits; it is REMOVED from the rankings on evidence: a movement cheat (noclip, speed, fly,
-//     spawn, teleport), a death the copy saw well before the end the page reported, or more hits than reported.
+//     time with the same hits (an endless run ended from the pause screen: alive at the replay's end, at its
+//     time); it is REMOVED from the rankings on evidence: a movement cheat (noclip, speed, fly, spawn, teleport), a death the copy saw well before the end the page reported, or more hits than reported.
 //   - a boss on the stage: the boss's health depends on the team's fire, which the server does not simulate
 //     (ROADMAP "Team fire on the server"), so the copy can drift from the real run: it stays unverified, never removed.
 // Anything the copy can't judge (a fall death: the copy has no fall damage) stays unverified too. Verdicts go to the
@@ -40,7 +40,7 @@ export function replayVerifier({ loadMap, findStage, store, log = () => {} }) {
     }
   }
 
-  // run: { map, stageId, mode, result: 'win' | 'lose' | 'over', time, hits, cause }; meta: cleanMeta's; data: decodeReplay's
+  // run: { map, stageId, mode, result: 'win' | 'lose' | 'over', quit (ended from the pause screen), time, hits, cause }; meta: cleanMeta's; data: decodeReplay's
   async function check({ run, meta, data }) {
     const stage = await findStage(run.map, run.stageId);
     if (!stage?.full) return { reason: 'no stage' };
@@ -80,6 +80,12 @@ export function replayVerifier({ loadMap, findStage, store, log = () => {} }) {
     if (outcome) {
       const same = (outcome.r === 'win') === (run.result === 'win') && Math.abs(outcome.t - run.time) <= TIME_SLACK && pc.hits === run.hits;
       return same ? { verified: true } : { reason: 'outcome mismatch' };
+    }
+    // ended from the pause screen: the copy lived to the end of the replay, at the page's time; a time past what
+    // the replay lived is a lie, like a death well before the reported end
+    if (run.quit) {
+      if (run.time > pc.stageTime + DEATH_SLACK) return { removed: 'replay: ended earlier than reported' };
+      return Math.abs(pc.stageTime - run.time) <= TIME_SLACK && pc.hits === run.hits ? { verified: true } : { reason: 'quit mismatch' };
     }
     return { reason: 'no end in the replay' }; // a fall death, an endless run ended by a fall, ...
   }

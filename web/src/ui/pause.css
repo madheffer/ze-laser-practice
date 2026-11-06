@@ -25,6 +25,18 @@
 .pz-actions button { justify-content: space-between; width: 100%; }
 .pause .pz-resume { min-height: 50px; font-size: 17px; }
 .pause .pz-danger { color: #ff9b9b; }
+/* Resume (green: go back in) | End run (red: stop), equal halves; Resume alone takes the row */
+.pz-top { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 8px; margin-bottom: 4px; }
+.pz-top button { justify-content: center; }
+#pause .primary.pz-go { background: linear-gradient(180deg, #45e08f, #2cc070); border-color: #6ef0aa; color: #05230f; }
+#pause .primary.pz-stop { background: rgba(255, 77, 77, 0.1); border-color: rgba(255, 77, 77, 0.55); color: #ff9b9b; }
+#pause .primary.pz-stop:hover { background: rgba(255, 77, 77, 0.2); color: #ffc2c2; filter: none; }
+/* the "are you sure" in place of the actions */
+.pz-confirm { padding: 18px; border-radius: 12px; border: 1px solid rgba(255, 77, 77, 0.4); background: rgba(255, 77, 77, 0.06); }
+.pz-confirm-q { margin: 0; font-size: 18px; font-weight: 700; }
+.pz-confirm-sub { margin: 4px 0 0; font-size: 14px; color: var(--dim); }
+.pz-confirm-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 16px; }
+.pz-confirm-row button { justify-content: center; min-height: 46px; }
 
 .pz-room { padding: 22px; border-left: 1px solid var(--line); background: linear-gradient(170deg, #1a1416, #121922 55%); display: flex; flex-direction: column; gap: 10px; min-width: 0; }
 .pz-label { font: 600 11px 'Segoe UI', sans-serif; letter-spacing: 0.16em; text-transform: uppercase; color: var(--dim); }

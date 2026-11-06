@@ -47,7 +47,7 @@ export function hasPendingRun() {
   try { return !!sessionStorage.getItem(PENDING); } catch { return false; }
 }
 
-// run: { map, stage, mode, result: 'win' | 'dead' | 'lose', time, hits, cause, name, god }; replay: { meta, bytes } or null
+// run: { map, stage, mode, result: 'win' | 'dead' | 'lose' | 'quit', time, hits, cause, name, god }; replay: { meta, bytes } or null
 // -> the server's { id, replay } (replay: the id to watch it by), { pending: true } for a guest, or null
 export async function reportSolo({ god, ...run }, replay) {
   if (god || !run.stage || run.stage === 'free') return null;

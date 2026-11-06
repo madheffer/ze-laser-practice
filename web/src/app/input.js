@@ -248,6 +248,7 @@ export function installInput(canvas, actions) {
         if (document.pointerLockElement) document.exitPointerLock?.();
         if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
         actions.pause();
+      } else if (G.pauseScreen?.dismiss()) { /* closed the pause screen's "are you sure" */
       } else if (S.run && !S.run.done && !ev.repeat) actions.resume();
       return;
     }

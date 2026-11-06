@@ -220,7 +220,8 @@ export function healPlayer(amount) {
 // What killed you, in words (world/run-engine.js hazardName, with this stage's own names for its hazards).
 export const hazardName = (source) => hazardText(source, S.scenario);
 
-// End of an attempt: pause behind a card, record the run.
+// End of an attempt: pause behind a card, record the run. result: 'win' | 'dead' | 'lose' | 'quit' (End run on the
+// pause screen, an endless run only: kept like a death at that time)
 export function finish(result) {
   const run = S.run;
   if (!run || run.done) return;
@@ -275,7 +276,7 @@ export function finish(result) {
   if (run.endless) {
     G.overlay.show({
       kind: 'endless', kicker: `${scenario.name} · endless`, title: 'RUN OVER',
-      subtitle: result === 'dead' ? `Killed by ${hazardName(run.killedBy)}` : 'Stage failed',
+      subtitle: result === 'dead' ? `Killed by ${hazardName(run.killedBy)}` : result === 'quit' ? 'You ended the run' : 'Stage failed',
       record: rec?.improved.time ? 'New personal best' : '', stats, buttons: [retry, ...save, ...watch, menu],
     }); G.menu.update();
     return;

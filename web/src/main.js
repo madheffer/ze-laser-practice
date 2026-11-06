@@ -388,6 +388,7 @@ G.pauseScreen = new PauseScreen($('#pause'), {
   net,
   on: {
     resume: () => G.resume(),
+    endRun: () => finish('quit'),
     restart: () => restartRun(),
     stages: () => { G.menu.show(S.map ? 'stages' : 'maps'); G.menu.update(); },
     settings: () => { G.menu.selectTab($('#tab-settings')); G.menu.update(); },

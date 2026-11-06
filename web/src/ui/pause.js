@@ -1,6 +1,6 @@
 // The pause screen: what Esc opens during a run (the full menu, ui/menu.js, is one click away for stages and settings).
-//   left   where you are (map, stage, clock, hits, HP) and the actions: Resume, Restart, Change stage / End round,
-//          Settings, Leave room / Home
+//   left   where you are (map, stage, clock, hits, HP) and the actions: Resume (| End run, endless), Restart,
+//          Change stage / End round, Settings, Leave room / Home; the ones that end something ask first, in the card
 //   right  in a room: the room code, big, with Copy code / Copy invite link, and the players (alive, dead, host)
 // Names come from the server: textContent only.
 import './pause.css';
@@ -19,7 +19,7 @@ function btn(label, cls, onClick, kbd) {
 }
 
 export class PauseScreen {
-  // net: CoopClient; on: { resume(), restart(), stages(), settings(), home(), endRound() }
+  // net: CoopClient; on: { resume(), endRun(), restart(), stages(), settings(), home(), endRound() }
   constructor(root, { net, on }) {
     this.root = root;
     this.net = net;
@@ -44,16 +44,37 @@ export class PauseScreen {
     this.live = el('p', 'pz-live', 'The round keeps going while this is open');
     this.stage = el('p', 'pz-stage');
     this.stats = el('dl', 'pz-stats');
-    const acts = el('div', 'pz-actions');
-    this.resumeBtn = btn('Resume', 'primary pz-resume', () => this.on.resume(), 'Esc');
+    const acts = this.acts = el('div', 'pz-actions');
+    this.resumeBtn = btn('Resume', 'primary pz-go pz-resume', () => this.on.resume(), 'Esc');
+    // an endless run has no end but a death: this ends it here, its time kept like a death's (app/session.js finish)
+    this.endRunBtn = btn('End run', 'primary pz-stop pz-resume', () => this.ask({
+      q: () => `End the run at ${formatTime(stageTime())}?`,
+      sub: 'Your time is saved.', yes: 'End run', run: () => this.on.endRun(),
+    }));
+    const top = el('div', 'pz-top');
+    top.append(this.resumeBtn, this.endRunBtn);
     this.restartBtn = btn('Restart', 'ghost', () => this.on.restart(), 'Backspace');
     this.stagesBtn = btn('Change stage', 'ghost', () => this.on.stages());
-    this.endBtn = btn('End round', 'ghost pz-danger', () => { if (confirm('End the round for everyone and go back to the room?')) this.on.endRound(); });
+    this.endBtn = btn('End round', 'ghost pz-danger', () => this.ask({
+      q: () => 'End the round for everyone?', sub: 'Everyone goes back to the room.', yes: 'End round', run: () => this.on.endRound(),
+    }));
     const settingsBtn = btn('Settings', 'ghost', () => this.on.settings());
-    this.leaveBtn = btn('Leave room', 'ghost pz-danger', () => { if (confirm('Leave the room?')) this.net.leave(); });
+    this.leaveBtn = btn('Leave room', 'ghost pz-danger', () => this.ask({ q: () => 'Leave the room?', yes: 'Leave', run: () => this.net.leave() }));
     this.homeBtn = btn('Home', 'ghost', () => this.on.home());
-    acts.append(this.resumeBtn, this.restartBtn, this.stagesBtn, this.endBtn, settingsBtn, this.leaveBtn, this.homeBtn);
-    main.append(this.kicker, title, this.live, this.stage, this.stats, acts);
+    acts.append(top, this.restartBtn, this.stagesBtn, this.endBtn, settingsBtn, this.leaveBtn, this.homeBtn);
+
+    // "are you sure": takes the actions' place in the card (Esc or No goes back)
+    this.confirm = el('div', 'pz-confirm');
+    this.confirm.hidden = true;
+    this.confirm.setAttribute('role', 'alertdialog');
+    this.confirmQ = el('p', 'pz-confirm-q');
+    this.confirmSub = el('p', 'pz-confirm-sub');
+    const row = el('div', 'pz-confirm-row');
+    this.noBtn = btn('No, go back', 'ghost', () => this.dismiss());
+    this.yesBtn = btn('Yes', 'primary pz-yes', () => { const run = this.asking?.run; this.dismiss(); run?.(); });
+    row.append(this.noBtn, this.yesBtn);
+    this.confirm.append(this.confirmQ, this.confirmSub, row);
+    main.append(this.kicker, title, this.live, this.stage, this.stats, acts, this.confirm);
 
     this.roomCard = el('aside', 'pz-room');
     this.roomCard.append(el('span', 'pz-label', 'Room code'));
@@ -71,10 +92,33 @@ export class PauseScreen {
 
   get open() { return !this.root.hidden; }
 
+  // { q(): the question, sub: a line under it, yes: the confirm button's label, run() }
+  ask(a) {
+    this.asking = a;
+    this.yesBtn.textContent = `Yes, ${a.yes.toLowerCase()}`;
+    this.confirmSub.textContent = a.sub || '';
+    this.confirmSub.hidden = !a.sub;
+    this.acts.hidden = true;
+    this.confirm.hidden = false;
+    this.render();
+    this.noBtn.focus({ preventScroll: true });
+  }
+
+  // close the "are you sure" (Esc, app/input.js): true if one was up
+  dismiss() {
+    if (!this.asking) return false;
+    this.asking = null;
+    this.confirm.hidden = true;
+    this.acts.hidden = false;
+    if (this.open) this.resumeBtn.focus({ preventScroll: true });
+    return true;
+  }
+
   show(on) {
     if (on === this.open) { if (on) this.render(); return; }
     this.root.hidden = !on;
     clearInterval(this.timer);
+    this.dismiss();
     if (on) {
       this.render();
       this.timer = setInterval(() => this.render(), 500);
@@ -98,6 +142,9 @@ export class PauseScreen {
     if (run && !run.spectating) cells.push(['HP', String(Math.max(0, Math.round(run.hp)))]);
     if (mp) cells.push(['Alive', `${mp.alive.length}/${mp.players.size}`]);
     this.stats.replaceChildren(...cells.map(([k, v]) => { const d = el('div'); d.append(el('dt', null, k), el('dd', null, v)); return d; }));
+    // solo endless only (a round's end is the server's), once the clock runs
+    this.endRunBtn.hidden = !(run?.endless && run.started && !run.done && !mp && !S.replay);
+    if (this.asking) this.confirmQ.textContent = this.asking.q();
 
     const host = net.isHost;
     const inRoom = !!room;
