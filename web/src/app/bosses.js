@@ -166,7 +166,7 @@ export function shootAs(shot, yaw, pitch) {
         const n = Math.max(1, Math.round(100 / Math.max(1, rule('bossHp'))));
         let landed = false;
         for (let k = 0; k < n; k++) landed = hitBoss(e, shot.damage || DAMAGE_PER_HIT) || landed;
-        if (landed) { run.myHits++; run.myDamage += shot.damage || DAMAGE_PER_HIT; G.hitmark(); }
+        if (landed) { run.myHits++; run.myDamage += shot.damage || DAMAGE_PER_HIT; G.bossHitmark(); }
       }
       if (shot.kind !== 'bullet') G.audio.play('knife.hit', { pos: player.origin });
       return;

@@ -72,6 +72,12 @@ public static class Program
             PanoramaBake.Run(pCs2, Path.GetFullPath(args[1]));
             return 0;
         }
+        if (args.Length >= 3 && args[0] == "--gfl")
+        {
+            // lasers-bake --gfl <GFL content .vpk> <web/public/gfl> [--cs2 <game/csgo>]: GFL's boss hitmarker particle (GflBake.cs)
+            var gi = Array.IndexOf(args, "--cs2");
+            return GflBake.Run(Path.GetFullPath(args[1]), Path.GetFullPath(args[2]), gi > 0 && gi + 1 < args.Length ? args[gi + 1] : FindCs2());
+        }
         if (args.Length >= 3 && args[0] == "--collision")
         {
             // lasers-bake --collision <workshop.vpk> <web/public/maps>: only collision_fx.bin + collision_fx_layers.bin

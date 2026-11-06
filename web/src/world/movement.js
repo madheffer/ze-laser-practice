@@ -31,10 +31,17 @@ export const CS = {
   halfWidth: 16,
   viewStand: 64,
   viewDuck: 46,
-  // seconds to go fully ducked (view height + hull swap at the end). A FIXED rate on purpose, with no duck-spam
-  // slowdown: CS2Fixes `cs2f_allow_duck_spam` (upstream src/detours.cpp) pins m_flDuckSpeed at 8.0 every
-  // movement tick on ZE servers, so repeated ducks never get slower. 1 / 8 = 0.125 s. Don't "fix" this.
-  duckTime: 0.125,
+  // seconds to go fully ducked (view height + hull swap at the end) and back up. FIXED rates on purpose, with no
+  // duck-spam slowdown: CS2Fixes `cs2f_allow_duck_spam` (upstream src/detours.cpp) pins m_flDuckSpeed at 8.0 every
+  // movement tick on ZE servers, so repeated ducks never get slower. CS2's duck handler (cs2_server FUN_180abb500)
+  // then ducks at m_flDuckSpeed x 0.8 per second (1 / 6.4 = 0.15625 s, 10 ticks) and unducks at
+  // max(m_flDuckSpeed, 1.5) (1 / 8 = 0.125 s, 8 ticks)
+  duckInTime: 0.15625,
+  unduckTime: 0.125,
+  // sv_timebetweenducks (cs2_server registration FUN_1800cae10: 0.4, "Minimum time before recognizing consecutive duck
+  // key"): the duck key starts a new duck only this long after the last finished duck (FinishDuck's m_flLastDuckTime),
+  // unless you are still FL_DUCKING (cleared once an unduck is down to duck amount 0.75). Duck handler FUN_180abb500
+  timeBetweenDucks: 0.4,
   groundNormalZ: 0.7,
   // stamina (sv_staminamax / sv_staminajumpcost / sv_staminalandcost / sv_staminarecoveryrate): jumping
   // and landing build stamina, and while it's above 0 your ground speed is scaled down each tick by
@@ -70,6 +77,8 @@ export class Player {
     this.groundEntity = null;
     this.ducked = false; // hull is the short one
     this.duckAmount = 0; // 0..1, view height blend
+    this.duckFlag = false; // FL_DUCKING
+    this.lastDuckTime = -Infinity; // m_flLastDuckTime: when the last duck finished (sv_timebetweenducks)
     this.jumpHeld = false;
     this.tr = makeTrace();
     this.baseVelocity = v3(); // trigger_push etc. add here for one tick
@@ -114,6 +123,8 @@ export class Player {
     this.pitch = 0;
     this.ducked = false;
     this.duckAmount = 0;
+    this.duckFlag = false;
+    this.lastDuckTime = -Infinity;
     this.onGround = false;
     this.categorize();
   }
@@ -218,8 +229,12 @@ export class Player {
   }
 
   handleDuck(input, dt) {
-    if (input.duck) {
-      this.duckAmount = Math.min(1, this.duckAmount + dt / CS.duckTime);
+    const now = this.ticks * CS.tick;
+    if (input.duck && (this.duckFlag || this.lastDuckTime + CS.timeBetweenDucks <= now)) {
+      // Approach(1, amount, step) as the binary does: 1 once the gap is no more than a step. The binary's floats are 32 bit
+      // (nine 0.1f steps leave a gap under 0.1f, so the 10th tick lands on 1); doubles leave 0.1000..09: hence the 1e-6
+      const step = dt / CS.duckInTime;
+      this.duckAmount = 1 - this.duckAmount <= step + 1e-6 ? 1 : this.duckAmount + step;
       if (!this.ducked && (this.duckAmount >= 1 || !this.onGround)) {
         if (!this.onGround) {
           // In the air the hull shrinks about its middle: CS2's FinishDuck (cs2_server FUN_180abde20) moves the
@@ -233,6 +248,8 @@ export class Player {
         } else {
           this.ducked = true;
         }
+        // FinishDuck: FL_DUCKING on, m_flLastDuckTime = now
+        if (this.ducked) { this.duckFlag = true; this.lastDuckTime = now; }
       }
     } else if (this.ducked || this.duckAmount > 0) {
       if (this.ducked) {
@@ -252,8 +269,11 @@ export class Player {
         } else this.origin = target;
         this.duckAmount = this.onGround ? Math.min(this.duckAmount, 1) : 0;
       }
-      this.duckAmount = Math.max(0, this.duckAmount - dt / CS.duckTime);
-    }
+      const step = dt / CS.unduckTime;
+      this.duckAmount = this.duckAmount <= step + 1e-6 ? 0 : this.duckAmount - step;
+      // the unduck clears FL_DUCKING once it is down to 0.75 (FUN_180abb500), and FinishUnDuck at 0
+      if (this.duckAmount <= 0.75) this.duckFlag = false;
+    } else this.duckFlag = false;
   }
 
   friction(dt) {

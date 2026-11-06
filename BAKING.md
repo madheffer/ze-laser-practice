@@ -36,6 +36,7 @@ node tools/steam.mjs                        # where it found CS2 and the worksho
 node tools/bake-map.mjs --scenarios         # bake every map that has stages (100-300 MB each, a few minutes each)
 ./bake/bin/Release/net10.0/lasers-bake --stock-sounds web/public/sounds    # knife / guns / player sounds
 ./bake/bin/Release/net10.0/lasers-bake --panorama web/public/panorama      # CS2's HUD icons, fonts, chat / kill feed
+./bake/bin/Release/net10.0/lasers-bake --gfl <workshop>/3793587501/3793587501.vpk web/public/gfl  # GFL's boss hitmarker
 ./bake/bin/Release/net10.0/lasers-bake --player web/public/player          # your third-person body
 npm --prefix web run dev                    # http://localhost:5804
 ```
@@ -128,6 +129,7 @@ Shared assets, once per checkout (not per map):
 # per map, sounds only (soundevents.json + sounds/, the stock events its entities name included; manifest version bumped):
 # ./bake/bin/Release/net10.0/lasers-bake.exe --sounds <workshop.vpk> web/public/maps/<map>
 ./bake/bin/Release/net10.0/lasers-bake.exe --panorama web/public/panorama     # HUD icons, fonts, Panorama reference
+./bake/bin/Release/net10.0/lasers-bake.exe --gfl <workshop>/3793587501/3793587501.vpk web/public/gfl  # GFL's boss hitmarker (their content pack)
 ./bake/bin/Release/net10.0/lasers-bake.exe --player web/public/player         # your third-person body
 ```
 

@@ -50,6 +50,7 @@ import { installReplays, bootReplays, replayKey, hasReplayLink } from './app/rep
 import { Peers } from './world/peers.js';
 import { usableHeals } from './world/items.js';
 import { applyGamma } from './ui/gamma.js';
+import { ScreenEffects } from './fx/screen-effects.js';
 import { loadLightmaps } from './world/lightmaps.js';
 import { WorldStream } from './world/stream.js';
 
@@ -151,6 +152,10 @@ const pulse = (sel, ms) => {
   };
 };
 G.hitmark = pulse('#hitmarker', 120);
+// a shot that lands on a boss: GFL's boss hitmarker particle (fx/screen-effects.js, lasers-bake --gfl), or the plain
+// marker when it isn't baked
+G.screenFx = new ScreenEffects('gfl/');
+G.bossHitmark = () => G.screenFx.spawn('particles/gfl/hitmarker_boss.vpcf') || G.hitmark();
 G.flash = pulse('#flash', 250);
 
 G.renderer.setFov(FOV); // CS2's fixed 90

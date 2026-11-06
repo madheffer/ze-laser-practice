@@ -605,6 +605,11 @@ bake/                Program.cs (map bake), PanoramaBake.cs, SoundBake (stock + 
 Panorama assets: `lasers-bake --panorama web/public/panorama` exports the HUD's SVG icons, its vxml/vcss (reference)
 and the Stratum2 fonts (from `stratum2.uifont`) — Valve content, gitignored.
 
+GFL's boss hitmarker: `lasers-bake --gfl <GFL's content .vpk> web/public/gfl` bakes their `particles/gfl/hitmarker_boss.vpcf`
+(workshop 3793587501, the pack GFL's servers send) as a map's effects are baked (`gfl/fx/`, gitignored). A shot that lands
+on a boss plays it on the particle runtime as a screen-space effect, over everything (fx/screen-effects.js); without the
+bake, the plain marker.
+
 `window.__lasers` is a debug handle. `__lasers.advance(seconds)` steps the simulation synchronously (a replay too:
 set `__lasers.replay.paused = true` first), `__lasers.watchLastRun()` / `watchReplay(id)` play a replay, and
 `window.__lasersInput = (t) => input` drives the player, for automated checks. A hidden tab gets no

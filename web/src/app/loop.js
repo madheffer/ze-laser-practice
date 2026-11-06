@@ -171,6 +171,8 @@ export function frame(now) {
     G.vm.setParticleLights(G.renderer.lighting?.barnUniforms, G.renderer.camera, (G.renderer.post?.uniforms?.cs2Exposure?.value ?? 1) * 2.8);
     G.vm.render(G.renderer.camera.aspect);
   }
+  G.screenFx?.frame(G.renderer.renderer, realDt); // screen-space particles (GFL's boss hitmarker) over everything
+
   if (now - listenerAt >= LISTENER_MS) {
     listenerAt = now;
     if (rv) G.audio.setListener(rv.pos, rv.yaw, rv.pitch);
